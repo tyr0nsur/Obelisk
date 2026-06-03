@@ -2066,6 +2066,42 @@ priorities, and do not use history files as the active source of truth.
   needed for that scope, and omit leader-only cadence, active-goal framing,
   community policy, and unrelated module history unless it changes the concrete task.
   Treat sub-agents as scope experts, not generic workers.
+- 2026-06-04 standby cleanup: lead explicitly closed prior known agent IDs
+  `019e8f9a-3bf8-73f3-a370-b8bf49f51d50`, `019e8f9a-6755-7a31-a573-cdae3ae34127`,
+  `019e8f9a-8eef-7900-9dd7-37d17ffbf66b`, `019e8f9a-ba29-74b0-9c4f-4fdd8a6d2d24`,
+  `019e8f9a-e1c4-73e3-afce-d8066ea65e02`, and
+  `019e8f9b-12a6-7520-9d6f-62731490b631`; all six returned `not found`, so no reachable
+  old standby agent remains in this tool context.
+- 2026-06-04 operator approval update: user explicitly approved `arkserver2` on
+  `TheIsland` as the debug/development target for necessary ObeliskSDK runtime work and
+  launch acceleration, including the player-principal lifecycle evidence window needed to
+  clear `approved_runtime_evidence_missing`. This supersedes the earlier no-server-target
+  assumption for that target only. Before each server-backed run, write the exact
+  marker/env changes, start/restart/stop window, rollback plan, evidence paths, and
+  expected final stable posture; approval does not by itself permit broad unbounded
+  ProcessEvent tracing, raw player text/gameplay payload logging, ReflectionScanner,
+  native-exec probes, ptrace/gcore, Frida/rr, Discord, publication, or SDK readiness
+  claims.
+- 2026-06-04 fast-path integration: six agents were spawned and then closed. Integrated
+  hardening covers approved-runtime evidence/bundle contradictions, route-gate accepted
+  runtime/public-contract aliases, downstream P0 accounting locks, PluginManager config
+  and plugin directory `.`/`..` plus symlink-component rejection, offline artifact
+  target-set/provenance overclaims, side-lane public/runtime/v1/support-tier aliases, and
+  SDK secondary text claims for public package, Plugin Hub, and runtime delivery. Validation
+  passed: approved-evidence/bundle 139, route/bound-route 72, P0 downstream 163,
+  side-lanes 95, offline artifact 414, SDK completion 250, plugin/event guardrails 45,
+  runtime CTest PluginManager/EventManager/Logger 3/3, full CMake build, `py_compile`,
+  and `git diff --check`. Route/SDK remain blocked at `approved_runtime_evidence_missing`,
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`.
+- 2026-06-04 runtime fast-path audit: read-only preflight for `arkserver2` / `TheIsland`
+  found no running ShooterGameServer process and LinuxGSM wrapper drift versus
+  `packaging/linuxgsm/ObeliskRun.sh`; `scripts/install_obelisk.sh --build-dir build
+  --dry-run /servidor/ark/obelisk` produced the expected staged install plan. Next
+  operation should commit the checkpoint, install rebuilt runtime/SDK with backup, refresh
+  wrapper, prepare a fresh player-principal lifecycle request pack, run the bounded
+  observer window, copy `Obelisk.log`, rollback to stable posture, and build the approved
+  runtime evidence bundle. See
+  `docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md`.
 
 ## Canonical References
 

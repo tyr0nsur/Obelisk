@@ -147,12 +147,36 @@ MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "runtime hook ready": "runtime_hooks",
     "runtime hooks enabled": "runtime_hooks",
     "runtime hooks ready": "runtime_hooks",
+    "runtime support active": "runtime_ready",
+    "runtime support enabled": "runtime_ready",
+    "runtime support ready": "runtime_ready",
+    "runtime support supported": "runtime_ready",
+    "umbrella leaf promoted": "umbrella_leaf_promotion",
+    "umbrella leaf promotion": "umbrella_leaf_promotion",
     "v1 complete": "v1_completion",
     "v1 completion": "v1_completion",
     "v1 done": "v1_completion",
     "v1 ready": "v1_completion",
+    "v1 support active": "v1_completion",
+    "v1 support enabled": "v1_completion",
+    "v1 support ready": "v1_completion",
+    "v1 support supported": "v1_completion",
     "version 1 complete": "v1_completion",
 }
+FORBIDDEN_SUPPORT_STATUS_KEYS = {
+    "public_sdk_support",
+    "runtime_support",
+    "runtime_v1_support",
+    "stable_sdk_support",
+    "support_tier",
+    "support_tier_status",
+    "v1_sdk_support",
+    "v1_support",
+}
+AFFIRMATIVE_SUPPORT_STATUS_RE = re.compile(
+    r"\b(?:active|available|enabled|promoted|published|ready|release[-_\s]+supported|stable|supported)\b",
+    re.IGNORECASE,
+)
 PUBLIC_MISSION_C_API_RE = re.compile(
     r"\b(?:(?:Register|Unregister)Mission[A-Za-z0-9_]*|"
     r"OBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*|"
@@ -169,6 +193,17 @@ PLUGIN_MANAGER_MISSION_WIRING_RE = re.compile(
 PUBLIC_MISSION_DOC_RE = re.compile(
     r"\bmission\b|\bMission[A-Za-z0-9_]*\b|\bOBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*\b"
 )
+NEGATIVE_MISSION_DOC_KEYS = {
+    "blocked",
+    "blocked_public_contract",
+    "explicitly_excluded",
+    "exclusions",
+    "guardrails",
+    "non_claim",
+    "non_claims",
+    "not_promoted",
+    "not_promoted_surfaces",
+}
 RUNTIME_SHARED_CMAKE_TARGETS = {
     "obelisk",
     "obelisk_runtime",
@@ -525,6 +560,9 @@ def collect_json_mission_doc_matches(value: Any, path: str = "$") -> list[dict[s
     if isinstance(value, dict):
         for key, child in value.items():
             child_path = f"{path}.{key}"
+            key_normalized = normalize_claim_key(key)
+            if key_normalized in NEGATIVE_MISSION_DOC_KEYS or key_normalized.startswith("not_promoted"):
+                continue
             if isinstance(key, str) and PUBLIC_MISSION_DOC_RE.search(key):
                 matches.append({"path": child_path, "value": key})
             matches.extend(collect_json_mission_doc_matches(child, child_path))
@@ -869,6 +907,11 @@ def collect_allowed_prefix_affirmative_overclaims(policy: dict[str, Any]) -> lis
     return overclaims
 
 
+def normalize_claim_key(value: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
+
+
 def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     gate_blockers = offline_gate.validate_mission_copied_bool_policy_slice_manifest(
         policy,
@@ -907,6 +950,9 @@ def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dic
     for trail, raw_value in offline_gate.collect_string_fields(policy):
         if any(trail.startswith(prefix) for prefix in ALLOWED_OVERCLAIM_TEXT_PREFIXES):
             continue
+        key = normalize_claim_key(trail.rsplit(".", 1)[-1])
+        if key in FORBIDDEN_SUPPORT_STATUS_KEYS and AFFIRMATIVE_SUPPORT_STATUS_RE.search(raw_value):
+            append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=key)
         text = raw_value.casefold()
         for needle, reason in MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES.items():
             if needle in text:

@@ -1845,6 +1845,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("promote_blocked_until_identity_public_contract_gate", report["blockers"])
+        self.assertEqual(report["remaining_blockers"], [])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertFalse(report["promotion_ready"])
         self.assertTrue(report["runtime_evidence_ready"])
@@ -1862,6 +1863,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertIn(blocker, report["blockers"])
                 self.assertTrue(report["approved_runtime_evidence_present"])
                 self.assertTrue(report["runtime_evidence_ready"])
+                self.assertEqual(report["remaining_blockers"], [])
                 self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
                 self.assertFalse(report["promotion_ready"])
                 self.assertFalse(report["public_sdk_ready"])

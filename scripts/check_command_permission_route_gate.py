@@ -114,6 +114,40 @@ ALLOWED_IDENTITY_LOCK_BLOCKERS = {
     },
 }
 FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
+    "accepted_runtime_evidence_ready",
+    "admin_authority_ready",
+    "approved_runtime_evidence_ready",
+    "approved_runtime_principal_lifecycle_evidence_ready",
+    "contract_reviewed",
+    "identity_contract_ready",
+    "identity_contract_reviewed",
+    "identity_public_contract_allowed",
+    "identity_public_contract_gate_ready",
+    "identity_public_contract_gate_reviewed",
+    "identity_public_contract_gate_unlocked",
+    "identity_public_contract_ready",
+    "identity_public_contract_reviewed",
+    "identity_ready",
+    "player_identity_public_contract_ready",
+    "principal_ready",
+    "public_contract_allowed",
+    "public_contract_gate_ready",
+    "public_contract_gate_reviewed",
+    "public_contract_gate_unlocked",
+    "public_contract_ready",
+    "public_contract_reviewed",
+    "public_readiness_ready",
+    "release_readiness_ready",
+    "stable_sdk_claim_allowed",
+    "stable_sdk_ready",
+    "v1_0_stable_ready",
+    "v1_ready",
+    "v1_release_ready",
+    "v1_sdk_ready",
+    "v1_sdk_support_ready",
+    "v1_stable_ready",
+    "v1_support_ready",
+    "v1_supported",
     "promotion_ready",
     "public_sdk_ready",
     "public_sdk",
@@ -143,7 +177,6 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "route_gate_non_counting_override",
     "public_header_allowed",
     "public_header_ready",
-    "public_readiness_ready",
     "public_route_ready",
     "public_bridge_abi_allowed",
     "public_command_router_allowed",
@@ -161,8 +194,11 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "send_chat_api_allowed",
     "permissions_admin_ready",
     "permissions_admin_route_ready",
+    "permissions_query_ready",
+    "permissions_unlocked",
     "permissions_ready",
     "permission_ready",
+    "permission_header_allowed",
     "command_router_allowed",
     "runtime_delivery_allowed",
     "runtime_readiness_allowed",
@@ -190,7 +226,12 @@ BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE = re.compile(
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
     r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
-    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:identity_)?public_contract(?:_gate)?_(?:ready|reviewed|allowed|supported|enabled|public|unlocked)|"
+    r"(?:identity_)?contract_(?:ready|reviewed)|"
+    r"(?:accepted|approved)_runtime(?:_principal_lifecycle)?_evidence_(?:ready|accepted|approved|available|supported)|"
+    r"v1(?:_0)?(?:_(?:sdk|api|public|release|stable|completion|support))*_"
+    r"(?:ready|supported|allowed|enabled|public|complete|stable)"
     r")$"
 )
 SPLIT_CLAIM_NAME_KEYS = {
@@ -264,26 +305,55 @@ FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE = re.compile(
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"\b(?:"
+    r"(?:accepted|approved)[_ -]?runtime(?:[_ -]?principal[_ -]?lifecycle)?[_ -]?evidence|"
+    r"admin[_ -]?authority|"
+    r"(?:identity[_ -]?(?:public[_ -]?)?|player[_ -]?identity[_ -]?public[_ -]?|public[_ -]?)"
+    r"contract(?:[_ -]?gate)?|"
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
+    r"permission[_ -]?headers?|permissions?[_ -]?quer(?:y|ies)|principal|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
     r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"
-    r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim|"
+    r"public[_ -]?(?:api|sdk|header)|v1(?:\.0)?(?:[_ -]?(?:sdk|api|support|completion|stable|release))?|"
+    r"release[_ -]?readiness|stable[_ -]?claim|"
     r"public[_ -]?route|route[_ -]?readiness|route|"
     r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
-    r")\b(?:\s+(?:is|are))?\s+"
-    r"\b(?:authorized|granted|public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
+    r")\b(?:\s+(?:is|are|now|becomes?|became))*\s+"
+    r"\b(?:accepted|authorized|available|established|granted|opened|promoted|public(?:\s+and\s+ready)?|"
+    r"ready|readiness|reviewed|live|enabled|allowed|operational|supported|unlocked)\b",
     re.IGNORECASE,
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED = re.compile(
-    r"\b(?:public[_ -]?(?:api|abi)|sdk|api|support)\b\s+"
+    r"\b(?:"
+    r"(?:accepted|approved)[_ -]?runtime(?:[_ -]?principal[_ -]?lifecycle)?[_ -]?evidence|"
+    r"(?:identity[_ -]?(?:public[_ -]?)?|player[_ -]?identity[_ -]?public[_ -]?|public[_ -]?)"
+    r"contract(?:[_ -]?gate)?|"
+    r"public[_ -]?(?:api|abi|contract|header|sdk)|"
+    r"v1(?:\.0)?(?:[_ -]?(?:sdk|api|support|completion|stable|release))?|"
+    r"sdk|api|support"
+    r")\b\s+"
     r"(?:is|are|now|becomes?|became)\s+"
-    r"\b(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?|public|ready|supported)\b",
+    r"\b(?:accepted|allowed|available|complete|enabled|established|full|opened|promoted|public|ready|"
+    r"reviewed|stable|supported|unlocked|production(?:[_ -]?(?:ready|grade))?)\b",
+    re.IGNORECASE,
+)
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_STATUS_FIRST = re.compile(
+    r"\b(?:accepted|authorized|available|enabled|established|granted|live|opened|operational|promoted|"
+    r"public|ready|supported|unlocked)\b\s+"
+    r"(?:for\s+|to\s+|is\s+|are\s+|now\s+|becomes?\s+|became\s+)*"
+    r"\b(?:"
+    r"(?:accepted|approved)[_ -]?runtime(?:[_ -]?principal[_ -]?lifecycle)?[_ -]?evidence|"
+    r"(?:identity[_ -]?(?:public[_ -]?)?|player[_ -]?identity[_ -]?public[_ -]?|public[_ -]?)"
+    r"contract(?:[_ -]?gate)?|"
+    r"public[_ -]?(?:api|abi|contract|header|sdk)|"
+    r"v1(?:\.0)?(?:[_ -]?(?:sdk|api|support|completion|stable|release))?|"
+    r"sdk|api|support"
+    r")\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_PREFIX_RE = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|excludes?|future|must\s+not|no|not|"
-    r"only|outside|post-v1|prevent|prevents|remain|remains|without)\b",
+    r"only|outside|post-v1|prevent|prevents|require[sd]?|remain|remains|until|without)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_SUFFIX_RE = re.compile(
@@ -334,7 +404,11 @@ def is_negated_text_claim(text: str, match: re.Match[str]) -> bool:
 
 
 def contains_positive_public_or_runtime_text_claim(text: str) -> bool:
-    for pattern in (POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE, POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED):
+    for pattern in (
+        POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE,
+        POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED,
+        POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_STATUS_FIRST,
+    ):
         for match in pattern.finditer(text):
             if not is_negated_text_claim(text, match):
                 return True
@@ -745,8 +819,34 @@ def collect_public_or_runtime_claims(
         return False
 
     def text_claim_path_is_exempt_metadata(claim_path: str) -> bool:
+        exempt_path_parts = {
+            "argv",
+            "blocked_until",
+            "blocker",
+            "blockers",
+            "cannot_unlock_without",
+            "claim_requires",
+            "current_blocker",
+            "current_route_blocker",
+            "exclusion",
+            "exclusions",
+            "negative_surface_exclusions",
+            "next_after_runtime_evidence",
+            "next_blocker",
+            "next_route_blocker_after_runtime_evidence",
+            "non_claim",
+            "non_claims",
+            "promotion_requires",
+            "remaining_route_blockers",
+            "required",
+            "required_evidence",
+            "required_exclusions",
+            "source_checker_blockers",
+            "source_checker_primary_blocker",
+            "why_blocked",
+        }
         return any(
-            normalized_key(part.split("[", 1)[0]) in {"argv", "non_claim", "non_claims"}
+            normalized_key(part.split("[", 1)[0]) in exempt_path_parts
             for part in claim_path.split(".")
             if part
         )
@@ -970,9 +1070,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
         primary_blocker = report.get("primary_blocker")
         next_blocker = report.get("next_blocker")
     source_blockers = report.get("blockers") if report is not None else None
-    source_claims = (
-        collect_public_or_runtime_claims(report, include_text_claims=False) if report is not None else []
-    )
+    source_claims = collect_public_or_runtime_claims(report) if report is not None else []
     current_blocker = primary_blocker or next_blocker
     manifest_sources = identity_manifest_source_diagnostics(args, report)
     approved_runtime_evidence_manifest = None

@@ -2689,7 +2689,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "runtime_ready": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
-        "remaining_blockers": [] if accepted else ["approved_runtime_evidence_not_accepted"],
+        "remaining_blockers": [] if evidence_accepted else ["approved_runtime_evidence_not_accepted"],
         "next_blocker": (
             NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE
             if evidence_accepted

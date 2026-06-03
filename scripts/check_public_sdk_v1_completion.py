@@ -569,7 +569,26 @@ SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_RE = re.compile(
     r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
     r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
     r"\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
-    r"(?:sdk|api|support)\s+(?:claim\s+)?progress\b",
+    r"(?:sdk|api|support)\s+(?:claim\s+)?progress\b"
+    r"|"
+    r"\b(?:public\s+(?:sdk|api|abi|header|package|module\s+sdk(?:\s+coverage)?)|"
+    r"(?:installed|release|sdk)\s+package|plugin\s+hub|pluginhub|support\s+tier|"
+    r"runtime\s+(?:readiness|ready|delivery|v1)|route\s+(?:readiness|ready)|"
+    r"public\s+route|(?:sdk|api|support)\s+v?1(?:\.?0)?|"
+    r"v1(?:\.?0)?\s+(?:sdk|api|support))\b.{0,80}"
+    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"promoted|public|publish(?:ed)?|ready|release(?:d)?|ship(?:ped|s)?|"
+    r"support(?:ed)?|satisf(?:y|ies|ied)|unlocked|"
+    r"[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
+    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"promoted|public|publish(?:ed)?|ready|release(?:d)?|ship(?:ped|s)?|"
+    r"support(?:ed)?|satisf(?:y|ies|ied)|unlocked|"
+    r"[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b"
+    r".{0,80}\b(?:public\s+(?:sdk|api|abi|header|package|module\s+sdk(?:\s+coverage)?)|"
+    r"(?:installed|release|sdk)\s+package|plugin\s+hub|pluginhub|support\s+tier|"
+    r"runtime\s+(?:readiness|ready|delivery|v1)|route\s+(?:readiness|ready)|"
+    r"public\s+route|(?:sdk|api|support)\s+v?1(?:\.?0)?|"
+    r"v1(?:\.?0)?\s+(?:sdk|api|support))\b",
     re.IGNORECASE,
 )
 SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_NEGATORS = re.compile(
@@ -2039,6 +2058,12 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
     def path_is_non_claim_container(path: str) -> bool:
         return any(part in {"non_claim", "non_claims"} for part in normalized_claim_path_parts(path))
 
+    def path_is_negative_claim_container(path: str) -> bool:
+        return any(
+            part in {"not_sufficient", "not_sufficient_for"}
+            for part in normalized_claim_path_parts(path)
+        )
+
     def text_claim_path_is_machine_metadata(path: str) -> bool:
         path_parts = normalized_claim_path_parts(path)
         return (
@@ -2142,6 +2167,7 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 visit(item, f"{path}[{index}]", blocked_report_context)
         elif (
             isinstance(value, str)
+            and not path_is_negative_claim_container(path)
             and (
                 path_is_non_claim_container(path)
                 or not text_claim_path_is_machine_metadata(path)

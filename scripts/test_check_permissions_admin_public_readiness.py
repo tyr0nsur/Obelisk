@@ -125,17 +125,18 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_route_ready"])
         self.assertFalse(report["permissions_admin_route_ready"])
 
-    def test_accepts_identity_contract_route_blocker_without_unlocking(self) -> None:
+    def test_rejects_identity_contract_route_blocker_before_runtime_evidence(self) -> None:
         result = run_checker(
             "--current-route-blocker",
             "identity_public_contract_gate_missing",
+            check=False,
         )
         report = json.loads(result.stdout)
 
-        self.assertEqual(result.returncode, 0)
-        self.assertTrue(report["valid"])
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["valid"])
         self.assertFalse(report["accepted_for_planning"])
-        self.assertEqual([], report["blockers"])
+        self.assertIn("current_route_blocker_out_of_order", report["blockers"])
         self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
         self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertFalse(report["public_sdk_ready"])
@@ -144,6 +145,23 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["route_ready"])
         self.assertFalse(report["public_route_ready"])
         self.assertFalse(report["permissions_admin_route_ready"])
+
+    def test_rejects_accounting_lock_identity_route_before_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["accounting_lock"]["current_route_blocker"] = "identity_public_contract_gate_missing"
+            decisions["accounting_lock"]["remaining_route_blockers"] = ["identity_public_contract_gate_missing"]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accounting_lock_route_blocker_out_of_order", report["blockers"])
+        self.assertIn("accounting_lock_remaining_route_blocker_out_of_order", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_accepts_candidate_query_failclosed_manifest_only_as_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -516,6 +534,31 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             ],
             [(item["reason"], item["label"]) for item in blockers],
         )
+
+    def test_rejects_unlocked_public_abi_reply_send_chat_claim_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "aliases": {
+                    "publicAbiUnlocked": True,
+                    "publicReplyAbiUnlocked": True,
+                    "replyUnlocked": True,
+                    "sendChatApiUnlocked": True,
+                },
+                "claims": [
+                    "public_abi_unlocked",
+                    "reply_abi_unlocked",
+                    "send_chat_api_unlocked",
+                    "publicReplyOrSendChatAbiUnlocked",
+                    "send_chat_api_unlocked remains blocked",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(4, [item["reason"] for item in blockers].count("public_surface_overclaim"))
+        self.assertEqual(4, [item["reason"] for item in blockers].count("positive_public_surface_claim"))
+        self.assertNotIn(("positive_public_surface_claim", "$.claims[4]"), [(item["reason"], item["label"]) for item in blockers])
 
     def test_rejects_post_identity_misleading_alias_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []

@@ -411,6 +411,50 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("SafeLogErrorNoThrow", body)
         self.assertNotIn("OBELISK_ERROR", body)
 
+    def test_plugin_directory_validation_rejects_alias_and_symlink_components_before_discovery(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        alias_body = extract_function_body(
+            text,
+            r"bool ValidateNoPathAliasComponents\(.*?\)",
+        )
+        self.assertIn('component == "." || component == ".."', alias_body)
+        self.assertIn("path alias components", alias_body)
+
+        component_body = extract_function_body(
+            text,
+            r"bool ValidateExistingPathComponentsNoSymlinks\(.*?\)",
+        )
+        self.assertIn("ValidateNoPathAliasComponents(path, label, error)", component_body)
+        self.assertIn("fs::symlink_status(current, ec)", component_body)
+        self.assertIn("fs::is_symlink(status)", component_body)
+        self.assertIn("path component must not be a symlink", component_body)
+
+        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+        config_validation_token = (
+            'ValidateExistingPathComponentsNoSymlinks(configRoot, "OBELISK_CONFIG_DIR", '
+            "configRootComponentError)"
+        )
+        self.assertIn(config_validation_token, load_body)
+        self.assertLess(
+            load_body.index(config_validation_token),
+            load_body.index("ValidatePluginConfigRoot(configRoot"),
+        )
+
+        validation_token = (
+            'ValidateExistingPathComponentsNoSymlinks(pluginDirectory, "Plugin directory", '
+            "pluginDirectoryError)"
+        )
+        self.assertIn(validation_token, load_body)
+        self.assertLess(
+            load_body.index(validation_token),
+            load_body.index("fs::symlink_status(pluginDirectory)"),
+        )
+        self.assertLess(
+            load_body.index("fs::symlink_status(pluginDirectory)"),
+            load_body.index("fs::directory_iterator(pluginDirectory)"),
+        )
+
     def test_no_throw_logging_helper_never_uses_logging_macros(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         body = extract_function_body(

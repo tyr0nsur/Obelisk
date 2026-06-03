@@ -819,6 +819,33 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[0]", paths)
         self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[1]", paths)
 
+    def test_support_and_umbrella_leaf_claim_aliases_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["aliases"] = [
+            "public SDK support is active",
+            "runtime/v1 support is enabled",
+            "gameplay policy umbrella leaf promotion is ready",
+        ]
+        fixtures["public_sdk_surfaces"]["release_note"] = "support tier active for inventory side lane"
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        readiness_paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "readiness_claim_enabled"
+        }
+        self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[0]", readiness_paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[1]", readiness_paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[2]", readiness_paths)
+        self.assertIn("$.public_sdk_surfaces.release_note", readiness_paths)
+
 
 if __name__ == "__main__":
     unittest.main()

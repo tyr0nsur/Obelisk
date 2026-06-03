@@ -235,6 +235,16 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "release_supported",
     "structure_events_ready",
     "structure_sdk_ready",
+    "support_ready",
+    "support_tier_active",
+    "support_tier_ready",
+    "runtime_support_active",
+    "runtime_support_ready",
+    "runtime_v1_support_active",
+    "runtime_v1_support_ready",
+    "umbrella_leaf_promoted",
+    "umbrella_leaf_promotion_ready",
+    "leaf_promotion_ready",
     "v1_complete",
     "v1_completion",
     "v1_ready",
@@ -283,9 +293,13 @@ READY_TERMS = {
     "ready",
     "supported",
     "released",
+    "active",
+    "available",
+    "enabled",
 }
 FORBIDDEN_STRING_DOMAINS = {
     "public sdk": "public_sdk",
+    "public sdk support": "public_sdk",
     "structure sdk": "structure_sdk",
     "structure events": "public_structure_events_sdk",
     "structureevents": "public_structure_events_sdk",
@@ -308,10 +322,18 @@ FORBIDDEN_STRING_DOMAINS = {
     "placement policy": "build_placement_policy",
     "release supported": "release_support",
     "release-supported": "release_support",
+    "runtime support": "runtime_support",
     "stable sdk": "structure_sdk",
+    "support tier": "support_tier",
+    "umbrella leaf promoted": "umbrella_leaf_promotion",
+    "umbrella leaf promotion": "umbrella_leaf_promotion",
+    "leaf promoted": "umbrella_leaf_promotion",
+    "leaf promotion": "umbrella_leaf_promotion",
+    "v1 support": "v1_completion",
 }
 POSITIVE_STRING_CLAIM_RE = re.compile(
     r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"\bactive\b|\bavailable\b|\benabled\b|\bsupported\b|"
     r"\brelease[-_\s]+supported\b|\bstable\b|\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
     r"\bpublic[-_\s]+ready\b|\bready\b)",
     re.IGNORECASE,
@@ -1192,8 +1214,12 @@ def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | Non
             return "_".join(sorted(domain_tokens))
     if POSITIVE_STRING_CLAIM_RE.search(text) is None:
         return None
+    key_context = f"{key} {value}"
     for phrase, surface in FORBIDDEN_STRING_DOMAINS.items():
         if flexible_phrase_in_text(value, phrase):
+            return surface
+    for phrase, surface in FORBIDDEN_STRING_DOMAINS.items():
+        if flexible_phrase_in_text(key_context, phrase):
             return surface
     return None
 

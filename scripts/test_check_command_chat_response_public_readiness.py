@@ -183,6 +183,27 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             },
         }
 
+    def make_surfaces_with_accepted_runtime_evidence(self) -> dict:
+        surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+        for surface in surfaces["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["evidence"]["accepted_runtime_evidence"] = {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                    "result": "approved runtime principal lifecycle evidence",
+                    "next_blocker": "identity_public_contract_gate_missing",
+                }
+                surface["blockers"] = [
+                    blocker
+                    for blocker in surface["blockers"]
+                    if blocker != "No approved runtime principal lifecycle evidence."
+                ]
+        return surfaces
+
+    def write_surfaces(self, root: Path, surfaces: dict) -> Path:
+        path = root / "public_sdk_surfaces.json"
+        path.write_text(json.dumps(surfaces), encoding="utf-8")
+        return path
+
     def make_decisions(self) -> dict:
         required = [
             {"id": "dependency.promoted_player_identity", "status": "unresolved", "required_behavior": [
@@ -448,7 +469,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
 
-    def test_accepts_identity_contract_route_blocker_without_unlocking(self) -> None:
+    def test_rejects_identity_contract_route_blocker_before_runtime_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             readiness_path, decisions_path, public_header_path = self.write_inputs(root)
@@ -461,6 +482,32 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 current_route_blocker="identity_public_contract_gate_missing",
             )
 
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("current_route_blocker_out_of_order", report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_accepts_identity_contract_route_blocker_after_runtime_evidence_without_unlocking(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            surfaces_path = self.write_surfaces(root, self.make_surfaces_with_accepted_runtime_evidence())
+            report = READINESS.build_report(
+                root,
+                readiness_path,
+                decisions_path,
+                public_header_path,
+                surfaces_path,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
+
         self.assertTrue(report["valid"])
         self.assertTrue(report["accepted_for_planning"])
         self.assertEqual([], report["blockers"])
@@ -470,6 +517,34 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_accounting_lock_identity_route_before_runtime_evidence(self) -> None:
+        decisions = self.make_decisions()
+        decisions["accounting_lock"] = {
+            "dependency_chain_locked": True,
+            "current_route_blocker": "identity_public_contract_gate_missing",
+            "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "public_or_runtime_accounting_allowed": False,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root, decisions=decisions)
+            report = READINESS.build_report(
+                root,
+                readiness_path,
+                decisions_path,
+                public_header_path,
+                SURFACES,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertIn("accounting_lock_route_blocker_out_of_order", report["blockers"])
+        self.assertIn("accounting_lock_remaining_route_blocker_out_of_order", report["blockers"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
@@ -576,6 +651,31 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn(("public_surface_overclaim", "$.claims[1]"), paths)
         self.assertIn(("public_surface_overclaim", "$.claims[2]"), paths)
         self.assertNotIn(("public_surface_overclaim", "$.claims[3]"), paths)
+
+    def test_rejects_unlocked_public_abi_reply_send_chat_claim_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "aliases": {
+                    "publicAbiUnlocked": True,
+                    "publicReplyAbiUnlocked": True,
+                    "replyUnlocked": True,
+                    "sendChatApiUnlocked": True,
+                },
+                "claims": [
+                    "public_abi_unlocked",
+                    "reply_abi_unlocked",
+                    "send_chat_api_unlocked",
+                    "publicReplyOrSendChatAbiUnlocked",
+                    "send_chat_api_unlocked remains blocked",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(4, [item["reason"] for item in blockers].count("public_surface_overclaim"))
+        self.assertEqual(4, [item["reason"] for item in blockers].count("positive_public_surface_claim"))
+        self.assertNotIn(("positive_public_surface_claim", "$.claims[4]"), [(item["reason"], item["label"]) for item in blockers])
 
     def test_rejects_nested_router_abi_and_runtime_authorization_aliases(self) -> None:
         blockers: list[dict[str, object]] = []

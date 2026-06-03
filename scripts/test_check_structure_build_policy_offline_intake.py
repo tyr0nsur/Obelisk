@@ -663,6 +663,37 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["enforcement_ready"])
 
+    def test_support_and_umbrella_leaf_string_aliases_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            readiness_payload["runtime_support"] = "active"
+            readiness_payload["v1_support"] = "enabled"
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            candidate = manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]
+            candidate["support_tier"] = "active"
+            candidate["notes"] = ["umbrella leaf promotion is ready"]
+            manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        blockers = [item for item in payload["blockers"] if item["reason"] == "forbidden_string_claim"]
+        surfaces = {item["surface"] for item in blockers}
+        self.assertIn("runtime_support", surfaces)
+        self.assertIn("v1_completion", surfaces)
+        self.assertIn("support_tier", surfaces)
+        self.assertIn("umbrella_leaf_promotion", surfaces)
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
     def test_snapshot_field_shape_drift_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

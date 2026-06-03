@@ -25,6 +25,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -220,6 +221,64 @@ namespace Obelisk::Core
         {
             static auto* loader = new DlopenLibraryLoader();
             return *loader;
+        }
+
+        bool ValidateNoPathAliasComponents(const fs::path& path, const char* label, std::string& error)
+        {
+            for (const auto& component : path)
+            {
+                if (component == path.root_name() || component == path.root_directory())
+                    continue;
+                if (component == "." || component == "..")
+                {
+                    error = std::string(label) + " must not contain path alias components";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool ValidateExistingPathComponentsNoSymlinks(const fs::path& path, const char* label, std::string& error)
+        {
+            if (!ValidateNoPathAliasComponents(path, label, error))
+                return false;
+
+            fs::path current;
+            for (const auto& component : path)
+            {
+                if (component == path.root_name())
+                {
+                    current = component;
+                    continue;
+                }
+                if (component == path.root_directory())
+                {
+                    current = current.empty() ? component : current / component;
+                    continue;
+                }
+
+                current = current.empty() ? component : current / component;
+                std::error_code ec;
+                const fs::file_status status = fs::symlink_status(current, ec);
+                if (status.type() == fs::file_type::not_found)
+                    return true;
+                if (ec)
+                {
+                    error = std::string(label) + " path component is not accessible: " + ec.message();
+                    return false;
+                }
+                if (fs::is_symlink(status))
+                {
+                    error = std::string(label) + " path component must not be a symlink";
+                    return false;
+                }
+                if (current != path && !fs::is_directory(status))
+                {
+                    error = std::string(label) + " path component must be a directory";
+                    return false;
+                }
+            }
+            return true;
         }
 
         bool IsLoadedPluginOwnerLocked(void* owner)
@@ -2656,6 +2715,14 @@ namespace Obelisk::Core
             }
 
             const fs::path configRoot = configRootEnv;
+            std::string configRootComponentError;
+            if (!ValidateExistingPathComponentsNoSymlinks(configRoot, "OBELISK_CONFIG_DIR", configRootComponentError))
+            {
+                OBELISK_ERROR("Invalid OBELISK_CONFIG_DIR: {}. Plugins will not be loaded.",
+                              configRootComponentError);
+                return;
+            }
+
             std::string configRootError;
             if (!ValidatePluginConfigRoot(configRoot, true, configRootError))
             {
@@ -2681,6 +2748,15 @@ namespace Obelisk::Core
             if (!pluginDirectory.is_absolute())
             {
                 OBELISK_ERROR("Plugin directory {} is not absolute. Plugins will not be loaded.", directory);
+                return;
+            }
+
+            std::string pluginDirectoryError;
+            if (!ValidateExistingPathComponentsNoSymlinks(pluginDirectory, "Plugin directory", pluginDirectoryError))
+            {
+                OBELISK_ERROR("Plugin directory {} rejected: {}. Plugins will not be loaded.",
+                              directory,
+                              pluginDirectoryError);
                 return;
             }
 

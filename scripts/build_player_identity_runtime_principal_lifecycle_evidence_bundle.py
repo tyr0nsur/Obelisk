@@ -172,6 +172,10 @@ def require_consume_only_check_report(payload: dict[str, Any], label: str) -> No
     if payload.get("runtime_evidence_ready") is not True:
         raise SystemExit(f"{label} did not preserve runtime evidence readiness")
     require_false_readiness_flags(payload, label)
+    if payload.get("blockers") != []:
+        raise SystemExit(f"{label} reported blockers despite ready consume-only evidence")
+    if payload.get("remaining_blockers") != []:
+        raise SystemExit(f"{label} reported remaining blockers despite ready consume-only evidence")
     if payload.get("next_blocker") != "identity_public_contract_gate_missing":
         raise SystemExit(f"{label} did not route to the identity public contract gate")
 
@@ -194,6 +198,13 @@ def require_negative_readiness_report(payload: dict[str, Any], label: str, expec
     blockers = payload.get("blockers")
     if not isinstance(blockers, list) or expected_blocker not in blockers:
         raise SystemExit(f"{label} failed for an unexpected blocker")
+    remaining_blockers = payload.get("remaining_blockers", [])
+    if (
+        payload.get("approved_runtime_evidence_present") is True
+        and payload.get("runtime_evidence_ready") is True
+        and remaining_blockers not in (None, [])
+    ):
+        raise SystemExit(f"{label} carried runtime evidence blockers despite accepted evidence")
     if payload.get("next_blocker") != "identity_public_contract_gate_missing":
         raise SystemExit(f"{label} did not preserve the identity public contract gate blocker")
 
@@ -457,6 +468,9 @@ def approved_runtime_manifest_check_state(
             and payload.get("runtime_ready") is False
             and payload.get("public_capability_bits_now", []) == []
             and payload.get("public_callback_abi_now", []) == []
+            and payload.get("blockers") == []
+            and payload.get("remaining_blockers") == []
+            and payload.get("next_blocker") == "identity_public_contract_gate_missing"
         )
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")

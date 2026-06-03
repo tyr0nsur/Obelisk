@@ -37,6 +37,8 @@ ALLOWED_ROUTE_BLOCKERS = (
     "approved_runtime_evidence_missing",
     "identity_public_contract_gate_missing",
 )
+RUNTIME_EVIDENCE_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
+IDENTITY_CONTRACT_ROUTE_BLOCKER = "identity_public_contract_gate_missing"
 PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = "obelisk.player-identity-promotion-certificate.v1"
 
 REQUIRED_DECISION_IDS = frozenset(
@@ -408,6 +410,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_or_runtime_accounting_allowed",
         "public_abi_allowed",
         "public_abi_ready",
+        "public_abi_unlocked",
         "public_admin_mutation_allowed",
         "public_bridge_abi_allowed",
         "public_cache_abi_allowed",
@@ -427,18 +430,26 @@ FALSE_ONLY_KEYS = frozenset(
         "public_route_ready",
         "public_reply_abi_allowed",
         "public_reply_abi_ready",
+        "public_reply_abi_unlocked",
         "public_reply_api",
+        "public_reply_api_unlocked",
         "public_response_abi_allowed",
         "public_response_path_ready",
         "public_reply_or_send_chat_abi_allowed",
+        "public_reply_or_send_chat_abi_unlocked",
         "public_response_path_allowed",
         "public_sdk",
         "public_sdk_ready",
         "public_send_chat_abi_allowed",
+        "public_send_chat_abi_unlocked",
         "public_send_chat_api",
+        "public_send_chat_api_unlocked",
         "reply_abi_allowed",
+        "reply_abi_unlocked",
         "reply_allowed",
         "reply_api_allowed",
+        "reply_api_unlocked",
+        "reply_unlocked",
         "route_ready",
         "route_gate_ready",
         "route_gate_unlocked",
@@ -459,10 +470,29 @@ FALSE_ONLY_KEYS = frozenset(
         "server_operations_authorized",
         "send_chat_allowed",
         "send_chat_api_allowed",
+        "send_chat_api_unlocked",
+        "send_chat_abi_unlocked",
         "send_chat_ready",
+        "send_chat_unlocked",
         "v1_0_stable_ready",
         "v1_completion_evidence",
         "v1_completion_ready",
+    )
+)
+POSITIVE_ALIAS_CLAIMS = frozenset(
+    (
+        "public_abi_unlocked",
+        "public_reply_abi_unlocked",
+        "public_reply_api_unlocked",
+        "public_reply_or_send_chat_abi_unlocked",
+        "public_send_chat_abi_unlocked",
+        "public_send_chat_api_unlocked",
+        "reply_abi_unlocked",
+        "reply_api_unlocked",
+        "reply_unlocked",
+        "send_chat_abi_unlocked",
+        "send_chat_api_unlocked",
+        "send_chat_unlocked",
     )
 )
 SPLIT_CLAIM_NAME_KEYS = frozenset(
@@ -709,6 +739,16 @@ def has_unnegated_positive_claim(text: str) -> bool:
     return False
 
 
+def has_unnegated_positive_alias_claim(text: str) -> bool:
+    for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
+        if NEGATED_CLAIM_RE.search(clause):
+            continue
+        normalized = normalized_key(clause)
+        if any(alias in normalized for alias in POSITIVE_ALIAS_CLAIMS):
+            return True
+    return False
+
+
 def c_identifier_exact_re(token: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
 
@@ -762,7 +802,7 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         or trail.endswith(".id")
     ):
         return
-    if has_unnegated_positive_claim(value):
+    if has_unnegated_positive_claim(value) or has_unnegated_positive_alias_claim(value):
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
@@ -1191,6 +1231,95 @@ def player_identity_has_approved_runtime_evidence(identity: dict[str, Any]) -> b
     return not any(term in text for term in forbidden_terms)
 
 
+def surface_by_id(payload: dict[str, Any] | None, surface_id: str) -> dict[str, Any] | None:
+    surfaces = payload.get("surfaces") if isinstance(payload, dict) else None
+    if not isinstance(surfaces, list):
+        return None
+    for surface in surfaces:
+        if isinstance(surface, dict) and surface.get("id") == surface_id:
+            return surface
+    return None
+
+
+def surfaces_have_accepted_runtime_evidence(payload: dict[str, Any] | None) -> bool:
+    identity = surface_by_id(payload, IDENTITY_SURFACE)
+    return isinstance(identity, dict) and player_identity_has_approved_runtime_evidence(identity)
+
+
+def validate_route_blocker_order(
+    current_route_blocker: str,
+    surfaces: dict[str, Any] | None,
+    blockers: list[dict[str, Any]],
+    *,
+    label: str = "$.current_route_blocker",
+) -> None:
+    if current_route_blocker != IDENTITY_CONTRACT_ROUTE_BLOCKER:
+        return
+    if surfaces_have_accepted_runtime_evidence(surfaces):
+        return
+    add(
+        blockers,
+        "current_route_blocker_out_of_order",
+        label,
+        value=current_route_blocker,
+        required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        required_evidence="accepted_runtime_evidence.next_blocker=identity_public_contract_gate_missing",
+    )
+
+
+def validate_accounting_lock_route_order(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    label: str,
+    surfaces: dict[str, Any] | None,
+) -> None:
+    lock = payload.get("accounting_lock")
+    if not isinstance(lock, dict):
+        return
+    lock_blocker = lock.get("current_route_blocker")
+    if lock_blocker not in ALLOWED_ROUTE_BLOCKERS:
+        add(
+            blockers,
+            "accounting_lock_route_blocker_mismatch",
+            f"{label}.accounting_lock.current_route_blocker",
+            expected=list(ALLOWED_ROUTE_BLOCKERS),
+            value=lock_blocker,
+        )
+    elif lock_blocker == IDENTITY_CONTRACT_ROUTE_BLOCKER and not surfaces_have_accepted_runtime_evidence(surfaces):
+        add(
+            blockers,
+            "accounting_lock_route_blocker_out_of_order",
+            f"{label}.accounting_lock.current_route_blocker",
+            value=lock_blocker,
+            required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        )
+    remaining = lock.get("remaining_route_blockers")
+    if isinstance(remaining, list) and IDENTITY_CONTRACT_ROUTE_BLOCKER in remaining and not surfaces_have_accepted_runtime_evidence(surfaces):
+        add(
+            blockers,
+            "accounting_lock_remaining_route_blocker_out_of_order",
+            f"{label}.accounting_lock.remaining_route_blockers",
+            value=remaining,
+            required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        )
+    if lock.get("dependency_chain_locked") is not True:
+        add(
+            blockers,
+            "accounting_lock_dependency_chain_not_locked",
+            f"{label}.accounting_lock.dependency_chain_locked",
+            value=lock.get("dependency_chain_locked"),
+        )
+    for key in (
+        "counts_toward_public_sdk",
+        "counts_toward_runtime",
+        "counts_toward_v1_completion",
+        "public_or_runtime_accounting_allowed",
+    ):
+        if key in lock and lock.get(key) is not False:
+            add(blockers, f"accounting_lock_{key}_not_false", f"{label}.accounting_lock.{key}", value=lock.get(key))
+
+
 def string_set(value: Any) -> set[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return set()
@@ -1417,8 +1546,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     surfaces = load_json(args.surfaces, "surfaces", blockers)
     if decisions is not None:
         validate_decisions(decisions, blockers, args.public_header)
+        validate_accounting_lock_route_order(decisions, blockers, label="$.decisions", surfaces=surfaces)
     if surfaces is not None:
         validate_surfaces(surfaces, blockers, args.public_header)
+    validate_route_blocker_order(current_route_blocker, surfaces, blockers)
     validate_header(args.public_header, blockers)
     query_artifact_schema = validate_query_artifact(args.query_failclosed_artifact, blockers)
     return {

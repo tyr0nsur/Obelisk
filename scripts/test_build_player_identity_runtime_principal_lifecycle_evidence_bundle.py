@@ -1135,6 +1135,54 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                         "public_capability_bits_now": [],
                         "public_callback_abi_now": [],
                         "blockers": [],
+                        "remaining_blockers": [],
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    payload.update(overrides)
+                    return 0, payload, ""
+
+                try:
+                    bundle_builder.run_json_check = fake_run_json_check
+                    state = bundle_builder.approved_runtime_manifest_check_state(
+                        {"exists": True, "path": Path("approved-runtime-principal-lifecycle-evidence.json")},
+                        blockers,
+                    )
+                finally:
+                    bundle_builder.run_json_check = original
+
+                self.assertTrue(state["checked"])
+                self.assertFalse(state["ready"])
+                self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
+
+    def test_approved_runtime_manifest_check_rejects_contradictory_ready_report(self) -> None:
+        cases = (
+            ("ready_with_blockers", {"blockers": ["contradictory_ready_blocker"]}),
+            ("ready_with_remaining_blockers", {"remaining_blockers": ["approved_runtime_evidence_not_accepted"]}),
+            ("wrong_next_blocker", {"next_blocker": "approved_runtime_evidence_not_accepted"}),
+        )
+        for name, overrides in cases:
+            with self.subTest(name=name):
+                original = bundle_builder.run_json_check
+                blockers: list[dict] = []
+
+                def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+                    payload = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "mode": "consume",
+                        "ready_scope": "runtime_evidence_only",
+                        "ready": True,
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "v1_completion_ready": False,
+                        "runtime_ready": False,
+                        "public_capability_bits_now": [],
+                        "public_callback_abi_now": [],
+                        "blockers": [],
+                        "remaining_blockers": [],
                         "next_blocker": "identity_public_contract_gate_missing",
                     }
                     payload.update(overrides)
@@ -2196,6 +2244,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "public_capability_bits_now": [],
             "public_callback_abi_now": [],
             "blockers": [],
+            "remaining_blockers": [],
             "next_blocker": "identity_public_contract_gate_missing",
         }
         for key, value, expected in (
@@ -2206,6 +2255,46 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             with self.subTest(key=key):
                 payload = dict(base)
                 payload[key] = value
+                with self.assertRaises(SystemExit) as raised:
+                    bundle_builder.require_consume_only_check_report(
+                        payload,
+                        "consume approved runtime principal lifecycle evidence check",
+                    )
+                self.assertIn(expected, str(raised.exception))
+
+    def test_rejects_consume_ready_report_with_blockers_or_wrong_next_blocker(self) -> None:
+        base = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "mode": "consume",
+            "ready_scope": "runtime_evidence_only",
+            "ready": True,
+            "approved_runtime_evidence_present": True,
+            "runtime_evidence_ready": True,
+            "promotion_ready": False,
+            "public_header_allowed": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "v1_completion_ready": False,
+            "runtime_ready": False,
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": [],
+            "remaining_blockers": [],
+            "next_blocker": "identity_public_contract_gate_missing",
+        }
+        cases = (
+            ("blockers", {"blockers": ["contradictory_ready_blocker"]}, "reported blockers"),
+            (
+                "remaining_blockers",
+                {"remaining_blockers": ["approved_runtime_evidence_not_accepted"]},
+                "reported remaining blockers",
+            ),
+            ("next_blocker", {"next_blocker": "approved_runtime_evidence_not_accepted"}, "did not route"),
+        )
+        for name, overrides, expected in cases:
+            with self.subTest(name=name):
+                payload = dict(base)
+                payload.update(overrides)
                 with self.assertRaises(SystemExit) as raised:
                     bundle_builder.require_consume_only_check_report(
                         payload,
@@ -2257,6 +2346,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
         self.assertIn("failed for an unexpected blocker", str(raised.exception))
+
+    def test_rejects_negative_readiness_report_with_stale_evidence_remaining_blocker(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_negative_readiness_report(
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "promote",
+                    "ready_scope": "runtime_evidence_only",
+                    "ready": False,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "blockers": ["promote_blocked_until_identity_public_contract_gate"],
+                    "remaining_blockers": ["approved_runtime_evidence_not_accepted"],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "promote approved runtime principal lifecycle evidence check",
+                "promote_blocked_until_identity_public_contract_gate",
+            )
+
+        self.assertIn("carried runtime evidence blockers despite accepted evidence", str(raised.exception))
 
 
 if __name__ == "__main__":

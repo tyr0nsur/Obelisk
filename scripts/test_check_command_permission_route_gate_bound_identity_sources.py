@@ -616,6 +616,35 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertIn("checks[0].summary:positive_text_claim", report["route_gate"]["public_or_runtime_claims"])
         self.assertNotIn("checks[0].non_claim:positive_text_claim", report["route_gate"]["public_or_runtime_claims"])
 
+    def test_rejects_bound_route_public_contract_runtime_evidence_and_v1_support_aliases(self) -> None:
+        route_report = self.base_route_report()
+        manifest_sources = route_report["critical_path_phase"]["source_checker_manifest_sources"]
+        manifest_sources["acceptedRuntimeEvidenceReady"] = True
+        manifest_sources["identityPublicContractReviewed"] = True
+        manifest_sources["v1SupportReady"] = True
+        manifest_sources["summary"] = "identity public contract reviewed"
+        route_report["route_summary"] = "ready for v1 support"
+
+        report = self.run_with_fake_route_report(route_report)
+
+        self.assertFalse(report["valid"])
+        self.assertIn("route_gate_public_or_runtime_claims_overclaim", report["blockers"])
+        claims = report["route_gate"]["public_or_runtime_claims"]
+        self.assertIn(
+            "critical_path_phase.source_checker_manifest_sources.acceptedRuntimeEvidenceReady",
+            claims,
+        )
+        self.assertIn(
+            "critical_path_phase.source_checker_manifest_sources.identityPublicContractReviewed",
+            claims,
+        )
+        self.assertIn("critical_path_phase.source_checker_manifest_sources.v1SupportReady", claims)
+        self.assertIn(
+            "critical_path_phase.source_checker_manifest_sources.summary:positive_text_claim",
+            claims,
+        )
+        self.assertIn("route_summary:positive_text_claim", claims)
+
     def test_rejects_partial_manifest_inputs_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             lifecycle_path = Path(temp_dir) / "players-identity-lifecycle-anchor-candidates.json"

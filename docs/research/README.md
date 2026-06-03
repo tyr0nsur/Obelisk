@@ -107,6 +107,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-30-transfer-scriptstruct-booltail-refresh.md](2026-05-30-transfer-scriptstruct-booltail-refresh.md)
 - [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md)
 - [2026-06-03-tribe-scalar-boundary-design.md](2026-06-03-tribe-scalar-boundary-design.md) (candidate-only internal Tribe scalar/control boundary; no public Tribe SDK, identity, permission enforcement ABI, runtime observer, mutation, return override, or v1 completion)
+- [2026-06-04-arkserver2-runtime-sdk-fast-path.md](2026-06-04-arkserver2-runtime-sdk-fast-path.md) (operator-approved `arkserver2` / `TheIsland` debug target and fastest safe route to approved player-principal lifecycle runtime evidence; not public SDK readiness)
 - [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md)
 - [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
 - [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)

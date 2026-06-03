@@ -261,6 +261,36 @@ class CheckBuffStatusReadinessTests(unittest.TestCase):
         self.assertFalse(output["runtime_ready"])
         self.assertFalse(output["v1_accounted"])
 
+    def test_support_status_and_umbrella_leaf_claims_in_fixtures_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self.copy_fixture_root(Path(temp_dir))
+            payload = self.read_snapshot(root, "PrimalBuff.AllowPostProcessEffect")
+            payload["support_tier"] = "active"
+            payload["runtime_support"] = "enabled"
+            payload["v1_support"] = "release-supported"
+            payload["interpretation"]["note"] = (
+                "Runtime support is active. V1 support is enabled. "
+                "Umbrella leaf promotion is ready."
+            )
+            self.write_snapshot(root, "PrimalBuff.AllowPostProcessEffect", payload)
+            result = self.run_checker("--snapshot-root", str(root), check=False)
+
+        output = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        claims = {
+            blocker["claim"]
+            for blocker in output["blockers"]
+            if blocker["reason"] == "forbidden_text_claim"
+        }
+        self.assertIn("support_tier=active", claims)
+        self.assertIn("runtime_support=enabled", claims)
+        self.assertIn("v1_support=release-supported", claims)
+        self.assertTrue(any("Runtime support" in claim for claim in claims))
+        self.assertTrue(any("V1 support" in claim for claim in claims))
+        self.assertTrue(any("Umbrella leaf promotion" in claim for claim in claims))
+        self.assertFalse(output["runtime_ready"])
+        self.assertFalse(output["v1_completion"])
+
     def test_negated_textual_non_claims_in_fixtures_are_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = self.copy_fixture_root(Path(temp_dir))

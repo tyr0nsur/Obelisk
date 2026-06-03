@@ -691,6 +691,35 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
         claims = {blocker["claim"] for blocker in blockers}
         self.assertEqual(claims, {"Mission SDK", "ResourceHandle", "return override"})
 
+    def test_support_and_umbrella_leaf_claim_aliases_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["support_tier"] = "active"
+            payload["runtime_support"] = "enabled"
+            payload["v1_support"] = "release-supported"
+            payload["surface_claims"] = {
+                "umbrella": "umbrella leaf promotion is ready",
+            }
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        blockers = [
+            blocker
+            for blocker in report["blockers"]
+            if blocker["reason"] == "mission_candidate_claim_overclaim"
+        ]
+        claims = {blocker["claim"] for blocker in blockers}
+        self.assertTrue(
+            {"support_tier", "runtime_support", "v1_support", "umbrella_leaf_promotion"} <= claims
+        )
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1_completion"])
+
     def test_priority_lane_stays_internal_reuse_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
@@ -825,6 +854,30 @@ typedef struct ObeliskApi {
         self.assertIn("RegisterMissionCopiedBoolEventWithOwnerTokenHandle", api_symbols)
         self.assertTrue(frontier["mission_public_frontier_owner_cleanup"]["public_frontier_detected"])
         self.assertFalse(frontier["mission_public_frontier_owner_cleanup"]["owner_cleanup_present"])
+
+    def test_repo_frontier_allows_mission_terms_in_not_promoted_doc_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                public_gameplay_events={
+                    "schema": "obelisk.public-gameplay-events.v1",
+                    "metadata_surfaces": [
+                        {
+                            "surface_id": "obelisk.gameplay_policy_event_descriptors.v1",
+                            "not_promoted": ["Mission SDK", "Mission callbacks"],
+                            "non_claims": ["does not promote public Mission SDK"],
+                        }
+                    ],
+                    "promoted_events": [],
+                },
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        self.assertEqual(frontier["status"], "accepted")
+        self.assertTrue(frontier["mission_internal_test_only"])
+        self.assertNotIn("public_mission_gameplay_event_or_descriptor", {blocker["reason"] for blocker in blockers})
 
     def test_repo_frontier_blocks_plugin_manager_mission_wiring_without_owner_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

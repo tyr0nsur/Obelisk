@@ -38,6 +38,8 @@ ALLOWED_ROUTE_BLOCKERS = (
     "approved_runtime_evidence_missing",
     "identity_public_contract_gate_missing",
 )
+RUNTIME_EVIDENCE_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
+IDENTITY_CONTRACT_ROUTE_BLOCKER = "identity_public_contract_gate_missing"
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 TARGET_SET = "command-chat-response-route-planning"
 TARGETS = frozenset(
@@ -307,6 +309,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_or_runtime_accounting_allowed",
         "public_abi_allowed",
         "public_abi_ready",
+        "public_abi_unlocked",
         "public_bridge_abi_allowed",
         "public_capability_advertised",
         "public_capability_allowed",
@@ -323,6 +326,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_contract_reviewed",
         "public_readiness_ready",
         "public_reply_or_send_chat_abi_allowed",
+        "public_reply_or_send_chat_abi_unlocked",
         "public_header_allowed",
         "public_header_ready",
         "public_headers_ready",
@@ -340,7 +344,9 @@ FALSE_ONLY_KEYS = frozenset(
         "public_response_path_allowed",
         "public_reply_abi_ready",
         "public_reply_abi_allowed",
+        "public_reply_abi_unlocked",
         "public_reply_api",
+        "public_reply_api_unlocked",
         "public_response_abi_allowed",
         "reply_path_ready",
         "release_readiness_ready",
@@ -354,12 +360,17 @@ FALSE_ONLY_KEYS = frozenset(
         "public_sdk",
         "public_sdk_ready",
         "public_send_chat_abi_allowed",
+        "public_send_chat_abi_unlocked",
         "public_send_chat_api",
+        "public_send_chat_api_unlocked",
         "reply_send_chat_router_claims_allowed",
         "reply_allowed",
+        "reply_unlocked",
         "reply_api",
         "reply_api_allowed",
+        "reply_api_unlocked",
         "reply_abi_allowed",
+        "reply_abi_unlocked",
         "route_ready",
         "route_gate_ready",
         "route_gate_unlocked",
@@ -387,7 +398,10 @@ FALSE_ONLY_KEYS = frozenset(
         "send_chat_allowed",
         "send_chat_api",
         "send_chat_api_allowed",
+        "send_chat_api_unlocked",
+        "send_chat_abi_unlocked",
         "send_chat_ready",
+        "send_chat_unlocked",
         "server_operations_authorized",
         "stable_claim_allowed",
         "stable_sdk_claim_allowed",
@@ -395,6 +409,22 @@ FALSE_ONLY_KEYS = frozenset(
         "v1_0_stable_ready",
         "v1_completion_evidence",
         "v1_completion_ready",
+    )
+)
+POSITIVE_ALIAS_CLAIMS = frozenset(
+    (
+        "public_abi_unlocked",
+        "public_reply_abi_unlocked",
+        "public_reply_api_unlocked",
+        "public_reply_or_send_chat_abi_unlocked",
+        "public_send_chat_abi_unlocked",
+        "public_send_chat_api_unlocked",
+        "reply_abi_unlocked",
+        "reply_api_unlocked",
+        "reply_unlocked",
+        "send_chat_abi_unlocked",
+        "send_chat_api_unlocked",
+        "send_chat_unlocked",
     )
 )
 SPLIT_CLAIM_NAME_KEYS = frozenset(
@@ -440,12 +470,12 @@ POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"accepted\s+runtime\s+evidence|admin\s+authority|"
     r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
-    r"capability\s+bits?|public\s+(?:abi|capabilit(?:y|ies)|contract)|permission\s+headers?|"
+    r"capability\s+bits?|public[_ -]?(?:abi|capabilit(?:y|ies)|contract)|permission\s+headers?|"
     r"permissions?\s+quer(?:y|ies)|"
     r"public\s+headers?|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
-    r"(?:complete|full|production|stable)\s+sdk|public\s+(?:command\s+)?sdk(?:\s+readiness)?|"
+    r"(?:complete|full|production|stable)\s+sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
     r"release\s+readiness|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
-    r"repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
+    r"repl(?:y|ies)(?:[_ -]?(?:api|abi|endpoint|path|request))?|send[_ -]?chat(?:[_ -]?(?:api|abi|endpoint|path|request))?|"
     r"broadcast(?:/notices?|[- ]?notices?)?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
     r"notices?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|moderation(?:\s+(?:api|abi|endpoint|path|request|authority))?|"
     r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
@@ -459,11 +489,11 @@ POSITIVE_SURFACE_REVERSED = re.compile(
     r".{0,80}\b("
     r"accepted\s+runtime\s+evidence|admin\s+authority|"
     r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
-    r"capability\s+bits?|public\s+(?:abi|capabilit(?:y|ies)|contract|headers?|sdk)|permission\s+headers?|"
+    r"capability\s+bits?|public[_ -]?(?:abi|capabilit(?:y|ies)|contract|headers?|sdk)|permission\s+headers?|"
     r"permissions?\s+quer(?:y|ies)|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
     r"(?:complete|full|production|stable)\s+sdk|release\s+readiness|v1(?:\.0)?\s+stable|"
-    r"v1\s+(?:sdk\s+)?completion|repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|"
-    r"send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
+    r"v1\s+(?:sdk\s+)?completion|repl(?:y|ies)(?:[_ -]?(?:api|abi|endpoint|path|request))?|"
+    r"send[_ -]?chat(?:[_ -]?(?:api|abi|endpoint|path|request))?|"
     r"broadcast(?:/notices?|[- ]?notices?)?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
     r"notices?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
     r"moderation(?:\s+(?:api|abi|endpoint|path|request|authority))?|"
@@ -567,6 +597,132 @@ def strings(value: Any) -> list[str]:
 
 def string_set(value: Any) -> set[str]:
     return set(strings(value))
+
+
+def iter_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        found: list[str] = []
+        for child in value.values():
+            found.extend(iter_strings(child))
+        return found
+    if isinstance(value, list):
+        found = []
+        for child in value:
+            found.extend(iter_strings(child))
+        return found
+    return []
+
+
+def surface_by_id(payload: dict[str, Any] | None, surface_id: str) -> dict[str, Any] | None:
+    surfaces = payload.get("surfaces") if isinstance(payload, dict) else None
+    if not isinstance(surfaces, list):
+        return None
+    for surface in surfaces:
+        if isinstance(surface, dict) and surface.get("id") == surface_id:
+            return surface
+    return None
+
+
+def player_identity_has_approved_runtime_evidence(identity: dict[str, Any]) -> bool:
+    evidence = identity.get("evidence")
+    accepted = evidence.get("accepted_runtime_evidence") if isinstance(evidence, dict) else None
+    if not isinstance(accepted, dict):
+        return False
+    if accepted.get("schema") != "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1":
+        return False
+    if accepted.get("result") != "approved runtime principal lifecycle evidence":
+        return False
+    if accepted.get("next_blocker") != IDENTITY_CONTRACT_ROUTE_BLOCKER:
+        return False
+    text = "\n".join(iter_strings(identity)).lower()
+    return not any(
+        term in text
+        for term in (
+            "no approved runtime principal lifecycle evidence",
+            RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        )
+    )
+
+
+def surfaces_have_accepted_runtime_evidence(payload: dict[str, Any] | None) -> bool:
+    identity = surface_by_id(payload, IDENTITY_SURFACE)
+    return isinstance(identity, dict) and player_identity_has_approved_runtime_evidence(identity)
+
+
+def validate_route_blocker_order(
+    current_route_blocker: str,
+    surfaces: dict[str, Any] | None,
+    blockers: list[dict[str, Any]],
+    *,
+    label: str = "$.current_route_blocker",
+) -> None:
+    if current_route_blocker != IDENTITY_CONTRACT_ROUTE_BLOCKER:
+        return
+    if surfaces_have_accepted_runtime_evidence(surfaces):
+        return
+    add(
+        blockers,
+        "current_route_blocker_out_of_order",
+        label,
+        value=current_route_blocker,
+        required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        required_evidence="accepted_runtime_evidence.next_blocker=identity_public_contract_gate_missing",
+    )
+
+
+def validate_accounting_lock_route_order(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    label: str,
+    surfaces: dict[str, Any] | None,
+) -> None:
+    lock = payload.get("accounting_lock")
+    if not isinstance(lock, dict):
+        return
+    lock_blocker = lock.get("current_route_blocker")
+    if lock_blocker not in ALLOWED_ROUTE_BLOCKERS:
+        add(
+            blockers,
+            "accounting_lock_route_blocker_mismatch",
+            f"{label}.accounting_lock.current_route_blocker",
+            expected=list(ALLOWED_ROUTE_BLOCKERS),
+            value=lock_blocker,
+        )
+    elif lock_blocker == IDENTITY_CONTRACT_ROUTE_BLOCKER and not surfaces_have_accepted_runtime_evidence(surfaces):
+        add(
+            blockers,
+            "accounting_lock_route_blocker_out_of_order",
+            f"{label}.accounting_lock.current_route_blocker",
+            value=lock_blocker,
+            required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        )
+    remaining = lock.get("remaining_route_blockers")
+    if isinstance(remaining, list) and IDENTITY_CONTRACT_ROUTE_BLOCKER in remaining and not surfaces_have_accepted_runtime_evidence(surfaces):
+        add(
+            blockers,
+            "accounting_lock_remaining_route_blocker_out_of_order",
+            f"{label}.accounting_lock.remaining_route_blockers",
+            value=remaining,
+            required_predecessor=RUNTIME_EVIDENCE_ROUTE_BLOCKER,
+        )
+    if lock.get("dependency_chain_locked") is not True:
+        add(
+            blockers,
+            "accounting_lock_dependency_chain_not_locked",
+            f"{label}.accounting_lock.dependency_chain_locked",
+            value=lock.get("dependency_chain_locked"),
+        )
+    for key in (
+        "counts_toward_public_sdk",
+        "counts_toward_runtime",
+        "counts_toward_v1_completion",
+        "public_or_runtime_accounting_allowed",
+    ):
+        if key in lock and lock.get(key) is not False:
+            add(blockers, f"accounting_lock_{key}_not_false", f"{label}.accounting_lock.{key}", value=lock.get(key))
 
 
 def contains_fragment(haystack: str, needle: str) -> bool:
@@ -678,6 +834,16 @@ def has_unnegated_positive_surface_claim(text: str) -> bool:
     return False
 
 
+def has_unnegated_positive_alias_claim(text: str) -> bool:
+    for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
+        if NEGATED_CLAIM_RE.search(clause):
+            continue
+        normalized = normalized_key(clause)
+        if any(alias in normalized for alias in POSITIVE_ALIAS_CLAIMS):
+            return True
+    return False
+
+
 def c_identifier_exact_re(token: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
 
@@ -714,7 +880,7 @@ def collect_surface_overclaims(value: Any, blockers: list[dict[str, Any]], trail
         return
     if not isinstance(value, str) or (negative_context(trail) and not is_claim_container_context(trail)):
         return
-    if has_unnegated_positive_surface_claim(value):
+    if has_unnegated_positive_surface_claim(value) or has_unnegated_positive_alias_claim(value):
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
@@ -1447,6 +1613,7 @@ def build_report(
         )
     if decisions is not None:
         validate_decisions(decisions, blockers, public_header_path)
+        validate_accounting_lock_route_order(decisions, blockers, label="$.decisions", surfaces=surfaces)
     if surfaces is not None:
         validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)
@@ -1458,6 +1625,7 @@ def build_report(
             expected=list(ALLOWED_ROUTE_BLOCKERS),
             value=current_route_blocker,
         )
+    validate_route_blocker_order(current_route_blocker, surfaces, blockers)
 
     valid = not blockers
     return {

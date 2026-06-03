@@ -97,6 +97,13 @@ FORBIDDEN_READY_KEYS = {
     "stable_sdk_ready",
     "support_tier_active",
     "support_tier_ready",
+    "leaf_promotion_ready",
+    "runtime_support_active",
+    "runtime_support_ready",
+    "runtime_v1_support_active",
+    "runtime_v1_support_ready",
+    "umbrella_leaf_promoted",
+    "umbrella_leaf_promotion_ready",
     "v1_accounted",
     "v1_complete",
     "v1_completion",
@@ -106,8 +113,9 @@ FORBIDDEN_READY_KEYS = {
 FORBIDDEN_CLAIM_KEY_RE = re.compile(
     r"(?:resource[_-]?handle|return[_-]?override|public[_-]?(?:sdk|api|abi|surface|module|header|callback|descriptor|capability)|"
     r"(?:module[_-]?sdk|callback|descriptor|capability|dispatcher)[_-]?ready|"
-    r"runtime[_-]?(?:ready|hook|observer|wiring)|v1[_-]?(?:ready|complete|completion|accounted)|"
+    r"runtime[_-]?(?:ready|hook|observer|wiring|support)|v1[_-]?(?:ready|complete|completion|accounted|support)|"
     r"(?:complete|stable)[_-]?sdk[_-]?claim|support[_-]?tier|release[_-]?ready|"
+    r"umbrella[_-]?leaf[_-]?(?:promoted|promotion)|leaf[_-]?promotion|"
     r"copied[_-]?payload[_-]?policy|lifecycle[_-]?semantics|"
     r"lookup[_-]?ready|mutation[_-]?ready|identity[_-]?ready|"
     r"(?:object|class)[_-]?(?:pointer|identity|contract|exposure)[_-]?ready)",
@@ -126,6 +134,7 @@ FORBIDDEN_TEXT_CLAIM_RE = re.compile(
     r"\b(?:(?:Buff/status|Buff status|BuffStatus|Buff)\s+(?:SDK|API|module|callback|descriptor|capability)|"
     r"public\s+(?:Buff/status\s+|Buff\s+|module\s+)?(?:SDK|API|ABI|C\s+ABI|runtime\s+API|callback|descriptor|capability)|"
     r"runtime\s+(?:hook|observer|wiring|dispatcher|callback)|"
+    r"(?:umbrella[- ]leaf|leaf)\s+(?:promotion|promoted)|"
     r"identity|lookup|mutation|return[- ]override|ResourceHandle|Resource\s+Handle|"
     r"object/class\s+(?:pointer\s+)?(?:contract|exposure)|class\s+exposure|object\s+exposure|"
     r"copied\s+payload\s+policy|lifecycle\s+semantics|stacking\s+semantics|invalidation\s+semantics|"
@@ -136,12 +145,18 @@ READY_TEXT_CLAIM_RE = re.compile(
     r"\b(?:public\s+(?:SDK|API|ABI)|(?:Buff/status|Buff status|BuffStatus|Buff)\s+SDK|runtime|runtime\s+observer|runtime\s+hook|"
     r"module\s+SDK|header\s+callbacks?|promotion|v1|v1\s+SDK)\s+"
     r"(?:is\s+|are\s+)?(?:ready|complete|completion|available|published|enabled|approved)\b|"
+    r"\b(?:runtime|runtime/v1|v1(?:\s+SDK)?|public\s+SDK|Buff/status\s+SDK|Buff\s+SDK)\s+support\s+"
+    r"(?:is\s+|are\s+)?(?:active|available|enabled|promoted|published|ready|supported)\b|"
     r"\b(?:ready|complete)\s+for\s+v1\b|"
     r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b|"
     r"\bcounts?\s+toward\s+(?:the\s+)?(?:complete|full|production)\s+SDK\s+claim\b|"
-    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|enabled|approved)\b|"
-    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|enabled|supported|release[- ]supported)\b|"
+    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|enabled|approved|supported)\b|"
+    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|enabled|promoted|published|supported|release[- ]supported)\b|"
     r"\bstable\s+SDK\s+(?:is\s+)?(?:allowed|ready|complete|available|enabled)\b",
+    re.IGNORECASE,
+)
+AFFIRMATIVE_STATUS_VALUE_RE = re.compile(
+    r"\b(?:active|available|enabled|promoted|published|ready|release[-_\s]+supported|stable|supported)\b",
     re.IGNORECASE,
 )
 
@@ -505,6 +520,17 @@ def reject_forbidden_claims(value: Any, blockers: list[dict[str, Any]], path: st
                 append_blocker(blockers, "forbidden_readiness_claim", path=f"{path}.{key}", value=child)
             elif FORBIDDEN_CLAIM_KEY_RE.search(key) and child is True:
                 append_blocker(blockers, "forbidden_positive_claim_key", path=f"{path}.{key}", value=child)
+            elif (
+                FORBIDDEN_CLAIM_KEY_RE.search(key)
+                and isinstance(child, str)
+                and AFFIRMATIVE_STATUS_VALUE_RE.search(child)
+            ):
+                append_blocker(
+                    blockers,
+                    "forbidden_text_claim",
+                    path=f"{path}.{key}",
+                    claim=f"{key}={child}",
+                )
             reject_forbidden_claims(child, blockers, f"{path}.{key}")
         return
     if isinstance(value, list):

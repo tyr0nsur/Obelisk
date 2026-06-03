@@ -1254,6 +1254,40 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_public_package_and_pluginhub_text_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "summary": "Public SDK is ready for plugin authors.",
+            "package": "Release package is published.",
+            "hub": "Plugin Hub publication enabled.",
+            "runtime": "Runtime delivery available.",
+            "allowed_note": "Public SDK is not ready and release package publication remains blocked.",
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "hub:positive_completion_text",
+                "package:positive_completion_text",
+                "runtime:positive_completion_text",
+                "summary:positive_completion_text",
+            ],
+        )
+
+    def test_secondary_report_scanner_allows_negative_not_sufficient_for_text(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "not_sufficient_for": [
+                "release package readiness or public package availability",
+                "Plugin Hub seed/package publication",
+                "stable SDK claim approval",
+            ],
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
     def test_secondary_report_scanner_allows_delegated_text_claim_when_report_has_blocker(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",

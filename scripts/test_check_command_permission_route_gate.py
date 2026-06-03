@@ -1335,6 +1335,58 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             claims,
         )
 
+    def test_build_critical_path_phase_rejects_identity_readiness_text_overclaims(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "primary_blocker": "approved_runtime_evidence_missing",
+                        "blockers": ["approved_runtime_evidence_missing"],
+                        "lifecycle_anchor_candidates_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+                        ),
+                        "principal_invalidation_policy_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+                        ),
+                        "status": "blocked",
+                        "ready": False,
+                        "accepted_for_internal_planning": False,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "route_notes": [
+                            "accepted runtime evidence ready",
+                            "identity public contract reviewed",
+                            "v1 support is ready",
+                        ],
+                        "cannot_unlock_without": [
+                            "reviewed public identity contract",
+                        ],
+                    }
+                ),
+                stderr="",
+            )
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase()
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        claims = phase["source_checker_public_or_runtime_claims"]
+        self.assertIn("critical_path_identity_readiness_public_or_runtime_claim", blockers)
+        self.assertIn("route_notes[0]:positive_text_claim", claims)
+        self.assertIn("route_notes[1]:positive_text_claim", claims)
+        self.assertIn("route_notes[2]:positive_text_claim", claims)
+        self.assertNotIn("cannot_unlock_without[0]:positive_text_claim", claims)
+
     def test_route_check_requires_explicit_valid_true(self) -> None:
         original_run = ROUTE_GATE.subprocess.run
 
@@ -1594,9 +1646,21 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "API is production ready",
                     "planning-only report says stable SDK is ready",
                     "stable SDK remains blocked",
+                    "accepted runtime evidence ready",
+                    "approved runtime principal lifecycle evidence ready",
+                    "identity public contract reviewed",
+                    "public contract gate unlocked",
+                    "v1 support is ready",
+                    "ready for v1 support",
                 ],
+                "acceptedRuntimeEvidenceReady": True,
+                "approved_runtime_principal_lifecycle_evidence_ready": True,
+                "identityPublicContractReviewed": "yes",
+                "publicContractGateUnlocked": True,
                 "stable_claim_allowed": True,
                 "v1_completion_ready": True,
+                "v1SupportReady": True,
+                "v1_sdk_ready": True,
                 "publicSdkReady": True,
                 "publicHeaderReady": "ready",
                 "routeReady": True,
@@ -1633,8 +1697,20 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("notes[9]:positive_text_claim", claims)
         self.assertIn("notes[10]:positive_text_claim", claims)
         self.assertNotIn("notes[11]:positive_text_claim", claims)
+        self.assertIn("notes[12]:positive_text_claim", claims)
+        self.assertIn("notes[13]:positive_text_claim", claims)
+        self.assertIn("notes[14]:positive_text_claim", claims)
+        self.assertIn("notes[15]:positive_text_claim", claims)
+        self.assertIn("notes[16]:positive_text_claim", claims)
+        self.assertIn("notes[17]:positive_text_claim", claims)
+        self.assertIn("acceptedRuntimeEvidenceReady", claims)
+        self.assertIn("approved_runtime_principal_lifecycle_evidence_ready", claims)
+        self.assertIn("identityPublicContractReviewed", claims)
+        self.assertIn("publicContractGateUnlocked", claims)
         self.assertIn("stable_claim_allowed", claims)
         self.assertIn("v1_completion_ready", claims)
+        self.assertIn("v1SupportReady", claims)
+        self.assertIn("v1_sdk_ready", claims)
         self.assertIn("publicSdkReady", claims)
         self.assertIn("publicHeaderReady", claims)
         self.assertIn("routeReady", claims)

@@ -1575,6 +1575,79 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnsafeConfigRootAliasAndAncestorDisablePluginLoading()
+    {
+        const struct {
+            const char* name;
+            fs::path path;
+            const char* getInfoFailure;
+            const char* initFailure;
+            const char* closeFailure;
+        } aliasCases[] = {
+            {
+                "current",
+                fs::path("config") / ".",
+                "current-alias config root still scanned plugin metadata",
+                "current-alias config root initialized plugin",
+                "current-alias config root opened plugin handle",
+            },
+            {
+                "parent",
+                fs::path("config") / ".." / "config",
+                "parent-alias config root still scanned plugin metadata",
+                "parent-alias config root initialized plugin",
+                "parent-alias config root opened plugin handle",
+            },
+        };
+
+        for (const auto& item : aliasCases)
+        {
+            const fs::path root = MakeTempRoot("obelisk_plugin_manager_config_root_alias");
+            ConfigureEnvironment(root);
+            setenv("OBELISK_CONFIG_DIR", (root / item.path).string().c_str(), 1);
+
+            FakePlugin plugin{.filename = std::string(item.name) + "_config_root_alias.so"};
+            FakeLoader loader;
+            loader.Add(plugin);
+            TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+            Obelisk::Core::PluginManager manager(loader);
+            manager.LoadPlugins((root / "plugins").string());
+
+            Require(plugin.getInfoCalls == 0, item.getInfoFailure);
+            Require(plugin.initCalls == 0, item.initFailure);
+            Require(plugin.closeCalls == 0, item.closeFailure);
+
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+        }
+
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_config_root_symlink_ancestor");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "config_root_symlink_ancestor.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+
+        const fs::path externalParent = root / "external-parent";
+        fs::create_directories(externalParent / "config");
+        fs::create_directory_symlink(externalParent, root / "config-parent-link");
+        setenv("OBELISK_CONFIG_DIR", (root / "config-parent-link" / "config").string().c_str(), 1);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(externalParent, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "symlink-ancestor config root still scanned plugin metadata");
+        Require(plugin.initCalls == 0, "symlink-ancestor config root initialized plugin");
+        Require(plugin.closeCalls == 0, "symlink-ancestor config root opened plugin handle");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestEmptyPluginDirectoryIsRejected()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_empty_plugin_dir");
@@ -1617,6 +1690,54 @@ namespace
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
+    }
+
+    void TestPluginDirectoryAliasComponentsAreRejected()
+    {
+        const struct {
+            const char* name;
+            fs::path path;
+            const char* getInfoFailure;
+            const char* initFailure;
+            const char* closeFailure;
+        } cases[] = {
+            {
+                "current",
+                fs::path("plugins") / ".",
+                "current-alias plugin directory still scanned plugin metadata",
+                "current-alias plugin directory initialized plugin",
+                "current-alias plugin directory opened plugin handle",
+            },
+            {
+                "parent",
+                fs::path("plugins") / ".." / "plugins",
+                "parent-alias plugin directory still scanned plugin metadata",
+                "parent-alias plugin directory initialized plugin",
+                "parent-alias plugin directory opened plugin handle",
+            },
+        };
+
+        for (const auto& item : cases)
+        {
+            const fs::path root = MakeTempRoot("obelisk_plugin_manager_alias_plugin_dir");
+            ConfigureEnvironment(root);
+
+            FakePlugin plugin{.filename = std::string(item.name) + "_alias_plugin_dir.so"};
+            FakeLoader loader;
+            loader.Add(plugin);
+            TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+            Obelisk::Core::PluginManager manager(loader);
+            manager.LoadPlugins((root / item.path).string());
+
+            Require(plugin.getInfoCalls == 0, item.getInfoFailure);
+            Require(plugin.initCalls == 0, item.initFailure);
+            Require(plugin.closeCalls == 0, item.closeFailure);
+
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+        }
     }
 
     void TestValidPluginLoadsAndUnloadCleansCallbacks()
@@ -6697,6 +6818,36 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestPluginDirectorySymlinkAncestorIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_plugin_dir_symlink_ancestor");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "escaped_ancestor.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+
+        const fs::path externalParent = root / "external-parent";
+        fs::create_directories(externalParent / "plugins");
+        fs::create_directory_symlink(externalParent, root / "plugin-parent-link");
+        {
+            std::ofstream out(externalParent / "plugins" / plugin.filename);
+            Require(out.is_open(), "failed to create fake plugin behind symlinked plugin ancestor");
+        }
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugin-parent-link" / "plugins").string());
+
+        Require(plugin.getInfoCalls == 0, "plugin behind symlinked plugin directory ancestor was opened");
+        Require(plugin.initCalls == 0, "plugin behind symlinked plugin directory ancestor was initialized");
+        Require(plugin.closeCalls == 0,
+                "plugin behind symlinked plugin directory ancestor reached loader close path");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMissingInitRejectsAndCloses()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_no_init");
@@ -7850,6 +8001,7 @@ int main()
 
     TestEmptyPluginDirectoryIsRejected();
     TestRelativePluginDirectoryIsRejected();
+    TestPluginDirectoryAliasComponentsAreRejected();
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
     TestGlobalProcessEventCallbackRejectedByDefault();
@@ -7920,6 +8072,7 @@ int main()
     TestOwnerTokenUnregisterAllowedDuringInitFailureShutdown();
     TestUnsafeInstanceIdDisablesPluginLoading();
     TestUnsafeConfigRootDisablesPluginLoading();
+    TestUnsafeConfigRootAliasAndAncestorDisablePluginLoading();
     TestGlobalProcessEventCallbackAllowedWithGate();
     TestGlobalProcessEventCallbackRejectedAfterGateRevoked();
     TestGlobalProcessEventRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
@@ -7936,6 +8089,7 @@ int main()
     TestResolveExceptionAfterOpenClosesHandle();
     TestPluginSymlinkCandidateIsRejected();
     TestPluginSymlinkDirectoryIsRejected();
+    TestPluginDirectorySymlinkAncestorIsRejected();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();

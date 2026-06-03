@@ -2123,6 +2123,21 @@ def known_ufunction_target_set_targets(target_set: str) -> list[str] | None:
     return targets
 
 
+def known_ufunction_target_set_metadata(target_set: str) -> dict[str, str] | None:
+    try:
+        from reflection_target_sets import target_set_module_lane, target_set_readiness_classification
+    except ImportError:
+        return None
+
+    try:
+        return {
+            "module_lane": target_set_module_lane(target_set),
+            "readiness_classification": target_set_readiness_classification(target_set),
+        }
+    except KeyError:
+        return None
+
+
 def expected_rc_ufunction_target_sources() -> dict[str, list[str]] | None:
     try:
         from reflection_target_sets import TARGET_SETS
@@ -2408,6 +2423,7 @@ def validate_target_set_coverage(
         (target_set, "snapshot") for target_set in source_target_sets
     ]
     expanded: dict[str, list[str]] = {}
+    target_set_metadata: dict[str, dict[str, str]] = {}
     for target_set, _ in declared:
         targets = known_ufunction_target_set_targets(target_set)
         if not targets:
@@ -2420,6 +2436,17 @@ def validate_target_set_coverage(
             )
             continue
         expanded[target_set] = targets
+        metadata = known_ufunction_target_set_metadata(target_set)
+        if metadata is None:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_target_set_metadata_unavailable",
+                    "label": f"{source_label}:$.target_set_coverage",
+                    "target_set": target_set,
+                }
+            )
+        else:
+            target_set_metadata[target_set] = metadata
 
     expected_targets = unique_ordered(
         [
@@ -2544,6 +2571,244 @@ def validate_target_set_coverage(
             blockers.append({"reason": "signature_manifest_declared_target_set_missing_targets_mismatch", "label": f"{entry_label}.missing_targets"})
         if entry.get("complete") != (not missing):
             blockers.append({"reason": "signature_manifest_declared_target_set_complete_mismatch", "label": f"{entry_label}.complete"})
+        metadata = target_set_metadata.get(str(entry.get("name")))
+        if metadata is not None:
+            recorded_module_lane = entry.get("module_lane")
+            if recorded_module_lane is not None and recorded_module_lane != metadata["module_lane"]:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_declared_target_set_module_lane_mismatch",
+                        "label": f"{entry_label}.module_lane",
+                        "expected": metadata["module_lane"],
+                        "recorded": recorded_module_lane,
+                    }
+                )
+            recorded_readiness = entry.get("readiness_classification")
+            if recorded_readiness is not None and recorded_readiness != metadata["readiness_classification"]:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_declared_target_set_readiness_classification_mismatch",
+                        "label": f"{entry_label}.readiness_classification",
+                        "expected": metadata["readiness_classification"],
+                        "recorded": recorded_readiness,
+                    }
+                )
+            if entry.get("release_readiness") is True and metadata["readiness_classification"] != "release_readiness":
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_declared_target_set_release_readiness_overclaim",
+                        "label": f"{entry_label}.release_readiness",
+                        "expected_readiness_classification": metadata["readiness_classification"],
+                    }
+                )
+        for trail, _ in collect_ready_overclaims(entry, trail=f"$.target_set_coverage.declared_target_sets[{index}]"):
+            blockers.append(
+                {
+                    "reason": "signature_manifest_declared_target_set_readiness_overclaim",
+                    "label": f"{source_label}:{trail}",
+                }
+            )
+        for trail, _, reason in collect_candidate_public_overclaims(entry):
+            blockers.append(
+                {
+                    "reason": f"signature_manifest_declared_target_set_public_overclaim_{reason}",
+                    "label": f"{entry_label}:{trail}",
+                }
+            )
+    families = coverage.get("target_families")
+    if families is not None:
+        expected_families = [
+            {
+                "name": target_set,
+                "source": source,
+                **target_set_metadata[target_set],
+            }
+            for target_set, source in declared
+            if target_set in target_set_metadata
+        ]
+        if families != expected_families:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_target_families_mismatch",
+                    "label": f"{source_label}:$.target_set_coverage.target_families",
+                    "expected": expected_families,
+                    "recorded": families,
+                }
+            )
+    return blockers
+
+
+def validate_redacted_signature_artifact_identity(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+    expected_binary_sha256: str | None,
+) -> tuple[str | None, list[dict[str, Any]]]:
+    identity = payload.get("artifact_identity")
+    blockers: list[dict[str, Any]] = []
+    if identity is None:
+        if expected_binary_sha256 is not None:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_missing_artifact_identity",
+                    "label": f"{source_label}:$.artifact_identity",
+                    "expected_binary_sha256": expected_binary_sha256,
+                }
+            )
+        return None, blockers
+    if not isinstance(identity, dict):
+        return None, [{"reason": "signature_manifest_artifact_identity_not_object", "label": f"{source_label}:$.artifact_identity"}]
+
+    for trail, _ in collect_path_fields(identity, trail="$.artifact_identity"):
+        blockers.append({"reason": "signature_manifest_artifact_identity_path_present", "label": f"{source_label}:{trail}"})
+    if identity.get("path_redacted") is not True:
+        blockers.append({"reason": "signature_manifest_artifact_identity_path_not_redacted", "label": f"{source_label}:$.artifact_identity.path_redacted"})
+
+    recorded_sha = identity.get("ark_binary_sha256")
+    if not isinstance(recorded_sha, str) or SHA256_RE.fullmatch(recorded_sha) is None:
+        blockers.append(
+            {
+                "reason": "signature_manifest_binary_sha256_invalid",
+                "label": f"{source_label}:$.artifact_identity.ark_binary_sha256",
+                "recorded_binary_sha256": recorded_sha,
+            }
+        )
+        recorded_sha = None
+    elif expected_binary_sha256 is not None and recorded_sha != expected_binary_sha256:
+        blockers.append(
+            {
+                "reason": "signature_manifest_binary_sha256_mismatch",
+                "label": f"{source_label}:$.artifact_identity.ark_binary_sha256",
+                "expected_binary_sha256": expected_binary_sha256,
+                "recorded_binary_sha256": recorded_sha,
+            }
+        )
+    return recorded_sha, blockers
+
+
+def validate_redacted_signature_embedded_provenance(
+    provenance: object,
+    *,
+    label: str,
+    expected_artifact_sha256: str | None,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if not isinstance(provenance, dict):
+        return [{"reason": "signature_manifest_input_snapshot_provenance_not_object", "label": label}]
+    blockers: list[dict[str, Any]] = []
+    if provenance.get("schema") not in {PROVENANCE_SCHEMA, STATIC_ARTIFACT_PROVENANCE_SCHEMA}:
+        blockers.append(
+            {
+                "reason": "signature_manifest_input_snapshot_provenance_schema_mismatch",
+                "label": f"{label}.schema",
+                "recorded_schema": provenance.get("schema"),
+            }
+        )
+    if provenance.get("verified") is not True:
+        blockers.append({"reason": "signature_manifest_input_snapshot_provenance_not_verified", "label": f"{label}.verified"})
+    if provenance.get("path_redacted") is not True:
+        blockers.append({"reason": "signature_manifest_input_snapshot_provenance_path_not_redacted", "label": f"{label}.path_redacted"})
+    for trail, _ in collect_path_fields(provenance, trail=label):
+        blockers.append({"reason": "signature_manifest_input_snapshot_provenance_path_present", "label": trail})
+    artifact_sha256 = provenance.get("artifact_sha256")
+    if artifact_sha256 is not None:
+        if not isinstance(artifact_sha256, str) or SHA256_RE.fullmatch(artifact_sha256) is None:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_input_snapshot_provenance_artifact_sha256_invalid",
+                    "label": f"{label}.artifact_sha256",
+                    "recorded_artifact_sha256": artifact_sha256,
+                }
+            )
+        elif expected_artifact_sha256 is not None and artifact_sha256 != expected_artifact_sha256:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_input_snapshot_provenance_artifact_sha256_mismatch",
+                    "label": f"{label}.artifact_sha256",
+                    "expected_artifact_sha256": expected_artifact_sha256,
+                    "recorded_artifact_sha256": artifact_sha256,
+                }
+            )
+    binary_sha256 = provenance.get("binary_sha256")
+    if binary_sha256 is not None:
+        if not isinstance(binary_sha256, str) or SHA256_RE.fullmatch(binary_sha256) is None:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_input_snapshot_provenance_binary_sha256_invalid",
+                    "label": f"{label}.binary_sha256",
+                    "recorded_binary_sha256": binary_sha256,
+                }
+            )
+        elif expected_binary_sha256 is not None and binary_sha256 != expected_binary_sha256:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_input_snapshot_provenance_binary_sha256_mismatch",
+                    "label": f"{label}.binary_sha256",
+                    "expected_binary_sha256": expected_binary_sha256,
+                    "recorded_binary_sha256": binary_sha256,
+                }
+            )
+    sidecar_sha256 = provenance.get("sidecar_sha256")
+    if sidecar_sha256 is not None and (not isinstance(sidecar_sha256, str) or SHA256_RE.fullmatch(sidecar_sha256) is None):
+        blockers.append(
+            {
+                "reason": "signature_manifest_input_snapshot_provenance_sidecar_sha256_invalid",
+                "label": f"{label}.sidecar_sha256",
+                "recorded_sidecar_sha256": sidecar_sha256,
+            }
+        )
+    return blockers
+
+
+def validate_redacted_signature_claim_wording(payload: dict[str, Any], *, source_label: str) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    allowed_prefixes = (
+        "$.non_claims",
+        "$.safety_summary.not_promoted_surfaces",
+    )
+    phrase_reasons = {
+        "public sdk ready": "public_sdk_ready",
+        "public sdk support": "public_sdk_support",
+        "sdk ready": "sdk_ready",
+        "release ready": "release_ready",
+        "runtime ready": "runtime_ready",
+        "runtime hook ready": "runtime_hook_ready",
+        "promotion ready": "promotion_ready",
+        "lookup ready": "lookup_ready",
+        "resource handle ready": "resource_handle_ready",
+        "resourcehandle ready": "resourcehandle_ready",
+        "mutation ready": "mutation_ready",
+        "return override ready": "return_override_ready",
+        "public callback ready": "public_callback_ready",
+    }
+    for trail, raw_value in collect_string_fields(payload):
+        if any(trail.startswith(prefix) for prefix in allowed_prefixes):
+            continue
+        normalized = re.sub(r"[^a-z0-9]+", " ", raw_value.casefold()).strip()
+        compact = normalized.replace(" ", "")
+        for phrase, reason in phrase_reasons.items():
+            if phrase in normalized or phrase.replace(" ", "") in compact:
+                blockers.append(
+                    {
+                        "reason": f"signature_manifest_generated_claim_overclaim_{reason}",
+                        "label": f"{source_label}:{trail}",
+                        "value": raw_value,
+                    }
+                )
+    for trail, _, reason in collect_candidate_public_overclaims(payload, allowed_prefixes=allowed_prefixes):
+        blockers.append(
+            {
+                "reason": f"signature_manifest_generated_claim_overclaim_{reason}",
+                "label": f"{source_label}:{trail}",
+            }
+        )
+    for trail, _ in collect_promoted_status_overclaims(payload, allowed_prefixes=allowed_prefixes):
+        blockers.append(
+            {
+                "reason": "signature_manifest_generated_claim_status_overclaim",
+                "label": f"{source_label}:{trail}",
+            }
+        )
     return blockers
 
 
@@ -2555,10 +2820,17 @@ def validate_redacted_signature_manifest(
     protected_root: Path,
     mode: str,
     strict_target_set_coverage: bool,
+    expected_binary_sha256: str | None,
 ) -> list[dict[str, Any]]:
     if payload.get("schema") != REDACTED_UFUNCTION_SIGNATURE_SCHEMA:
         return []
     blockers: list[dict[str, Any]] = []
+    recorded_binary_sha256, identity_blockers = validate_redacted_signature_artifact_identity(
+        payload,
+        source_label=source_label,
+        expected_binary_sha256=expected_binary_sha256,
+    )
+    blockers.extend(identity_blockers)
     snapshot_root = payload.get("snapshot_root")
     if snapshot_root not in (None, "redacted"):
         blockers.append(
@@ -2595,6 +2867,8 @@ def validate_redacted_signature_manifest(
                 if not isinstance(snapshot, dict):
                     blockers.append({"reason": "signature_manifest_input_snapshot_not_object", "label": snapshot_label})
                     continue
+                for trail, _ in collect_path_fields(snapshot, trail=f"$.generated_from.input_snapshots[{index}]"):
+                    blockers.append({"reason": "signature_manifest_input_snapshot_path_present", "label": f"{source_label}:{trail}"})
                 snapshot_id = snapshot.get("id")
                 sha256 = snapshot.get("sha256")
                 if not isinstance(snapshot_id, str) or not snapshot_id:
@@ -2609,6 +2883,15 @@ def validate_redacted_signature_manifest(
                     )
                 if isinstance(snapshot_id, str) and isinstance(sha256, str):
                     generated_snapshot_ids[snapshot_id] = sha256
+                if "provenance" in snapshot:
+                    blockers.extend(
+                        validate_redacted_signature_embedded_provenance(
+                            snapshot.get("provenance"),
+                            label=f"{snapshot_label}.provenance",
+                            expected_artifact_sha256=sha256 if isinstance(sha256, str) else None,
+                            expected_binary_sha256=recorded_binary_sha256 or expected_binary_sha256,
+                        )
+                    )
     missing_targets = payload.get("missing_targets")
     missing_target_count = len(missing_targets) if isinstance(missing_targets, list) else 0
     if missing_targets is not None and not isinstance(missing_targets, list):
@@ -2782,7 +3065,7 @@ def validate_redacted_signature_manifest(
                 )
             for trail, raw_value in collect_bool_fields(signature, trail=f"$.signatures[{index}]"):
                 key = trail.rsplit(".", 1)[-1]
-                if raw_value is True and key in READY_OVERCLAIM_KEYS:
+                if raw_value is True and is_ready_overclaim_key(key):
                     blockers.append(
                         {
                             "reason": "signature_manifest_signature_readiness_overclaim",
@@ -2922,19 +3205,27 @@ def validate_redacted_signature_manifest(
         )
         for trail, raw_value in collect_bool_fields(safety_summary, trail="$.safety_summary"):
             key = trail.rsplit(".", 1)[-1]
-            if raw_value is True and key in READY_OVERCLAIM_KEYS:
+            if raw_value is True and is_ready_overclaim_key(key):
                 blockers.append(
                     {
                         "reason": "signature_manifest_safety_summary_readiness_overclaim",
                         "label": f"{source_label}:{trail}",
                     }
                 )
+    blockers.extend(validate_redacted_signature_claim_wording(payload, source_label=source_label))
     for trail, raw_value in collect_string_fields(payload):
         if raw_value == "redacted":
             continue
         candidate = Path(raw_value)
         if not candidate.is_absolute():
             continue
+        blockers.append(
+            {
+                "reason": "signature_manifest_absolute_path_string",
+                "label": f"{source_label}:{trail}",
+                "value": raw_value,
+            }
+        )
         blockers.extend(
             path_blockers(
                 candidate,
@@ -10648,6 +10939,7 @@ def validate_manifest(
             protected_root=protected_root,
             mode=mode,
             strict_target_set_coverage=strict_target_set_coverage,
+            expected_binary_sha256=expected_binary_sha256,
         )
     )
     blockers.extend(validate_redacted_scriptstruct_signature_manifest(payload, source_label=str(resolved), mode=mode))

@@ -36,10 +36,16 @@ This file is an active routing table only. Durable evidence belongs in
 - GitHub work may be delegated only for an evidenced, stable milestone. No tag or
   release-ref push has release-manager/lead authorization for this current-turn; this
   handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
-- No server target has standing approval. Technical progress is only a reason to request a
-  scoped run; it is not approval to change markers/env, start/restart/stop a server, run
-  ReflectionScanner, ptrace/gcore, broad ProcessEvent tracing, runtime observers, or write
-  under protected live paths.
+- Operator approval update, 2026-06-04: `arkserver2` on `TheIsland` is explicitly approved
+  as the debug/development target for necessary ObeliskSDK runtime work and launch
+  acceleration, including the player-principal lifecycle evidence window needed to clear
+  `approved_runtime_evidence_missing`. This approval supersedes the previous no-server
+  standing approval rule for this target only. Before each server-backed run, the lead
+  must still write the exact marker/env changes, start/restart/stop window, rollback
+  plan, evidence paths, and expected final stable posture; this approval does not allow
+  broad unbounded ProcessEvent tracing, raw player text/gameplay payload logging,
+  ReflectionScanner/native-exec/ptrace/gcore/Frida/rr use, Discord, publication, or SDK
+  readiness claims unless those are separately scoped in the run plan.
 - Request-pack/preflight/window-manifest/operator-receipt/sidecar readiness, planning
   acceptance, or route acceptance are operational preparation only; they do not authorize
   runtime work, public identity readiness, public ABI readiness, public SDK readiness, release readiness, command router,
@@ -101,7 +107,8 @@ This file is an active routing table only. Durable evidence belongs in
   `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` are
   `static_accepted` and cite static report SHA256
   `03acc0573b680d3e0b19937b30cc73028c5fd833e3796fe839006941b8779cf4`. Runtime/server
-  authorization remains false. Route-lock expectation:
+  authorization is now approved only for the scoped `arkserver2` / `TheIsland` debug
+  target described in Hard Overrides. Route-lock expectation:
   `approved_runtime_evidence_missing` keeps
   `blocked_until=[approved_runtime_principal_lifecycle_evidence,
   reviewed_identity_public_contract]`.
@@ -120,8 +127,9 @@ This file is an active routing table only. Durable evidence belongs in
   but they are not accepted lifecycle anchors. Current accepted planning anchors for the
   bound route are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`.
 - The next P0 runtime-side blocker is approved copied runtime principal lifecycle
-  evidence. No approved copied runtime principal lifecycle evidence exists yet, and no
-  runtime request is authorized by this file.
+  evidence. No approved copied runtime principal lifecycle evidence exists yet. The
+  approved runtime target for producing it is `arkserver2` on `TheIsland`; preserve the
+  single-module copied-log evidence route and the stable-posture rollback checks.
 - Permissions/admin remains query-only planning until promoted copied identity/principal
   semantics exist. Command response and commands/replies remain blocked by identity and
   permissions/admin.
@@ -145,19 +153,16 @@ This file is an active routing table only. Durable evidence belongs in
   no-runtime-evidence proof should report `approved_runtime_evidence_missing`. If accepted
   approved runtime evidence is supplied to the route, confirm
   `identity_public_contract_gate_missing` and keep all unlock/readiness flags false.
-- P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
-  runtime principal lifecycle evidence. Request/window preparation is offline guardrail
-  work only: request-pack acceptance keeps `server_operations_authorized=false`,
-  `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
-  `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
-  `operator_live_ops_brief`, reviewed server binary path/SHA, exact env/marker
-  boundaries, and sibling `window-request.json`, `observer-window.env`,
-  `operator-approval-request.md`, completed `operator-approval-receipt.json`,
-  `preflight-pre.json`, `preflight-post.json`, `window-manifest.env`, and copied log.
-  Receipts count only for post-window replay; preflight sidecars keep false auth/readiness
-  flags; preserve post-run checks, rollback delta, and no runtime/server authorization.
-  Request packs are pre-window only: started/expired windows fail closed; receipt
-  templates never count.
+- P0 runtime evidence: run the next scoped live-ops brief on approved target `arkserver2`
+  / `TheIsland` to produce copied runtime principal lifecycle evidence. The run must keep
+  plugins disabled, use the player-principal lifecycle observer only, set dispatch limit
+  `0`, use log limit exactly `10` for the first approved evidence, reject residual
+  observer/debug/scanner/callback markers, and preserve the sibling set
+  `window-request.json`, `observer-window.env`, `operator-approval-request.md`,
+  completed `operator-approval-receipt.json`, `preflight-pre.json`,
+  `preflight-post.json`, `window-manifest.env`, and copied `Obelisk.log`. Receipts count
+  only for post-window replay; preserve rollback delta, post-run stable posture, and
+  no-public/no-promotion/no-v1-completion semantics.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
@@ -218,3 +223,24 @@ This file is an active routing table only. Durable evidence belongs in
   GitHub operation.
 - Active SDK split-claim/runtime-cleanup round integrated: request/preflight/window/bundle false aliases, downstream P0 split key/value claim rejection, PluginManager owner-cleanup fallback `0`-removed fail-closed behavior, scoped release-statement outcome-progress rejection, and historical-ledger route boundary are hardened; baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, stable false. Do not rerun full runtime-evidence suites that write `/servidor/ark/workspace-offline` while the active rule forbids `/servidor/ark` writes.
 - Latest 6-agent SDK route/claim hardening round integrated and all agents closed: request-window current-turn approval aliases, identity public-contract nested prose/split overclaims, bound-route positive text claims, SDK mixed-case/support-tier release-statement false positives, Buff/status umbrella promotion paths, and Logger `.`/`..` path aliases are rejected. Baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`; request/route 147 OK, public-contract 108 OK, side-lane 49 OK, SDK full 248 OK, docs/SDK guardrails 556 OK by auditor, runtime CTest 14/14, plugin/timer 38/7 OK; no `/servidor/ark` writes, server/runtime/Discord/GitHub operation.
+- Standby cleanup note: on 2026-06-04, lead explicitly re-closed prior known agent IDs `019e8f9a-3bf8-73f3-a370-b8bf49f51d50`, `019e8f9a-6755-7a31-a573-cdae3ae34127`, `019e8f9a-8eef-7900-9dd7-37d17ffbf66b`, `019e8f9a-ba29-74b0-9c4f-4fdd8a6d2d24`, `019e8f9a-e1c4-73e3-afce-d8066ea65e02`, and `019e8f9b-12a6-7520-9d6f-62731490b631`; the multi-agent tool returned `not found` for all six, so no reachable old standby agent remains in this tool context.
+- Latest SDK fast-path hardening round integrated and six agents closed: approved-runtime
+  evidence/bundle contradictions, route-gate accepted-runtime/public-contract aliases,
+  downstream P0 accounting locks, PluginManager config/plugin directory `.`/`..` and
+  symlink-component rejection, offline artifact target-set/provenance claims, side-lane
+  public/runtime/v1/support-tier aliases, and SDK secondary text claims for public package
+  / Plugin Hub / runtime delivery are hardened. Validation: approved-evidence/bundle 139
+  OK, route/bound-route 72 OK, P0 downstream 163 OK, side-lanes 95 OK, offline artifact
+  414 OK, SDK completion 250 OK, plugin/event guardrails 45 OK, runtime CTest
+  PluginManager/EventManager/Logger 3/3 OK, full CMake build OK, `py_compile` and
+  `git diff --check` OK. Route JSON remains planning-only at
+  `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`.
+- Runtime fast-path note: after the 2026-06-04 operator approval, read-only preflight on
+  `arkserver2` / `TheIsland` found no running ShooterGameServer process and found
+  LinuxGSM wrapper drift. The fastest safe next operation is to commit this checkpoint,
+  install rebuilt runtime/SDK package-shape artifacts with backup, refresh
+  `ObeliskRun.sh`, prepare a fresh player-principal lifecycle request pack, run the
+  bounded observer window, copy `Obelisk.log`, rollback to stable posture, and build the
+  approved runtime evidence bundle. See
+  `docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md`.
