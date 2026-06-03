@@ -160,10 +160,47 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/operator-approval-receipt.json",
         )
         self.assertIn("--post-window-replay", replay_contract["checks"]["window_manifest_replay"])
-        self.assertIn("does not authorize runtime work", replay_contract["non_authorization"])
+        self.assertIn("does not authorize runtime work, server operations", replay_contract["non_authorization"])
+        binding = request["operator_live_ops_brief"]["artifact_binding"]
+        self.assertEqual(binding["run_id"], request["run_id"])
+        self.assertEqual(binding["copied_evidence_dir"], request["copied_evidence_dir"])
+        self.assertEqual(binding["copied_log_path"], request["copied_log_path"])
+        self.assertEqual(binding["window_manifest_path"], request["window_manifest_path"])
+        self.assertEqual(binding["binding_claim"], "exact_run_id_window_artifacts_only")
+        self.assertIn("does not authorize runtime work", binding["non_authorization"])
+        self.assertIn("server operations", binding["non_authorization"])
+        self.assertEqual(
+            binding["required_sidecars"]["operator_approval_receipt_json"],
+            replay_contract["sidecars"]["operator_approval_receipt_path"],
+        )
+        self.assertEqual(
+            binding["required_sidecars"]["preflight_post_json"],
+            replay_contract["sidecars"]["preflight_post_path"],
+        )
         self.assertIn("enable-player-principal-lifecycle-observer", request["marker_set"])
         self.assertIn("enable-reflection-scanner", request["forbidden_markers"])
         self.assertIn("does not claim stable principal identity", request["non_claims"])
+        evidence_capture = request["operator_live_ops_brief"]["evidence_capture"]
+        self.assertEqual(
+            evidence_capture["request_pack_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/window-request.json",
+        )
+        self.assertEqual(
+            evidence_capture["observer_env_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/observer-window.env",
+        )
+        self.assertEqual(
+            evidence_capture["preflight_pre_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-pre.json",
+        )
+        self.assertEqual(
+            evidence_capture["preflight_post_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-post.json",
+        )
+        self.assertIn(
+            "does not authorize server operations, marker/env changes",
+            request["operator_live_ops_brief"]["non_authorization"],
+        )
         self.assertEqual(
             request["operator_live_ops_brief"]["post_run_stable_posture"]["verification_commands"],
             [

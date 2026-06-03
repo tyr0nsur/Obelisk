@@ -1281,6 +1281,16 @@ def run_command_permission_route_gate(
     source_checker_ready = critical_path_phase.get("source_checker_ready")
     source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
     route_blockers = payload.get("blockers", [])
+    route_checks = payload.get("checks")
+    approved_runtime_evidence_forwarded = False
+    if isinstance(route_checks, list):
+        for check in route_checks:
+            if not isinstance(check, dict) or check.get("name") != "player_identity_public_contract_gap":
+                continue
+            argv = check.get("argv")
+            if isinstance(argv, list) and "--approved-runtime-evidence" in argv:
+                approved_runtime_evidence_forwarded = True
+                break
     expected_lock_by_blocker = {
         "lifecycle_anchor_first_evidence_provenance_unbound": [
             "bound_lifecycle_anchor_and_principal_policy_sources",
@@ -1291,6 +1301,10 @@ def run_command_permission_route_gate(
             "reviewed_identity_public_contract",
         ],
     }
+    if approved_runtime_evidence_forwarded:
+        expected_lock_by_blocker["identity_public_contract_gate_missing"] = [
+            "reviewed_identity_public_contract",
+        ]
     expected_route_lock = expected_lock_by_blocker.get(current_blocker)
     if current_blocker not in expected_lock_by_blocker:
         blockers.append("command_permission_route_gate_default_blocker_mismatch")

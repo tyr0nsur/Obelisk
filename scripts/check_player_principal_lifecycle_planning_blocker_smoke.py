@@ -17,6 +17,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    REQUIRED_CONSUMER_CASES,
+    REQUIRED_OBSERVED_EVENT_CASES,
+)
+
 
 REPORT_SCHEMA = "obelisk.player-principal-lifecycle-planning-blocker-smoke.v1"
 EXPECTED_BLOCKER = "approved_runtime_evidence_missing"
@@ -33,6 +38,42 @@ EXPECTED_START_TARGETS = ("ShooterGameMode.HandleNewPlayer",)
 EXPECTED_END_TARGETS = ("ShooterGameMode.OnLogout",)
 NO_RUNTIME_NON_CLAIM = "no runtime or server operation was performed"
 NO_PUBLIC_SDK_NON_CLAIM = "no public SDK, public ABI, release, or v1 completion readiness is claimed"
+APPROVED_MANIFEST_CHECKER = "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
+APPROVED_MANIFEST_BUILDER = "scripts/build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
+
+
+def required_runtime_event_cases() -> list[dict[str, Any]]:
+    cases = [
+        {
+            "case": "observer_enable",
+            "source": "runtime_observer_gate",
+            "target_set": "players-lifecycle-anchor-candidates",
+            "limit": 10,
+            "dispatch_limit": 0,
+            "delivery_claim": "none",
+            "principal_claim": "none",
+        }
+    ]
+    labels = {
+        "session_start": "session_start_anchor",
+        "session_start_rejected": "session_start_rejected_anchor",
+        "session_end": "session_end_anchor",
+    }
+    for case in REQUIRED_OBSERVED_EVENT_CASES:
+        role = str(case["role"])
+        cases.append({"case": labels[role], **case})
+    return cases
+
+
+def required_consumer_cases() -> list[dict[str, Any]]:
+    return [
+        {
+            "case": case,
+            "result": "fail_closed",
+            "provenance": "consumer_boundary_assertion_not_runtime_observation",
+        }
+        for case in sorted(REQUIRED_CONSUMER_CASES)
+    ]
 
 
 @dataclass
@@ -277,6 +318,18 @@ def build_report(root: Path, manifests: dict[str, LoadedManifest | None], blocke
         },
         "accepted_start_targets": list(EXPECTED_START_TARGETS) if planning_ready else [],
         "accepted_end_targets": list(EXPECTED_END_TARGETS) if planning_ready else [],
+        "approved_manifest_checker": APPROVED_MANIFEST_CHECKER,
+        "approved_manifest_builder": APPROVED_MANIFEST_BUILDER,
+        "required_runtime_event_cases": required_runtime_event_cases(),
+        "required_consumer_cases": required_consumer_cases(),
+        "next_runtime_artifact_contract": {
+            "required_artifact": "approved_runtime_principal_lifecycle_evidence",
+            "required_builder": APPROVED_MANIFEST_BUILDER,
+            "required_checker": APPROVED_MANIFEST_CHECKER,
+            "required_window_replay": "--post-window-replay",
+            "source_summary_module": "player_principal_lifecycle",
+            "non_authorization": "planning smoke only; this contract does not authorize runtime work",
+        },
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [

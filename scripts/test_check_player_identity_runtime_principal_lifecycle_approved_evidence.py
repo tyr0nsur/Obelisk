@@ -364,9 +364,9 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
 
 
 def analyzer_summary() -> dict:
-    temp_dir = temp_offline_workspace()
-    LIVE_TEMP_DIRS.append(temp_dir)
-    log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+    if not OFFLINE_WORKSPACE.is_dir():
+        raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
+    log_path = OFFLINE_WORKSPACE / "live-validation-logs" / RUN_ID / "Obelisk.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
     result = subprocess.run(

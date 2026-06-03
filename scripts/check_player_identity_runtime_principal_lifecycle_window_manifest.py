@@ -27,6 +27,7 @@ from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_TEXT as REQUEST_APPROVAL_TEXT,
     EXPECTED_SERVER_BINARY_PATH,
     MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
+    REPLAY_NON_AUTHORIZATION,
     request_pack_digest,
 )
 from snapshot_evidence_pack import reject_symlink_component
@@ -1448,7 +1449,7 @@ def validate_request_pack_replay_contract(
         add(blockers, "request_pack_post_window_replay_contract_required_mismatch", "request_pack_path")
     if contract.get("offline_only") is not True:
         add(blockers, "request_pack_post_window_replay_contract_offline_only_mismatch", "request_pack_path")
-    if contract.get("non_authorization") != "post-window replay contract only; does not authorize runtime work":
+    if contract.get("non_authorization") != REPLAY_NON_AUTHORIZATION:
         add(blockers, "request_pack_post_window_replay_contract_non_authorization_mismatch", "request_pack_path")
     sidecars = contract.get("sidecars")
     if not isinstance(sidecars, dict):

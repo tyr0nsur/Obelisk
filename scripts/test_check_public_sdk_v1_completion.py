@@ -27,6 +27,7 @@ from check_public_sdk_v1_completion import (
     secondary_report_completion_claims_without_blocker,
     surface_has_promotion_evidence,
 )
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
     manifest as approved_runtime_principal_lifecycle_manifest,
 )
@@ -235,6 +236,28 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "sha256": hashlib.sha256(data).hexdigest(),
         }
 
+    def write_approved_runtime_evidence_artifacts(self, manifest_path: Path, report_path: Path) -> dict[str, str]:
+        manifest_payload = approved_runtime_principal_lifecycle_manifest()
+        data = json.dumps(manifest_payload, sort_keys=True).encode("utf-8")
+        manifest_path.write_bytes(data)
+        validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(
+            manifest_payload,
+            check_mode="consume",
+        )
+        report = approved_runtime_principal_lifecycle_evidence.build_report(
+            manifest_payload,
+            validation,
+            check_mode="consume",
+        )
+        report_path.write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+        return {
+            "approved_runtime_evidence_manifest": {
+                "path": str(manifest_path.relative_to(REPO_ROOT)),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            },
+            "approved_runtime_evidence_report": str(report_path.relative_to(REPO_ROOT)),
+        }
+
     def identity_structured_missing_for_contract_report(self, contract_payload: dict[str, object]) -> list[str]:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
             root = Path(core_dir)
@@ -242,22 +265,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             runtime_report = root / "player_identity_approved_runtime_report.json"
             contract_report = root / "player_identity_public_contract_readiness_report.json"
             executed_report = root / "player_identity_executed_tests.json"
-            runtime_manifest_binding = self.write_approved_runtime_manifest_binding(runtime_manifest)
-            runtime_report.write_text(
-                json.dumps(
-                    {
-                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
-                        "ready_scope": "runtime_evidence_only",
-                        "approved_runtime_evidence_present": True,
-                        "runtime_evidence_ready": True,
-                        "promotion_ready": False,
-                        "public_sdk_ready": False,
-                        "runtime_ready": False,
-                        "next_blocker": "identity_public_contract_gate_missing",
-                    }
-                ),
-                encoding="utf-8",
-            )
+            runtime_artifacts = self.write_approved_runtime_evidence_artifacts(runtime_manifest, runtime_report)
             contract_report.write_text(json.dumps(contract_payload), encoding="utf-8")
             executed_report_path = write_executed_test_artifact(
                 executed_report,
@@ -266,8 +274,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
             return player_identity_structured_promotion_evidence_missing(
                 {
-                    "approved_runtime_evidence_manifest": runtime_manifest_binding,
-                    "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
+                    **runtime_artifacts,
                     "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
                     "executed_test_report": executed_report_path,
                 }
@@ -278,22 +285,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         runtime_report = root / "player_identity_approved_runtime_report.json"
         contract_report = root / "player_identity_public_contract_readiness_report.json"
         executed_report = root / "player_identity_executed_tests.json"
-        runtime_manifest_binding = self.write_approved_runtime_manifest_binding(runtime_manifest)
-        runtime_report.write_text(
-            json.dumps(
-                {
-                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
-                    "ready_scope": "runtime_evidence_only",
-                    "approved_runtime_evidence_present": True,
-                    "runtime_evidence_ready": True,
-                    "promotion_ready": False,
-                    "public_sdk_ready": False,
-                    "runtime_ready": False,
-                    "next_blocker": "identity_public_contract_gate_missing",
-                }
-            ),
-            encoding="utf-8",
-        )
+        runtime_artifacts = self.write_approved_runtime_evidence_artifacts(runtime_manifest, runtime_report)
         contract_report.write_text(
             json.dumps(
                 {
@@ -348,8 +340,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             argv=["python3", "-m", "unittest", "player_identity_promotion"],
         )
         return {
-            "approved_runtime_evidence_manifest": runtime_manifest_binding,
-            "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
+            **runtime_artifacts,
             "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
             "executed_test_report": executed_report_path,
         }
@@ -1037,6 +1028,67 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             if row["surface"] in payload["v1_required_dependency_chain"]:
                 self.assertFalse(row["route_gate_claim_satisfied"], row)
                 self.assertTrue(row["unresolved_for_complete_sdk_claim"], row)
+
+    def test_completion_gate_accepts_identity_public_contract_blocker_with_approved_runtime_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                critical_path_phase={
+                    "current_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_next_blocker": None,
+                    "source_checker_status": "blocked",
+                    "source_checker_ready": False,
+                    "source_checker_accepted_for_internal_planning": False,
+                },
+                route_lock={
+                    "locked": True,
+                    "blocked_until": ["reviewed_identity_public_contract"],
+                },
+                checks=[
+                    {
+                        "name": "player_identity_public_contract_gap",
+                        "argv": [
+                            "check_player_identity_public_contract_gap_report.py",
+                            "--approved-runtime-evidence",
+                            str(Path(temp_dir) / "approved-runtime-principal-lifecycle.json"),
+                        ],
+                    }
+                ],
+            )
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        route_gate = payload["command_permission_route_gate"]
+        progress = payload["v1_sdk_progress"]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(route_gate["completion_gate_accepted"])
+        self.assertEqual(route_gate["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(route_gate["source_checker_primary_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(route_gate["route_lock_blocked_until"], ["reviewed_identity_public_contract"])
+        self.assertFalse(route_gate["counts_toward_public_sdk"])
+        self.assertFalse(route_gate["counts_toward_runtime"])
+        self.assertFalse(route_gate["counts_toward_v1_completion"])
+        self.assertFalse(route_gate["public_or_runtime_accounting_allowed"])
+        self.assertNotIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
+        self.assertNotIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
+        self.assertNotIn("command_permission_route_gate_default_lock_blocked_until_unexpected", payload["blockers"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["stable_release_contract_claim_allowed"])
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
+        self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["runtime_required_blockers"]["route_gate_current_blockers"],
+            ["identity_public_contract_gate_missing"],
+        )
 
     def test_completion_gate_binds_executed_test_artifacts_to_selected_manifest_and_header(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))

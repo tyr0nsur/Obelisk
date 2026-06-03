@@ -63,6 +63,43 @@ class PlayerPrincipalLifecyclePlanningBlockerSmokeTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(report["accepted_start_targets"], ["ShooterGameMode.HandleNewPlayer"])
         self.assertEqual(report["accepted_end_targets"], ["ShooterGameMode.OnLogout"])
+        self.assertEqual(
+            report["approved_manifest_checker"],
+            "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py",
+        )
+        self.assertEqual(
+            report["next_runtime_artifact_contract"]["required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence",
+        )
+        self.assertEqual(
+            report["next_runtime_artifact_contract"]["required_window_replay"],
+            "--post-window-replay",
+        )
+        self.assertEqual(
+            [case["case"] for case in report["required_runtime_event_cases"]],
+            [
+                "observer_enable",
+                "session_start_anchor",
+                "session_start_rejected_anchor",
+                "session_end_anchor",
+            ],
+        )
+        self.assertEqual(
+            report["required_runtime_event_cases"][1],
+            {
+                "case": "session_start_anchor",
+                "target": "ShooterGameMode.HandleNewPlayer",
+                "role": "session_start",
+                "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                "copied_bool_values": ["1", "1"],
+                "principal_action": "candidate_created",
+            },
+        )
+        self.assertEqual(
+            [case["case"] for case in report["required_consumer_cases"]],
+            ["malformed_or_unsupported_evidence", "stale_after_logout"],
+        )
+        self.assertTrue(all(case["result"] == "fail_closed" for case in report["required_consumer_cases"]))
 
     def test_rejects_policy_blocker_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

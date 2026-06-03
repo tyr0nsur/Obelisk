@@ -897,9 +897,8 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                     body = extract_function_body(text, signature)
                 except AssertionError:
                     continue
-                if "std::exception_ptr deferredFailure" not in body:
-                    continue
                 with self.subTest(source=source.name, signature=signature):
+                    self.assertIn("std::exception_ptr deferredFailure", body)
                     self.assertIn("uint64_t cleanupBatchId = 0", body)
                     self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
                     self.assertTrue(

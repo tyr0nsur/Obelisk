@@ -171,7 +171,30 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request["post_window_replay_contract"]["sidecars"]["operator_approval_receipt_path"],
             brief["evidence_capture"]["operator_approval_receipt_path"],
         )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["request_pack_path"],
+            brief["evidence_capture"]["request_pack_path"],
+        )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["observer_env_path"],
+            brief["evidence_capture"]["observer_env_path"],
+        )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["preflight_pre_path"],
+            brief["evidence_capture"]["preflight_pre_path"],
+        )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["preflight_post_path"],
+            brief["evidence_capture"]["preflight_post_path"],
+        )
+        self.assertEqual(request["run_id"], brief["artifact_binding"]["run_id"])
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["window_manifest_path"],
+            brief["artifact_binding"]["required_sidecars"]["window_manifest_env"],
+        )
+        self.assertEqual("exact_run_id_window_artifacts_only", brief["artifact_binding"]["binding_claim"])
         self.assertEqual("completed_operator_receipt", brief["evidence_capture"]["operator_approval_receipt_required"])
+        self.assertIn("does not authorize server operations, marker/env changes", brief["non_authorization"])
         self.assertEqual(
             [
                 [
@@ -229,6 +252,23 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_operator_live_ops_brief_artifact_binding_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["artifact_binding"]["required_sidecars"][
+                "preflight_post_json"
+            ] = "/servidor/ark/workspace-offline/live-validation-logs/other/preflight-post.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_artifact_binding_mismatch", report["blockers"])
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
 
     def test_rejects_operator_live_ops_brief_template_receipt_requirement(self) -> None:
@@ -433,6 +473,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
         self.assertIn("post_window_replay_contract_observer_env_path_not_approved_offline_workspace", report["blockers"])
+        self.assertIn("post_window_replay_contract_observer_env_path_not_exact_expected_path", report["blockers"])
 
     def test_rejects_post_window_replay_contract_receipt_path_outside_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -458,6 +499,38 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
         self.assertIn(
             "post_window_replay_contract_operator_approval_receipt_path_not_approved_offline_workspace",
+            report["blockers"],
+        )
+        self.assertIn(
+            "post_window_replay_contract_operator_approval_receipt_path_not_exact_expected_path",
+            report["blockers"],
+        )
+
+    def test_rejects_post_window_replay_contract_sidecar_in_wrong_run_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["post_window_replay_contract"]["sidecars"]["preflight_post_path"] = (
+                "/servidor/ark/workspace-offline/live-validation-logs/"
+                f"{request['run_id']}-other/preflight-post.json"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
+        self.assertIn(
+            "post_window_replay_contract_preflight_post_path_not_exact_expected_path",
             report["blockers"],
         )
 

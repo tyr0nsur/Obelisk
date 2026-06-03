@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-06-02
+Updated: 2026-06-03
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -1232,6 +1232,19 @@ priorities, and do not use history files as the active source of truth.
   Validation included analyzer/approved-evidence/window/request/route/SDK tests, C++
   dispatcher and PluginManager tests, guardrails, py_compile, route/SDK JSON, and
   `git diff --check`; no runtime/server op.
+- 2026-06-03 supervised 4-agent integration follow-up: runtime window request packs now
+  bind exact run-id artifacts in `operator_live_ops_brief.artifact_binding`, replay
+  sidecars must match exact expected paths, planning smoke JSON lists the required
+  approved-runtime event/consumer cases, SDK accounting allows the post-runtime
+  `identity_public_contract_gate_missing` blocker only when `--approved-runtime-evidence`
+  was forwarded to the identity contract gap checker, and Mission copied-bool granular
+  unregister propagates deferred `DestroyUserData` failures. Window-manifest replay now
+  imports the shared replay non-authorization constant; approved-runtime test fixtures use
+  replay-built reports. Validations passed: request/window/planning/approved-runtime tests,
+  route gate tests, full SDK completion suite, PluginManager guardrails, Mission C++ test,
+  route/SDK JSON, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

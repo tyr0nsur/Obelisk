@@ -26,6 +26,7 @@ from snapshot_evidence_pack import first_symlink_component, reject_symlink_compo
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_RECEIPT_SCHEMA,
     APPROVAL_TEXT,
+    BRIEF_NON_AUTHORIZATION,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
@@ -34,10 +35,12 @@ from prepare_player_principal_lifecycle_window_request import (
     MAX_REQUEST_PREPARATION_LEAD_SECONDS,
     NON_CLAIMS,
     REQUIRED_ENV,
+    REPLAY_NON_AUTHORIZATION,
     RUN_ID_RE,
     SCHEMA,
     UTC_RE,
     WINDOW_MARKERS,
+    artifact_binding,
     bound_artifact,
     env_lines,
     markdown_request,
@@ -96,6 +99,7 @@ EXPECTED_OPERATOR_BRIEF_KEYS = frozenset(
         "notice_path",
         "user_policy",
         "evidence_capture",
+        "artifact_binding",
         "rollback",
         "post_run_stable_posture",
         "approval_boundary",
@@ -117,14 +121,39 @@ EXPECTED_MARKER_CHANGE_KEYS = frozenset(("set", "forbidden"))
 EXPECTED_WINDOW_BRIEF_KEYS = frozenset(("start_utc", "end_utc", "expectation", "final_posture"))
 EXPECTED_EVIDENCE_CAPTURE_KEYS = frozenset(
     (
+        "request_pack_path",
         "copied_evidence_dir",
         "copied_log_path",
         "window_manifest_path",
         "observer_env_file",
+        "observer_env_path",
         "operator_approval_receipt_path",
         "operator_approval_receipt_required",
+        "preflight_pre_path",
+        "preflight_post_path",
         "single_module_summary",
         "copied_log_only",
+    )
+)
+EXPECTED_ARTIFACT_BINDING_KEYS = frozenset(
+    (
+        "run_id",
+        "copied_evidence_dir",
+        "copied_log_path",
+        "window_manifest_path",
+        "required_sidecars",
+        "binding_claim",
+        "non_authorization",
+    )
+)
+EXPECTED_ARTIFACT_BINDING_SIDECAR_KEYS = frozenset(
+    (
+        "window_request_json",
+        "observer_window_env",
+        "operator_approval_receipt_json",
+        "preflight_pre_json",
+        "preflight_post_json",
+        "window_manifest_env",
     )
 )
 EXPECTED_POST_RUN_KEYS = frozenset(
@@ -633,6 +662,14 @@ def validate_post_window_replay_contract(payload: dict[str, Any], blockers: list
         return
     if contract != expected:
         add(blockers, "post_window_replay_contract_mismatch", "post_window_replay_contract", expected=expected, actual=contract)
+    if contract.get("non_authorization") != REPLAY_NON_AUTHORIZATION:
+        add(
+            blockers,
+            "post_window_replay_contract_non_authorization_mismatch",
+            "post_window_replay_contract.non_authorization",
+            expected=REPLAY_NON_AUTHORIZATION,
+            actual=contract.get("non_authorization"),
+        )
     sidecars = contract.get("sidecars")
     if not isinstance(sidecars, dict):
         return
@@ -663,6 +700,15 @@ def validate_post_window_replay_contract(payload: dict[str, Any], blockers: list
             add(blockers, f"post_window_replay_contract_{key}_not_approved_offline_workspace", f"post_window_replay_contract.sidecars.{key}", resolved=str(status.resolved))
         if status.resolved.name != expected_name:
             add(blockers, f"post_window_replay_contract_{key}_filename_mismatch", f"post_window_replay_contract.sidecars.{key}", expected=expected_name, actual=status.resolved.name)
+        expected_path = Path(expected["sidecars"][key]).resolve()
+        if status.resolved != expected_path:
+            add(
+                blockers,
+                f"post_window_replay_contract_{key}_not_exact_expected_path",
+                f"post_window_replay_contract.sidecars.{key}",
+                expected=str(expected_path),
+                resolved=str(status.resolved),
+            )
 
 
 def args_for_env(payload: dict[str, Any]) -> argparse.Namespace:
@@ -717,17 +763,22 @@ def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) ->
             "notice_path": payload["notice_path"],
             "user_policy": payload["user_policy"],
             "evidence_capture": {
+                "request_pack_path": payload["post_window_replay_contract"]["sidecars"]["request_pack_path"],
                 "copied_evidence_dir": payload["copied_evidence_dir"],
                 "copied_log_path": payload["copied_log_path"],
                 "window_manifest_path": payload["window_manifest_path"],
                 "observer_env_file": payload["observer_env_file"],
+                "observer_env_path": payload["post_window_replay_contract"]["sidecars"]["observer_env_path"],
                 "operator_approval_receipt_path": payload["post_window_replay_contract"]["sidecars"][
                     "operator_approval_receipt_path"
                 ],
                 "operator_approval_receipt_required": "completed_operator_receipt",
+                "preflight_pre_path": payload["post_window_replay_contract"]["sidecars"]["preflight_pre_path"],
+                "preflight_post_path": payload["post_window_replay_contract"]["sidecars"]["preflight_post_path"],
                 "single_module_summary": "player_principal_lifecycle",
                 "copied_log_only": True,
             },
+            "artifact_binding": artifact_binding(payload),
             "rollback": payload["rollback"],
             "post_run_stable_posture": {
                 "required": True,
@@ -737,7 +788,7 @@ def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) ->
                 "verification_commands": post_run_verification_commands(payload),
             },
             "approval_boundary": APPROVAL_TEXT,
-            "non_authorization": "brief only; request-pack acceptance does not authorize operations",
+            "non_authorization": BRIEF_NON_AUTHORIZATION,
         }
     except (KeyError, TypeError):
         return None
@@ -757,6 +808,14 @@ def validate_operator_live_ops_brief(payload: dict[str, Any], env: list[str], bl
     require_keys(brief.get("marker_changes"), required=EXPECTED_MARKER_CHANGE_KEYS, label="operator_live_ops_brief_marker_changes", blockers=blockers)
     require_keys(brief.get("start_restart_stop_window"), required=EXPECTED_WINDOW_BRIEF_KEYS, label="operator_live_ops_brief_window", blockers=blockers)
     evidence_capture = require_keys(brief.get("evidence_capture"), required=EXPECTED_EVIDENCE_CAPTURE_KEYS, label="operator_live_ops_brief_evidence_capture", blockers=blockers)
+    binding = require_keys(brief.get("artifact_binding"), required=EXPECTED_ARTIFACT_BINDING_KEYS, label="operator_live_ops_brief_artifact_binding", blockers=blockers)
+    if isinstance(binding, dict):
+        require_keys(
+            binding.get("required_sidecars"),
+            required=EXPECTED_ARTIFACT_BINDING_SIDECAR_KEYS,
+            label="operator_live_ops_brief_artifact_binding_required_sidecars",
+            blockers=blockers,
+        )
     require_keys(brief.get("post_run_stable_posture"), required=EXPECTED_POST_RUN_KEYS, label="operator_live_ops_brief_post_run_stable_posture", blockers=blockers)
     if isinstance(evidence_capture, dict):
         if evidence_capture.get("operator_approval_receipt_required") != "completed_operator_receipt":
@@ -775,14 +834,27 @@ def validate_operator_live_ops_brief(payload: dict[str, Any], env: list[str], bl
                 "operator_live_ops_brief.evidence_capture.operator_approval_receipt_path",
                 value=receipt_path,
             )
-    if brief.get("non_authorization") != "brief only; request-pack acceptance does not authorize operations":
+    if brief.get("non_authorization") != BRIEF_NON_AUTHORIZATION:
         add(
             blockers,
             "operator_live_ops_brief_non_authorization_mismatch",
             "operator_live_ops_brief.non_authorization",
-            expected="brief only; request-pack acceptance does not authorize operations",
+            expected=BRIEF_NON_AUTHORIZATION,
             actual=brief.get("non_authorization"),
         )
+    if isinstance(binding, dict):
+        try:
+            expected_binding = artifact_binding(payload)
+        except (KeyError, TypeError):
+            expected_binding = None
+        if expected_binding is not None and binding != expected_binding:
+            add(
+                blockers,
+                "operator_live_ops_brief_artifact_binding_mismatch",
+                "operator_live_ops_brief.artifact_binding",
+                expected=expected_binding,
+                actual=binding,
+            )
     expected = expected_operator_live_ops_brief(payload, env)
     if expected is not None and brief != expected:
         add(blockers, "operator_live_ops_brief_mismatch", "operator_live_ops_brief", expected=expected, actual=brief)

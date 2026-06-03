@@ -658,6 +658,102 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "deferred destroy mission callback survived cleanup");
     }
 
+    struct RetryingGranularDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 1;
+    };
+
+    void BlockingGranularDestroyCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<RetryingGranularDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FailsOnceGranularDestroy(void* userData)
+    {
+        auto* state = static_cast<RetryingGranularDestroyState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected granular mission destroy failure");
+        }
+    }
+
+    void TestGranularUnregisterPropagatesDeferredDestroyFailure()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        RetryingGranularDestroyState state;
+        std::atomic<bool> unregisterThrew{false};
+        std::atomic<bool> unregisterFinished{false};
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        const uint64_t id = dispatcher.Register(&owner, {
+            BlockingGranularDestroyCallback,
+            &state,
+            FailsOnceGranularDestroy,
+        });
+        Require(id != 0, "granular deferred destroy mission registration failed");
+
+        std::thread dispatchThread([&dispatcher, &bools]() {
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                    "granular deferred destroy mission callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "granular deferred destroy mission callback did not enter");
+        }
+
+        std::thread unregisterThread([&]() {
+            try
+            {
+                (void)dispatcher.Unregister(id);
+            }
+            catch (const std::runtime_error&)
+            {
+                unregisterThrew.store(true, std::memory_order_release);
+            }
+            unregisterFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "granular unregister did not remove mission callback during dispatch");
+        Require(!unregisterFinished.load(std::memory_order_acquire),
+                "granular unregister completed before deferred destroy mission dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        unregisterThread.join();
+
+        Require(unregisterThrew.load(std::memory_order_acquire),
+                "granular unregister hid deferred mission DestroyUserData failure");
+        Require(state.DestroyCalls == 2,
+                "granular unregister did not retry the failed deferred mission DestroyUserData");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "granular unregister left mission callback dispatchable after failure");
+        Require(!dispatcher.Unregister(id), "completed granular mission unregister was not idempotent");
+    }
+
     void TestCallbackExceptionDoesNotStopDispatch()
     {
         MissionCopiedBoolEventDispatcher dispatcher;
@@ -805,6 +901,7 @@ int main()
         TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
+        TestGranularUnregisterPropagatesDeferredDestroyFailure();
         TestCallbackExceptionDoesNotStopDispatch();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();
         TestOwnerCleanupRetriesFailedDestroyUserData();

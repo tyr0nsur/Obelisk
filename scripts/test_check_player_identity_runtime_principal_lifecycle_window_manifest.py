@@ -2386,7 +2386,6 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
-        self.assertIn("copied_log_file_missing", report["blockers"])
         self.assertIn("copied_log_sha256_placeholder", report["blockers"])
 
 

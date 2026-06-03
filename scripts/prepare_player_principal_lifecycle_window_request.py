@@ -33,6 +33,18 @@ MAX_APPROVED_WINDOW_SECONDS = 600
 MAX_REQUEST_PREPARATION_LEAD_SECONDS = 3600
 MAX_OPERATOR_APPROVAL_LEAD_SECONDS = 600
 APPROVAL_TEXT = "current-turn operator-approved runtime window, not standing approval"
+REPLAY_NON_AUTHORIZATION = (
+    "post-window replay contract only; does not authorize runtime work, server operations, "
+    "marker/env changes, starts, restarts, or stops"
+)
+BRIEF_NON_AUTHORIZATION = (
+    "brief only; request-pack acceptance does not authorize server operations, marker/env "
+    "changes, starts, restarts, stops, or runtime capture"
+)
+ARTIFACT_BINDING_NON_AUTHORIZATION = (
+    "artifact binding only; does not authorize runtime work, server operations, "
+    "marker/env changes, public readiness, or promotion"
+)
 POSTURE_GUARDRAIL_TEXT = (
     "player-principal lifecycle request packs require --final-posture stable; "
     "stopped/stop-after-window is not supported because downstream manifest and "
@@ -265,7 +277,30 @@ def post_window_replay_contract(
                 str(evidence_dir / "window-manifest.env"),
             ],
         },
-        "non_authorization": "post-window replay contract only; does not authorize runtime work",
+        "non_authorization": REPLAY_NON_AUTHORIZATION,
+    }
+
+
+def artifact_binding(payload: dict[str, Any]) -> dict[str, Any]:
+    replay_contract = payload.get("post_window_replay_contract")
+    if not isinstance(replay_contract, dict):
+        replay_contract = post_window_replay_contract(payload)
+    sidecars = replay_contract["sidecars"]
+    return {
+        "run_id": payload["run_id"],
+        "copied_evidence_dir": payload["copied_evidence_dir"],
+        "copied_log_path": payload["copied_log_path"],
+        "window_manifest_path": payload["window_manifest_path"],
+        "required_sidecars": {
+            "window_request_json": sidecars["request_pack_path"],
+            "observer_window_env": sidecars["observer_env_path"],
+            "operator_approval_receipt_json": sidecars["operator_approval_receipt_path"],
+            "preflight_pre_json": sidecars["preflight_pre_path"],
+            "preflight_post_json": sidecars["preflight_post_path"],
+            "window_manifest_env": sidecars["window_manifest_path"],
+        },
+        "binding_claim": "exact_run_id_window_artifacts_only",
+        "non_authorization": ARTIFACT_BINDING_NON_AUTHORIZATION,
     }
 
 
@@ -302,15 +337,20 @@ def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str
         "notice_path": payload["notice_path"],
         "user_policy": payload["user_policy"],
         "evidence_capture": {
+            "request_pack_path": replay_contract["sidecars"]["request_pack_path"],
             "copied_evidence_dir": payload["copied_evidence_dir"],
             "copied_log_path": payload["copied_log_path"],
             "window_manifest_path": payload["window_manifest_path"],
             "observer_env_file": payload["observer_env_file"],
+            "observer_env_path": replay_contract["sidecars"]["observer_env_path"],
             "operator_approval_receipt_path": replay_contract["sidecars"]["operator_approval_receipt_path"],
             "operator_approval_receipt_required": "completed_operator_receipt",
+            "preflight_pre_path": replay_contract["sidecars"]["preflight_pre_path"],
+            "preflight_post_path": replay_contract["sidecars"]["preflight_post_path"],
             "single_module_summary": "player_principal_lifecycle",
             "copied_log_only": True,
         },
+        "artifact_binding": artifact_binding(payload),
         "rollback": payload["rollback"],
         "post_run_stable_posture": {
             "required": True,
@@ -320,7 +360,7 @@ def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str
             "verification_commands": post_run_verification_commands(payload),
         },
         "approval_boundary": APPROVAL_TEXT,
-        "non_authorization": "brief only; request-pack acceptance does not authorize operations",
+        "non_authorization": BRIEF_NON_AUTHORIZATION,
     }
 
 

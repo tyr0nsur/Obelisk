@@ -204,12 +204,13 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
 - Latest round delegated runtime-evidence prep, SDK accounting, reversing/static audit,
-  and runtime ABI. Integrated result: request prep is limited to one hour before the
-  approved window, completed receipts to ten minutes before window start, approved runtime
-  manifests reject broad `ProcessEvent detour hit` traces, route checks forward supplied
+  and runtime ABI. Integrated result: request packs now bind exact run-id artifacts in the
+  operator brief and replay sidecars, planning smoke JSON exposes the required runtime
+  event/consumer cases for the next approved manifest, route checks forward supplied
   approved runtime evidence into the identity public-contract gap checker, SDK accounting
-  reads canonical `current_route_blocker`, and copied dispatchers retain every failed
-  deferred `DestroyUserData` subscription in a cleanup batch for retry. Reversing audit
-  confirms repo-local/static evidence cannot clear `approved_runtime_evidence_missing`;
-  only an operator-approved runtime window plus copied-log post-window replay can. SDK
-  remains blocked, `stable_claim_allowed=false`; no runtime/server op. Agents closed.
+  accepts `identity_public_contract_gate_missing` only when that runtime input was
+  forwarded, and Mission copied-bool granular unregister now propagates deferred
+  `DestroyUserData` failures. Window-manifest replay uses the shared replay
+  non-authorization constant. Route JSON remains valid/planning-only at
+  `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.
