@@ -1951,6 +1951,22 @@ priorities, and do not use history files as the active source of truth.
   that created temp dirs under `/servidor/ark/workspace-offline`; do not delete them or
   rerun those suites while `/servidor/ark` writes are forbidden. No servers, markers/env,
   restarts, runtime probes, Discord, GitHub, tags, or publication.
+- 2026-06-03 runtime-evidence test safety and public-contract hardening follow-up:
+  four scoped workers were delegated by the lead. Integrated changes add
+  `OBELISK_ALLOW_SERVER_ROOT_WRITES=1` as the explicit opt-in before helper outputs write
+  under `/servidor/ark`, gate test-only approved offline roots behind both
+  `OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE` and `OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES=1`,
+  retarget principal lifecycle evidence/window/approved-manifest tests to safe temp roots,
+  and add protected-path coverage for the no-opt-in fail-closed route. Static sweep of the
+  scoped lifecycle suites no longer finds protected-root `TemporaryDirectory(... dir=/servidor...)`
+  patterns. Identity public contract readiness/gap checks now reject plural/list split
+  claims (`aliases`/`claims`/`names` plus `values`/`statuses`); the 2026-06-02 SDK priority
+  map is guarded as a historical ledger with active blocker `approved_runtime_evidence_missing`;
+  runtime/ABI audit made no public ABI changes. Validation included lifecycle 295 OK,
+  protected_paths 9 OK, focused identity split-claim 4 OK, source-boundary guardrails 3 OK,
+  route JSON valid/planning-only at `approved_runtime_evidence_missing`, and SDK JSON
+  blocked with SDK `0/12`, P0 `0/4`, stable false. No `/servidor/ark` writes, server/runtime
+  tools, marker/env edits, Discord, GitHub, tags, or publication.
 
 ## Agent Coordination
 

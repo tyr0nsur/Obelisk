@@ -18,6 +18,12 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
+SAFE_OFFLINE_WORKSPACE_DIR = tempfile.TemporaryDirectory(prefix="obelisk-safe-offline-workspace-")
+SAFE_OFFLINE_WORKSPACE = Path(SAFE_OFFLINE_WORKSPACE_DIR.name)
+_OLD_TEST_WORKSPACE_ROOT = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
+_OLD_ALLOW_TEST_WORKSPACES = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
 
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("check_player_identity_runtime_principal_lifecycle_window_manifest", SCRIPT)
@@ -39,6 +45,14 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     operator_approval_receipt_payload,
     post_window_replay_contract,
 )
+if _OLD_TEST_WORKSPACE_ROOT is None:
+    os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+else:
+    os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = _OLD_TEST_WORKSPACE_ROOT
+if _OLD_ALLOW_TEST_WORKSPACES is None:
+    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+else:
+    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = _OLD_ALLOW_TEST_WORKSPACES
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
@@ -403,6 +417,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
     def run_checker_in_approved_workspace(
@@ -415,9 +434,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         sidecar_mutator=None,
         post_window_replay: bool = False,
     ) -> subprocess.CompletedProcess[str]:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
             window_fields = future_window_fields()
@@ -454,7 +471,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
     def mutate_preflight_checked_at(
@@ -1243,10 +1264,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("preflight_checked_at_order_invalid", report["blockers"])
 
     def test_emit_template_from_copied_log_fills_path_sha_and_run_id(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
-        with tempfile.TemporaryDirectory(dir=workspace) as tmp:
+        workspace = SAFE_OFFLINE_WORKSPACE
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
             copied_log = root / "live-validation-logs" / RUN_ID / "Obelisk.log"
             copied_log.parent.mkdir(parents=True, exist_ok=True)
@@ -1266,6 +1285,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
             self.assertEqual(result.stdout, "")
@@ -2024,9 +2048,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_approved_workspace_nested_live_validation_alias(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         with tempfile.TemporaryDirectory(dir=workspace) as tmp:
             root = Path(tmp)
             alias_log = root / "tmp" / "live-validation-logs" / RUN_ID / "Obelisk.log"
@@ -2044,7 +2066,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
         report = json.loads(result.stdout)
@@ -2250,9 +2276,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_request_pack_observer_env_drift(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
             exact_dir = root / "live-validation-logs" / RUN_ID
@@ -2289,7 +2313,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
         report = json.loads(result.stdout)
@@ -2493,9 +2521,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_request_pack_obelisk_commit_mismatch(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
             exact_dir = root / "live-validation-logs" / RUN_ID
@@ -2528,7 +2554,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
         report = json.loads(result.stdout)
@@ -2537,9 +2567,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_preflight_sidecar_content_drift_even_with_matching_sha(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
             exact_dir = root / "live-validation-logs" / RUN_ID
@@ -2573,7 +2601,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
         report = json.loads(result.stdout)
@@ -2582,9 +2614,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_preflight_sidecar_anchor_drift_even_with_matching_sha(self) -> None:
-        workspace = Path("/servidor/ark/workspace-offline")
-        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
-            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        workspace = SAFE_OFFLINE_WORKSPACE
         cases = (
             ("run_id", "20260601T121111Z-player-principal-lifecycle", "preflight_pre_path_run_id_mismatch"),
             ("map", "Ragnarok", "preflight_pre_path_map_mismatch"),
@@ -2632,7 +2662,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                         text=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                        env={
+                            **os.environ,
+                            "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                            "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                        },
                     )
 
                 report = json.loads(result.stdout)

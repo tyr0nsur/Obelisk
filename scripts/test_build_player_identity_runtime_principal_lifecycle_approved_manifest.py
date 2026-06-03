@@ -16,10 +16,24 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+SAFE_OFFLINE_WORKSPACE_DIR = tempfile.TemporaryDirectory(prefix="obelisk-safe-offline-workspace-")
+SAFE_OFFLINE_WORKSPACE = Path(SAFE_OFFLINE_WORKSPACE_DIR.name)
+_OLD_TEST_WORKSPACE_ROOT = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
+_OLD_ALLOW_TEST_WORKSPACES = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
 BUILDER = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
 CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
+if _OLD_TEST_WORKSPACE_ROOT is None:
+    os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+else:
+    os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = _OLD_TEST_WORKSPACE_ROOT
+if _OLD_ALLOW_TEST_WORKSPACES is None:
+    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+else:
+    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = _OLD_ALLOW_TEST_WORKSPACES
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 WINDOW_START = (datetime.now(timezone.utc) - timedelta(minutes=20)).replace(microsecond=0)
 WINDOW_END = WINDOW_START + timedelta(minutes=10)
@@ -52,6 +66,13 @@ def write_sidecar(path: Path, text: str) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def safe_test_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+    env["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+    return env
+
+
 def preflight_payload(
     *,
     mode: str,
@@ -70,6 +91,10 @@ def preflight_payload(
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -81,6 +106,10 @@ def preflight_payload(
         "promotion_ready": False,
         "public_header_allowed": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "route_ready": False,
+        "sdk_accounting_counts_as_completed_surface": False,
+        "p0_accounting_counts_as_promoted_surface": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -143,9 +172,7 @@ def runtime_log_lines() -> list[str]:
 
 class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
     def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
-        if not OFFLINE_WORKSPACE.is_dir():
-            self.skipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
-        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=SAFE_OFFLINE_WORKSPACE)
 
     def write_summary(self, temp_dir: Path) -> Path:
         log_path = temp_dir / "live-validation-logs" / RUN_ID / "Obelisk.log"
@@ -157,6 +184,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=safe_test_env(),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         summary_path = temp_dir / "runtime-summary.json"
@@ -329,15 +357,13 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        env = os.environ.copy()
-        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         result = subprocess.run(
             [sys.executable, str(WINDOW_CHECKER), "--json", "--post-window-replay", str(manifest_path)],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=env,
+            env=safe_test_env(),
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         check_path = temp_dir / "window.check.json"
@@ -353,8 +379,6 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         reviewed_by: str = "runtime-reviewer",
         review_note: str = "consume-only lifecycle evidence reviewed",
     ) -> subprocess.CompletedProcess[str]:
-        env = os.environ.copy()
-        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         return subprocess.run(
             [
                 sys.executable,
@@ -374,19 +398,17 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=env,
+            env=safe_test_env(),
         )
 
     def run_checker(self, manifest: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
-        env = os.environ.copy()
-        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         return subprocess.run(
             [sys.executable, str(CHECKER), str(manifest), "--json", *extra_args],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=env,
+            env=safe_test_env(),
         )
 
     def test_builds_manifest_that_passes_existing_consume_checker(self) -> None:
@@ -520,7 +542,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             result = self.run_builder(summary_path, window_check, output)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--output must not write under protected server root", result.stderr)
+            self.assertIn("--output must not write under /servidor/ark", result.stderr)
+            self.assertIn("OBELISK_ALLOW_SERVER_ROOT_WRITES=1", result.stderr)
             self.assertFalse(output.exists())
 
     def test_rejects_symlinked_source_summary_before_reading(self) -> None:

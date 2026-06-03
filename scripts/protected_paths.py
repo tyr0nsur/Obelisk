@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from dataclasses import dataclass
 
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+SERVER_ROOT_WRITE_OPT_IN_ENV = "OBELISK_ALLOW_SERVER_ROOT_WRITES"
+TEST_APPROVED_OFFLINE_WORKSPACE_ENV = "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"
+ALLOW_TEST_WORKSPACE_PREFIXES_ENV = "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,15 @@ def is_under_path(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def approved_offline_workspace_roots(
+    default: tuple[Path, ...] = APPROVED_OFFLINE_WORKSPACE_ROOTS,
+) -> tuple[Path, ...]:
+    test_root = os.environ.get(TEST_APPROVED_OFFLINE_WORKSPACE_ENV)
+    if os.environ.get(ALLOW_TEST_WORKSPACE_PREFIXES_ENV) == "1" and test_root:
+        return (Path(test_root).expanduser(),)
+    return default
 
 
 def is_approved_offline_workspace_path(
@@ -81,6 +94,28 @@ def protected_path_blocked(
         approved_roots=approved_roots,
     )
     return status.protected, status.resolved
+
+
+def server_root_write_allowed() -> bool:
+    return os.environ.get(SERVER_ROOT_WRITE_OPT_IN_ENV) == "1"
+
+
+def reject_server_root_write_without_opt_in(
+    path: Path,
+    label: str,
+    *,
+    protected_root: Path = SERVER_ROOT,
+) -> None:
+    expanded = path.expanduser()
+    resolved = expanded.resolve()
+    protected = protected_root.resolve()
+    direct_protected = expanded.is_absolute() and is_under_path(expanded, protected_root)
+    resolved_protected = is_under_path(resolved, protected)
+    if (direct_protected or resolved_protected) and not server_root_write_allowed():
+        raise SystemExit(
+            f"{label} must not write under {protected_root} unless "
+            f"{SERVER_ROOT_WRITE_OPT_IN_ENV}=1 is set: {resolved}"
+        )
 
 
 def first_symlink_component(path: Path) -> Path | None:

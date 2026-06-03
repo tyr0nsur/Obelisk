@@ -715,6 +715,46 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Runtime-Evidence Test Safety And Public Contract Hardening Round
+
+The next supervised four-worker round addressed offline safety and false-positive SDK
+claims without changing the active route blocker.
+
+Integrated findings:
+
+- Runtime-evidence lifecycle tests now use safe process-local temp roots through
+  `OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE`, which is honored only when
+  `OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES=1` is set. Helper output writes under
+  `/servidor/ark` require explicit `OBELISK_ALLOW_SERVER_ROOT_WRITES=1`.
+- Scoped static search of lifecycle evidence/window/approved-manifest tests no longer
+  finds protected-root `TemporaryDirectory(... dir=/servidor...)` patterns. Remaining
+  `/servidor/ark` literals in those tests are payload or fail-closed error assertions.
+- Player-identity public contract readiness and gap reports now reject plural/list split
+  claim forms such as `aliases`/`claims`/`names` paired with `values`/`statuses` when they
+  imply public/runtime/readiness promotion.
+- The 2026-06-02 SDK priority map is guarded as a historical ledger; historical
+  `lifecycle_anchor_first_evidence_provenance_unbound` text cannot be treated as the active
+  route blocker. The active blocker remains `approved_runtime_evidence_missing`.
+- Runtime/ABI audit found no concrete callback-lifetime or unload-cleanup gap and made no
+  public ABI change.
+
+Validation:
+
+- `env -u OBELISK_ALLOW_SERVER_ROOT_WRITES PYTHONDONTWRITEBYTECODE=1 python3 -m unittest ...`
+  for the six principal-lifecycle evidence/window/request/bundle/approved-manifest suites:
+  295 tests OK.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_protected_paths`: 9 tests OK.
+- Focused identity public contract split-claim tests: 4 tests OK.
+- Focused research/source-boundary guardrails: 3 tests OK.
+- `scripts/check_command_permission_route_gate.py --json`: valid planning-only route at
+  `approved_runtime_evidence_missing`, with no public/runtime/v1 accounting.
+- `python3 scripts/check_public_sdk_v1_completion.py --json`: blocked by design with SDK
+  `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+This round did not touch `/servidor/ark`, start/stop/restart servers, edit markers/env,
+run runtime observers, ReflectionScanner, ptrace/gcore, broad tracing, Discord, GitHub,
+tags, or publication.
+
 ## Split-Claim, Runtime Cleanup, And Workspace-Offline Discipline Round
 
 The next delegated round plus lead integration hardened more offline false-positive

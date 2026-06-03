@@ -22,7 +22,7 @@ import protected_paths
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ROOT = Path("/servidor/ark")
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
 LOG_PREFIX = r"(?:\[[^\]]+\]\s+)*"
 SAFE_DETAIL_KEYS = {
     "chat": {

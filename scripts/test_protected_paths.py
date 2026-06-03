@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import sys
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import protected_paths
@@ -124,6 +125,31 @@ class ProtectedPathsTests(unittest.TestCase):
 
             with self.assertRaisesRegex(SystemExit, r"--source must not be a symlink: .*link"):
                 protected_paths.reject_symlink_component(link / "snapshot.json", "--source")
+
+    def test_reject_server_root_write_requires_explicit_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            protected.mkdir()
+            output = protected / "workspace-offline" / "out.json"
+
+            with mock.patch.dict("os.environ", {}, clear=True):
+                with self.assertRaisesRegex(SystemExit, "must not write"):
+                    protected_paths.reject_server_root_write_without_opt_in(
+                        output,
+                        "--output",
+                        protected_root=protected,
+                    )
+
+            with mock.patch.dict(
+                "os.environ",
+                {protected_paths.SERVER_ROOT_WRITE_OPT_IN_ENV: "1"},
+                clear=True,
+            ):
+                protected_paths.reject_server_root_write_without_opt_in(
+                    output,
+                    "--output",
+                    protected_root=protected,
+                )
 
 
 if __name__ == "__main__":

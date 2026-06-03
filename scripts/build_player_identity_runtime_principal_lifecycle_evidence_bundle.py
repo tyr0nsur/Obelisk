@@ -30,7 +30,7 @@ WINDOW_MANIFEST_CHECKER = SCRIPT_DIR / "check_player_principal_lifecycle_window_
 WINDOW_REQUEST_CHECKER = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 OFFLINE_GATE = SCRIPT_DIR / "validate_offline_artifact_gate.py"
 SERVER_ROOT = Path("/servidor/ark")
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_RUNTIME_LOG_POSTURE = {
     "loaded_native_ld_preload": True,
@@ -959,6 +959,7 @@ def main() -> int:
     window_manifest = require_exact_sibling_window_manifest(args.window_manifest, copied_log)
     output_dir = args.output_dir.expanduser()
     reject_symlink_component(output_dir, "--output-dir")
+    protected_paths.reject_server_root_write_without_opt_in(output_dir, "--output-dir", protected_root=SERVER_ROOT)
     output_dir = reject_protected_output_path(output_dir, "--output-dir")
     output_dir.mkdir(parents=True, exist_ok=True)
 

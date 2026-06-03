@@ -40,7 +40,7 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-man
 NEXT_BLOCKER_AFTER_WINDOW_MANIFEST = "approved_runtime_observer_log_summary_and_manifest_missing"
 WINDOW_REQUEST_CHECKER = Path(__file__).resolve().parent / "check_player_principal_lifecycle_window_request.py"
 SERVER_ROOT = Path("/servidor/ark")
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_OBELISK_ROOT = "/servidor/ark/obelisk"
 EXPECTED_INSTALLED_WRAPPER_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh"
@@ -2202,6 +2202,7 @@ def template_fields_from_copied_log(copied_log: Path) -> dict[str, str]:
 
 def write_template(path: Path, copied_log: Path | None = None) -> None:
     reject_symlink_component(path, "--emit-template")
+    protected_paths.reject_server_root_write_without_opt_in(path, "--emit-template", protected_root=SERVER_ROOT)
     resolved = protected_paths.reject_protected_input_path(
         path,
         "--emit-template",

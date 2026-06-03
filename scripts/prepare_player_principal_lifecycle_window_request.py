@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 from protected_paths import reject_protected_output_path
 from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import reject_symlink_component
@@ -70,7 +71,8 @@ POSTURE_GUARDRAIL_TEXT = (
     "stopped/stop-after-window is not supported because downstream manifest and "
     "approved evidence checks require stable post posture"
 )
-EVIDENCE_ROOT = Path("/servidor/ark/workspace-offline/live-validation-logs")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
+EVIDENCE_ROOT = APPROVED_OFFLINE_WORKSPACE_ROOTS[0] / "live-validation-logs"
 REQUIRED_ENV = {
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK": "1",
     "OBELISK_DISABLE_PLUGINS": "1",
@@ -691,6 +693,7 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
     reject_symlink_component(args.output_dir, "--output-dir")
+    protected_paths.reject_server_root_write_without_opt_in(args.output_dir.expanduser(), "--output-dir")
     output_dir = reject_protected_output_path(args.output_dir.expanduser(), "--output-dir")
     output_dir.mkdir(parents=True, exist_ok=True)
 

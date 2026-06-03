@@ -55,8 +55,8 @@ from prepare_player_principal_lifecycle_window_request import (
 
 REPORT_SCHEMA = "obelisk.player-principal-lifecycle-window-request-check.v1"
 SERVER_ROOT = Path("/servidor/ark")
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
-EVIDENCE_ROOT = Path("/servidor/ark/workspace-offline/live-validation-logs")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
+EVIDENCE_ROOT = APPROVED_OFFLINE_WORKSPACE_ROOTS[0] / "live-validation-logs"
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 EXPECTED_TOP_LEVEL_KEYS = frozenset(

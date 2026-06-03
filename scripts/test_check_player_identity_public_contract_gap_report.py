@@ -1606,7 +1606,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                     {"key": "publicIdentityReady", "value": True},
                     {"field": "principalHandleAbiReady", "state": "ready"},
                     {"claim": "identityHeaderAllowed", "enabled": "yes"},
+                    {"aliases": ["publicHeaderAllowed", "runtimeEvidenceReady"], "values": ["ready"]},
                     {"key": "publicIdentityReady", "value": False},
+                    {"claims": ["publicHeaderAllowed"], "values": ["blocked"]},
                 ]
             }
         )
@@ -1615,7 +1617,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.claims[0]", paths)
         self.assertIn("$.claims[1]", paths)
         self.assertIn("$.claims[2]", paths)
-        self.assertNotIn("$.claims[3]", paths)
+        self.assertIn("$.claims[3]", paths)
+        self.assertNotIn("$.claims[4]", paths)
+        self.assertNotIn("$.claims[5]", paths)
 
     def test_sanitize_non_promotional_report_rejects_split_key_value_aliases(self) -> None:
         blockers: list[dict] = []
@@ -1624,7 +1628,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "nested": [
                     {"key": "publicSdkReady", "value": True},
                     {"field": "public_header_symbols_now", "state": "ready"},
+                    {"names": ["publicAbiReady", "runtimeEvidenceReady"], "statuses": ["available"]},
                     {"key": "publicSdkReady", "value": False},
+                    {"names": ["publicAbiReady"], "statuses": ["blocked"]},
                 ]
             },
             blockers,
@@ -1635,7 +1641,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[0]"), paths)
         self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[1]"), paths)
-        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[2]"), paths)
+        self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[2]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[3]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[4]"), paths)
 
 
 if __name__ == "__main__":

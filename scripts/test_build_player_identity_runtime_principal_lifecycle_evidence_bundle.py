@@ -17,6 +17,12 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+SAFE_OFFLINE_WORKSPACE_DIR = tempfile.TemporaryDirectory(prefix="obelisk-safe-offline-workspace-")
+SAFE_OFFLINE_WORKSPACE = Path(SAFE_OFFLINE_WORKSPACE_DIR.name)
+_OLD_TEST_WORKSPACE_ROOT = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
+_OLD_ALLOW_TEST_WORKSPACES = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
 
 import check_player_identity_first_evidence_readiness as first_evidence_checker
 import build_player_identity_runtime_principal_lifecycle_evidence_bundle as bundle_builder
@@ -35,6 +41,14 @@ from prepare_player_principal_lifecycle_window_request import (
     operator_live_ops_brief,
     post_window_replay_contract,
 )
+if _OLD_TEST_WORKSPACE_ROOT is None:
+    os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+else:
+    os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = _OLD_TEST_WORKSPACE_ROOT
+if _OLD_ALLOW_TEST_WORKSPACES is None:
+    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+else:
+    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = _OLD_ALLOW_TEST_WORKSPACES
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
@@ -180,9 +194,7 @@ def preflight_payload(
 
 class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
-        if not OFFLINE_WORKSPACE.is_dir():
-            self.skipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
-        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=SAFE_OFFLINE_WORKSPACE)
 
     def write_window_manifest(self, temp_dir: Path, copied_log: Path) -> Path:
         manifest = temp_dir / "live-validation-logs" / RUN_ID / "window-manifest.env"
@@ -379,6 +391,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             window_manifest = self.write_window_manifest(output_dir.parent, copied_log)
         env = os.environ.copy()
         env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        env["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
         return subprocess.run(
             [
                 sys.executable,
@@ -406,6 +419,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def run_preflight(self, evidence_dir: Path) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        env["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
         return subprocess.run(
             [
                 sys.executable,
@@ -1528,7 +1542,11 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                         text=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                        env={
+                            **os.environ,
+                            "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                            "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                        },
                     )
                 )
 
@@ -1589,7 +1607,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
 
             old_env = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+            old_root = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
             os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+            os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
             try:
                 diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     output_dir / "approved-runtime-principal-lifecycle-evidence.json"
@@ -1599,6 +1619,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
                 else:
                     os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_env
+                if old_root is None:
+                    os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+                else:
+                    os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = old_root
             if not (
                 first_evidence_checker.APPROVED_CANDIDATE_ROOT_FALLBACK.is_dir()
                 and first_evidence_checker.APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK.is_file()
@@ -1617,7 +1641,11 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
             )
 
         self.assertTrue(diagnosis["ready"])
@@ -1711,7 +1739,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--output-dir must not write under protected server root", result.stderr)
+            self.assertIn("OBELISK_ALLOW_SERVER_ROOT_WRITES=1", result.stderr)
             self.assertFalse((temp_dir / "runtime-observer-summary.json").exists())
 
     def test_rejects_symlinked_output_dir_before_writing(self) -> None:

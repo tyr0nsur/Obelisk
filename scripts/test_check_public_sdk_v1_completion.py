@@ -10323,6 +10323,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             valid_missing,
             [
                 "player_identity_promotion_certificate:surface_record_missing_or_unpromoted",
+                "player_identity_approved_runtime_evidence_manifest:validation_failed",
+                "player_identity_approved_runtime_evidence_report:fields_invalid",
                 "player_identity_public_contract_readiness_report:promotion_blockers_remaining",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_candidate_only",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_promotion_ready_false",

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import hashlib
-import os
 import subprocess
 import sys
 import tempfile
@@ -21,28 +20,11 @@ from prepare_player_principal_lifecycle_window_request import AUTHORIZATION_FLAG
 
 
 SHA = EXPECTED_BINARY_SHA256
-TEST_COMMIT = "1" * 40
-_FAKE_GIT_DIR = tempfile.TemporaryDirectory()
-_FAKE_GIT = Path(_FAKE_GIT_DIR.name) / "git"
-_FAKE_GIT.write_text(
-    f"""#!/bin/sh
-if [ "$1" = "rev-parse" ]; then
-  printf '%s\\n' "{TEST_COMMIT}"
-  exit 0
-fi
-if [ "$1" = "cat-file" ] && [ "$2" = "-e" ]; then
-  commit="$3"
-  commit="${{commit%%^*}}"
-  if [ "$commit" = "{TEST_COMMIT}" ]; then
-    exit 0
-  fi
-fi
-exit 1
-""",
-    encoding="utf-8",
-)
-_FAKE_GIT.chmod(0o755)
-os.environ["PATH"] = f"{_FAKE_GIT_DIR.name}{os.pathsep}{os.environ['PATH']}"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 
 
 def future_window() -> tuple[str, str, str]:
@@ -95,6 +77,18 @@ def fenced_section(markdown: str, title: str) -> list[str]:
 
 
 class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
+    def test_rejects_server_root_output_without_explicit_write_opt_in(self) -> None:
+        result = subprocess.run(
+            base_args(Path("/servidor/ark/workspace-offline/obelisk-test-player-principal-guard")),
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("OBELISK_ALLOW_SERVER_ROOT_WRITES=1", result.stderr)
+
     def test_prepares_secret_free_request_pack_without_authorizing_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -528,7 +522,7 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         live_output = base_args(Path("/servidor/ark/obelisk/request-pack"))
         live_output_result = subprocess.run(live_output, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertNotEqual(live_output_result.returncode, 0)
-        self.assertIn("must not write under protected server root", live_output_result.stderr)
+        self.assertIn("OBELISK_ALLOW_SERVER_ROOT_WRITES=1", live_output_result.stderr)
 
     def test_rejects_placeholder_obelisk_commit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -155,6 +155,9 @@ RESEARCH_MODULE_BOUNDARY_README = REPO_ROOT / "docs" / "research" / "README.md"
 LATEST_V1_SDK_ROUND_RESEARCH_NOTE = (
     REPO_ROOT / "docs" / "research" / "2026-05-31-v1-sdk-round-identity-static-demand-audit.md"
 )
+SDK_COMPLETE_PRIORITY_MAP_NOTE = (
+    REPO_ROOT / "docs" / "research" / "2026-06-02-sdk-complete-priority-map.md"
+)
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -4812,6 +4815,40 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(text=text):
                 self.assertIn(normalized(text), compact)
+
+    def test_sdk_complete_priority_map_is_historical_and_route_bound(self) -> None:
+        note = SDK_COMPLETE_PRIORITY_MAP_NOTE.read_text(encoding="utf-8")
+        readme = RESEARCH_MODULE_BOUNDARY_README.read_text(encoding="utf-8")
+        compact_note = normalized(note)
+        compact_readme = normalized(readme)
+
+        for text in (
+            "This note is an accumulated ledger with historical validation snapshots",
+            "must not be routed as an active blocker",
+            "The active default blocker is `approved_runtime_evidence_missing`",
+            "Only after accepted approved runtime principal lifecycle evidence may the identity route advance to the locked planning blocker `identity_public_contract_gate_missing`",
+            "ArkServerApi/AseApi/NextGenPlugins remain names/demand signals only",
+        ):
+            with self.subTest(file="priority_map", text=text):
+                self.assertIn(normalized(text), compact_note)
+
+        self.assertIn(
+            normalized(
+                "read with its current route boundary, where old `lifecycle_anchor_first_evidence_provenance_unbound` validation lines are historical only and the active default blocker is `approved_runtime_evidence_missing`"
+            ),
+            compact_readme,
+        )
+
+        stale_current_route_phrases = (
+            "with current blocker `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "current default-route blocker is `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "default route remained planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "default route remained valid only as planning, with `promotion_ready=false` and the then-current blocker `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "rejects SDK completion if the default route drifts away from `lifecycle_anchor_first_evidence_provenance_unbound`",
+        )
+        for phrase in stale_current_route_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(normalized(phrase), compact_note)
 
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
         texts = {

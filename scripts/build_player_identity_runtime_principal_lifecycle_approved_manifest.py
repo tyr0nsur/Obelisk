@@ -27,6 +27,7 @@ SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_MODULE = "player_principal_lifecycle"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
 FORBIDDEN_REVIEW_TEXT_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
@@ -130,13 +131,19 @@ def reject_if_forbidden_review_text(value: str, label: str) -> None:
 def path_is_copied_or_offline(path_text: Any) -> bool:
     if not isinstance(path_text, str) or not path_text:
         return False
-    return not protected_paths.protected_path_status(Path(path_text)).protected
+    return not protected_paths.protected_path_status(
+        Path(path_text),
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    ).protected
 
 
 def path_is_approved_offline_workspace(path_text: Any) -> bool:
     if not isinstance(path_text, str) or not path_text:
         return False
-    status = protected_paths.protected_path_status(Path(path_text))
+    status = protected_paths.protected_path_status(
+        Path(path_text),
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
     return not status.protected and status.approved_offline_workspace
 
 
@@ -373,7 +380,12 @@ def build_manifest(
 
 def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     protected_paths.reject_symlink_component(path, "--output")
-    resolved = protected_paths.reject_protected_output_path(path, "--output")
+    protected_paths.reject_server_root_write_without_opt_in(path, "--output")
+    resolved = protected_paths.reject_protected_output_path(
+        path,
+        "--output",
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
     resolved.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     fd = -1

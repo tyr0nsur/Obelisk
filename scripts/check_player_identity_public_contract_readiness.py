@@ -651,20 +651,31 @@ EMPTY_PUBLIC_LIST_KEYS = {
 }
 SPLIT_CLAIM_NAME_KEYS = {
     "alias",
+    "aliases",
     "claim",
+    "claims",
     "field",
+    "fields",
     "flag",
+    "flags",
     "key",
+    "keys",
     "name",
+    "names",
     "property",
+    "properties",
 }
 SPLIT_CLAIM_VALUE_KEYS = {
     "allowed",
     "enabled",
+    "readiness",
     "ready",
     "state",
+    "states",
     "status",
+    "statuses",
     "value",
+    "values",
 }
 ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
     "approved_runtime_evidence_present",
@@ -869,6 +880,8 @@ def is_positive_claim_value(value: Any) -> bool:
         return True
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return value != 0
+    if isinstance(value, list):
+        return any(is_positive_claim_value(item) for item in value)
     if isinstance(value, str):
         normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
         return normalized in {
@@ -888,11 +901,20 @@ def is_positive_claim_value(value: Any) -> bool:
     return False
 
 
+def split_claim_name_values(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    return []
+
+
 def split_claim_overclaims(value: dict[str, Any], path: str) -> list[dict[str, Any]]:
     declared_claim_names = [
-        str(item)
+        claim_name
         for key, item in value.items()
-        if normalize_contract_key(key) in SPLIT_CLAIM_NAME_KEYS and isinstance(item, str)
+        if normalize_contract_key(key) in SPLIT_CLAIM_NAME_KEYS
+        for claim_name in split_claim_name_values(item)
     ]
     declared_claim_values = [
         item

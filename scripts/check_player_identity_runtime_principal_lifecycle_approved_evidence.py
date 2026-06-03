@@ -55,7 +55,7 @@ MODULE = "player_principal_lifecycle"
 NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
 SERVER_ROOT = Path("/servidor/ark")
 REPO_ROOT = Path(__file__).resolve().parents[1]
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+APPROVED_OFFLINE_WORKSPACE_ROOTS = protected_paths.approved_offline_workspace_roots()
 REQUIRED_TOP_LEVEL_KEYS = frozenset(
     (
         "schema",

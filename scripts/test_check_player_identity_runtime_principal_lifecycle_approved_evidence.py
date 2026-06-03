@@ -28,6 +28,9 @@ TEST_COMMIT = subprocess.check_output(
     text=True,
 ).strip()
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+SAFE_OFFLINE_WORKSPACE_DIR = tempfile.TemporaryDirectory(prefix="obelisk-safe-offline-workspace-")
+SAFE_OFFLINE_WORKSPACE = Path(SAFE_OFFLINE_WORKSPACE_DIR.name)
+os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
 WINDOW_NON_CLAIMS = [
@@ -102,14 +105,30 @@ def load_script_module(path: Path, name: str):
         sys.path.insert(0, script_dir)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
-    spec.loader.exec_module(module)
+    old_allow = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+    old_root = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
+    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+    os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if old_allow is None:
+            os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+        else:
+            os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_allow
+        if old_root is None:
+            os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+        else:
+            os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = old_root
+    if hasattr(module, "APPROVED_OFFLINE_WORKSPACE_ROOTS"):
+        module.APPROVED_OFFLINE_WORKSPACE_ROOTS = (SAFE_OFFLINE_WORKSPACE,)
+    if hasattr(module, "window_manifest_checker"):
+        module.window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (SAFE_OFFLINE_WORKSPACE,)
     return module
 
 
 def temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
-    if not OFFLINE_WORKSPACE.is_dir():
-        raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
-    return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+    return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=SAFE_OFFLINE_WORKSPACE)
 
 
 def retained_temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
@@ -179,6 +198,10 @@ def preflight_payload(
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -190,6 +213,10 @@ def preflight_payload(
         "promotion_ready": False,
         "public_header_allowed": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "route_ready": False,
+        "sdk_accounting_counts_as_completed_surface": False,
+        "p0_accounting_counts_as_promoted_surface": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -414,6 +441,11 @@ def analyzer_summary() -> dict:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env={
+            **os.environ,
+            "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+            "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+        },
     )
     return json.loads(result.stdout)
 
@@ -690,7 +722,11 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), str(path), "--json", *args],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env={
+                    **os.environ,
+                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
+                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                },
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
