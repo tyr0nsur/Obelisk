@@ -489,13 +489,18 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             [
                 "copied_obelisk_log",
                 "checked_window_manifest_env",
+                "window_request_json",
+                "observer_window_env",
+                "operator_approval_request_md",
                 "operator_approval_receipt",
+                "preflight_pre_json",
+                "preflight_post_json",
                 "approved_runtime_principal_lifecycle_evidence_manifest",
             ],
         )
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],
-            [False, False, True, False],
+            [False, False, True, True, False, True, True, True, False],
         )
         self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("copied_log_missing", report["blockers"])
@@ -549,10 +554,24 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(report["public_callback_abi_now"], [])
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
         self.assertEqual(
-            [artifact["present"] for artifact in report["next_required_artifacts"]],
-            [True, True, True, False],
+            [artifact["artifact"] for artifact in report["next_required_artifacts"]],
+            [
+                "copied_obelisk_log",
+                "checked_window_manifest_env",
+                "window_request_json",
+                "observer_window_env",
+                "operator_approval_request_md",
+                "operator_approval_receipt",
+                "preflight_pre_json",
+                "preflight_post_json",
+                "approved_runtime_principal_lifecycle_evidence_manifest",
+            ],
         )
-        self.assertTrue(report["next_required_artifacts"][3]["satisfies_approved_runtime_evidence"])
+        self.assertEqual(
+            [artifact["present"] for artifact in report["next_required_artifacts"]],
+            [True, True, True, True, True, True, True, True, False],
+        )
+        self.assertTrue(report["next_required_artifacts"][-1]["satisfies_approved_runtime_evidence"])
         self.assertNotIn("request_pack_check_failed", report["blockers"])
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])

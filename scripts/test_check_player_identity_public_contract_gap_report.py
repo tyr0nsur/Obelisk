@@ -357,7 +357,21 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertTrue(runtime_report["provided"])
         self.assertTrue(runtime_report["accepted_for_contract_review"])
         self.assertEqual(runtime_report["resolved_input"], "runtime.lifecycle_evidence")
+        self.assertEqual(runtime_report["resolved_inputs"], ["runtime.lifecycle_evidence"])
         self.assertEqual(runtime_report["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(
+            runtime_report["observed_runtime_cases"],
+            [
+                "observer_enable",
+                "session_start_anchor",
+                "session_start_rejected_anchor",
+                "session_end_anchor",
+            ],
+        )
+        self.assertEqual(
+            runtime_report["consumer_cases"],
+            ["malformed_or_unsupported_evidence", "stale_after_logout"],
+        )
         self.assertFalse(runtime_report["promotion_ready"])
         self.assertFalse(runtime_report["public_sdk_ready"])
         self.assertFalse(runtime_report["runtime_ready"])
@@ -418,6 +432,53 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_non_promotional_inputs_claimed", reasons)
         self.assertIn("approved_runtime_evidence_resolved_inputs_unexpected", reasons)
         self.assertFalse(runtime_report["accepted_for_contract_review"])
+
+    def test_approved_runtime_evidence_rejects_weak_lifecycle_report_linkage(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def weak_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "schema": checker.approved_runtime_evidence.REPORT_SCHEMA,
+                "mode": "consume",
+                "ready_scope": "runtime_evidence_only",
+                "remaining_blockers": [],
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "observed_runtime_cases": [
+                    "observer_enable",
+                    "session_start_anchor",
+                    "session_start_rejected_anchor",
+                ],
+                "consumer_cases": ["malformed_or_unsupported_evidence"],
+                "consumer_boundary_assertions": ["malformed_or_unsupported_evidence"],
+            }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            runtime_path = Path(tempdir) / "approved-runtime-evidence.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(checker.approved_runtime_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_runtime_evidence, "build_report", side_effect=weak_report),
+            ):
+                runtime_report = checker.validate_approved_runtime_evidence(runtime_path, blockers)
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("approved_runtime_evidence_observed_runtime_cases_mismatch", reasons)
+        self.assertIn("approved_runtime_evidence_consumer_cases_mismatch", reasons)
+        self.assertIn("approved_runtime_evidence_consumer_boundary_assertions_mismatch", reasons)
+        self.assertFalse(runtime_report["accepted_for_contract_review"])
+        self.assertIsNone(runtime_report["resolved_input"])
+        self.assertEqual(runtime_report["resolved_inputs"], [])
 
     def test_approved_runtime_evidence_rejects_v1_completion_overclaim(self) -> None:
         def accepted_validation(_payload, *, check_mode: str):

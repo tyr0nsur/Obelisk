@@ -389,8 +389,19 @@ def approved_runtime_manifest_check_state(
 def next_required_preflight_artifacts(
     copied_log: dict[str, Any],
     window_manifest: dict[str, Any],
+    request_pack: dict[str, Any],
+    observer_env: dict[str, Any],
+    preflight_pre: dict[str, Any],
+    preflight_post: dict[str, Any],
     approved_bundle: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    operator_request = dict(request_pack)
+    request_path = request_pack.get("path")
+    if isinstance(request_path, str):
+        operator_request["path"] = str(Path(request_path).with_name("operator-approval-request.md"))
+    operator_request["exists"] = (
+        isinstance(operator_request.get("path"), str) and Path(operator_request["path"]).is_file()
+    )
     required = [
         (
             "copied_obelisk_log",
@@ -405,8 +416,38 @@ def next_required_preflight_artifacts(
             False,
         ),
         (
+            "window_request_json",
+            request_pack,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "observer_window_env",
+            observer_env,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "operator_approval_request_md",
+            operator_request,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
             "operator_approval_receipt",
             approved_bundle.get("operator_approval_receipt", {}),
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "preflight_pre_json",
+            preflight_pre,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "preflight_post_json",
+            preflight_post,
             "offline_runtime_principal_lifecycle_bundle_builder_input",
             False,
         ),
@@ -640,6 +681,10 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "next_required_artifacts": next_required_preflight_artifacts(
             copied_log,
             window_manifest,
+            request_pack,
+            observer_env,
+            preflight_pre,
+            preflight_post,
             approved_bundle,
         ),
         "blockers": [blocker["reason"] for blocker in blockers],

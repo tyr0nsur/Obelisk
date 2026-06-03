@@ -537,6 +537,47 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("ItemId", terms)
         self.assertIn("InventoryComp", terms)
 
+    def test_nested_review_notes_cannot_leak_raw_param_identity_claims(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["target_set_evidence"][1]["review_notes"] = [
+            "ItemID1 identity is ready for copied inventory signals",
+            {
+                "summary": (
+                    "InventoryComp and raw params can be used for public inventory lookup"
+                )
+            },
+        ]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        terms = {
+            blocker["term"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "public_claim_forbidden_term"
+        }
+        self.assertIn("ItemID1", terms)
+        self.assertIn("InventoryComp", terms)
+        self.assertIn("raw params", terms)
+        self.assertIn("lookup", terms)
+
+    def test_negated_nested_review_notes_remain_allowed(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["target_set_evidence"][1]["review_notes"] = [
+            (
+                "No ItemID1 identity, no InventoryComp, no raw params, no lookup, "
+                "no mutation, and no ResourceHandle are promoted."
+            )
+        ]
+
+        result = self.run_fixture(fixtures)
+        payload = json.loads(result.stdout)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["blockers"], [])
+
     def test_public_sdk_and_v1_readiness_cannot_be_activated_by_this_surface(self) -> None:
         fixtures = self.make_fixture()
         surfaces = fixtures["public_sdk_surfaces"]

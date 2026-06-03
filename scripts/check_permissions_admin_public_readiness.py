@@ -957,7 +957,7 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]], p
                 "player_identity_evidence_not_approved",
                 "$.surfaces[player_identity].status",
             )
-        if not player_identity_has_promoted_public_contract(identity):
+        if not player_identity_has_promoted_public_contract(identity, blockers):
             add(
                 blockers,
                 "player_identity_public_contract_not_promoted",
@@ -1027,7 +1027,10 @@ def repo_relative_path(raw_path: Any) -> Path | None:
     return path
 
 
-def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
+def player_identity_has_promotion_certificate(
+    identity: dict[str, Any],
+    blockers: list[dict[str, Any]] | None = None,
+) -> bool:
     evidence = identity.get("evidence")
     binding = evidence.get("player_identity_promotion_certificate") if isinstance(evidence, dict) else None
     if not isinstance(binding, dict):
@@ -1050,6 +1053,15 @@ def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
         return False
     if not isinstance(certificate, dict):
         return False
+    if blockers is not None:
+        previous_blocker_count = len(blockers)
+        collect_overclaims(
+            certificate,
+            blockers,
+            "$.surfaces[player_identity].evidence.player_identity_promotion_certificate_artifact",
+        )
+        if len(blockers) != previous_blocker_count:
+            return False
     certificate_evidence = certificate.get("evidence")
     if not isinstance(certificate_evidence, dict):
         return False
@@ -1092,7 +1104,10 @@ def player_identity_surface_record_sha256(identity: dict[str, Any]) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bool:
+def player_identity_has_promoted_public_contract(
+    identity: dict[str, Any],
+    blockers: list[dict[str, Any]] | None = None,
+) -> bool:
     """Require identity's public contract, not just its consume-mode runtime evidence."""
 
     if not player_identity_has_approved_runtime_evidence(identity):
@@ -1122,7 +1137,7 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
         return False
     if not evidence_tests and not evidence_sdk_consumer_tests:
         return False
-    if not player_identity_has_promotion_certificate(identity):
+    if not player_identity_has_promotion_certificate(identity, blockers):
         return False
     if not isinstance(decision_contract, dict):
         return False

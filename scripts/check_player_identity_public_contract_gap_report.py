@@ -70,6 +70,17 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM = (
     "A valid approved runtime evidence manifest can resolve only the runtime lifecycle "
     "evidence input for contract review; it does not promote public player identity or open ABI."
 )
+REQUIRED_APPROVED_RUNTIME_READY_SCOPE = "runtime_evidence_only"
+REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES = [
+    "observer_enable",
+    "session_start_anchor",
+    "session_start_rejected_anchor",
+    "session_end_anchor",
+]
+REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES = [
+    "malformed_or_unsupported_evidence",
+    "stale_after_logout",
+]
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
 REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID = "public_abi_preflight_candidate"
@@ -1303,6 +1314,38 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
             path=str(path),
             evidence_blockers=report.get("blockers", []),
         )
+    if report.get("schema") != approved_runtime_evidence.REPORT_SCHEMA:
+        add(
+            blockers,
+            "approved_runtime_evidence_report_schema_mismatch",
+            "--approved-runtime-evidence.schema",
+            value=report.get("schema"),
+        )
+        accepted = False
+    if report.get("mode") != "consume":
+        add(
+            blockers,
+            "approved_runtime_evidence_mode_mismatch",
+            "--approved-runtime-evidence.mode",
+            value=report.get("mode"),
+        )
+        accepted = False
+    if report.get("ready_scope") != REQUIRED_APPROVED_RUNTIME_READY_SCOPE:
+        add(
+            blockers,
+            "approved_runtime_evidence_ready_scope_mismatch",
+            "--approved-runtime-evidence.ready_scope",
+            value=report.get("ready_scope"),
+        )
+        accepted = False
+    if report.get("remaining_blockers") != []:
+        add(
+            blockers,
+            "approved_runtime_evidence_remaining_blockers_not_empty",
+            "--approved-runtime-evidence.remaining_blockers",
+            value=report.get("remaining_blockers"),
+        )
+        accepted = False
     if report.get("next_blocker") != APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER:
         add(
             blockers,
@@ -1360,6 +1403,36 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
                     unexpected=unexpected_inputs,
                 )
                 accepted = False
+    observed_runtime_cases = report.get("observed_runtime_cases")
+    if observed_runtime_cases != REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES:
+        add(
+            blockers,
+            "approved_runtime_evidence_observed_runtime_cases_mismatch",
+            "--approved-runtime-evidence.observed_runtime_cases",
+            expected=REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES,
+            value=observed_runtime_cases,
+        )
+        accepted = False
+    consumer_cases = report.get("consumer_cases")
+    if consumer_cases != REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES:
+        add(
+            blockers,
+            "approved_runtime_evidence_consumer_cases_mismatch",
+            "--approved-runtime-evidence.consumer_cases",
+            expected=REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+            value=consumer_cases,
+        )
+        accepted = False
+    consumer_boundary_assertions = report.get("consumer_boundary_assertions")
+    if consumer_boundary_assertions != REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES:
+        add(
+            blockers,
+            "approved_runtime_evidence_consumer_boundary_assertions_mismatch",
+            "--approved-runtime-evidence.consumer_boundary_assertions",
+            expected=REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+            value=consumer_boundary_assertions,
+        )
+        accepted = False
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if report.get(key) is not False:
             add(
@@ -1383,10 +1456,14 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
         "provided": True,
         "accepted_for_contract_review": accepted,
         "resolved_input": APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT if accepted else None,
+        "resolved_inputs": [APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT] if accepted else [],
         "next_blocker": report.get("next_blocker"),
         "approved_runtime_evidence_present": report.get("approved_runtime_evidence_present") is True,
         "runtime_evidence_ready": report.get("runtime_evidence_ready") is True,
         "ready_scope": report.get("ready_scope"),
+        "observed_runtime_cases": report.get("observed_runtime_cases", []),
+        "consumer_cases": report.get("consumer_cases", []),
+        "consumer_boundary_assertions": report.get("consumer_boundary_assertions", []),
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,

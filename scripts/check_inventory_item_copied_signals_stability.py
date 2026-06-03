@@ -189,6 +189,21 @@ CONTRACT_SCAN_KEYS = frozenset(
         "support_tier",
     )
 )
+CLAIM_TEXT_SCAN_KEYS = CONTRACT_SCAN_KEYS | frozenset(
+    (
+        "claim",
+        "claims",
+        "description",
+        "evidence_summary",
+        "note",
+        "notes",
+        "rationale",
+        "release_note",
+        "review_note",
+        "review_notes",
+        "summary",
+    )
+)
 NEGATIVE_KEYS = frozenset(
     (
         "blockers",
@@ -326,7 +341,7 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
             child_trail = f"{trail}.{key}"
             if key in NEGATIVE_KEYS:
                 continue
-            if key in CONTRACT_SCAN_KEYS:
+            if key in CLAIM_TEXT_SCAN_KEYS:
                 for text_path, text in string_values(child, child_trail):
                     for term in PUBLIC_CLAIM_TERMS:
                         match = re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE)
