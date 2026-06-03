@@ -600,8 +600,20 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_secondary_report_scanner_rejects_completion_claims_without_blocker(self) -> None:
         for key in (
             "complete_sdk_ready",
+            "complete_sdk_blockers_promoted_count",
+            "complete_sdk_blockers_promoted_for_claim_count",
+            "complete_sdk_blockers_promoted_for_claim_ratio",
+            "complete_sdk_claim_progress_percent",
+            "complete_sdk_claim_progress_ratio",
+            "complete_sdk_progress_percent",
+            "complete_sdk_progress_ratio",
             "full_api_supported",
+            "p0_chain_promoted_count",
+            "p0_chain_promoted_ratio",
+            "p0_dependency_chain_promoted_for_claim_count",
+            "p0_dependency_chain_promoted_for_claim_ratio",
             "package_shape_release_ready",
+            "promoted_for_claim_ratio",
             "public_package_available",
             "public_abi_ready",
             "rc_ready",
@@ -614,6 +626,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "public_sdk_ready",
             "promotion_ready",
             "runtime_ready",
+            "sdk_completion_progress_percent",
+            "sdk_completion_progress_ratio",
+            "v1_completion_progress_percent",
+            "v1_completion_progress_ratio",
         ):
             with self.subTest(key=key):
                 payload = {
@@ -625,6 +641,30 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 claims = secondary_report_completion_claims_without_blocker(payload)
 
                 self.assertEqual(claims, [f"nested[0].claim.{key}"])
+
+    def test_secondary_report_scanner_rejects_numeric_completion_progress_without_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "progress": {
+                "complete_sdk_claim_progress_percent": 25,
+                "complete_sdk_progress_percent": "25%",
+                "promoted_for_claim_ratio": "1/12",
+            },
+            "zero_progress": {
+                "complete_sdk_blockers_promoted_for_claim_count": 0,
+                "p0_dependency_chain_promoted_for_claim_ratio": "0/4",
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "progress.complete_sdk_claim_progress_percent",
+                "progress.complete_sdk_progress_percent",
+                "progress.promoted_for_claim_ratio",
+            ],
+        )
 
     def test_secondary_report_scanner_allows_positive_claim_when_report_has_blocker(self) -> None:
         payload = {

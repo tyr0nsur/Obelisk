@@ -209,12 +209,12 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest supervised round delegated identity public-contract aggregation, SDK release
-  wording, runtime ABI/lifecycle cleanup, and read-only reversing triage. Integrated:
-  candidate ABI preflight no longer appears as a top-level identity `resolved_input`;
-  release statements reject direct SDK/package ready/published/GA wording; command-response
-  repo-local route snapshots must be provenance-bearing, non-placeholder UFunction-chain
-  snapshots; Mission copied-bool owner cleanup propagates/retries `DestroyUserData`
-  failures. Agents closed; route/SDK remain fail-closed at
+- Latest round delegated identity intake, SDK accounting, runtime lifecycle, and reversing.
+  approved runtime principal lifecycle summaries must keep `readiness_gate=none` and an
+  observational-only not-ready promotion gate; secondary reports reject nonzero complete-SDK
+  and P0 progress aliases; command-response planning readiness must carry a distinct
+  `--candidate-root`; PluginManager has player-principal cleanup retry/close coverage.
+  Pending: lifecycle-anchor mixed/generic artifact identity needs placeholder/report-hash
+  rejection. Agents closed; route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, public/runtime false,
   `stable_claim_allowed=false`. No runtime/server op.

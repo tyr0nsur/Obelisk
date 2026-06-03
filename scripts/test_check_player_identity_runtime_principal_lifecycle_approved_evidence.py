@@ -683,6 +683,37 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
 
+    def test_rejects_runtime_summary_readiness_gate_overclaim(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["readiness_gate"] = "public_readiness"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_readiness_gate_mismatch", report["blockers"])
+        self.assertIn("source_summary_not_derived_from_copied_log", report["blockers"])
+        self.assertFalse(report["runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
+    def test_rejects_runtime_summary_promotion_gate_overclaim(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["promotion_gate"] = {
+            "gate_type": "runtime_observer_promoted",
+            "ready": True,
+            "blockers": [],
+            "public_sdk_ready": True,
+        }
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_promotion_gate_keys_unexpected", report["blockers"])
+        self.assertIn("source_summary_promotion_gate_gate_type_mismatch", report["blockers"])
+        self.assertIn("source_summary_promotion_gate_ready_mismatch", report["blockers"])
+        self.assertIn("source_summary_promotion_gate_blockers_mismatch", report["blockers"])
+        self.assertFalse(report["runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
     def test_rejects_runtime_summary_commit_that_is_not_current_head(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_current_head")
         payload = manifest()

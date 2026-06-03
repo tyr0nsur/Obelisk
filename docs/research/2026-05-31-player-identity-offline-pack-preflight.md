@@ -258,6 +258,20 @@ anchor and one real session-end anchor captured through an approved copied obser
 window. The accepted consume-only lifecycle pack and admin snapshots do not satisfy that
 runtime evidence requirement by themselves.
 
+## Approved Evidence Intake Guardrail
+
+As of 2026-06-03, the approved runtime principal lifecycle evidence checker also verifies
+the copied analyzer summary's own gate metadata before accepting a manifest for consume
+mode. `source_summary.readiness_gate` must remain `none`, and
+`source_summary.promotion_gate` must be the exact observational-only, not-ready gate:
+`gate_type=runtime_observer_observational_only`, `ready=false`, and blockers
+`runtime_observer_evidence_only` plus
+`requires_isolated_capture_or_second_source_for_promotion`.
+
+This is an offline replay guardrail only. It does not authorize a runtime window, does not
+make runtime evidence present, and does not change `promotion_ready=false`,
+`public_sdk_ready=false`, or `runtime_ready=false`.
+
 Closing `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer` removed the admin-surface fixture gap. It does
 not unblock permissions, command routing, operator ingress/storage, Inventory SDK, runtime

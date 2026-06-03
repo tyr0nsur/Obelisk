@@ -25,7 +25,11 @@ WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microse
 WINDOW_END = WINDOW_START + timedelta(minutes=10)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
-TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
@@ -62,6 +66,14 @@ def preflight_payload(
     payload = {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
         "ready": True,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "promotion_ready": False,
+        "public_header_allowed": False,
+        "v1_completion_ready": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -82,10 +94,10 @@ def preflight_payload(
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
-        "allow_stopped": True,
+        "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
-        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+        "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
     }
     return json.dumps(payload, sort_keys=True) + "\n"
 
@@ -170,6 +182,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             "run_id": RUN_ID,
             "status": "candidate_only_request_pack",
             "approval_required": APPROVAL_TEXT,
+            "prepared_at_utc": (WINDOW_START - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "ark_binary_sha256": SHA,
             "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
@@ -221,7 +234,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     env_path=observer_env,
                     operator_approved=True,
                     operator_reference="test-current-turn-approval",
-                    approved_at_utc=WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    approved_at_utc=(WINDOW_START - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 ),
                 sort_keys=True,
             )

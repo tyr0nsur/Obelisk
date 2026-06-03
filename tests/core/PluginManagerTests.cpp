@@ -7555,6 +7555,55 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetriesPlayerPrincipalDestroyUserDataBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_player_principal_destroy_userdata_retry");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "player_principal_destroy_userdata_retry.so",
+            .registerPlayerPrincipalCallback = true,
+            .failDestroyUserDataOnce = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "player-principal destroy-userdata retry plugin was not initialized");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "player-principal destroy-userdata retry plugin callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "player-principal destroy-userdata retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "player-principal destroy-userdata retry plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 1,
+                "player-principal destroy-userdata cleanup was not attempted during first unload");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "player-principal destroy-userdata retry callback remained dispatchable after failed cleanup");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "player-principal destroy-userdata retry plugin shutdown repeated during retry");
+        Require(plugin.destroyUserDataCalls == 2,
+                "player-principal destroy-userdata retry did not retry the retained failed callback");
+        Require(plugin.closeCalls == 1,
+                "player-principal destroy-userdata retry plugin was not closed after cleanup retry");
+        Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
+                "player-principal destroy-userdata retry callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_cleanup_fail");
@@ -7904,6 +7953,7 @@ int main()
     TestUnloadAllRetriesPublicChatCleanupAfterBackingDispatcherCleanup();
     TestUnloadAllRetriesGameplayPolicyCleanupAfterBackingDispatcherCleanup();
     TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose();
+    TestUnloadAllRetriesPlayerPrincipalDestroyUserDataBeforeClose();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
     TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails();
     TestDuplicatePluginIdRejectsSecondPlugin();

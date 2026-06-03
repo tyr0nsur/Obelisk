@@ -716,6 +716,57 @@ def validate_readiness_provenance(
         add(blockers, "readiness_producer_argv_readiness_report_missing", "$.readiness.producer.argv")
     if "--json" not in argv:
         add(blockers, "readiness_producer_argv_json_missing", "$.readiness.producer.argv")
+    validate_readiness_producer_root_arg(
+        argv,
+        "--base-root",
+        root,
+        "readiness_producer_argv_base_root",
+        "$.readiness.producer.argv",
+        blockers,
+    )
+    candidate_root = validate_readiness_producer_root_arg(
+        argv,
+        "--candidate-root",
+        None,
+        "readiness_producer_argv_candidate_root",
+        "$.readiness.producer.argv",
+        blockers,
+    )
+    expected_root = safe_resolve_input_path(root, "root", blockers)
+    if candidate_root is not None and expected_root is not None and candidate_root == expected_root:
+        add(
+            blockers,
+            "readiness_producer_candidate_root_matches_base_root",
+            "$.readiness.producer.argv",
+            value=str(candidate_root),
+        )
+
+
+def validate_readiness_producer_root_arg(
+    argv: list[str],
+    option: str,
+    expected_root: Path | None,
+    reason_prefix: str,
+    label: str,
+    blockers: list[dict[str, Any]],
+) -> Path | None:
+    if option not in argv:
+        add(blockers, f"{reason_prefix}_missing", label)
+        return None
+    index = argv.index(option) + 1
+    if index >= len(argv):
+        add(blockers, f"{reason_prefix}_value_missing", label)
+        return None
+    observed = safe_resolve_input_path(Path(argv[index]), reason_prefix, blockers)
+    if observed is None:
+        return None
+    if expected_root is not None:
+        expected = safe_resolve_input_path(expected_root, "root", blockers)
+        if expected is not None and observed != expected:
+            add(blockers, f"{reason_prefix}_mismatch", label, expected=str(expected), value=str(observed))
+    if not observed.is_dir():
+        add(blockers, f"{reason_prefix}_not_directory", label, value=str(observed))
+    return observed
 
 
 def validate_readiness(

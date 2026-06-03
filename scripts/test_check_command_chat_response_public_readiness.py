@@ -74,6 +74,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             return str(root / "base-snapshots" / basename)
 
         source_root = str(root) if root is not None else "/offline"
+        candidate_root = str(root / "candidate-snapshots") if root is not None else "/offline-candidate"
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "evidence_scope": "second_source_layout_evidence_only",
@@ -85,6 +86,8 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                     "scripts/compare_reflection_snapshots.py",
                     "--base-root",
                     source_root,
+                    "--candidate-root",
+                    candidate_root,
                     "--target-set",
                     "command-chat-response-route-planning",
                     "--readiness-report",
@@ -366,7 +369,9 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         temp_header: bool = False,
     ) -> tuple[Path, Path, Path]:
         snapshot_root = root / "base-snapshots"
+        candidate_root = root / "candidate-snapshots"
         snapshot_root.mkdir(parents=True, exist_ok=True)
+        candidate_root.mkdir(parents=True, exist_ok=True)
         for target in TARGETS:
             (snapshot_root / f"{target.rsplit(':', 1)[1]}.snapshot.json").write_text(
                 json.dumps(target_snapshot_payload(target.rsplit(":", 1)[1])),
@@ -385,6 +390,8 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                     "scripts/compare_reflection_snapshots.py",
                     "--base-root",
                     effective_readiness["source_root"],
+                    "--candidate-root",
+                    str(candidate_root),
                     "--target-set",
                     "command-chat-response-route-planning",
                     "--readiness-report",
@@ -396,7 +403,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         producer = effective_readiness.get("producer")
         if isinstance(producer, dict) and isinstance(producer.get("argv"), list):
             producer["argv"] = [
-                effective_readiness["source_root"] if item == "/offline" else item
+                effective_readiness["source_root"] if item == "/offline" else str(candidate_root) if item == "/offline-candidate" else item
                 for item in producer["argv"]
             ]
         readiness_path.write_text(json.dumps(effective_readiness), encoding="utf-8")
@@ -535,6 +542,31 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertFalse(report["valid"])
         self.assertIn("readiness_source_root_mismatch", report["blockers"])
+
+    def test_rejects_accepted_second_source_without_candidate_root_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+            argv = readiness["producer"]["argv"]
+            candidate_index = argv.index("--candidate-root")
+            del argv[candidate_index : candidate_index + 2]
+            readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("readiness_producer_argv_candidate_root_missing", report["blockers"])
 
     def test_rejects_placeholder_target_snapshot_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

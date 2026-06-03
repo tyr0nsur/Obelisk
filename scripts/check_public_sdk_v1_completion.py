@@ -287,6 +287,18 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
 )
 SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     *INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS,
+    "complete_sdk_blockers_promoted_count",
+    "complete_sdk_blockers_promoted_for_claim_count",
+    "complete_sdk_blockers_promoted_for_claim_ratio",
+    "complete_sdk_claim_progress_percent",
+    "complete_sdk_claim_progress_ratio",
+    "complete_sdk_progress_percent",
+    "complete_sdk_progress_ratio",
+    "p0_chain_promoted_count",
+    "p0_chain_promoted_ratio",
+    "p0_dependency_chain_promoted_for_claim_count",
+    "p0_dependency_chain_promoted_for_claim_ratio",
+    "promoted_for_claim_ratio",
     "public_abi_ready",
     "rc_ready",
     "rc_readiness_ready",
@@ -299,6 +311,10 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "public_sdk_ready",
     "promotion_ready",
     "runtime_ready",
+    "sdk_completion_progress_percent",
+    "sdk_completion_progress_ratio",
+    "v1_completion_progress_percent",
+    "v1_completion_progress_ratio",
 )
 BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r"^(?:"
@@ -1390,6 +1406,16 @@ def is_positive_completion_claim_value(value: Any) -> bool:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return value != 0
     if isinstance(value, str):
+        stripped = value.strip()
+        number_match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)%?", stripped)
+        if number_match:
+            return float(number_match.group(1)) != 0
+        ratio_match = re.fullmatch(
+            r"([+-]?\d+(?:\.\d+)?)\s*/\s*([+-]?\d+(?:\.\d+)?)",
+            stripped,
+        )
+        if ratio_match:
+            return float(ratio_match.group(1)) != 0
         return normalized_completion_claim_key(value) in {
             "allowed",
             "available",

@@ -338,6 +338,15 @@ EXPECTED_DETAIL_KEYS = {
     function: frozenset(details)
     for function, details in EXPECTED_DETAIL_VALUES.items()
 }
+ALLOWED_SOURCE_SUMMARY_PROMOTION_GATE_KEYS = frozenset(("gate_type", "ready", "blockers"))
+EXPECTED_SOURCE_SUMMARY_PROMOTION_GATE = {
+    "gate_type": "runtime_observer_observational_only",
+    "ready": False,
+    "blockers": [
+        "runtime_observer_evidence_only",
+        "requires_isolated_capture_or_second_source_for_promotion",
+    ],
+}
 PRIVACY_BOUNDARY_KEYS = frozenset(
     (
         "copied_opaque_principal_only",
@@ -1649,6 +1658,35 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         add(blockers, "source_summary_schema_mismatch", "$.source_summary.schema")
     if summary.get("review_scope") != "runtime_observer_evidence_summary":
         add(blockers, "source_summary_review_scope_mismatch", "$.source_summary.review_scope")
+    if summary.get("readiness_gate") != "none":
+        add(
+            blockers,
+            "source_summary_readiness_gate_mismatch",
+            "$.source_summary.readiness_gate",
+            expected="none",
+            actual=summary.get("readiness_gate"),
+        )
+    source_promotion_gate = summary.get("promotion_gate")
+    if not isinstance(source_promotion_gate, dict):
+        add(blockers, "source_summary_promotion_gate_missing", "$.source_summary.promotion_gate")
+    else:
+        unexpected_keys = set(source_promotion_gate) - ALLOWED_SOURCE_SUMMARY_PROMOTION_GATE_KEYS
+        if unexpected_keys:
+            add(
+                blockers,
+                "source_summary_promotion_gate_keys_unexpected",
+                "$.source_summary.promotion_gate",
+                unexpected=sorted(unexpected_keys),
+            )
+        for key, expected in EXPECTED_SOURCE_SUMMARY_PROMOTION_GATE.items():
+            if source_promotion_gate.get(key) != expected:
+                add(
+                    blockers,
+                    f"source_summary_promotion_gate_{key}_mismatch",
+                    f"$.source_summary.promotion_gate.{key}",
+                    expected=expected,
+                    actual=source_promotion_gate.get(key),
+                )
     evidence = summary.get("evidence")
     if not isinstance(evidence, dict):
         add(blockers, "source_summary_evidence_missing", "$.source_summary.evidence")

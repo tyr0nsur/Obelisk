@@ -9,6 +9,8 @@
       "scripts/compare_reflection_snapshots.py",
       "--base-root",
       "tests/fixtures/command_chat_response_route_planning_default",
+      "--candidate-root",
+      "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/command_chat_response_route_planning",
       "--target-set",
       "command-chat-response-route-planning",
       "--readiness-report",
