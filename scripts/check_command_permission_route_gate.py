@@ -744,9 +744,9 @@ def collect_public_or_runtime_claims(
             return any(contains_forbidden_claim_source(child) for child in item.values())
         return False
 
-    def text_claim_path_is_command_metadata(claim_path: str) -> bool:
+    def text_claim_path_is_exempt_metadata(claim_path: str) -> bool:
         return any(
-            normalized_key(part.split("[", 1)[0]) in {"argv"}
+            normalized_key(part.split("[", 1)[0]) in {"argv", "non_claim", "non_claims"}
             for part in claim_path.split(".")
             if part
         )
@@ -808,7 +808,7 @@ def collect_public_or_runtime_claims(
     elif isinstance(value, str):
         if (
             include_text_claims
-            and not text_claim_path_is_command_metadata(path)
+            and not text_claim_path_is_exempt_metadata(path)
             and contains_positive_public_or_runtime_text_claim(value)
         ):
             claims.append(f"{path}:positive_text_claim")

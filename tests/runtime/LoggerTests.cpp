@@ -85,6 +85,42 @@ namespace
         ExpectInitThrowsContaining("absolute");
     }
 
+    void TestRejectsRelativeRootDerivedLogDir()
+    {
+        ResetEnv();
+        const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+        const fs::path relativeRoot = std::string("obelisk_logger_relative_root_") + std::to_string(now);
+        fs::remove_all(relativeRoot);
+        setenv("OBELISK_ROOT", relativeRoot.string().c_str(), 1);
+
+        ExpectInitThrowsContaining("absolute");
+        Require(!fs::exists(relativeRoot / "logs"), "logger created logs from a relative OBELISK_ROOT");
+        fs::remove_all(relativeRoot);
+    }
+
+    void TestRejectsExplicitLogDirWithParentAlias()
+    {
+        ResetEnv();
+        const fs::path root = MakeTempRoot("obelisk_logger_parent_alias_log_dir");
+        setenv("OBELISK_LOG_DIR", (root / "missing-parent" / ".." / "escaped-logs").string().c_str(), 1);
+
+        ExpectInitThrowsContaining("path alias");
+        Require(!fs::exists(root / "missing-parent"), "logger created a parent-alias log component");
+        Require(!fs::exists(root / "escaped-logs"), "logger created logs through a parent-directory alias");
+        fs::remove_all(root);
+    }
+
+    void TestRejectsExplicitLogDirWithCurrentAlias()
+    {
+        ResetEnv();
+        const fs::path root = MakeTempRoot("obelisk_logger_current_alias_log_dir");
+        setenv("OBELISK_LOG_DIR", (root / "." / "logs").string().c_str(), 1);
+
+        ExpectInitThrowsContaining("path alias");
+        Require(!fs::exists(root / "logs"), "logger created logs through a current-directory alias");
+        fs::remove_all(root);
+    }
+
     void TestRejectsSymlinkExplicitLogDir()
     {
         ResetEnv();
@@ -142,6 +178,18 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestRejectsRootDerivedLogDirWithParentAlias()
+    {
+        ResetEnv();
+        const fs::path root = MakeTempRoot("obelisk_logger_root_parent_alias");
+        setenv("OBELISK_ROOT", (root / "missing-root" / ".." / "obelisk").string().c_str(), 1);
+
+        ExpectInitThrowsContaining("path alias");
+        Require(!fs::exists(root / "missing-root"), "logger created a parent-alias root component");
+        Require(!fs::exists(root / "obelisk" / "logs"), "logger created root-derived logs through a parent alias");
+        fs::remove_all(root);
+    }
+
     void TestRejectsRootDerivedSymlinkLogDir()
     {
         ResetEnv();
@@ -163,10 +211,14 @@ int main()
         TestExplicitLogDirCreatesInstanceLogs();
         TestRejectsMissingLogRoot();
         TestRejectsRelativeExplicitLogDir();
+        TestRejectsRelativeRootDerivedLogDir();
+        TestRejectsExplicitLogDirWithParentAlias();
+        TestRejectsExplicitLogDirWithCurrentAlias();
         TestRejectsSymlinkExplicitLogDir();
         TestRejectsSymlinkExplicitLogDirAncestor();
         TestRejectsSymlinkInstanceLogDir();
         TestRejectsRootDerivedSymlinkAncestor();
+        TestRejectsRootDerivedLogDirWithParentAlias();
         TestRejectsRootDerivedSymlinkLogDir();
         ResetEnv();
         std::cout << "LoggerTests passed\n";

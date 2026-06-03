@@ -598,6 +598,24 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         )
         self.assertIn("checks[0].nested.dependency_chain_unlocked", report["route_gate"]["public_or_runtime_claims"])
 
+    def test_rejects_nested_route_gate_positive_text_claims_outside_non_claims(self) -> None:
+        route_report = self.base_route_report()
+        route_report["checks"] = [
+            {
+                "name": "injected_text_claim",
+                "valid": True,
+                "summary": "player identity public SDK ready after approved runtime evidence",
+                "non_claim": "this route lock does not promote public SDK readiness",
+            }
+        ]
+
+        report = self.run_with_fake_route_report(route_report)
+
+        self.assertFalse(report["valid"])
+        self.assertIn("route_gate_public_or_runtime_claims_overclaim", report["blockers"])
+        self.assertIn("checks[0].summary:positive_text_claim", report["route_gate"]["public_or_runtime_claims"])
+        self.assertNotIn("checks[0].non_claim:positive_text_claim", report["route_gate"]["public_or_runtime_claims"])
+
     def test_rejects_partial_manifest_inputs_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             lifecycle_path = Path(temp_dir) / "players-identity-lifecycle-anchor-candidates.json"

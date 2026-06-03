@@ -677,6 +677,25 @@ SPLIT_CLAIM_VALUE_KEYS = {
     "value",
     "values",
 }
+NON_PROMOTIONAL_CLAIM_VALUE_TOKENS = {
+    "",
+    "blocked",
+    "empty",
+    "false",
+    "missing",
+    "no",
+    "none",
+    "not_available",
+    "unavailable",
+    "unresolved",
+}
+NON_CLAIM_CONTAINER_PATH_FRAGMENTS = (
+    ".blocker_details",
+    ".blockers",
+    ".does_not_resolve",
+    ".non_claims",
+    ".remaining_blockers",
+)
 ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
     "approved_runtime_evidence_present",
     "runtime_evidence_ready",
@@ -727,7 +746,50 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     "lookup_allowed": re.compile(r"(?:player\s+)?lookup\s+(?:is\s+)?allowed", re.IGNORECASE),
     "mutation_allowed": re.compile(r"mutation\s+(?:is\s+)?allowed", re.IGNORECASE),
     "return_override_allowed": re.compile(r"return[_ -]?override\s+(?:is\s+)?allowed", re.IGNORECASE),
-    "resource_handle_supported": re.compile(r"resource[_ -]?handle\s+(?:is\s+)?supported", re.IGNORECASE),
+    "resource_handle_supported": re.compile(
+        r"resource[_ -]?handle\s+(?:is\s+)?"
+        r"(?:available|enabled|exposed|promoted|public|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "opaque_principal_promoted": re.compile(
+        r"\b(?:copied[-_ ]+)?opaque[-_ ]+(?:player[-_ ]+)?principal\b[^.;\n]{0,80}\b"
+        r"(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "principal_generation_ready": re.compile(
+        r"\bprincipal[-_ ]+generation\b[^.;\n]{0,80}\b"
+        r"(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "privacy_redaction_ready": re.compile(
+        r"\b(?:identifier[-_ ]+redaction|privacy[-_ ]+redaction|privacy\s+and\s+redaction)\b"
+        r"[^.;\n]{0,80}\b(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "real_identifier_exposed": re.compile(
+        r"\b(?:real[-_ ]+identifiers?|platform[-_ ]+account[-_ ]+ids?|steamid|steam[-_ ]+id|"
+        r"eos[-_ ]+id|uniquenetid|playerdataid|player[-_ ]+names?|tribe[-_ ]+(?:ids?|identifiers?)|"
+        r"network[-_ ]+addresses?|ip[-_ ]+addresses?)\b[^.;\n]{0,80}\b"
+        r"(?:available|enabled|exposed|promoted|public|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "permissions_admin_ready": re.compile(
+        r"\b(?:permissions?[/ _-]?admin|permission[-_ ]+query|permission[-_ ]+cache|"
+        r"admin[-_ ]+mutation)\b[^.;\n]{0,80}\b"
+        r"(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "commands_ready": re.compile(
+        r"\b(?:command[/ _-]?chat[-_ ]+response|commands?[/ _-]?replies|command[-_ ]+response|"
+        r"command[-_ ]+router|send[-_ ]+chat)\b[^.;\n]{0,80}\b"
+        r"(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "lookup_ready": re.compile(
+        r"\b(?:player[-_ ]+lookup|principal[-_ ]+lookup|lookup[-_ ]+api|lookup[-_ ]+handle|lookup)"
+        r"\b[^.;\n]{0,80}\b(?:allowed|available|enabled|exposed|promoted|public|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
 }
 PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
     **APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS,
@@ -901,6 +963,23 @@ def is_positive_claim_value(value: Any) -> bool:
     return False
 
 
+def is_nonempty_public_surface_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if value in (False, None):
+        return False
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+        return normalized not in NON_PROMOTIONAL_CLAIM_VALUE_TOKENS
+    if isinstance(value, list):
+        return any(is_nonempty_public_surface_claim_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(is_nonempty_public_surface_claim_value(item) for item in value.values())
+    return False
+
+
 def split_claim_name_values(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
@@ -924,13 +1003,22 @@ def split_claim_overclaims(value: dict[str, Any], path: str) -> list[dict[str, A
     overclaims: list[dict[str, Any]] = []
     for claim_name in declared_claim_names:
         claim_key = normalize_contract_key(claim_name)
+        positive_claim = any(is_positive_claim_value(item) for item in declared_claim_values)
+        public_surface_list_claim = (
+            claim_key in EMPTY_PUBLIC_LIST_KEYS
+            and any(is_nonempty_public_surface_claim_value(item) for item in declared_claim_values)
+        )
         if (
             claim_key in READINESS_FALSE_KEYS
             or claim_key in EMPTY_PUBLIC_LIST_KEYS
             or APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(claim_key) is not None
-        ) and any(is_positive_claim_value(item) for item in declared_claim_values):
+        ) and (positive_claim or public_surface_list_claim):
             overclaims.append({"path": path, "term": "split_readiness_alias", "value": value})
     return overclaims
+
+
+def is_non_claim_container_path(path: str) -> bool:
+    return any(fragment in path for fragment in NON_CLAIM_CONTAINER_PATH_FRAGMENTS)
 
 
 def alias_guardrails_false() -> dict[str, bool]:
@@ -982,7 +1070,8 @@ def has_negative_context(value: str, match_start: int) -> bool:
         return True
     return bool(
         re.search(
-            r"\b(?:forbidden|unavailable|blocked|redacted|cannot|can't|false)\b|"
+            r"\b(?:after|before|forbidden|unavailable|blocked|redacted|cannot|can't|false|missing|not|"
+            r"unresolved|until)\b|"
             r"\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
             suffix,
             re.IGNORECASE,
@@ -997,6 +1086,8 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
         for key, item in report.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
+            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+                overclaims.extend(public_text_overclaims(str(key), item_path))
             if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
                 overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
             if (
@@ -1017,7 +1108,9 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
         for index, item in enumerate(report):
             overclaims.extend(approved_runtime_report_overclaims(item, f"{path}[{index}]"))
     elif isinstance(report, str):
-        for term, pattern in APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS.items():
+        if is_non_claim_container_path(path) or path.endswith(".next_blocker"):
+            return overclaims
+        for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
             for match in pattern.finditer(report):
                 if has_negative_context(report, match.start()):
                     continue
@@ -1791,6 +1884,16 @@ def sanitize_non_promotional_report(
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
+            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+                for claim in public_text_overclaims(str(key), item_path):
+                    add(
+                        blockers,
+                        "nested_public_text_overclaim",
+                        claim["path"],
+                        input=input_label,
+                        term=claim["term"],
+                        value=claim["value"],
+                    )
             contract_review_allowed = (
                 normalized_key == "accepted_for_contract_review"
                 and path != root_path
@@ -1824,6 +1927,18 @@ def sanitize_non_promotional_report(
             )
             for index, item in enumerate(value)
         ]
+    if isinstance(value, str):
+        if is_non_claim_container_path(path):
+            return value
+        for claim in public_text_overclaims(value, path):
+            add(
+                blockers,
+                "nested_public_text_overclaim",
+                claim["path"],
+                input=input_label,
+                term=claim["term"],
+                value=claim["value"],
+            )
     return value
 
 

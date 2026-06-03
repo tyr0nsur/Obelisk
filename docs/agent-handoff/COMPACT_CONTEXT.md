@@ -2035,6 +2035,27 @@ priorities, and do not use history files as the active source of truth.
   `stable_claim_allowed=false`, and no promoted evidence-less blockers. No
   `/servidor/ark` writes, server access, live runtime tools, marker/env edits, Discord,
   GitHub, tags, releases, or publication.
+- 2026-06-04 6-agent SDK route/claim hardening checkpoint: six scoped workers were
+  delegated and closed by the lead. Integrated changes reject request/window/current-turn
+  approval aliases such as runtime work authorized, server restart approved, marker
+  changes enabled, and generated templates counting as approval; reject identity public
+  contract nested prose/key/split overclaims for public header symbols, opaque principal,
+  generation, privacy/redaction, real identifiers, lookup, ResourceHandle,
+  permissions/admin, commands, runtime, and v1 completion; make the bound identity route
+  wrapper reject positive text claims outside `non_claim`/`non_claims`; harden SDK
+  release-statement accounting against mixed-case surface/status rows, support-tier or
+  release-supported wording, nested secondary split claims, and demand-family equivalent
+  aliases; make Mission/Transfer/Dino/Tribe/Buff umbrella accounting fail closed on
+  promoted leaf attempts while preserving explicit leaf exclusion only; add Buff/status
+  text/path/false-flag overclaim checks; and make Logger reject explicit or root-derived
+  `.`/`..` path aliases before directory creation. Validation: request/window plus route
+  147 OK, identity public contract/gap/decisions 108 OK, Buff/status umbrella 49 OK,
+  SDK focused 5 OK, full SDK completion 248 OK in 530.343s, docs/research/public SDK/
+  release-scope plus full SDK guardrails 556 OK from the docs auditor, C++ build OK,
+  runtime CTest 14/14, plugin/timer guardrails 38/7 OK, route JSON valid planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`, and
+  `stable_claim_allowed=false`. No `/servidor/ark` writes, server access, live runtime
+  tools, marker/env edits, Discord, GitHub, tags, releases, or publication.
 
 ## Agent Coordination
 

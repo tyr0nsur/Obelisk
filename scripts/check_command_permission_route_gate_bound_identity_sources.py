@@ -483,7 +483,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         )
         route_public_or_runtime_claims = route_gate.collect_public_or_runtime_claims(
             route_report,
-            include_text_claims=False,
+            include_text_claims=True,
         )
         if route_report.get("schema") != ROUTE_GATE_SCHEMA:
             blockers.append("route_gate_schema_mismatch")
@@ -604,7 +604,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "parse_error": route_parse_error,
             "report": route_report,
             "public_or_runtime_claims": (
-                route_gate.collect_public_or_runtime_claims(route_report, include_text_claims=False)
+                route_gate.collect_public_or_runtime_claims(route_report, include_text_claims=True)
                 if isinstance(route_report, dict)
                 else []
             ),

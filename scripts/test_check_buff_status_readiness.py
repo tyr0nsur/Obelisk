@@ -63,17 +63,29 @@ class CheckBuffStatusReadinessTests(unittest.TestCase):
         self.assertTrue(payload["zero_param_lifecycle_shape_ready"])
         self.assertFalse(payload["copied_payload_policy_ready"])
         self.assertFalse(payload["lifecycle_semantics_ready"])
+        self.assertFalse(payload["buff_status_sdk_ready"])
+        self.assertFalse(payload["module_sdk_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["public_buff_sdk_ready"])
         self.assertFalse(payload["public_abi_ready"])
+        self.assertFalse(payload["public_api_ready"])
+        self.assertFalse(payload["public_callback_ready"])
         self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["runtime_hook_ready"])
+        self.assertFalse(payload["runtime_wiring_ready"])
         self.assertFalse(payload["runtime_observer_approved"])
+        self.assertFalse(payload["dispatcher_ready"])
         self.assertFalse(payload["identity_ready"])
         self.assertFalse(payload["lookup_ready"])
         self.assertFalse(payload["mutation_ready"])
         self.assertFalse(payload["return_override_ready"])
         self.assertFalse(payload["resource_handle_ready"])
+        self.assertFalse(payload["v1_accounted"])
+        self.assertFalse(payload["v1_completion"])
         self.assertFalse(payload["v1_completion_ready"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["complete_sdk_claim_allowed"])
+        self.assertFalse(payload["counts_toward_complete_sdk_claim"])
         self.assertFalse(payload["promotion_ready"])
         self.assertEqual(6, payload["summary"]["copied_bool_count"])
         self.assertEqual(4, payload["summary"]["redacted_field_count"])
@@ -214,6 +226,7 @@ class CheckBuffStatusReadinessTests(unittest.TestCase):
             payload["public_buff_sdk_ready"] = True
             payload["runtime_ready"] = True
             payload["v1_completion_ready"] = True
+            payload["counts_toward_complete_sdk_claim"] = True
             self.write_snapshot(root, "PrimalBuff.AllowPostProcessEffect", payload)
             result = self.run_checker("--snapshot-root", str(root), check=False)
 
@@ -223,6 +236,45 @@ class CheckBuffStatusReadinessTests(unittest.TestCase):
         self.assertFalse(output["public_sdk_ready"])
         self.assertFalse(output["runtime_ready"])
         self.assertFalse(output["v1_completion_ready"])
+        self.assertFalse(output["counts_toward_complete_sdk_claim"])
+
+    def test_textual_public_runtime_or_v1_claims_in_fixtures_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self.copy_fixture_root(Path(temp_dir))
+            payload = self.read_snapshot(root, "PrimalBuff.AllowPostProcessEffect")
+            payload["interpretation"]["note"] = (
+                "Public Buff/status SDK is ready. Buff/status SDK is available. Runtime observer is approved. "
+                "This counts toward the complete SDK claim."
+            )
+            self.write_snapshot(root, "PrimalBuff.AllowPostProcessEffect", payload)
+            result = self.run_checker("--snapshot-root", str(root), check=False)
+
+        output = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in output["blockers"]}
+        self.assertIn("forbidden_text_claim", reasons)
+        claims = {blocker["claim"] for blocker in output["blockers"] if blocker["reason"] == "forbidden_text_claim"}
+        self.assertIn("Public Buff/status SDK", claims)
+        self.assertIn("Buff/status SDK", claims)
+        self.assertIn("Runtime observer", claims)
+        self.assertIn("counts toward the complete SDK claim", claims)
+        self.assertFalse(output["public_sdk_ready"])
+        self.assertFalse(output["runtime_ready"])
+        self.assertFalse(output["v1_accounted"])
+
+    def test_negated_textual_non_claims_in_fixtures_are_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self.copy_fixture_root(Path(temp_dir))
+            payload = self.read_snapshot(root, "PrimalBuff.AllowPostProcessEffect")
+            payload["interpretation"]["note"] = (
+                "No public Buff/status SDK is ready; runtime observer remains blocked; "
+                "v1 completion is not included."
+            )
+            self.write_snapshot(root, "PrimalBuff.AllowPostProcessEffect", payload)
+            result = self.run_checker("--snapshot-root", str(root))
+
+        output = json.loads(result.stdout)
+        self.assertTrue(output["ready"])
+        self.assertEqual([], output["blockers"])
 
     def test_snapshot_root_must_not_be_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -234,6 +286,21 @@ class CheckBuffStatusReadinessTests(unittest.TestCase):
         output = json.loads(result.stdout)
         reasons = {blocker["reason"] for blocker in output["blockers"]}
         self.assertIn("path_rejected", reasons)
+
+    def test_snapshot_file_must_not_be_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self.copy_fixture_root(Path(temp_dir))
+            snapshot = self.snapshot_path(root, "PrimalBuff.AllowPostProcessEffect")
+            real_snapshot = Path(temp_dir) / "outside.snapshot.json"
+            shutil.copy2(snapshot, real_snapshot)
+            snapshot.unlink()
+            snapshot.symlink_to(real_snapshot)
+            result = self.run_checker("--snapshot-root", str(root), check=False)
+
+        output = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in output["blockers"]}
+        self.assertIn("path_rejected", reasons)
+        self.assertIn("required_target_snapshot_missing", reasons)
 
 
 if __name__ == "__main__":

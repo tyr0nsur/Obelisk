@@ -151,7 +151,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         for leaf_id in REQUIRED_LEAVES:
             self.assertEqual(
                 accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"],
-                "not counted for v1; requires future promoted evidence or explicit leaf exclusion",
+                "not counted for v1 by this candidate-only checker; requires explicit leaf exclusion",
             )
             self.assertNotIn("C ABI surface", accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"])
             self.assertNotIn("promoted as", accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"])
@@ -351,6 +351,23 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         )
         self.assertFalse(report["candidate_only_accounting"]["leaf_family_gaps"]["buff_status"]["v1_accounted"])
 
+    def test_release_statement_does_not_count_generic_buff_identity_exclusion_as_buff_status_leaf(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission excluded; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded. "
+            "Buff identity excluded from v1. "
+            "No Buff/status SDK, runtime hook, identity, lookup, mutation, return override, or ResourceHandle is included in v1.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_leaf_exclusions_missing", report["blockers"])
+        details = [item for item in report["blocker_details"] if item["reason"] == "release_statement_leaf_exclusions_missing"]
+        self.assertEqual(details[0]["missing"], ["buff_status"])
+        self.assertFalse(report["release_statement"]["leaf_exclusions"]["buff_status"])
+        self.assertFalse(report["candidate_only_accounting"]["leaf_family_gaps"]["buff_status"]["v1_accounted"])
+
     def test_release_statement_rejects_affirmative_forbidden_claims(self) -> None:
         statement = (
             f"{SURFACE_ID}: excluded - mission excluded; transfer excluded; "
@@ -493,7 +510,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("runtime ready", leaf_claims)
         self.assertIn("v1 is complete", leaf_claims)
 
-    def test_future_per_leaf_promoted_route_requires_real_evidence(self) -> None:
+    def test_promoted_leaf_route_is_blocked_even_with_synthetic_evidence(self) -> None:
         evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
         evidence_parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
@@ -518,17 +535,20 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                     ],
                 }
 
-            result = self.run_checker(manifest=manifest)
+            result = self.run_checker(manifest=manifest, check=False)
         report = json.loads(result.stdout)
 
-        self.assertTrue(report["ready"])
-        self.assertEqual(report["accounting_route"], "per_leaf_promoted")
-        self.assertTrue(report["promotion_ready"])
-        self.assertTrue(report["public_sdk_ready"])
-        self.assertTrue(report["runtime_ready"])
-        self.assertEqual(report["missing_leaf_families"], [])
-        self.assertEqual(report["candidate_only_accounting"]["result"], "all_leaf_families_accounted")
-        self.assertEqual(report["candidate_only_accounting"]["missing_public_gate_counts"]["mission"], 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertEqual(report["accounting_route"], "candidate_only")
+        self.assertFalse(report["v1_accounted"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["missing_leaf_families"], REQUIRED_LEAVES)
+        self.assertEqual(report["candidate_only_accounting"]["result"], "leaf_families_missing_v1_outcomes")
+        self.assertEqual(report["candidate_only_accounting"]["status_counts"], {"promoted": 5})
+        self.assertIn("side_lane_leaf_promotion_not_allowed", report["blockers"])
 
     def test_future_per_leaf_promoted_route_rejects_placeholder_evidence_paths(self) -> None:
         manifest = load_manifest()
@@ -944,6 +964,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                 "counts_toward_complete_sdk_claim": True,
                 "stable_claim_allowed": True,
                 "complete-sdk-claim-allowed": True,
+                "v1_completion_ready": True,
                 "promotion_status": "promoted",
             },
             "claim": "This side lane counts toward the complete SDK claim.",
@@ -964,6 +985,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                 "$.leaf_decision_units[buff_status].evidence.nested.counts_toward_complete_sdk_claim",
                 "$.leaf_decision_units[buff_status].evidence.nested.stable_claim_allowed",
                 "$.leaf_decision_units[buff_status].evidence.nested.complete-sdk-claim-allowed",
+                "$.leaf_decision_units[buff_status].evidence.nested.v1_completion_ready",
                 "$.leaf_decision_units[buff_status].evidence.nested.promotion_status",
                 "$.leaf_decision_units[buff_status].evidence",
             }.issubset(fields)
@@ -1047,6 +1069,41 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                 "$.leaf_decision_units[dino_policy].evidence.capability_ready",
                 "$.leaf_decision_units[dino_policy].evidence.resource_handle_available",
                 "$.leaf_decision_units[dino_policy].evidence.v1_accounted",
+            },
+        )
+
+    def test_buff_candidate_leaf_rejects_status_runtime_and_payload_alias_true_fields(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["buff_status"]["evidence"] = {
+            "buff_status_sdk_ready": True,
+            "module_sdk_ready": True,
+            "runtime_wiring_ready": True,
+            "dispatcher_ready": True,
+            "copied_payload_policy_ready": True,
+            "lifecycle_semantics_ready": True,
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim"
+        }
+        self.assertEqual(
+            fields,
+            {
+                "$.leaf_decision_units[buff_status].evidence.buff_status_sdk_ready",
+                "$.leaf_decision_units[buff_status].evidence.module_sdk_ready",
+                "$.leaf_decision_units[buff_status].evidence.runtime_wiring_ready",
+                "$.leaf_decision_units[buff_status].evidence.dispatcher_ready",
+                "$.leaf_decision_units[buff_status].evidence.copied_payload_policy_ready",
+                "$.leaf_decision_units[buff_status].evidence.lifecycle_semantics_ready",
             },
         )
 

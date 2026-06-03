@@ -1198,7 +1198,12 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "accepted_for_contract_review": True,
                 "public_sdk_ready": True,
                 "public_header_symbols_now": ["RegisterPlayerIdentityCallback"],
+                "notes": "public header symbols are available",
             },
+            "review_notes": [
+                "runtime is ready",
+                {"claim": "public_header_symbols_now", "values": ["PrivateOnlySymbol"]},
+            ],
             "blockers": [],
         }
 
@@ -1211,6 +1216,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
         self.assertIn("nested_capability_bits_not_empty", reasons)
         self.assertIn("nested_callback_abi_not_empty", reasons)
+        self.assertIn("nested_public_text_overclaim", reasons)
+        self.assertIn("nested_readiness_split_claim_overclaim", reasons)
         self.assertFalse(report["accepted_for_candidate_review"])
         self.assertFalse(report["accepted_for_contract_review"])
         self.assertFalse(report["promotion_ready"])
@@ -1247,6 +1254,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "sdk_consumer": {
                 "public_sdk_ready": True,
                 "public_header_symbols_now": ["RegisterPlayerIdentityCallback"],
+                "notes": "command router is ready",
             },
             "blockers": [],
         }
@@ -1264,6 +1272,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         reasons = [blocker["reason"] for blocker in blockers]
         self.assertIn("nested_readiness_flag_not_false", reasons)
         self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
+        self.assertIn("nested_public_text_overclaim", reasons)
         self.assertTrue(report["provided"])
         self.assertEqual(report["source"], "owner_token_sdk_consumer_contract")
         self.assertFalse(report["accepted_for_contract_review"])
@@ -1425,6 +1434,71 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("$.nestedClaims.downstream.principalLookupReady", paths)
         self.assertIn("$.nestedClaims.downstream.redactionEvidencePromotesIdentity", paths)
         self.assertFalse(report["accepted_for_contract_review"])
+
+    def test_approved_runtime_report_rejects_prose_key_and_split_overclaims(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def overclaiming_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            report = self.accepted_runtime_contract_review_report()
+            report["reviewNotes"] = [
+                "public header symbols are available",
+                "runtime is ready",
+                "opaque principal is promoted",
+                "principal generation is ready",
+                "privacy and redaction are ready",
+                "platform account ids are public",
+                "player lookup is available",
+                "ResourceHandle is ready",
+                "permissions/admin is unlocked",
+                "commands/replies are ready",
+                "v1 SDK completion is ready",
+                {"claim": "public_header_symbols_now", "values": ["PrivateOnlySymbol"]},
+                {"name": "ObeliskPlayerPrincipalEvent", "value": True},
+            ]
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report),
+            ):
+                report = checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertIn(
+            "approved_runtime_evidence_report_public_readiness_overclaim",
+            [blocker["reason"] for blocker in blockers],
+        )
+        overclaims = next(
+            blocker["overclaims"]
+            for blocker in blockers
+            if blocker["reason"] == "approved_runtime_evidence_report_public_readiness_overclaim"
+        )
+        terms = {claim["term"] for claim in overclaims}
+        for term in (
+            "public_header_ready",
+            "runtime_ready",
+            "opaque_principal_promoted",
+            "principal_generation_ready",
+            "privacy_redaction_ready",
+            "real_identifier_exposed",
+            "lookup_ready",
+            "resource_handle_supported",
+            "permissions_admin_ready",
+            "commands_ready",
+            "v1_completion_ready",
+            "split_readiness_alias",
+            "public_player_header_symbol",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, terms)
 
     def test_approved_runtime_report_must_not_overclaim_public_header_allowed(self) -> None:
         def accepted_validation(_payload, *, check_mode: str):
@@ -1831,8 +1905,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     {"field": "principalHandleAbiReady", "state": "ready"},
                     {"claim": "identityHeaderAllowed", "enabled": "yes"},
                     {"aliases": ["publicHeaderAllowed", "runtimeEvidenceReady"], "values": ["ready"]},
+                    {"key": "public_header_symbols_now", "values": ["PrivateOnlySymbol"]},
                     {"key": "publicIdentityReady", "value": False},
                     {"claims": ["publicHeaderAllowed"], "values": ["blocked"]},
+                    {"key": "public_header_symbols_now", "values": []},
+                    {"key": "public_header_symbols_now", "values": ["blocked"]},
                 ]
             }
         )
@@ -1842,8 +1919,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("$.claims[1]", paths)
         self.assertIn("$.claims[2]", paths)
         self.assertIn("$.claims[3]", paths)
-        self.assertNotIn("$.claims[4]", paths)
+        self.assertIn("$.claims[4]", paths)
         self.assertNotIn("$.claims[5]", paths)
+        self.assertNotIn("$.claims[6]", paths)
+        self.assertNotIn("$.claims[7]", paths)
+        self.assertNotIn("$.claims[8]", paths)
 
     def test_sanitize_non_promotional_report_rejects_split_key_value_aliases(self) -> None:
         blockers: list[dict] = []
@@ -1853,8 +1933,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     {"key": "publicSdkReady", "value": True},
                     {"field": "public_header_symbols_now", "state": "ready"},
                     {"names": ["publicAbiReady", "runtimeEvidenceReady"], "statuses": ["available"]},
+                    {"key": "public_header_symbols_now", "values": ["PrivateOnlySymbol"]},
                     {"key": "publicSdkReady", "value": False},
                     {"names": ["publicAbiReady"], "statuses": ["blocked"]},
+                    {"key": "public_header_symbols_now", "values": []},
+                    {"key": "public_header_symbols_now", "values": ["blocked"]},
                 ]
             },
             blockers,
@@ -1866,8 +1949,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[0]"), paths)
         self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[1]"), paths)
         self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[2]"), paths)
-        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[3]"), paths)
+        self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[3]"), paths)
         self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[4]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[5]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[6]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[7]"), paths)
 
 
 if __name__ == "__main__":

@@ -279,7 +279,7 @@ FORBIDDEN_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 POSITIVE_CAPABILITY_RE = re.compile(
-    r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"(?:public[_ -]?(?:sdk|abi|player[_ -]?identity)|"
     r"(?:(?:request[_ -]?pack|window[_ -]?request|preflight|(?:completed[_ -]?)?receipt|"
     r"operator[_ -]?approval[_ -]?(?:request|receipt)|operator[_ -]?request|"
     r"approval[_ -]?request|window[_ -]?manifest|observer[_ -]?(?:window[_ -]?)?env|"
@@ -287,25 +287,42 @@ POSITIVE_CAPABILITY_RE = re.compile(
     r"stale[_ -]?bundle|sidecars?|artifacts?)[_ -]?"
     r"(?:counts?[_ -]?as|is|are|proves?|provides?|authorizes?|approves?)[_ -]?"
     r"approved[_ -]?runtime[_ -]?evidence)|"
-    r"(?:stable|complete|full|production)[_ -]?(?:v1[_ -]?)?(?:sdk[_ -]?)?claim[_ -]?(?:allowed|ready|enabled|supported)|"
-    r"(?:stable|complete|full|production)[_ -]?sdk[_ -]?(?:ready|allowed|claim)|"
-    r"stable[_ -]?release[_ -]?contract[_ -]?claim[_ -]?allowed|"
-    r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
-    r"(?:sdk|runtime|runtime[_ -]?work|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
-    r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
+    r"(?:stable|complete|full|production)[_ -]?(?:v1[_ -]?)?(?:sdk[_ -]?)?claim[_ -]?"
+    r"(?:(?:is|are)[_ -]?)?(?:allowed|ready|enabled|supported)|"
+    r"(?:stable|complete|full|production)[_ -]?sdk[_ -]?(?:(?:is|are)[_ -]?)?(?:ready|allowed|claim)|"
+    r"(?:v1[_ -]?(?:sdk[_ -]?)?(?:completion|complete)|sdk[_ -]?v1[_ -]?completion)[_ -]?"
+    r"(?:(?:is|are)[_ -]?)?(?:ready|readiness|complete|completed|allowed|enabled|supported)|"
+    r"stable[_ -]?release[_ -]?contract[_ -]?claim[_ -]?(?:(?:is|are)[_ -]?)?allowed|"
+    r"player[_ -]?identity[_ -]?(?:(?:is|are)[_ -]?)?(?:promotion|ready|readiness)|"
+    r"(?:sdk|runtime|runtime[_ -]?work|route|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
+    r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?(?:(?:is|are)[_ -]?)?"
     r"(?:ready|readiness|enabled|allowed|authorized|supported|promoted|delivered)|"
     r"command[_ -]?(?:reply|response|routing|support)|"
-    r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
+    r"(?:lookup|mutation|return[_ -]?override)[_ -]?(?:(?:is|are)[_ -]?)?allowed)",
     re.IGNORECASE,
 )
 OPERATIONAL_AUTHORIZATION_CLAIM_RE = re.compile(
     r"(?:(?:server|runtime)[_ -]?(?:operations?|work|capture|observation)[_ -]?"
-    r"(?:ready|readiness|enabled|allowed|authorized|approved)|"
-    r"(?:server[_ -]?)?(?:starts?|stops?|restarts?)[_ -]?(?:allowed|authorized|approved|ready|enabled)|"
-    r"(?:marker|env|environment|state)[_ -]?(?:changes?|edits?|ops|operations?)[_ -]?"
+    r"(?:(?:is|are)[_ -]?)?(?:ready|readiness|enabled|allowed|authorized|approved)|"
+    r"(?:server[_ -]?)?(?:starts?|stops?|restarts?)[_ -]?(?:(?:is|are)[_ -]?)?"
     r"(?:allowed|authorized|approved|ready|enabled)|"
-    r"(?:discord|github|publication|publishing|release|tag)[_ -]?"
+    r"(?:marker|env|environment|state)[_ -]?(?:changes?|edits?|ops|operations?)[_ -]?"
+    r"(?:(?:is|are)[_ -]?)?(?:allowed|authorized|approved|ready|enabled)|"
+    r"(?:discord|github|publication|publishing|release|tag)[_ -]?(?:(?:is|are)[_ -]?)?"
     r"(?:allowed|authorized|approved|ready|enabled|published))",
+    re.IGNORECASE,
+)
+CURRENT_TURN_APPROVAL_CLAIM_RE = re.compile(
+    r"(?:(?:request[_ -]?pack|window[_ -]?request|preflight|(?:completed[_ -]?)?receipt|"
+    r"operator[_ -]?approval[_ -]?(?:request|receipt)|operator[_ -]?request|"
+    r"approval[_ -]?request|window[_ -]?manifest|observer[_ -]?(?:window[_ -]?)?env|"
+    r"window[_ -]?env|env(?:ironment)?|(?:source[_ -]?)?markers?|copied[_ -]?(?:log|bundle)|"
+    r"stale[_ -]?bundle|sidecars?|artifacts?|generated[_ -]?template|operator[_ -]?live[_ -]?ops[_ -]?brief)"
+    r"[_ -]?(?:counts?[_ -]?as|is|are|proves?|provides?|authorizes?|approves?|records?|constitutes|grants?)"
+    r"[_ -]?(?:current[_ -]?turn[_ -]?(?:operator[_ -]?)?(?:approval|authorization)|"
+    r"operator[_ -]?approval|runtime[_ -]?window[_ -]?approval)|"
+    r"(?:current[_ -]?turn[_ -]?(?:operator[_ -]?)?(?:approval|authorization)|operator[_ -]?approval)"
+    r"[_ -]?(?:(?:is|are)[_ -]?)?(?:recorded|complete|completed|granted|approved|authorized))",
     re.IGNORECASE,
 )
 NEGATED_CAPABILITY_ACTION_RE = re.compile(
@@ -541,7 +558,7 @@ def string_at(payload: dict[str, Any], key: str, blockers: list[dict[str, Any]])
 
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
-    for pattern in (POSITIVE_CAPABILITY_RE, OPERATIONAL_AUTHORIZATION_CLAIM_RE):
+    for pattern in (POSITIVE_CAPABILITY_RE, OPERATIONAL_AUTHORIZATION_CLAIM_RE, CURRENT_TURN_APPROVAL_CLAIM_RE):
         for match in pattern.finditer(value):
             if not is_negated_for_match(value, match.start()) and not is_negated_after_match(value, match.end()):
                 return True

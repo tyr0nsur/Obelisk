@@ -3,9 +3,9 @@
 
 This is an accounting guardrail, not a promotion checker.  The current repository
 state is allowed to remain candidate-only/planning.  A v1 release statement that
-uses this umbrella blocker must either exclude the umbrella and name every leaf as
-excluded, or rely on a future manifest where every leaf is promoted with concrete
-evidence.
+uses this umbrella blocker must exclude the umbrella and name every leaf as
+excluded; promoted leaf attempts are reported as blocked because this checker
+must not create a public SDK, runtime, or v1 completion path.
 """
 
 from __future__ import annotations
@@ -89,18 +89,37 @@ TRIBE_PUBLIC_FALSE_KEYS = (
 BUFF_PUBLIC_FALSE_KEYS = (
     "public_sdk_ready",
     "public_buff_sdk_ready",
+    "buff_sdk_ready",
+    "buff_status_sdk_ready",
+    "sdk_ready",
+    "module_sdk_ready",
     "public_abi_ready",
+    "public_api_ready",
+    "public_callback_ready",
+    "public_descriptor_ready",
+    "public_capability_ready",
     "runtime_ready",
+    "runtime_hook_ready",
+    "runtime_wiring_ready",
     "runtime_observer_approved",
+    "dispatcher_ready",
+    "callback_ready",
+    "descriptor_ready",
+    "capability_ready",
     "identity_ready",
     "lookup_ready",
     "mutation_ready",
     "return_override_ready",
     "resource_handle_ready",
+    "v1_accounted",
+    "v1_completion",
     "v1_completion_ready",
     "promotion_ready",
     "copied_payload_policy_ready",
     "lifecycle_semantics_ready",
+    "stable_claim_allowed",
+    "complete_sdk_claim_allowed",
+    "counts_toward_complete_sdk_claim",
 )
 MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
     "mission-copied-bool-policy-slice",
@@ -117,9 +136,11 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "counts_toward_complete_sdk_claim",
     "descriptor_ready",
     "dino_sdk_ready",
+    "dispatcher_ready",
     "full_sdk_claim_allowed",
     "identity_available",
     "identity_ready",
+    "lifecycle_semantics_ready",
     "lookup_available",
     "lookup_ready",
     "mission_sdk_ready",
@@ -136,8 +157,10 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "public_callback_ready",
     "public_capability_ready",
     "public_descriptor_ready",
+    "public_header_ready",
     "public_dino_sdk_ready",
     "public_buff_sdk_ready",
+    "public_buff_status_sdk_ready",
     "public_sdk_available",
     "public_module_ready",
     "public_module_sdk_ready",
@@ -159,6 +182,7 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "runtime_observer_ready",
     "runtime_hook_ready",
     "runtime_ready",
+    "runtime_wiring_ready",
     "sdk_complete",
     "sdk_completion",
     "sdk_ready",
@@ -172,14 +196,26 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "v1_accounted",
     "transfer_sdk_ready",
     "tribe_sdk_ready",
+    "buff_sdk_ready",
+    "buff_status_sdk_ready",
     "v1_complete",
     "v1_completion",
+    "v1_completion_ready",
     "v1_ready",
+    "copied_payload_policy_ready",
+    "counts_toward_complete_sdk_claim",
 }
 CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS = {
     "accounting_route",
     "promotion_status",
+    "public_sdk_status",
+    "release_status",
+    "resource_handle_status",
+    "runtime_status",
+    "sdk_completion",
     "status",
+    "support_tier",
+    "v1_completion",
 }
 CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES = {
     "active",
@@ -200,9 +236,9 @@ CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES = {
 LEAF_ALIASES = {
     "mission": ("mission",),
     "transfer": ("transfer",),
-    "dino_policy": ("dino_policy", "dino policy", "dino"),
-    "tribe_policy": ("tribe_policy", "tribe policy", "tribe"),
-    "buff_status": ("buff_status", "buff/status", "buff status", "buff"),
+    "dino_policy": ("dino_policy", "dino policy", "dino-policy"),
+    "tribe_policy": ("tribe_policy", "tribe policy", "tribe-policy"),
+    "buff_status": ("buff_status", "buff/status", "buff status", "buff-status"),
 }
 PROMOTED_LEAF_EVIDENCE_KEYS = ("abi_tests", "sdk_consumer_tests", "second_source_evidence")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -955,11 +991,23 @@ def validate_promoted_leaf_evidence(
     all_promoted = bool(leaves) and all(leaf.get("status") == "promoted" for leaf in leaves.values())
     any_promoted = any(leaf.get("status") == "promoted" for leaf in leaves.values())
     if any_promoted and not all_promoted:
+        promoted_leaves = sorted(leaf_id for leaf_id, leaf in leaves.items() if leaf.get("status") == "promoted")
+        add(
+            blockers,
+            "side_lane_leaf_promotion_not_allowed",
+            "$.leaf_decision_units",
+            promoted_leaves=promoted_leaves,
+        )
         add(blockers, "partial_leaf_promotion_not_allowed", "$.leaf_decision_units")
         return False
     if not all_promoted:
         return False
-    blocker_count = len(blockers)
+    add(
+        blockers,
+        "side_lane_leaf_promotion_not_allowed",
+        "$.leaf_decision_units",
+        promoted_leaves=list(REQUIRED_LEAVES),
+    )
     for leaf_id in REQUIRED_LEAVES:
         leaf = leaves[leaf_id]
         evidence = evidence_for_leaf(surface, leaf)
@@ -988,7 +1036,7 @@ def validate_promoted_leaf_evidence(
         joined = "\n".join(flattened_strings(evidence))
         if NEGATIVE_EVIDENCE_RE.search(joined):
             add(blockers, "promoted_leaf_evidence_contains_candidate_only_markers", label, leaf=leaf_id)
-    return len(blockers) == blocker_count
+    return False
 
 
 def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
@@ -1166,7 +1214,7 @@ def non_counting_allowed_v1_outcome(leaf: dict[str, Any], accounted_by: str | No
         return value if isinstance(value, str) else None
     if accounted_by in {"manifest_leaf_exclusion", "release_statement_leaf_exclusion"}:
         return "explicitly excluded by name from v1"
-    return "not counted for v1; requires future promoted evidence or explicit leaf exclusion"
+    return "not counted for v1 by this candidate-only checker; requires explicit leaf exclusion"
 
 
 def build_mission_leaf_blocker_accounting(
@@ -1583,8 +1631,6 @@ def validate_public_contracts(
 
 
 def leaf_accounted_by(route: str, leaf_id: str, leaf: dict[str, Any], outcome: dict[str, Any]) -> str | None:
-    if route == "per_leaf_promoted" and leaf.get("status") == "promoted":
-        return "promoted_leaf_evidence"
     if route == "manifest_umbrella_excluded" and leaf.get("status") == "excluded":
         return "manifest_leaf_exclusion"
     if route == "release_statement_umbrella_excluded" and outcome["leaf_exclusions"].get(leaf_id):
@@ -1645,7 +1691,7 @@ def build_leaf_family_accounting(
         "accepted_for_internal_planning": route == "candidate_only" and not blockers,
         "public_sdk_ready": False,
         "runtime_ready": False,
-        "promotion_ready": route == "per_leaf_promoted" and not blockers,
+        "promotion_ready": False,
         "planning_target_sets": planning_target_sets,
         "missing_leaf_families": missing_leaf_families,
         "non_promoted_leaf_families": non_promoted_leaf_families,
@@ -1782,7 +1828,7 @@ def build_report(
     statement_umbrella_excluded = outcome["present"] and outcome["umbrella_excluded"] and all(
         outcome["leaf_exclusions"].get(leaf_id) for leaf_id in REQUIRED_LEAVES
     )
-    all_promoted = validate_promoted_leaf_evidence(surface, leaves, blockers, manifest_dir=manifest_path.parent)
+    promoted_leaf_route_ready = validate_promoted_leaf_evidence(surface, leaves, blockers, manifest_dir=manifest_path.parent)
 
     if outcome["forbidden_claims"]:
         add(
@@ -1801,14 +1847,14 @@ def build_report(
     promoted_statement_leaves = [
         leaf_id for leaf_id in REQUIRED_LEAVES if outcome["leaf_promotions"].get(leaf_id)
     ]
-    if promoted_statement_leaves and not all_promoted:
+    if promoted_statement_leaves and not promoted_leaf_route_ready:
         add(
             blockers,
             "release_statement_leaf_promotions_without_evidence",
             "$.release_statement",
             leaves=promoted_statement_leaves,
         )
-    if outcome["present"] and not statement_umbrella_excluded and not all_promoted:
+    if outcome["present"] and not statement_umbrella_excluded and not promoted_leaf_route_ready:
         missing = [leaf_id for leaf_id in REQUIRED_LEAVES if not outcome["leaf_exclusions"].get(leaf_id)]
         if not outcome["umbrella_excluded"]:
             add(blockers, "release_statement_umbrella_exclusion_missing", "$.release_statement", surface=SURFACE_ID)
@@ -1825,9 +1871,7 @@ def build_report(
     excluded_route = manifest_umbrella_excluded or statement_umbrella_excluded
     validate_public_contracts(surface, leaves, blockers, excluded_route=excluded_route)
 
-    if all_promoted:
-        route = "per_leaf_promoted"
-    elif statement_umbrella_excluded:
+    if statement_umbrella_excluded:
         route = "release_statement_umbrella_excluded"
     elif manifest_umbrella_excluded:
         route = "manifest_umbrella_excluded"
@@ -1852,11 +1896,11 @@ def build_report(
         "surface": SURFACE_ID,
         "ready": not blockers,
         "accounting_route": route,
-        "v1_accounted": route in {"release_statement_umbrella_excluded", "manifest_umbrella_excluded", "per_leaf_promoted"},
+        "v1_accounted": route in {"release_statement_umbrella_excluded", "manifest_umbrella_excluded"},
         "candidate_only": route == "candidate_only",
-        "promotion_ready": all_promoted and not blockers,
-        "public_sdk_ready": all_promoted and not blockers,
-        "runtime_ready": all_promoted and not blockers,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
         "required_leaves": list(REQUIRED_LEAVES),
         "observed_leaves": [leaf_id for leaf_id in REQUIRED_LEAVES if leaf_id in leaves],
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},

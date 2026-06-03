@@ -1155,6 +1155,33 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_nested_split_claim_key_value_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "records": [
+                {
+                    "Claim": {
+                        "Display-Name": "Stable_SDK",
+                        "details": {"label": "complete-sdk claim progress"},
+                    },
+                    "Status": {"nested": {"Value": "READY"}},
+                },
+                {
+                    "metric-name": {"label": "SDK support tier"},
+                    "state": {"details": ["release-supported seed"]},
+                },
+            ],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "records[0].Status",
+                "records[1].state",
+            ],
+        )
+
     def test_secondary_report_scanner_rejects_identity_resource_completion_aliases(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",
@@ -5303,6 +5330,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn(blocker_id, gaps)
         self.assertNotIn(blocker_id, satisfied_by)
 
+    def test_minimum_promoted_demand_family_ignores_mixed_case_hyphen_equivalent_aliases(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.inventory_items_mutation.v1"
+        equivalent_id = "obelisk.inventory_items_mutation_hyphen_alias_equivalent.v1"
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = {
+            "id": equivalent_id,
+            "status": "promoted",
+            "V1-Completion-Equivalent-For": [blocker_id],
+            "evidence": {"tests": ["tests/sdk_consumer"]},
+        }
+        stable_contract = {
+            "promotedDemandFamilyEquivalents": {
+                blocker_id: equivalent_id,
+            },
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            },
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertFalse(module.surface_declares_completion_equivalent(surfaces_by_id[equivalent_id], blocker_id))
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
+
     def test_promoted_experimental_only_gameplay_policy_event_cannot_count_as_completion_evidence(self) -> None:
         import importlib.util
 
@@ -8491,6 +8558,41 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
         )
 
+    def test_release_statement_parser_rejects_mixed_case_surface_or_status_records(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        mixed_surface = "Obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.\n"
+        mixed_status = "obelisk.chat_message.v1: Promoted - reviewed ABI and SDK evidence.\n"
+
+        self.assertIsNone(
+            module.release_statement_surface_record(
+                mixed_surface,
+                "obelisk.chat_message.v1",
+                "promoted",
+            )
+        )
+        self.assertIsNone(
+            module.release_statement_surface_record(
+                mixed_status,
+                "obelisk.chat_message.v1",
+                "promoted",
+            )
+        )
+        self.assertIsNone(
+            module.release_statement_recorded_outcome(
+                mixed_surface,
+                "obelisk.chat_message.v1",
+            )
+        )
+        records = module.release_statement_all_surface_records(mixed_surface + mixed_status)
+        self.assertEqual([record["canonical_reviewed_record"] for record in records], [False, False])
+
     def test_release_statement_rejects_bare_promoted_record_for_promoted_surface(self) -> None:
         manifest = {
             "schema": "obelisk.public-sdk-surfaces.v1",
@@ -8567,12 +8669,24 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
                 },
             }
-            bad_rows = completion_blocker_outcome_rows(
-                [surface_id],
-                {surface_id: surface},
-                set(),
+            bad_release_statements = (
                 f"{surface_id}: promoted - package shape reviewed.\n",
+                f"{surface_id}: promoted - reviewed support-tier evidence.\n",
+                f"{surface_id}: promoted - reviewed release-supported evidence.\n",
+                f"{surface_id}: promoted - reviewed. ABI and SDK evidence available.\n",
             )
+            bad_rows_by_statement = [
+                (
+                    release_statement,
+                    completion_blocker_outcome_rows(
+                        [surface_id],
+                        {surface_id: surface},
+                        set(),
+                        release_statement,
+                    )[0],
+                )
+                for release_statement in bad_release_statements
+            ]
             good_rows = completion_blocker_outcome_rows(
                 [surface_id],
                 {surface_id: surface},
@@ -8580,14 +8694,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 f"{surface_id}: promoted - reviewed ABI and SDK evidence.\n",
             )
 
-        bad_row = bad_rows[0]
         good_row = good_rows[0]
-        self.assertTrue(bad_row["promotion_evidence_satisfied"])
-        self.assertEqual(bad_row["release_statement_outcome"], "promoted")
-        self.assertFalse(bad_row["release_statement_contract_satisfied"])
-        self.assertIn("release_statement_outcome_or_contract_missing", bad_row["non_counting_reasons"])
-        self.assertFalse(bad_row["counts_toward_complete_sdk_claim"])
-        self.assertIn("reviewed evidence details", bad_row["next_action"])
+        for release_statement, bad_row in bad_rows_by_statement:
+            with self.subTest(release_statement=release_statement):
+                self.assertTrue(bad_row["promotion_evidence_satisfied"])
+                self.assertEqual(bad_row["release_statement_outcome"], "promoted")
+                self.assertFalse(bad_row["release_statement_contract_satisfied"])
+                self.assertIn("release_statement_outcome_or_contract_missing", bad_row["non_counting_reasons"])
+                self.assertFalse(bad_row["counts_toward_complete_sdk_claim"])
+                self.assertIn("reviewed evidence details", bad_row["next_action"])
         self.assertTrue(good_row["release_statement_contract_satisfied"])
         self.assertEqual(good_row["non_counting_reasons"], [])
         self.assertTrue(good_row["counts_toward_complete_sdk_claim"])

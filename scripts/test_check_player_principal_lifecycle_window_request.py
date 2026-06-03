@@ -858,6 +858,30 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_rejects_operator_approval_receipt_current_turn_approval_alias_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["operator_completion"]["approved_by_role"] = (
+                "operator approval receipt records current-turn approval"
+            )
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn(
+            "operator_approval_receipt_forbidden_public_capability_or_readiness_claim",
+            report["blockers"],
+        )
+
     def test_rejects_operator_approval_receipt_complete_sdk_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -1246,6 +1270,31 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             )
         )
 
+    def test_rejects_split_operational_authorization_claim_aliases(self) -> None:
+        for text in (
+            "runtime work is authorized",
+            "server operations are authorized",
+            "server restart is approved",
+            "marker changes are enabled",
+            "publication is approved",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
+    def test_rejects_split_readiness_claim_aliases(self) -> None:
+        for text in (
+            "runtime is ready",
+            "complete v1 SDK claim is supported",
+            "production SDK is ready",
+            "v1 completion is ready",
+            "route is ready",
+            "public ABI is ready",
+            "stable release contract claim is allowed",
+            "lookup is allowed",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
     def test_rejects_runtime_evidence_claim_source_aliases(self) -> None:
         for text in (
             "window request counts as approved runtime evidence",
@@ -1255,6 +1304,51 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         ):
             with self.subTest(text=text):
                 self.assertTrue(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
+    def test_rejects_current_turn_approval_claim_source_aliases(self) -> None:
+        for text in (
+            "request pack is current-turn approval",
+            "operator approval request approves current turn authorization",
+            "observer window env provides operator approval",
+            "generated template records current-turn approval",
+            "sidecar constitutes runtime window approval",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
+    def test_rejects_nested_operator_live_ops_brief_split_authorization_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["evidence_capture"]["single_module_summary"] = (
+                "runtime work is authorized"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
+    def test_rejects_nested_request_pack_current_turn_approval_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["evidence_capture"]["single_module_summary"] = (
+                "request pack is current-turn approval"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
 
     def test_accepts_negated_runtime_readiness_suffix_claims(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):

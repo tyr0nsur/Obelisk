@@ -1235,7 +1235,11 @@ PROMOTED_RELEASE_STATEMENT_NON_EVIDENCE_DETAIL_RE = re.compile(
     r"\b(?:candidate(?:[-_ ]?only)?|consume[-_ ]?only|core[-_ ]?first|"
     r"evidence[-_ ]?only|foundation|package[-_ ]?shape|placeholder|"
     r"planning(?:[-_ ]?only)?|plugin[-_ ]?hub|pluginhub|readiness[-_ ]?only|"
-    r"tbd|todo)\b",
+    r"release[-_ ]?supported(?:[-_ ]?seeds?)?|support[-_ ]?tiers?|tbd|todo)\b",
+    re.IGNORECASE,
+)
+PROMOTED_RELEASE_STATEMENT_DETAIL_CLAUSE_SPLIT_RE = re.compile(
+    r"[.;:\n\r]|(?:\s+\b(?:but|however|yet)\b\s+)",
     re.IGNORECASE,
 )
 PLUGIN_HUB_DEFERRED_CONTEXT = re.compile(
@@ -1965,6 +1969,8 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         return re.sub(r"[_-]+", " ", separated.casefold())
 
     def is_split_claim_descriptor(value: Any) -> bool:
+        if isinstance(value, dict):
+            return any(is_split_claim_descriptor(item) for item in value.values())
         if isinstance(value, list):
             return any(is_split_claim_descriptor(item) for item in value)
         return (
@@ -1976,6 +1982,8 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         )
 
     def is_positive_split_claim_status(value: Any) -> bool:
+        if isinstance(value, dict):
+            return any(is_positive_split_claim_status(item) for item in value.values())
         if isinstance(value, list):
             return any(is_positive_split_claim_status(item) for item in value)
         if is_positive_completion_claim_value(value):
@@ -2979,7 +2987,7 @@ def release_statement_surface_record_candidates(
     status: str | None = None,
 ) -> list[tuple[str, str, bool]]:
     pattern = re.compile(
-        rf"^\s*{re.escape(surface_id)}\s*"
+        rf"^\s*(?P<surface>{re.escape(surface_id)})\s*"
         rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|{RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE})\s*"
         rf"(?P<status>promoted|excluded|post-v1)"
         rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
@@ -2998,7 +3006,11 @@ def release_statement_surface_record_candidates(
                     RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
                     match.group("delimiter"),
                 )
-            ) and (found_status != "promoted" or has_reviewed_details)
+            ) and (
+                match.group("surface") == surface_id
+                and match.group("status") == found_status
+                and (found_status != "promoted" or has_reviewed_details)
+            )
             records.append((found_status, line.strip(), canonical_reviewed_record))
     return records
 
@@ -3019,16 +3031,21 @@ def release_statement_all_surface_records(text: str | None) -> list[dict[str, An
         if not match:
             continue
         status = match.group("status").lower()
+        surface_id = match.group("surface")
         has_reviewed_details = bool((match.group("details") or "").strip())
         canonical_reviewed_record = bool(
             re.fullmatch(
                 RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
                 match.group("delimiter"),
             )
-        ) and (status != "promoted" or has_reviewed_details)
+        ) and (
+            surface_id == surface_id.casefold()
+            and match.group("status") == status
+            and (status != "promoted" or has_reviewed_details)
+        )
         records.append(
             {
-                "surface": match.group("surface"),
+                "surface": surface_id,
                 "outcome": status,
                 "line": line.strip(),
                 "line_number": str(line_number),
@@ -3314,6 +3331,16 @@ def promoted_release_statement_detail(record: str) -> str:
     return (match.group("details") if match else "").strip()
 
 
+def promoted_release_statement_detail_has_reviewed_evidence(detail: str) -> bool:
+    for raw_clause in PROMOTED_RELEASE_STATEMENT_DETAIL_CLAUSE_SPLIT_RE.split(detail):
+        clause = raw_clause.strip()
+        if not clause:
+            continue
+        if PROMOTED_RELEASE_STATEMENT_REVIEWED_EVIDENCE_DETAIL_RE.search(clause):
+            return True
+    return False
+
+
 def release_statement_satisfies_promoted_outcome(
     text: str,
     surface_id: str,
@@ -3326,7 +3353,7 @@ def release_statement_satisfies_promoted_outcome(
         return False
     if PROMOTED_RELEASE_STATEMENT_NON_EVIDENCE_DETAIL_RE.search(detail):
         return False
-    return PROMOTED_RELEASE_STATEMENT_REVIEWED_EVIDENCE_DETAIL_RE.search(detail) is not None
+    return promoted_release_statement_detail_has_reviewed_evidence(detail)
 
 
 def surface_exclusion_claim_terms(surface: dict[str, Any]) -> set[str]:

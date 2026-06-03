@@ -17,8 +17,21 @@ namespace Obelisk
 
     namespace
     {
+        void ValidateNoPathAliasComponents(const std::filesystem::path& path, const char* label)
+        {
+            for (const auto& component : path)
+            {
+                if (component == path.root_name() || component == path.root_directory())
+                    continue;
+                if (component == "." || component == "..")
+                    throw std::runtime_error(std::string(label) + " must not contain path alias components");
+            }
+        }
+
         void ValidateExistingPathComponentsNoSymlinks(const std::filesystem::path& path, const char* label)
         {
+            ValidateNoPathAliasComponents(path, label);
+
             std::filesystem::path current;
             for (const auto& component : path)
             {

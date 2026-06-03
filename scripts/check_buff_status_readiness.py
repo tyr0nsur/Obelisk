@@ -56,11 +56,21 @@ FORBIDDEN_READY_KEYS = {
     "aggregate_ready",
     "buff_sdk_ready",
     "buff_status_sdk_ready",
+    "callback_ready",
+    "capability_bit_ready",
+    "capability_ready",
     "class_pointer_ready",
+    "complete_sdk_claim_allowed",
+    "copied_payload_policy_ready",
     "copied_payload_ready",
+    "counts_toward_complete_sdk_claim",
+    "descriptor_ready",
+    "dispatcher_ready",
     "identity_ready",
     "lifecycle_ready",
+    "lifecycle_semantics_ready",
     "lookup_ready",
+    "module_sdk_ready",
     "mutation_ready",
     "object_identity_ready",
     "object_pointer_ready",
@@ -69,21 +79,69 @@ FORBIDDEN_READY_KEYS = {
     "public_abi_ready",
     "public_api_ready",
     "public_buff_sdk_ready",
+    "public_callback_ready",
+    "public_capability_ready",
+    "public_descriptor_ready",
+    "public_header_ready",
+    "public_module_sdk_ready",
     "public_sdk_ready",
+    "release_ready",
     "resource_handle_ready",
     "return_override_ready",
     "runtime_observer_approved",
+    "runtime_hook_ready",
     "runtime_ready",
+    "runtime_wiring_ready",
     "sdk_ready",
+    "stable_claim_allowed",
+    "stable_sdk_ready",
+    "support_tier_active",
+    "support_tier_ready",
+    "v1_accounted",
     "v1_complete",
+    "v1_completion",
     "v1_completion_ready",
     "v1_ready",
 }
 FORBIDDEN_CLAIM_KEY_RE = re.compile(
-    r"(?:resource[_-]?handle|return[_-]?override|public[_-]?(?:sdk|api|abi|surface)|"
-    r"runtime[_-]?(?:ready|hook|observer|wiring)|v1[_-]?(?:ready|complete|completion)|"
+    r"(?:resource[_-]?handle|return[_-]?override|public[_-]?(?:sdk|api|abi|surface|module|header|callback|descriptor|capability)|"
+    r"(?:module[_-]?sdk|callback|descriptor|capability|dispatcher)[_-]?ready|"
+    r"runtime[_-]?(?:ready|hook|observer|wiring)|v1[_-]?(?:ready|complete|completion|accounted)|"
+    r"(?:complete|stable)[_-]?sdk[_-]?claim|support[_-]?tier|release[_-]?ready|"
+    r"copied[_-]?payload[_-]?policy|lifecycle[_-]?semantics|"
     r"lookup[_-]?ready|mutation[_-]?ready|identity[_-]?ready|"
-    r"(?:object|class)[_-]?(?:pointer|identity|contract)[_-]?ready)",
+    r"(?:object|class)[_-]?(?:pointer|identity|contract|exposure)[_-]?ready)",
+    re.IGNORECASE,
+)
+NEGATOR_RE = re.compile(
+    r"\b(?:cannot|does\s+not|do\s+not|is\s+not|are\s+not|"
+    r"must\s+not|no|not|without)\b",
+    re.IGNORECASE,
+)
+AFTER_NEGATOR_RE = re.compile(
+    r"\b(?:blocked|excluded|not\s+included|post-v1|post v1|false|redacted|candidate-only)\b",
+    re.IGNORECASE,
+)
+FORBIDDEN_TEXT_CLAIM_RE = re.compile(
+    r"\b(?:(?:Buff/status|Buff status|BuffStatus|Buff)\s+(?:SDK|API|module|callback|descriptor|capability)|"
+    r"public\s+(?:Buff/status\s+|Buff\s+|module\s+)?(?:SDK|API|ABI|C\s+ABI|runtime\s+API|callback|descriptor|capability)|"
+    r"runtime\s+(?:hook|observer|wiring|dispatcher|callback)|"
+    r"identity|lookup|mutation|return[- ]override|ResourceHandle|Resource\s+Handle|"
+    r"object/class\s+(?:pointer\s+)?(?:contract|exposure)|class\s+exposure|object\s+exposure|"
+    r"copied\s+payload\s+policy|lifecycle\s+semantics|stacking\s+semantics|invalidation\s+semantics|"
+    r"v1\s+(?:completion|complete|ready|release|accounted))\b",
+    re.IGNORECASE,
+)
+READY_TEXT_CLAIM_RE = re.compile(
+    r"\b(?:public\s+(?:SDK|API|ABI)|(?:Buff/status|Buff status|BuffStatus|Buff)\s+SDK|runtime|runtime\s+observer|runtime\s+hook|"
+    r"module\s+SDK|header\s+callbacks?|promotion|v1|v1\s+SDK)\s+"
+    r"(?:is\s+|are\s+)?(?:ready|complete|completion|available|published|enabled|approved)\b|"
+    r"\b(?:ready|complete)\s+for\s+v1\b|"
+    r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b|"
+    r"\bcounts?\s+toward\s+(?:the\s+)?(?:complete|full|production)\s+SDK\s+claim\b|"
+    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|enabled|approved)\b|"
+    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|enabled|supported|release[- ]supported)\b|"
+    r"\bstable\s+SDK\s+(?:is\s+)?(?:allowed|ready|complete|available|enabled)\b",
     re.IGNORECASE,
 )
 
@@ -180,7 +238,10 @@ def load_snapshots(snapshot_root: Path, blockers: list[dict[str, Any]]) -> dict[
         append_blocker(blockers, "snapshot_root_missing", path=str(snapshot_root))
         return snapshots
     for path in sorted(snapshot_root.rglob("*.snapshot.json")):
-        payload = read_json_file(path, blockers)
+        safe_snapshot = safe_path(path, "snapshot", blockers)
+        if safe_snapshot is None:
+            continue
+        payload = read_json_file(safe_snapshot, blockers)
         if payload is None:
             continue
         target_payload = first_target(payload, blockers)
@@ -417,12 +478,29 @@ def validate_zero_param_target(target: str, snapshot: dict[str, Any], blockers: 
     }
 
 
+def text_claim_is_negated(text: str, start: int, end: int) -> bool:
+    clause_start = max(text.rfind(".", 0, start), text.rfind("\n", 0, start), text.rfind(";", 0, start)) + 1
+    before = text[clause_start:start]
+    after = text[end : min(len(text), end + 80)]
+    return bool(NEGATOR_RE.search(before) or AFTER_NEGATOR_RE.search(after))
+
+
+def forbidden_text_claims(text: str) -> list[str]:
+    claims: list[str] = []
+    for regex in (FORBIDDEN_TEXT_CLAIM_RE, READY_TEXT_CLAIM_RE):
+        for match in regex.finditer(text):
+            if text_claim_is_negated(text, match.start(), match.end()):
+                continue
+            claims.append(match.group(0))
+    return sorted(set(claims))
+
+
 def reject_forbidden_claims(value: Any, blockers: list[dict[str, Any]], path: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
             if key.startswith("_"):
                 continue
-            key_lower = key.lower()
+            key_lower = key.lower().replace("-", "_").replace(" ", "_")
             if key_lower in FORBIDDEN_READY_KEYS and child is not False and child is not None:
                 append_blocker(blockers, "forbidden_readiness_claim", path=f"{path}.{key}", value=child)
             elif FORBIDDEN_CLAIM_KEY_RE.search(key) and child is True:
@@ -432,6 +510,10 @@ def reject_forbidden_claims(value: Any, blockers: list[dict[str, Any]], path: st
     if isinstance(value, list):
         for index, child in enumerate(value):
             reject_forbidden_claims(child, blockers, f"{path}[{index}]")
+        return
+    if isinstance(value, str):
+        for claim in forbidden_text_claims(value):
+            append_blocker(blockers, "forbidden_text_claim", path=path, claim=claim)
 
 
 def validate_snapshots(snapshots: dict[str, dict[str, Any]], blockers: list[dict[str, Any]]) -> dict[str, Any]:
@@ -523,17 +605,36 @@ def build_report(snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
         "zero_param_lifecycle_shape_ready": ready,
         "copied_payload_policy_ready": False,
         "lifecycle_semantics_ready": False,
+        "buff_sdk_ready": False,
+        "buff_status_sdk_ready": False,
+        "sdk_ready": False,
+        "module_sdk_ready": False,
         "public_sdk_ready": False,
         "public_buff_sdk_ready": False,
         "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_callback_ready": False,
+        "public_descriptor_ready": False,
+        "public_capability_ready": False,
         "runtime_ready": False,
+        "runtime_hook_ready": False,
+        "runtime_wiring_ready": False,
         "runtime_observer_approved": False,
+        "dispatcher_ready": False,
+        "callback_ready": False,
+        "descriptor_ready": False,
+        "capability_ready": False,
         "identity_ready": False,
         "lookup_ready": False,
         "mutation_ready": False,
         "return_override_ready": False,
         "resource_handle_ready": False,
+        "v1_accounted": False,
+        "v1_completion": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "complete_sdk_claim_allowed": False,
+        "counts_toward_complete_sdk_claim": False,
         "promotion_ready": False,
         "blockers": blockers,
         "non_claims": [
