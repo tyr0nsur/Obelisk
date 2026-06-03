@@ -181,6 +181,8 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
         raise SystemExit(f"--window-manifest-check schema must be {WINDOW_CHECK_SCHEMA}")
     if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
         raise SystemExit("--window-manifest-check must be ready")
+    if window.get("post_window_replay") is not True:
+        raise SystemExit("--window-manifest-check must be generated with --post-window-replay")
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
         if window.get(key) is not False:
             raise SystemExit(f"--window-manifest-check {key} must remain false")

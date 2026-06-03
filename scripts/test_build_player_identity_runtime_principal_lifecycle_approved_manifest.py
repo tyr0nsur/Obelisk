@@ -324,7 +324,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         env = os.environ.copy()
         env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         result = subprocess.run(
-            [sys.executable, str(WINDOW_CHECKER), "--json", str(manifest_path)],
+            [sys.executable, str(WINDOW_CHECKER), "--json", "--post-window-replay", str(manifest_path)],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
@@ -424,6 +424,22 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 report["observed_runtime_cases"],
                 ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
             )
+
+    def test_rejects_window_manifest_check_not_generated_in_post_window_replay_mode(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            payload = json.loads(window_check.read_text(encoding="utf-8"))
+            payload["post_window_replay"] = False
+            window_check.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--window-manifest-check must be generated with --post-window-replay", result.stderr)
+            self.assertFalse(manifest_path.exists())
 
     def test_rejects_generated_manifest_that_fails_consume_checker(self) -> None:
         with self.temp_offline_workspace() as temp:

@@ -203,14 +203,15 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest round delegated identity, SDK accounting, runtime ABI, and reversing. Integrated
-  result: static lifecycle-anchor report builder/artifact added; planning manifests now
-  bind `HandleNewPlayer`/`OnLogout` to static report SHA256
-  `03acc0573b680d3e0b19937b30cc73028c5fd833e3796fe839006941b8779cf4` and non-placeholder
-  source IDs. Route/SDK guardrails force parent `counts_toward_*` false, reject bare
-  lifecycle-anchor/request/preflight/window/operator/placeholder promotion scopes, and keep
-  SDK `0/12`, P0 `0/4`, public/runtime false. Runtime ABI guardrails require all
-  owner-scoped callback registries to be covered by PluginManager cleanup. One worker
-  accidentally invoked a default first-evidence checker that read protected
-  `/servidor/ark/workspace-offline`; no output was used as evidence and no server write/op
-  occurred. Agents closed.
+- Latest round delegated runtime-evidence prep, SDK accounting, reversing/static audit,
+  and runtime ABI. Integrated result: approved runtime principal lifecycle manifest
+  builder now requires window-manifest checks generated with `--post-window-replay`;
+  route/SDK guardrails reject forged runtime-evidence source labels from request packs,
+  preflight/window manifests, operator receipts, sidecars, placeholder evidence, and the
+  placeholder `players-identity-runtime-principal-lifecycle-evidence` schema. Runtime ABI
+  fix: `PlayerPrincipalEventDispatcher` deferred cleanup now retains every failed
+  `DestroyUserData` subscription in a cleanup batch for retry; public ABI unchanged.
+  Reversing audit confirms repo-local/static evidence cannot clear
+  `approved_runtime_evidence_missing`; only an operator-approved runtime window plus
+  copied-log post-window replay can. SDK remains `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server op. Agents closed.

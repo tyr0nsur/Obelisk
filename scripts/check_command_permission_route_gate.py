@@ -157,14 +157,17 @@ def route_lock_blocked_until(current_blocker: Any) -> list[str]:
         blocked_until.append("reviewed_identity_public_contract")
     return blocked_until
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = {
+    "approved_runtime_evidence_source",
     "authority_claim_source",
     "authz_principal_source",
     "command_principal_source",
+    "evidence_source",
     "identity_claim_source",
     "permission_principal_source",
     "principal_claim_source",
     "principal_source",
     "public_identity_source",
+    "runtime_evidence_source",
     "runtime_identity_source",
 }
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = {
@@ -177,10 +180,17 @@ FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE = re.compile(
     r"approved_runtime_principal_lifecycle_evidence|"
     r"runtime_principal_lifecycle_evidence|"
     r"runtime_lifecycle_evidence|"
+    r"players?_identity_runtime_principal_lifecycle_evidence|"
     r"reviewed_identity_public_contract|"
     r"identity_public_contract|"
     r"(?:players?_?)?identity_?lifecycle_?anchor_?candidates?|"
     r"lifecycle_?anchor_?(?:candidates?|report|evidence)|"
+    r"request_?pack|"
+    r"preflight(?:_?sidecar)?|"
+    r"operator_?(?:approval_?)?receipts?|"
+    r"(?:live_?)?(?:validation|ops)_?sidecars?|"
+    r"window_?manifests?|"
+    r"placeholder_?(?:runtime_?)?evidence|"
     r"public_identity"
     r")"
 )

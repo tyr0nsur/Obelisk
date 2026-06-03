@@ -2434,6 +2434,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "runtime_approval_granted": True,
                         "runtime_work_authorized": True,
                         "server_operations_authorized": True,
+                        "approved_runtime_evidence_source": "operator_receipt",
+                        "runtimeEvidenceSource": "request-pack",
+                        "evidence_source": {"source": "live-validation-sidecar"},
+                        "authz_principal_source": ["players_identity_runtime_principal_lifecycle_evidence"],
                         "reply_allowed": 1,
                         "send_chat_allowed": "true",
                         "notes": [
@@ -2487,6 +2491,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].runtime_approval_granted", claims)
         self.assertIn("checks[0].runtime_work_authorized", claims)
         self.assertIn("checks[0].server_operations_authorized", claims)
+        self.assertIn("checks[0].approved_runtime_evidence_source", claims)
+        self.assertIn("checks[0].runtimeEvidenceSource", claims)
+        self.assertIn("checks[0].evidence_source", claims)
+        self.assertIn("checks[0].authz_principal_source", claims)
         self.assertIn("checks[0].reply_allowed", claims)
         self.assertIn("checks[0].send_chat_allowed", claims)
         self.assertIn("checks[0].notes[0]:positive_text_claim", claims)
@@ -5993,6 +6001,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             {
                 **base_evidence,
                 "schemas": ["obelisk.placeholder-provenance.v1"],
+            },
+            {
+                **base_evidence,
+                "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1",
+            },
+            {
+                **base_evidence,
+                "schemas": ["obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"],
+            },
+            {
+                **base_evidence,
+                "source_kind": "runtime-principal-lifecycle-evidence",
             },
             {
                 **base_evidence,

@@ -1004,6 +1004,125 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left player principal callbacks dispatchable");
     }
 
+    struct DeferredMultiRetryDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int FirstDestroyCalls = 0;
+        int SecondDestroyCalls = 0;
+        bool FirstFailNext = true;
+        bool SecondFailNext = true;
+    };
+
+    void DeferredMultiRetryBlockingCallback(const PlayerPrincipalEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FirstDeferredRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        ++state->FirstDestroyCalls;
+        if (state->FirstFailNext)
+        {
+            state->FirstFailNext = false;
+            throw std::runtime_error("expected first deferred player principal destroy failure");
+        }
+    }
+
+    void SecondDeferredRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        ++state->SecondDestroyCalls;
+        if (state->SecondFailNext)
+        {
+            state->SecondFailNext = false;
+            throw std::runtime_error("expected second deferred player principal destroy failure");
+        }
+    }
+
+    void TestOwnerCleanupRetriesAllDeferredDestroyUserDataFailures()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredMultiRetryDestroyState state;
+        std::atomic<bool> cleanupThrew{false};
+        const std::vector<PlayerPrincipalBoolValue> bools = MakeStartBools();
+
+        Require(dispatcher.Register(
+                    &owner,
+                    {DeferredMultiRetryBlockingCallback, &state, FirstDeferredRetryDestroyUserData}) != 0,
+                "first deferred multi-retry player principal registration failed");
+        Require(dispatcher.Register(
+                    &owner,
+                    {DeferredMultiRetryBlockingCallback, &state, SecondDeferredRetryDestroyUserData}) != 0,
+                "second deferred multi-retry player principal registration failed");
+
+        std::thread dispatchThread([&]() {
+            Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 1,
+                    "deferred multi-retry dispatch did not skip owner-cleaned snapshot");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock,
+                                      std::chrono::seconds(2),
+                                      [&state]() { return state.CallbackEntered; }),
+                    "deferred multi-retry callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred multi-retry cleanup did not remove dispatchable callbacks");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "deferred multi-retry cleanup hid DestroyUserData failures");
+        Require(state.FirstDestroyCalls == 1,
+                "first deferred multi-retry cleanup was not attempted once");
+        Require(state.SecondDestroyCalls == 1,
+                "second deferred multi-retry cleanup was not attempted once");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 2,
+                "deferred multi-retry cleanup did not retain every failed subscription");
+        Require(state.FirstDestroyCalls == 2,
+                "first deferred multi-retry cleanup was not retried");
+        Require(state.SecondDestroyCalls == 2,
+                "second deferred multi-retry cleanup was not retried");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed deferred multi-retry cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred multi-retry cleanup left callbacks dispatchable");
+    }
+
     void TestUnregisterIsIdempotent()
     {
         PlayerPrincipalEventDispatcher dispatcher;
@@ -1044,6 +1163,7 @@ int main()
         TestCallbackExceptionsAreContained();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();
         TestOwnerCleanupRetriesFailedDestroyUserData();
+        TestOwnerCleanupRetriesAllDeferredDestroyUserDataFailures();
         TestUnregisterIsIdempotent();
     }
     catch (const std::exception& e)

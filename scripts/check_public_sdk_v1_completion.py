@@ -289,6 +289,40 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "runtime_work_authorized",
     "server_operations_authorized",
 )
+COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_KEYS = {
+    "approved_runtime_evidence_source",
+    "authority_claim_source",
+    "authz_principal_source",
+    "command_principal_source",
+    "evidence_source",
+    "identity_claim_source",
+    "permission_principal_source",
+    "principal_claim_source",
+    "principal_source",
+    "public_identity_source",
+    "runtime_evidence_source",
+    "runtime_identity_source",
+}
+COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE = re.compile(
+    r"(?:"
+    r"(?:approved_?)?runtime(?:_local|_evidence|_lifecycle|_observation|_observed|_principal.*evidence)?|"
+    r"approved_runtime_principal_lifecycle_evidence|"
+    r"runtime_principal_lifecycle_evidence|"
+    r"runtime_lifecycle_evidence|"
+    r"players?_identity_runtime_principal_lifecycle_evidence|"
+    r"reviewed_identity_public_contract|"
+    r"identity_public_contract|"
+    r"(?:players?_?)?identity_?lifecycle_?anchor_?candidates?|"
+    r"lifecycle_?anchor_?(?:candidates?|report|evidence)|"
+    r"request_?pack|"
+    r"preflight(?:_?sidecar)?|"
+    r"operator_?(?:approval_?)?receipts?|"
+    r"(?:live_?)?(?:validation|ops)_?sidecars?|"
+    r"window_?manifests?|"
+    r"placeholder_?(?:runtime_?)?evidence|"
+    r"public_identity"
+    r")"
+)
 SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     *INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS,
     "complete_sdk_blockers_promoted_count",
@@ -595,6 +629,7 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
+    r"players?[-_ ]?identity[-_ ]?runtime[-_ ]?principal[-_ ]?lifecycle[-_ ]?evidence|"
     r"players?[-_ ]?identity[-_ ]?lifecycle[-_ ]?anchor[-_ ]?candidates?|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"lifecycle[-_ ]?anchor[-_ ]?candidates?|"
@@ -1323,6 +1358,10 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
         return separated.casefold().replace("-", "_").replace(" ", "_")
 
+    def normalized_source(value: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
     def is_positive_claim_value(value: Any) -> bool:
         if value is True:
             return True
@@ -1373,6 +1412,15 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
             return False
         return True
 
+    def contains_forbidden_claim_source(item: Any) -> bool:
+        if isinstance(item, str):
+            return COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE.search(normalized_source(item)) is not None
+        if isinstance(item, list):
+            return any(contains_forbidden_claim_source(child) for child in item)
+        if isinstance(item, dict):
+            return any(contains_forbidden_claim_source(child) for child in item.values())
+        return False
+
     def text_claim_path_is_negative_context(path: str) -> bool:
         return any(
             normalized_key(part.split("[", 1)[0]) in PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS
@@ -1389,6 +1437,11 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
                     key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
                     or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
                 ) and is_positive_claim_value(item):
+                    claims.append(item_path)
+                if (
+                    key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_KEYS
+                    and contains_forbidden_claim_source(item)
+                ):
                     claims.append(item_path)
                 if key == "public_or_runtime_claims" and isinstance(item, list):
                     for claim in item:

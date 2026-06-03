@@ -1216,6 +1216,19 @@ priorities, and do not use history files as the active source of truth.
   registries. One worker accidentally invoked a default checker that read protected
   `/servidor/ark/workspace-offline`; no output was used as evidence and no write/server op
   occurred.
+- 2026-06-03 supervised 4-agent follow-up: approved runtime principal lifecycle manifest
+  builder now rejects window-manifest checks unless they were generated with
+  `--post-window-replay`. Route and SDK accounting guardrails reject forged runtime
+  evidence source labels from request packs, preflight/window manifests, operator
+  receipts, live-ops/validation sidecars, placeholder evidence, and the placeholder
+  `players-identity-runtime-principal-lifecycle-evidence` schema. Runtime ABI fix:
+  `PlayerPrincipalEventDispatcher` now retains every failed deferred `DestroyUserData`
+  subscription in a cleanup batch for later retry; public ABI unchanged. Reversing/static
+  audit confirmed current repo-local evidence cannot clear
+  `approved_runtime_evidence_missing`; a fresh operator-approved runtime window with
+  copied-log post-window replay remains required. Validation included route tests, SDK
+  completion tests, PluginManager guardrails, py_compile, route/SDK JSON, and
+  `PlayerPrincipalEventDispatcherTests`; no runtime/server op.
 
 ## Agent Coordination
 

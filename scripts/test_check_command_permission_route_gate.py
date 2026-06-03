@@ -1304,9 +1304,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "identity_claim_source": "runtime_lifecycle_evidence",
                 "principal-claim-source": {"source": "runtime-local"},
                 "commandPrincipalSource": ["approved runtime evidence"],
+                "approved_runtime_evidence_source": "operator_receipt",
+                "runtime_evidence_source": "request_pack",
+                "evidence_source": "live-validation-sidecar",
                 "public_identity_source": "reviewed_identity_public_contract",
                 "runtime_identity_source": {"source": "lifecycle-anchor-report"},
                 "publicIdentitySource": "players_identity_lifecycle_anchor_candidates",
+                "authz_principal_source": "players_identity_runtime_principal_lifecycle_evidence",
                 "candidate_source": "runtime_lifecycle_evidence",
             }
         }
@@ -1317,9 +1321,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.identity_claim_source", claims)
         self.assertIn("nested.principal-claim-source", claims)
         self.assertIn("nested.commandPrincipalSource", claims)
+        self.assertIn("nested.approved_runtime_evidence_source", claims)
+        self.assertIn("nested.runtime_evidence_source", claims)
+        self.assertIn("nested.evidence_source", claims)
         self.assertIn("nested.public_identity_source", claims)
         self.assertIn("nested.runtime_identity_source", claims)
         self.assertIn("nested.publicIdentitySource", claims)
+        self.assertIn("nested.authz_principal_source", claims)
         self.assertNotIn("nested.candidate_source", claims)
 
     def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:
