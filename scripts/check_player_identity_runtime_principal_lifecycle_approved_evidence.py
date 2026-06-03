@@ -189,6 +189,17 @@ ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
     ("completed", "observer_env_survived", "observer_marker_survived", "delta")
 )
 ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
+REQUIRED_OPERATIONAL_WINDOW_SIBLING_FILENAMES = {
+    "manifest": "window-manifest.env",
+    "request_pack": "window-request.json",
+    "observer_env": "observer-window.env",
+    "operator_approval_receipt": "operator-approval-receipt.json",
+    "preflight.pre": "preflight-pre.json",
+    "preflight.post": "preflight-post.json",
+}
+REQUIRED_IMPLICIT_OPERATIONAL_WINDOW_SIDECARS = {
+    "operator_approval_request_md": "operator-approval-request.md",
+}
 OPERATOR_APPROVAL_RECEIPT_SCOPE_FALSE_FLAGS = (
     "standing_approval",
     "reusable",
@@ -777,6 +788,71 @@ def bound_artifact_from_status(status: protected_paths.ProtectedPathStatus) -> d
 def resolved_artifact_path(artifact: Any) -> str | None:
     status = approved_artifact_status(artifact)
     return None if status is None else str(status.resolved)
+
+
+def nested_operational_window_artifact(window: dict[str, Any], key: str) -> Any:
+    current: Any = window
+    for part in key.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def validate_operational_window_sibling_set(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    copied_status = approved_artifact_status(window.get("copied_log"))
+    if copied_status is None:
+        return
+    expected_dir = copied_status.resolved.parent
+
+    for key, expected_name in REQUIRED_OPERATIONAL_WINDOW_SIBLING_FILENAMES.items():
+        artifact = nested_operational_window_artifact(window, key)
+        artifact_status = approved_artifact_status(artifact)
+        if artifact_status is None:
+            continue
+        expected_path = expected_dir / expected_name
+        if artifact_status.resolved != expected_path:
+            add(
+                blockers,
+                "operational_window_sidecar_not_exact_copied_log_sibling",
+                f"$.operational_window.{key}.path",
+                expected=str(expected_path),
+                actual=str(artifact_status.resolved),
+            )
+
+    for key, expected_name in REQUIRED_IMPLICIT_OPERATIONAL_WINDOW_SIDECARS.items():
+        expected_path = expected_dir / expected_name
+        symlink_component = first_symlink_component(expected_path)
+        if symlink_component is not None:
+            add(
+                blockers,
+                "operational_window_implicit_sidecar_path_symlink_component",
+                f"$.operational_window.{key}.path",
+                expected=str(expected_path),
+                symlink=str(symlink_component),
+            )
+            continue
+        status = protected_paths.protected_path_status(
+            expected_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        if status.protected or not status.approved_offline_workspace:
+            add(
+                blockers,
+                "operational_window_implicit_sidecar_not_approved_offline_workspace",
+                f"$.operational_window.{key}.path",
+                expected=str(expected_path),
+                actual=str(status.resolved),
+            )
+            continue
+        if not status.resolved.is_file():
+            add(
+                blockers,
+                "operational_window_implicit_sidecar_missing",
+                f"$.operational_window.{key}.path",
+                expected=str(expected_path),
+            )
 
 
 def artifact_status_for_read(
@@ -2083,6 +2159,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             expected_name="preflight-post.json",
         )
         validate_preflight_bindings(window, blockers)
+    validate_operational_window_sibling_set(window, blockers)
 
     posture = window.get("posture")
     if not isinstance(posture, dict):

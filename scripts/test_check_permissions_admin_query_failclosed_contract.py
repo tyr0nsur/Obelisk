@@ -737,6 +737,30 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("authority_allow_capable_kinds_unexpected", report["blockers"])
         self.assertIn("authority_forbidden_allow_capable_kind", report["blockers"])
 
+    def test_rejects_duplicate_authority_kind_lists_that_set_match_required_values(self) -> None:
+        payload = manifest()
+        payload["authority_policy"]["recognized_authority_kinds"] = [
+            "operator-config",
+            "runtime-local",
+            "runtime-local",
+        ]
+        payload["authority_policy"]["allow_capable_authority_kinds"] = [
+            "runtime-local",
+            "runtime-local",
+        ]
+        payload["authority_policy"]["allowed_authority_kinds"] = [
+            "operator-config",
+            "runtime-local",
+            "operator-config",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("authority_kind_duplicate", report["blockers"])
+        self.assertIn("authority_allowed_kinds_duplicate_legacy_alias", report["blockers"])
+
     def test_rejects_missing_or_weakened_principal_runtime_identity_policy(self) -> None:
         payload = manifest()
         payload.pop("principal_runtime_identity_policy")

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Record the current P0 SDK route after the tribe/accounting checkpoint so future
-agents do not confuse internal side-lanes with progress on the complete v1 SDK
-claim.
+Record the current P0 SDK route after same-day SDK guardrail rounds so future
+agents do not confuse internal side-lanes, docs cleanup, package-shape evidence,
+or checker hardening with progress on the complete v1 SDK claim.
 
 ## Baseline
 
@@ -193,6 +193,37 @@ These are offline guardrails only. They keep P0 downstream gates from treating
 identity-stage progress, request/window artifacts, or wording sidecars as
 permissions/admin, response-path, replies, public SDK, runtime, or v1 completion
 promotion evidence.
+
+## P0 Non-Claim Integration Snapshot
+
+The later supervised P0/non-claim round closed four more false-positive classes
+without changing the active blocker:
+
+- Approved runtime principal lifecycle evidence now requires declared sidecars,
+  plus implicit `operator-approval-request.md`, to be exact siblings of the
+  copied `live-validation-logs/<run-id>/Obelisk.log`. Same-run-id aliases outside
+  that sibling directory fail closed.
+- Player identity public-contract review now rejects accepted-looking
+  identifier-redaction and principal-invalidation helper reports if nested text
+  or fields imply public identity/principal, public ABI/header/callbacks, lookup,
+  runtime, promotion, or complete-SDK progress.
+- Permissions/admin query and public-readiness checks reject duplicate
+  recognized/allow-capable authority kind lists, including the legacy
+  `allowed_authority_kinds` alias, so set-equivalent duplicates cannot hide
+  authority-model drift.
+- Plugin example docs now describe `oProcessTimer` as a pre-release `v0.1.x`
+  process-local timer reference, not a first-stable or complete/stable SDK claim.
+
+Lead validation observed approved runtime evidence 71 OK, identity public
+contract 36 OK, permissions query fail-closed 43 OK, permissions public readiness
+62 OK, public SDK guardrails 194 OK, route JSON valid/planning-only with
+`current_route_blocker=approved_runtime_evidence_missing`, SDK JSON blocked with
+complete SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile` OK,
+and `git diff --check` OK.
+
+No server/runtime operation, protected live-path write, marker/env change,
+ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish,
+tag, or push occurred.
 
 ## P0 Claim-Surface Hardening
 

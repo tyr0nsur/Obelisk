@@ -1419,6 +1419,33 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("policy_runtime_local_authority_not_required_runtime_owned", report["blockers"])
         self.assertIn("policy_authority_fail_closed_requirements_missing", report["blockers"])
 
+    def test_rejects_duplicate_authority_kind_lists_that_set_match_required_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            policy = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "policy.authority_provenance_required"
+            )
+            policy["recognized_authority_kinds"] = [
+                "operator-config",
+                "runtime-local",
+                "operator-config",
+            ]
+            policy["allow_capable_authority_kinds"] = [
+                "runtime-local",
+                "runtime-local",
+            ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("policy_recognized_authority_kinds_duplicate", report["blockers"])
+        self.assertIn("policy_allow_capable_authority_kinds_duplicate", report["blockers"])
+
     def test_rejects_policy_provenance_self_attestation_requirements_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

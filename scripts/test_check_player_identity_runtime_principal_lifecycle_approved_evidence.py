@@ -1966,6 +1966,26 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operational_window_copied_log_path_not_live_validation_run_log", report["blockers"])
 
+    def test_rejects_sidecar_alias_not_exact_copied_log_sibling(self) -> None:
+        payload = manifest()
+        request_artifact = payload["operational_window"]["request_pack"]
+        original_path = Path(request_artifact["path"])
+        alias_path = original_path.parent.parent / "sidecar-aliases" / RUN_ID / "window-request.json"
+        alias_path.parent.mkdir(parents=True, exist_ok=True)
+        alias_path.write_bytes(original_path.read_bytes())
+        request_artifact["path"] = str(alias_path)
+        request_artifact["sha256"] = hashlib.sha256(alias_path.read_bytes()).hexdigest()
+        payload.pop("output_artifact_identity")
+        add_output_artifact_identity(payload)
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_sidecar_not_exact_copied_log_sibling", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_rejects_nested_operational_window_and_approval_overclaim_keys(self) -> None:
         payload = manifest()
         payload["approval"]["server_restart_authorized_by_this_manifest"] = True

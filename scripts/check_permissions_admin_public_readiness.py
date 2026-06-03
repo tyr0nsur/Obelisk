@@ -880,11 +880,23 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]], 
                 "policy_recognized_authority_kinds_unexpected",
                 "$.required_before_public_header[policy.authority_provenance_required].recognized_authority_kinds",
             )
+        if string_list_has_duplicates(recognized):
+            add(
+                blockers,
+                "policy_recognized_authority_kinds_duplicate",
+                "$.required_before_public_header[policy.authority_provenance_required].recognized_authority_kinds",
+            )
         allow_capable = policy.get("allow_capable_authority_kinds")
         if not isinstance(allow_capable, list) or set(allow_capable) != REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS:
             add(
                 blockers,
                 "policy_allow_capable_authority_kinds_unexpected",
+                "$.required_before_public_header[policy.authority_provenance_required].allow_capable_authority_kinds",
+            )
+        if string_list_has_duplicates(allow_capable):
+            add(
+                blockers,
+                "policy_allow_capable_authority_kinds_duplicate",
                 "$.required_before_public_header[policy.authority_provenance_required].allow_capable_authority_kinds",
             )
         if policy.get("allow_capable_authority_ownership") != "runtime-owned":
@@ -1072,6 +1084,12 @@ def string_set(value: Any) -> set[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return set()
     return set(value)
+
+
+def string_list_has_duplicates(value: Any) -> bool:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return False
+    return len(set(value)) != len(value)
 
 
 def sha256_file(path: Path) -> str | None:

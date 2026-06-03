@@ -471,6 +471,20 @@ PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
         re.IGNORECASE,
     ),
 }
+CONTRACT_REVIEW_TEXT_OVERCLAIM_PATTERNS = {
+    **PUBLIC_TEXT_OVERCLAIM_PATTERNS,
+    "identity_or_principal_promoted": re.compile(
+        r"\b(?:public[-_ ]+)?(?:player[-_ ]+)?(?:identity|principal)\s+(?:is\s+)?"
+        r"(?:promoted|promotion[-_ ]+ready|promotion[-_ ]+complete)\b|"
+        r"\b(?:promotes?|promoted)\s+(?:public[-_ ]+)?(?:player[-_ ]+)?(?:identity|principal)\b",
+        re.IGNORECASE,
+    ),
+    "complete_sdk_progress": re.compile(
+        r"\b(?:complete|full|production)\s+sdk\s+"
+        r"(?:progress|ready|complete|available|enabled|promoted|supported)\b",
+        re.IGNORECASE,
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -648,6 +662,53 @@ def validate_public_text_overclaims(
     claims = public_text_overclaims(value)
     if claims:
         add(blockers, reason, "$", input=label, claims=claims)
+
+
+def non_promotional_contract_review_report_overclaims(
+    value: Any,
+    *,
+    allowed_true_paths: set[str],
+    path: str = "$",
+) -> list[dict[str, Any]]:
+    overclaims: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            normalized_key = normalize_contract_key(key)
+            if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+                overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
+            if normalized_key in READINESS_FALSE_KEYS and item_path not in allowed_true_paths and item is not False:
+                overclaims.append({"path": item_path, "term": "readiness_flag", "value": item})
+            elif (
+                item_path not in allowed_true_paths
+                and item not in (False, None, [], {})
+                and APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(normalized_key)
+            ):
+                overclaims.append({"path": item_path, "term": "readiness_or_authorization_key", "value": item})
+            overclaims.extend(
+                non_promotional_contract_review_report_overclaims(
+                    item,
+                    allowed_true_paths=allowed_true_paths,
+                    path=item_path,
+                )
+            )
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            overclaims.extend(
+                non_promotional_contract_review_report_overclaims(
+                    item,
+                    allowed_true_paths=allowed_true_paths,
+                    path=f"{path}[{index}]",
+                )
+            )
+    elif isinstance(value, str):
+        for term, pattern in CONTRACT_REVIEW_TEXT_OVERCLAIM_PATTERNS.items():
+            for match in pattern.finditer(value):
+                if has_negative_context(value, match.start()):
+                    continue
+                overclaims.append({"path": path, "term": term, "value": value})
+                break
+    return overclaims
 
 
 def sanitize_non_promotional_report(
@@ -1554,6 +1615,7 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
 
     redaction_blockers = redaction_checker.validate_evidence(payload)
     report = redaction_checker.build_report(payload, redaction_blockers)
+    accepted = not redaction_blockers
     if redaction_blockers:
         add(
             blockers,
@@ -1562,6 +1624,19 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
             path=str(path),
             evidence_blockers=report["blockers"],
         )
+        accepted = False
+    overclaims = non_promotional_contract_review_report_overclaims(
+        report,
+        allowed_true_paths={"$.accepted_for_contract_review"},
+    )
+    if overclaims:
+        add(
+            blockers,
+            "identifier_redaction_evidence_public_contract_overclaim",
+            "--identifier-redaction-evidence",
+            overclaims=overclaims,
+        )
+        accepted = False
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if report.get(key) is not False:
             add(
@@ -1570,6 +1645,7 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
                 f"--identifier-redaction-evidence.{key}",
                 value=report.get(key),
             )
+            accepted = False
     if report.get("accepted_for_contract_review") and report.get("resolved_inputs") != [PRIMARY_OFFLINE_GAP]:
         add(
             blockers,
@@ -1577,16 +1653,25 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
             "--identifier-redaction-evidence.resolved_inputs",
             value=report.get("resolved_inputs"),
         )
+        accepted = False
+    if not accepted and not redaction_blockers:
+        add(
+            blockers,
+            "identifier_redaction_evidence_not_accepted",
+            "--identifier-redaction-evidence",
+            path=str(path),
+            evidence_blockers=report.get("blockers", []),
+        )
     return {
         "path": str(path),
         "present": True,
-        "accepted_for_contract_review": report.get("accepted_for_contract_review") is True,
+        "accepted_for_contract_review": accepted and report.get("accepted_for_contract_review") is True,
         "resolved_inputs": report.get("resolved_inputs", []),
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
         "public_header_allowed": False,
-        "blockers": report.get("blockers", []),
+        "blockers": report.get("blockers", []) + (["public_contract_overclaim"] if overclaims else []),
         "non_claims": report.get("non_claims", []),
     }
 
@@ -1617,6 +1702,7 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
 
     validation = principal_invalidation_policy.validate_manifest(payload, check_mode="consume")
     report = principal_invalidation_policy.build_report(payload, validation, check_mode="consume")
+    accepted = not validation.blockers
     if validation.blockers:
         add(
             blockers,
@@ -1625,6 +1711,19 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
             path=str(path),
             policy_blockers=report["blockers"],
         )
+        accepted = False
+    overclaims = non_promotional_contract_review_report_overclaims(
+        report,
+        allowed_true_paths={"$.ready"},
+    )
+    if overclaims:
+        add(
+            blockers,
+            "principal_invalidation_policy_public_contract_overclaim",
+            "--principal-invalidation-policy",
+            overclaims=overclaims,
+        )
+        accepted = False
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "principal_invalidation_ready"):
         if report.get(key) is not False:
             add(
@@ -1633,11 +1732,20 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
                 f"--principal-invalidation-policy.{key}",
                 value=report.get(key),
             )
+            accepted = False
+    if not accepted and not validation.blockers:
+        add(
+            blockers,
+            "principal_invalidation_policy_not_accepted",
+            "--principal-invalidation-policy",
+            path=str(path),
+            policy_blockers=report.get("blockers", []),
+        )
     return {
         "path": str(path),
         "provided": True,
-        "accepted_for_policy_review": report.get("ready") is True,
-        "resolved_input": PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT if report.get("ready") is True else None,
+        "accepted_for_policy_review": accepted and report.get("ready") is True,
+        "resolved_input": PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT if accepted and report.get("ready") is True else None,
         "mode": report.get("mode"),
         "candidate_only": report.get("candidate_only") is True,
         "principal_fields": report.get("principal_fields", []),
@@ -1648,7 +1756,7 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
         "runtime_ready": False,
         "public_header_allowed": False,
         "principal_invalidation_ready": False,
-        "blockers": report.get("blockers", []),
+        "blockers": report.get("blockers", []) + (["public_contract_overclaim"] if overclaims else []),
     }
 
 

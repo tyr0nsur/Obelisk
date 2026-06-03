@@ -949,6 +949,125 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["sdk_consumer"]["public_sdk_ready"])
         self.assertEqual(report["sdk_consumer"]["public_header_symbols_now"], [])
 
+    def test_rejects_identifier_redaction_helper_public_contract_overclaims(self) -> None:
+        def accepted_validation(_payload):
+            return []
+
+        overclaim_report = {
+            "accepted_for_contract_review": True,
+            "resolved_inputs": ["privacy.identifier_redaction"],
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "publicIdentityReady": True,
+            "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
+            "claims": {
+                "summary": "public player identity ready",
+                "lookup": "player lookup is allowed",
+                "promotion": "principal is promoted",
+                "completion": "complete SDK progress ready",
+            },
+            "blockers": [],
+            "non_claims": [],
+        }
+
+        blockers: list[dict] = []
+        with (
+            mock.patch.object(checker.redaction_checker, "load_evidence", return_value={}),
+            mock.patch.object(checker.redaction_checker, "validate_evidence", side_effect=accepted_validation),
+            mock.patch.object(checker.redaction_checker, "build_report", return_value=overclaim_report),
+        ):
+            report = checker.validate_identifier_redaction_evidence(
+                IDENTIFIER_REDACTION_EVIDENCE,
+                blockers,
+            )
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("identifier_redaction_evidence_public_contract_overclaim", reasons)
+        self.assertIn("identifier_redaction_evidence_not_accepted", reasons)
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertIn("public_contract_overclaim", report["blockers"])
+        detail = next(
+            blocker
+            for blocker in blockers
+            if blocker["reason"] == "identifier_redaction_evidence_public_contract_overclaim"
+        )
+        paths = {claim["path"] for claim in detail["overclaims"]}
+        self.assertIn("$.publicIdentityReady", paths)
+        self.assertIn("$.public_header_symbols_now", paths)
+        self.assertIn("$.claims.summary", paths)
+        self.assertIn("$.claims.lookup", paths)
+        self.assertIn("$.claims.promotion", paths)
+        self.assertIn("$.claims.completion", paths)
+
+    def test_rejects_principal_policy_helper_public_contract_overclaims(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        overclaim_report = {
+            "ready": True,
+            "mode": "consume",
+            "candidate_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "principal_invalidation_ready": False,
+            "publicAbiReady": True,
+            "public_callback_abi_now": ["ObeliskPlayerIdentityCallback"],
+            "claims": {
+                "summary": "public callback ABI is available",
+                "identity": "identity is promoted",
+                "sdk": "public SDK ready",
+            },
+            "principal_fields": [],
+            "invalidation_cases": [],
+            "negative_consumer_rules": [],
+            "blockers": [],
+        }
+
+        blockers: list[dict] = []
+        with (
+            mock.patch.object(checker.principal_invalidation_policy, "load_json", return_value={}),
+            mock.patch.object(
+                checker.principal_invalidation_policy,
+                "validate_manifest",
+                side_effect=accepted_validation,
+            ),
+            mock.patch.object(
+                checker.principal_invalidation_policy,
+                "build_report",
+                return_value=overclaim_report,
+            ),
+        ):
+            report = checker.validate_principal_invalidation_policy(
+                PRINCIPAL_INVALIDATION_POLICY,
+                blockers,
+            )
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("principal_invalidation_policy_public_contract_overclaim", reasons)
+        self.assertIn("principal_invalidation_policy_not_accepted", reasons)
+        self.assertFalse(report["accepted_for_policy_review"])
+        self.assertIsNone(report["resolved_input"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertIn("public_contract_overclaim", report["blockers"])
+        detail = next(
+            blocker
+            for blocker in blockers
+            if blocker["reason"] == "principal_invalidation_policy_public_contract_overclaim"
+        )
+        paths = {claim["path"] for claim in detail["overclaims"]}
+        self.assertIn("$.publicAbiReady", paths)
+        self.assertIn("$.public_callback_abi_now", paths)
+        self.assertIn("$.claims.summary", paths)
+        self.assertIn("$.claims.identity", paths)
+        self.assertIn("$.claims.sdk", paths)
+
     def test_rejects_invalid_identifier_redaction_evidence(self) -> None:
         evidence = self.load_identifier_redaction_evidence()
         evidence["promotion_ready"] = True

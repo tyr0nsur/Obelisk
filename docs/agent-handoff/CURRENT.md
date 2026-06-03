@@ -199,7 +199,23 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
+- Latest integration note: 2026-06-03 turbo SDK P0/non-claim round after `7a3f882`
+  delegated four scopes: approved runtime principal lifecycle evidence hardening to
+  Hegel, player-identity public-contract helper overclaim scanning to Popper,
+  permissions/admin authority fail-closed drift to Singer, and examples/plugin docs
+  stable-SDK wording to Gibbs. Integrated changes require approved runtime sidecars,
+  plus implicit `operator-approval-request.md`, to be exact siblings of the copied
+  `live-validation-logs/<run-id>/Obelisk.log`; reject identifier-redaction and
+  principal-invalidation helper reports that imply public identity/principal, ABI/header,
+  lookup, runtime, promotion, or complete-SDK readiness; reject duplicate
+  recognized/allow-capable authority kind lists and legacy allowed-authority aliases; and
+  replace `oProcessTimer` first-stable wording with pre-release/non-claim wording. Lead
+  validation: approved runtime evidence 71, identity public contract 36, permissions
+  query 43, permissions public readiness 62, public SDK guardrails 194, route JSON
+  valid/planning-only with `approved_runtime_evidence_missing`, SDK JSON blocked with
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile`, and
+  `git diff --check`. No runtime/server/Discord/GitHub operation.
+- Previous integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
   after `36e191b`: SDK completion/release-statement bookkeeping to Jason,
   Mission/Transfer/Dino/Tribe/Buff side-lanes to Herschel, ResourceHandle/object identity
   to Mendel, and build/install/package-shape release boundaries to Meitner. Integrated

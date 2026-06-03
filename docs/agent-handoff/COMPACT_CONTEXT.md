@@ -19,6 +19,28 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 turbo SDK P0/non-claim round after `7a3f882` delegated four scopes:
+  approved runtime principal lifecycle evidence sidecar hardening, player-identity
+  public-contract helper overclaim scanning, permissions/admin authority fail-closed
+  duplicate detection, and plugin/example stable-SDK wording cleanup.
+- Integrated changes: approved runtime evidence sidecars and implicit
+  `operator-approval-request.md` must be exact siblings of the copied
+  `live-validation-logs/<run-id>/Obelisk.log`; identifier-redaction and
+  principal-invalidation helper reports are rejected if they imply public
+  identity/principal, ABI/header/callback, lookup, runtime, promotion, or complete-SDK
+  readiness; permissions/admin rejects duplicate recognized/allow-capable authority kind
+  lists and legacy `allowed_authority_kinds` duplicates; `oProcessTimer` docs now use
+  pre-release/non-claim wording instead of first-stable SDK wording.
+- Validation observed: approved runtime evidence 71 OK, identity public contract 36 OK,
+  permissions query fail-closed 43 OK, permissions public readiness 62 OK, public SDK
+  guardrails 194 OK, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`, SDK JSON blocked by design
+  with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile` OK, and
+  `git diff --check` OK.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 turbo SDK visibility/non-claim round after `36e191b` delegated four scopes:
   SDK completion/release-statement bookkeeping, Mission/Transfer/Dino/Tribe/Buff
   side-lane accounting, ResourceHandle/object identity, and build/install/package-shape

@@ -1037,6 +1037,9 @@ def validate_authority_kind_list(
     unexpected = set(names) - required
     if unexpected:
         add(blockers, unexpected_reason, label, authority_kinds=sorted(unexpected))
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        add(blockers, "authority_kind_duplicate", label, authority_kinds=duplicates)
     return names
 
 
@@ -1074,6 +1077,16 @@ def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> tu
         legacy_names = [item for item in legacy_allowed if isinstance(item, str)] if isinstance(legacy_allowed, list) else []
         if not isinstance(legacy_allowed, list) or set(legacy_names) != REQUIRED_RECOGNIZED_AUTHORITY_KINDS:
             add(blockers, "authority_allowed_kinds_must_match_recognized_legacy_alias", "$.authority_policy.allowed_authority_kinds")
+        if isinstance(legacy_allowed, list) and len(legacy_names) != len(legacy_allowed):
+            add(blockers, "authority_kind_invalid", "$.authority_policy.allowed_authority_kinds")
+        legacy_duplicates = sorted({name for name in legacy_names if legacy_names.count(name) > 1})
+        if legacy_duplicates:
+            add(
+                blockers,
+                "authority_allowed_kinds_duplicate_legacy_alias",
+                "$.authority_policy.allowed_authority_kinds",
+                authority_kinds=legacy_duplicates,
+            )
     for key in (
         "plugin_supplied_authority_allowed",
         "remote_authority_allowed",

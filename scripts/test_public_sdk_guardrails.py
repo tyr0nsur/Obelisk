@@ -4910,6 +4910,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (timer_doc, "`ObeliskApi::struct_size` through `UnregisterTimerWithOwnerToken`"),
             (timer_doc, "non-null timer\nregister/unregister function pointers"),
             (timer_doc, "non-zero `plugin_owner_token` before any\nregistration"),
+            (plugins_readme, "`oProcessTimer` is a current core timer reference for the pre-release `v0.1.x` SDK line"),
+            (plugins_readme, "not a stable SDK readiness or complete SDK claim"),
             (plugins_readme, "Release-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
             (plugins_readme, "Those release-supported seeds still must\nkeep the shared safe default config posture"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
@@ -4921,6 +4923,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(required), normalized(text))
 
         self.assertNotIn("Seed examples are production-ready only when", plugins_readme)
+        self.assertNotIn("first-stable core plugin set", plugins_readme)
 
         for required in (
             "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
