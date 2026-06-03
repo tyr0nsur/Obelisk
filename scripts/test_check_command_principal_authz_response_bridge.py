@@ -313,6 +313,19 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("pre_runtime_principal_or_authority_claim_source", report["blockers"])
         self.assertIn("positive_public_or_runtime_claim", report["blockers"])
 
+    def test_rejects_nested_positive_claims_even_under_negative_context_keys(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["non_claims"].append("The public bridge ABI is ready and runtime response delivery is enabled.")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("positive_public_or_runtime_claim", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "positive_public_or_runtime_claim")
+        self.assertIn("non_claims", detail["label"])
+
     def test_rejects_missing_shared_principal_vocabulary(self) -> None:
         decisions = self.load_json(DECISIONS)
         decisions["shared_principal_vocabulary"] = [

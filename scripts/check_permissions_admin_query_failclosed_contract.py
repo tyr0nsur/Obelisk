@@ -1001,6 +1001,14 @@ def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> N
     if not isinstance(policy, dict):
         add(blockers, "query_text_policy_missing", label)
         return
+    if set(policy) != set(REQUIRED_QUERY_TEXT_POLICY):
+        add(
+            blockers,
+            "query_text_policy_fields_mismatch",
+            label,
+            missing=sorted(set(REQUIRED_QUERY_TEXT_POLICY) - set(policy)),
+            unexpected=sorted(set(policy) - set(REQUIRED_QUERY_TEXT_POLICY)),
+        )
     for key, expected in REQUIRED_QUERY_TEXT_POLICY.items():
         if policy.get(key) != expected:
             add(

@@ -24,8 +24,10 @@ Current planning-only evidence:
 - target set: `players-lifecycle-anchor-candidates`;
 - ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`;
-- layout comparison: six lifecycle-anchor planning targets accepted across two offline
-  roots, with promotion still blocked as `planning_only`;
+- layout comparison: six committed base fixtures exist for lifecycle-anchor planning.
+  Durable source-bound second-source lifecycle-anchor evidence is currently limited to
+  `HandleNewPlayer` and `OnLogout`; historical all-six output is scratch triage unless
+  materialized into an approved offline artifact/root with hash binding;
 - principal policy: candidate-only process-local opaque principal policy exists, but
   runtime evidence and public ABI review remain missing;
 - runtime readiness: false.

@@ -73,6 +73,9 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         runtime_plan = (
             REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-capture-plan.md"
         ).read_text(encoding="utf-8")
+        observer_brief = (
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("committed base fixtures for all six", fixture_gap)
         self.assertIn("limited to `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`", fixture_gap)
@@ -82,9 +85,16 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("six committed base fixtures", runtime_plan)
         self.assertIn("limited to\n  `HandleNewPlayer` and `OnLogout`", runtime_plan)
         self.assertIn("scratch triage unless materialized into an approved offline artifact/root", runtime_plan)
+        self.assertIn("six committed base fixtures", observer_brief)
+        self.assertIn("limited to\n  `HandleNewPlayer` and `OnLogout`", observer_brief)
+        self.assertIn("scratch triage unless\n  materialized into an approved offline artifact/root", observer_brief)
         self.assertNotIn(
             "`players-lifecycle-anchor-candidates` has accepted planning-layout evidence for six",
             runtime_plan,
+        )
+        self.assertNotIn(
+            "six lifecycle-anchor planning targets accepted across two offline\n  roots",
+            observer_brief,
         )
 
     def _documented_identity_bundle_flags(

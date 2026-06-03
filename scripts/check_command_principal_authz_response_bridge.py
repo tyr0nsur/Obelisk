@@ -437,14 +437,6 @@ FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
     )
 )
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(("command_text", "operator_config"))
-NEGATIVE_CONTEXT_TOKENS = (
-    "blocked",
-    "fail_closed",
-    "forbidden",
-    "non_claim",
-    "required",
-    "public_header_forbidden_tokens",
-)
 POSITIVE_CLAIM_RE = re.compile(
     r"\b("
     r"bridge|capability|command[_ -]?router|command\s+response\s+path|commands?/replies|permissions?/admin|"
@@ -453,7 +445,10 @@ POSITIVE_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(blocked|cannot|does\s+not|fail[s-]?closed|forbidden|missing|must\s+not|never|no|not|planning|until|without)\b",
+    r"\b("
+    r"before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|missing|must|never|no|not|only|planning|"
+    r"requires?|until|without"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -525,11 +520,6 @@ def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
     return False
 
 
-def is_negative_context(trail: str) -> bool:
-    lowered = trail.casefold()
-    return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
-
-
 def collect_strings(value: Any) -> list[str]:
     if isinstance(value, dict):
         observed: list[str] = []
@@ -567,7 +557,6 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         return
     if (
         not isinstance(value, str)
-        or is_negative_context(trail)
         or trail.endswith(".schema")
         or trail.endswith(".surface")
         or trail.endswith(".id")

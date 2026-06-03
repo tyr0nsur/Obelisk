@@ -906,6 +906,17 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("query_text_policy_resource_scope_required_invalid", report["blockers"])
         self.assertIn("query_text_policy_command_parser_claim_allowed_invalid", report["blockers"])
 
+    def test_rejects_extra_query_text_policy_bounds_aliases(self) -> None:
+        payload = manifest()
+        payload["query_text_policy"]["action_unbounded_allowed"] = True
+        payload["query_text_policy"]["resource_scope_unbounded_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_text_policy_fields_mismatch", report["blockers"])
+
     def test_rejects_missing_or_weakened_abuse_policy(self) -> None:
         payload = manifest()
         payload.pop("abuse_policy")

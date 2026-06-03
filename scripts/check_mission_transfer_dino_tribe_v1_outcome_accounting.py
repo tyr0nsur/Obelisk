@@ -812,13 +812,31 @@ def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
     return overclaims
 
 
-def validate_candidate_leaf_evidence(leaf_id: str, leaf: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def candidate_leaf_evidence_sources(
+    surface: dict[str, Any],
+    leaf_id: str,
+    leaf: dict[str, Any],
+) -> list[tuple[dict[str, Any], str]]:
+    sources: list[tuple[dict[str, Any], str]] = []
+    evidence = leaf.get("evidence")
+    if isinstance(evidence, dict):
+        sources.append((evidence, f"$.leaf_decision_units[{leaf_id}].evidence"))
+    per_leaf = surface.get("promotion_evidence_by_leaf")
+    if isinstance(per_leaf, dict) and isinstance(per_leaf.get(leaf_id), dict):
+        sources.append((per_leaf[leaf_id], f"$.promotion_evidence_by_leaf[{leaf_id}]"))
+    return sources
+
+
+def validate_candidate_leaf_evidence(
+    surface: dict[str, Any],
+    leaf_id: str,
+    leaf: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
     status = leaf.get("status") if isinstance(leaf.get("status"), str) else "missing"
     if status == "promoted":
         return
-    evidence = leaf.get("evidence")
-    if isinstance(evidence, dict):
-        label = f"$.leaf_decision_units[{leaf_id}].evidence"
+    for evidence, label in candidate_leaf_evidence_sources(surface, leaf_id, leaf):
         ready_reason = "mission_leaf_candidate_ready_overclaim" if leaf_id == "mission" else "leaf_candidate_ready_overclaim"
         claim_reason = (
             "mission_leaf_candidate_evidence_forbidden_claim"
@@ -1121,7 +1139,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
     leaves = leaf_map(surface, blockers)
     outcome = release_statement_outcome(release_statement)
     for leaf_id in REQUIRED_LEAVES:
-        validate_candidate_leaf_evidence(leaf_id, leaves.get(leaf_id, {}), blockers)
+        validate_candidate_leaf_evidence(surface, leaf_id, leaves.get(leaf_id, {}), blockers)
 
     manifest_umbrella_excluded = surface.get("status") == "excluded" and all(
         leaves.get(leaf_id, {}).get("status") == "excluded" for leaf_id in REQUIRED_LEAVES
