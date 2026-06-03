@@ -31,6 +31,7 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-e
 SHAPE_FIXTURE_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+EXPECTED_PROCESS_EVENT_ADDRESS = "0x1d34e20"
 MODULE = "player_principal_lifecycle"
 NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
 SERVER_ROOT = Path("/servidor/ark")
@@ -1681,6 +1682,8 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         expected_runtime = {
             "loaded_native_ld_preload": True,
             "process_event_candidate_count": 1,
+            "process_event_candidates": [{"index": 0, "address": EXPECTED_PROCESS_EVENT_ADDRESS}],
+            "process_event_address": EXPECTED_PROCESS_EVENT_ADDRESS,
             "process_event_hook_installed": True,
             "process_event_hook_patch_size": 18,
             "reflection_scanner_disabled": True,

@@ -2867,6 +2867,49 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("v1 completion", human)
         self.assertIn("stable SDK wording", human)
 
+    def test_completion_checker_rejects_installed_sdk_positive_non_claim_metadata(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        installed_shape = manifest["installed_sdk_package_shape"]
+        installed_shape["non_claim_exports"]["Obelisk_V1_COMPLETION_CLAIM_ALLOWED"] = True
+        installed_shape["v1_completion_equivalent_for"] = ["obelisk.player_identity.v1"]
+        installed_shape["counts_toward_complete_sdk_claim"] = True
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = checker["build_report"](manifest_path)
+
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertIn("installed_sdk_package_shape_guardrail_incomplete", report["blockers"])
+        self.assertIn(
+            "non_claim_exports:Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:non_claim_exports.Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:v1_completion_equivalent_for",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:counts_toward_complete_sdk_claim",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertEqual(
+            report["p0_dependency_chain_claim_accounting"]["promoted_for_claim_ratio"],
+            "0/4",
+        )
+        self.assertEqual(
+            report["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_ratio"],
+            "0/12",
+        )
+
     def test_public_sdk_v1_completion_json_exposes_stable_blocker_accounting_totals(self) -> None:
         checker = runpy.run_path(
             str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
@@ -4887,6 +4930,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn(
             "stable_release_contract.claim_allowed",
             sdk_package_shape["not_sufficient_for"],
+        )
+        self.assertEqual(
+            sdk_package_shape["non_claim_exports"],
+            {
+                "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED": False,
+                "Obelisk_V1_COMPLETION_CLAIM_ALLOWED": False,
+                "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED": False,
+                "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED": False,
+            },
         )
         self.assertNotRegex(root_cmake, r"install\s*\(\s*DIRECTORY\s+include/?\b")
         self.assertRegex(

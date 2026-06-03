@@ -3187,6 +3187,97 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllWaitsForShutdownUnregisteredInFlightPluginTimerBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_shutdown_unregister_in_flight");
+        ConfigureEnvironment(root);
+
+        TimerFenceState state;
+        FakePlugin plugin{
+            .filename = "timer_shutdown_unregister_in_flight.so",
+            .pluginId = "timer_shutdown_unregister_in_flight",
+            .registerBlockingTimerCallback = true,
+            .unregisterTimerInShutdown = true,
+            .timerFence = &state,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "shutdown-unregister in-flight timer plugin was not initialized");
+        Require(plugin.timerRegistrationId != 0,
+                "shutdown-unregister in-flight timer was not registered before unload");
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.UnloadReturned = true;
+            }
+            state.Cv.notify_all();
+        });
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.ShutdownEntered;
+            });
+        }
+
+        if (!shutdownEntered)
+        {
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.Release = true;
+            }
+            state.Cv.notify_all();
+            unloadThread.join();
+            Require(false, "UnloadAll did not reach plugin shutdown while shutdown-unregistered timer was in flight");
+        }
+
+        bool closedWhileCallbackInFlight = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            closedWhileCallbackInFlight =
+                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
+                    return state.CloseEntered || state.UnloadReturned;
+                });
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        bool callbackCompleted = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.Completed == 1;
+            });
+        }
+
+        unloadThread.join();
+
+        Require(plugin.shutdownCalls == 1,
+                "shutdown-unregister in-flight timer plugin shutdown was not called");
+        Require(plugin.shutdownTimerUnregisterResult,
+                "shutdown unregister rejected the in-flight plugin timer");
+        Require(!closedWhileCallbackInFlight,
+                "UnloadAll closed plugin while shutdown-unregistered timer callback was in flight");
+        Require(callbackCompleted,
+                "shutdown-unregistered timer callback did not complete after release");
+        Require(plugin.closeCalls == 1,
+                "shutdown-unregister in-flight timer plugin was not closed once");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
+                "shutdown-unregistered in-flight timer survived unload cleanup");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllWaitsForInFlightRepeatingPluginTimerBeforeCloseAndDoesNotReschedule()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_repeating_timer_unload_in_flight");
@@ -7035,6 +7126,7 @@ int main()
     TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
     TestPublicRepeatingTimerFiresAndStopsAfterUnregister();
     TestUnloadAllWaitsForInFlightPluginTimerBeforeClose();
+    TestUnloadAllWaitsForShutdownUnregisteredInFlightPluginTimerBeforeClose();
     TestUnloadAllWaitsForInFlightRepeatingPluginTimerBeforeCloseAndDoesNotReschedule();
     TestTimerCallbackCleansOnInitFailure();
     TestInitFailureWaitsForInFlightPluginTimerBeforeClose();

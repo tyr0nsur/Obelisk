@@ -147,7 +147,10 @@ Allowed redacted fields:
 `principal_action=candidate_created` is allowed only for post-original
 `HandleNewPlayer` with canonical `bIsFromLogin=1` and `ReturnValue=1`.
 `principal_action=none` is required for every `session_start_rejected` combination such
-as `0,1`, `1,0`, or `0,0`. `principal_action=candidate_invalidated` is allowed for exact
+as `0,1`, `1,0`, or `0,0`. Approved runtime evidence intake currently requires the
+canonical rejected anchor `bIsFromLogin=0` and `ReturnValue=1`; other safe rejected
+combinations are observer-acceptable diagnostics only and are not sufficient for the
+approved-evidence manifest. `principal_action=candidate_invalidated` is allowed for exact
 `OnLogout`, but it remains private evidence and must not be consumed by public plugins.
 
 Do not log player names, Steam/EOS/platform ids, IP-like values, tribe ids, transfer ids,

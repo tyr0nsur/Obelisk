@@ -495,9 +495,10 @@ def manifest() -> dict:
     })
 
 
-def manifest_for_copied_log(copied_log: Path) -> dict:
+def manifest_for_copied_log(copied_log: Path, *, log_lines: list[str] | None = None) -> dict:
+    lines = runtime_log_lines() if log_lines is None else log_lines
     analyzer = load_script_module(ANALYZER, "test_player_principal_analyzer")
-    summary = analyzer.analyze_lines(runtime_log_lines())
+    summary = analyzer.analyze_lines(lines)
     source_sha256 = hashlib.sha256(copied_log.read_bytes()).hexdigest()
     summary["evidence"] = {
         "kind": "runtime-observer-log",
@@ -506,7 +507,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             {
                 "path": str(copied_log),
                 "sha256": source_sha256,
-                "line_count": len(runtime_log_lines()),
+                "line_count": len(lines),
             }
         ],
         "server_paths_allowed": False,
@@ -677,6 +678,40 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             report["consumer_cases"],
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
+
+    def test_rejects_runtime_summary_process_event_candidate_address_drift(self) -> None:
+        lines = [
+            line.replace("ProcessEvent candidate[0] = 0x1d34e20", "ProcessEvent candidate[0] = 0x1d34e21")
+            for line in runtime_log_lines()
+        ]
+        temp_dir = temp_offline_workspace()
+        LIVE_TEMP_DIRS.append(temp_dir)
+        log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        result = self.run_checker(manifest_for_copied_log(log_path, log_lines=lines), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_runtime_posture_mismatch", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
+    def test_rejects_runtime_summary_process_event_found_address_drift(self) -> None:
+        lines = [
+            line.replace("Found ProcessEvent at address: 0x1d34e20", "Found ProcessEvent at address: 0x1d34e21")
+            for line in runtime_log_lines()
+        ]
+        temp_dir = temp_offline_workspace()
+        LIVE_TEMP_DIRS.append(temp_dir)
+        log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        result = self.run_checker(manifest_for_copied_log(log_path, log_lines=lines), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_runtime_posture_mismatch", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
 
     def test_rejects_synthetic_shape_fixture_as_approved_runtime_evidence(self) -> None:
         payload = {

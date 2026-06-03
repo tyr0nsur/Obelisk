@@ -178,7 +178,35 @@ CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE = {
         "Plugin Hub seed/package publication",
         "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces",
     ),
+    "non_claim_exports": {
+        "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED": False,
+        "Obelisk_V1_COMPLETION_CLAIM_ALLOWED": False,
+        "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED": False,
+        "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED": False,
+    },
 }
+INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS = (
+    "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED",
+    "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",
+    "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
+    "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+    "counts_toward_complete_sdk_claim",
+    "plugin_hub_publication_allowed",
+    "plugin_hub_seed_package_publication",
+    "promoted_for_claim_count",
+    "promotion_ready",
+    "public_module_sdk_coverage_claim_allowed",
+    "public_sdk_ready",
+    "stable_claim_allowed",
+    "stable_release_contract_claim_allowed",
+    "v1_completion_claim_allowed",
+    "v1_completion_ready",
+    "v1_completion_required",
+)
+INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_ALIAS_KEYS = (
+    "promoted_demand_family_equivalents",
+    "v1_completion_equivalent_for",
+)
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "command_permission_route_gate_blockers_not_empty",
     "command_permission_route_gate_invalid",
@@ -2782,6 +2810,51 @@ def installed_sdk_package_shape_guardrail_drift(manifest: dict[str, Any]) -> lis
     for item in CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["not_sufficient_for"]:
         if item not in not_sufficient_for:
             drift.append(f"not_sufficient_for:{item}")
+
+    non_claim_exports = installed_shape.get("non_claim_exports")
+    expected_non_claim_exports = CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["non_claim_exports"]
+    if not isinstance(non_claim_exports, dict):
+        drift.append("non_claim_exports")
+    else:
+        for key, expected_value in expected_non_claim_exports.items():
+            if non_claim_exports.get(key) is not expected_value:
+                drift.append(f"non_claim_exports:{key}")
+
+    forbidden_positive_keys = {
+        normalized_completion_claim_key(key)
+        for key in (
+            *INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS,
+            *COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS,
+            *SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS,
+        )
+    }
+    forbidden_alias_keys = {
+        normalized_completion_claim_key(key)
+        for key in INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_ALIAS_KEYS
+    }
+
+    def positive_installed_claim_value(key_name: str, value: Any) -> bool:
+        if key_name in forbidden_alias_keys:
+            return bool(value)
+        return is_positive_completion_claim_value(value)
+
+    def visit(value: Any, path: str = "") -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                key_path = f"{path}.{key}" if path else str(key)
+                key_name = normalized_completion_claim_key(key)
+                if (
+                    key_name in forbidden_positive_keys
+                    or key_name in forbidden_alias_keys
+                    or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
+                ) and positive_installed_claim_value(key_name, item):
+                    drift.append(f"positive_claim:{key_path}")
+                visit(item, key_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+
+    visit(installed_shape)
     return drift
 
 
