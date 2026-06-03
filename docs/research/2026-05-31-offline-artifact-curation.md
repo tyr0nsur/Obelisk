@@ -120,8 +120,13 @@ paths during read-only artifact audits.
 
 ## Player Identity Status
 
-Current readiness preflight found no accepted `obelisk.reflection-inventory-pack.v1`
-under the artifact root:
+Historical status, superseded by the source-bound planning manifests recorded in
+`docs/research/player-identity-planning-sources/` and the route audit. Do not use this
+section to rerun player-identity offline pack discovery or reopen closed fixture gaps; the
+current blocker is `approved_runtime_evidence_missing`.
+
+At the time of this curation pass, readiness preflight found no accepted
+`obelisk.reflection-inventory-pack.v1` under the artifact root:
 
 - `status=blocked`;
 - `accepted_pack=null`;
@@ -131,9 +136,10 @@ under the artifact root:
 - `reason=scriptstruct_pack_not_reflection_inventory` for ScriptStruct inventory packs;
 - `reason=schema_mismatch` for other non-reflection manifests when present;
 - the required target set is `players-identity-lifecycle-intake` with 12 expected targets;
-- the known snapshot gaps remain `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer`, and there are still no accepted
-  login/logout lifecycle anchors.
+- historical snapshot gaps included `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer`; those gaps are now closed by later
+  source-bound planning manifests, and accepted planning anchors are
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`.
 
 Do not use the normalized artifact packs above, their container manifests, or the nested
 ScriptStruct inventory pack as substitutes for player-identity reflection inventory

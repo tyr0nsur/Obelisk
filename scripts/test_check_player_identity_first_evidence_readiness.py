@@ -464,6 +464,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             public_contract_gap["contract_review_inputs_resolved"],
             [
                 "privacy.identifier_redaction",
+                "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
             ],
         )

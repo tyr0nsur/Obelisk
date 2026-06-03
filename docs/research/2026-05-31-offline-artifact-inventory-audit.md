@@ -48,10 +48,15 @@ using them as active evidence.
 
 ## Current Blockers
 
-Player identity is still blocked before focal planning. The artifact root has the
-matching offline `ShooterGameServer` binary, but no paired non-protected core input, no
-complete `obelisk.core-dump-evidence-pack.v1`, and no accepted
-`obelisk.reflection-inventory-pack.v1` for `players-identity-lifecycle-intake`.
+Historical status, superseded for player identity by the source-bound planning manifests
+under `docs/research/player-identity-planning-sources/`. Do not use this older audit to
+rerun player-identity offline pack discovery; the current player-identity blocker is
+`approved_runtime_evidence_missing`.
+
+At the time of this audit, player identity was still blocked before focal planning. The
+artifact root had the matching offline `ShooterGameServer` binary, but no paired
+non-protected core input, no complete `obelisk.core-dump-evidence-pack.v1`, and no
+accepted `obelisk.reflection-inventory-pack.v1` for `players-identity-lifecycle-intake`.
 
 Command/chat response orientation is not an artifact gate. The static checker reports
 candidate-only orientation for `obelisk.command_chat_response_path.v1` with

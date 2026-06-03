@@ -222,6 +222,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             report["contract_review_inputs_resolved"],
             [
                 "privacy.identifier_redaction",
+                "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
             ],
         )
@@ -300,6 +301,19 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["principal_invalidation_policy"]["runtime_ready"])
         self.assertFalse(report["principal_invalidation_policy"]["public_header_allowed"])
         self.assertFalse(report["principal_invalidation_policy"]["principal_invalidation_ready"])
+        source_verification = report["source_bound_planning_manifest_verification"]
+        self.assertTrue(source_verification["provided"])
+        self.assertTrue(source_verification["accepted_for_contract_review"])
+        self.assertEqual(
+            source_verification["resolved_input"],
+            "planning.source_bound_committed_manifests",
+        )
+        self.assertTrue(source_verification["planning_only"])
+        self.assertFalse(source_verification["promotion_ready"])
+        self.assertFalse(source_verification["public_sdk_ready"])
+        self.assertFalse(source_verification["runtime_ready"])
+        self.assertFalse(source_verification["public_abi_ready"])
+        self.assertFalse(source_verification["v1_completion_ready"])
         self.assertTrue(report["private_pod_layout_candidate"]["accepted_for_contract_review_input"])
         self.assertEqual(
             report["private_pod_layout_candidate"]["review_input"],
@@ -829,7 +843,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertEqual(report["primary_offline_gap"], "privacy.identifier_redaction")
         self.assertEqual(
             report["contract_review_inputs_resolved"],
-            ["lifetime.generation_scope_invalidation.candidate_policy"],
+            [
+                "planning.source_bound_committed_manifests",
+                "lifetime.generation_scope_invalidation.candidate_policy",
+            ],
         )
         self.assertIn("privacy.identifier_redaction", report["remaining_contract_gate_inputs"])
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
@@ -849,7 +866,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
-        self.assertEqual(report["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertEqual(
+            report["contract_review_inputs_resolved"],
+            ["privacy.identifier_redaction", "planning.source_bound_committed_manifests"],
+        )
         lifetime_action = next(
             action
             for action in report["next_offline_actions"]
@@ -872,6 +892,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             report["contract_review_inputs_resolved"],
             [
                 "privacy.identifier_redaction",
+                "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
             ],
         )
@@ -879,6 +900,50 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("private_pod_layout_candidate_not_accepted", report["blockers"])
         self.assertIn("event_payload_layout_fields_mismatch", report["private_pod_layout_candidate"]["blockers"])
         self.assertFalse(report["private_pod_layout_candidate"]["accepted_for_contract_review_input"])
+
+    def test_rejects_stale_source_bound_planning_manifest_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            planning_dir = Path(tempdir) / "planning"
+            subprocess.run(
+                [
+                    "cp",
+                    "-a",
+                    str(REPO_ROOT / "docs" / "research" / "player-identity-planning-sources"),
+                    str(planning_dir),
+                ],
+                check=True,
+            )
+            stale_path = planning_dir / "players-identity-lifecycle-anchor-candidates.json"
+            stale = json.loads(stale_path.read_text(encoding="utf-8"))
+            stale["candidate_anchors"] = []
+            stale_path.write_text(json.dumps(stale), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--planning-sources-dir",
+                    str(planning_dir),
+                    "--json",
+                ],
+                cwd=REPO_ROOT,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_bound_planning_manifest_verification_not_accepted", report["blockers"])
+        source_verification = report["source_bound_planning_manifest_verification"]
+        self.assertFalse(source_verification["accepted_for_contract_review"])
+        self.assertFalse(source_verification["promotion_ready"])
+        self.assertFalse(source_verification["public_sdk_ready"])
+        self.assertFalse(source_verification["runtime_ready"])
+        self.assertFalse(source_verification["public_abi_ready"])
+        self.assertFalse(source_verification["v1_completion_ready"])
 
     def test_rejects_symlinked_identifier_redaction_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

@@ -665,6 +665,32 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
         self.assertIn("mission_candidate_claim_overclaim", reasons)
         self.assertTrue({"mutation", "return_override", "runtime_hooks", "public_abi", "v1_completion"} <= claims)
 
+    def test_allowed_non_claim_and_exclusion_fields_reject_affirmative_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["safety_summary"]["explicitly_excluded"].extend(
+                [
+                    "Mission SDK ready",
+                    "ResourceHandle lookup available",
+                ]
+            )
+            payload["non_claims"].append("return override supported")
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        blockers = [
+            blocker
+            for blocker in report["blockers"]
+            if blocker["reason"] == "mission_allowed_prefix_affirmative_overclaim"
+        ]
+        self.assertEqual(len(blockers), 3)
+        claims = {blocker["claim"] for blocker in blockers}
+        self.assertEqual(claims, {"Mission SDK", "ResourceHandle", "return override"})
+
     def test_priority_lane_stays_internal_reuse_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"

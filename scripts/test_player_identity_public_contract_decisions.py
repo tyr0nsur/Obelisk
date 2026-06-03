@@ -352,6 +352,29 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("does not resolve the full lifetime/generation/scope blocker", intake["non_claim"])
 
+    def test_source_bound_planning_manifest_verification_intake_is_not_promoting(self) -> None:
+        payload = self.load_decisions()
+        intake = payload["source_bound_planning_manifest_verification_intake"]
+
+        self.assertEqual(intake["id"], "source_bound_planning_manifest_verification")
+        self.assertEqual(intake["status"], "repo_source_bound_verification_required")
+        self.assertEqual(intake["resolved_input"], "planning.source_bound_committed_manifests")
+        self.assertFalse(intake["promotion_ready"])
+        self.assertFalse(intake["public_sdk_ready"])
+        self.assertFalse(intake["runtime_ready"])
+        self.assertFalse(intake["public_header_allowed"])
+        self.assertFalse(intake["public_abi_ready"])
+        self.assertFalse(intake["v1_completion_evidence"])
+        self.assertEqual(
+            intake["required_checker"],
+            "scripts/build_player_identity_planning_source_manifests.py --verify-existing-dir",
+        )
+        self.assertEqual(
+            intake["default_manifest_dir"],
+            "docs/research/player-identity-planning-sources",
+        )
+        self.assertIn("contract-review provenance only", intake["non_claim"])
+
     def test_contract_review_input_tests_are_covered_without_promotion(self) -> None:
         payload = self.load_decisions()
         tests = {

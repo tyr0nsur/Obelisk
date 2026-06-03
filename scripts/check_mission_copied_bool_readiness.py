@@ -94,6 +94,30 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "v1_ready",
 } | offline_gate.MISSION_COPIED_BOOL_FORBIDDEN_TRUE_READY_KEYS
 ALLOWED_OVERCLAIM_TEXT_PREFIXES = ("$.non_claims", "$.safety_summary.explicitly_excluded")
+AFFIRMATIVE_OVERCLAIM_CONTEXT_RE = re.compile(
+    r"\b(?:ready|readiness|available|availability|supported|support|enabled|promoted|promotion|"
+    r"included|exposed|exposure|complete|completion|stable)\b",
+    re.IGNORECASE,
+)
+NEGATED_OR_EXCLUDED_CONTEXT_RE = re.compile(
+    r"\b(?:blocked|does\s+not|do\s+not|excluded|explicitly\s+excluded|is\s+not|must\s+not|no|not|"
+    r"without)\b",
+    re.IGNORECASE,
+)
+ALLOWED_PREFIX_CLAIM_SUBJECT_RE = re.compile(
+    r"\b(?:"
+    r"(?:public[_ -]?)?(?:mission|module)[_ -]?(?:sdk|api)|"
+    r"public[_ -]?(?:abi|api|callback|descriptor|sdk)|"
+    r"mission[_ -]?(?:callback|descriptor|event|identity)|"
+    r"player[_ -]?identity|"
+    r"object[_ -]?identity|"
+    r"identity|lookup|mutation|"
+    r"resource[_ -]?handle|ResourceHandle|"
+    r"return[_ -]?override|"
+    r"runtime[_ -]?(?:hook|hooks|callback|callbacks|observer)"
+    r")\b",
+    re.IGNORECASE,
+)
 MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "abi ready": "public_abi",
     "allows mutation": "mutation",
@@ -817,6 +841,34 @@ def validate_redacted_source_entries(
         )
 
 
+def allowed_prefix_claim_is_negated_or_excluded(text: str, start: int, end: int) -> bool:
+    clause_start = max(text.rfind(".", 0, start), text.rfind("\n", 0, start), text.rfind(";", 0, start)) + 1
+    clause_end_candidates = [
+        index for index in (text.find(".", end), text.find("\n", end), text.find(";", end)) if index != -1
+    ]
+    clause_end = min(clause_end_candidates) if clause_end_candidates else len(text)
+    clause = text[clause_start:clause_end]
+    return bool(NEGATED_OR_EXCLUDED_CONTEXT_RE.search(clause))
+
+
+def collect_allowed_prefix_affirmative_overclaims(policy: dict[str, Any]) -> list[tuple[str, str, str]]:
+    overclaims: list[tuple[str, str, str]] = []
+    for trail, raw_value in offline_gate.collect_string_fields(policy):
+        if not any(trail.startswith(prefix) for prefix in ALLOWED_OVERCLAIM_TEXT_PREFIXES):
+            continue
+        for subject in ALLOWED_PREFIX_CLAIM_SUBJECT_RE.finditer(raw_value):
+            window_start = max(0, subject.start() - 56)
+            window_end = min(len(raw_value), subject.end() + 56)
+            window = raw_value[window_start:window_end]
+            if not AFFIRMATIVE_OVERCLAIM_CONTEXT_RE.search(window):
+                continue
+            if allowed_prefix_claim_is_negated_or_excluded(raw_value, subject.start(), subject.end()):
+                continue
+            overclaims.append((trail, raw_value, subject.group(0)))
+            break
+    return overclaims
+
+
 def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     gate_blockers = offline_gate.validate_mission_copied_bool_policy_slice_manifest(
         policy,
@@ -859,6 +911,14 @@ def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dic
         for needle, reason in MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES.items():
             if needle in text:
                 append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=reason)
+    for trail, raw_value, claim in collect_allowed_prefix_affirmative_overclaims(policy):
+        append_blocker(
+            blockers,
+            "mission_allowed_prefix_affirmative_overclaim",
+            field=trail,
+            claim=claim,
+            value=raw_value,
+        )
 
 
 def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:

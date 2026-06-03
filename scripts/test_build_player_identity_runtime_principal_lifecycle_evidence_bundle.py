@@ -117,6 +117,14 @@ def preflight_payload(
     payload = {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
         "ready": True,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "promotion_ready": False,
+        "public_header_allowed": False,
+        "v1_completion_ready": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -140,7 +148,7 @@ def preflight_payload(
         "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
-        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+        "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
     }
     return json.dumps(payload, sort_keys=True) + "\n"
 

@@ -66,6 +66,9 @@ EXPECTED_REQUEST_SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
 EXPECTED_REQUEST_STATUS = "candidate_only_request_pack"
 EXPECTED_SERVER_BINARY_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
 EXPECTED_REQUEST_ROLLBACK_DELTA = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
+EXPECTED_PREFLIGHT_NON_CLAIM = (
+    "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers"
+)
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA = "obelisk.player-principal-lifecycle-operator-approval-receipt.v1"
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
     "generated receipt template only; does not record operator approval",
@@ -1067,6 +1070,14 @@ def validate_preflight_payload(
         add(blockers, "operational_window_preflight_checked_at_utc_invalid", label)
     if payload.get("posture_check") != "accepted":
         add(blockers, "operational_window_preflight_posture_check_mismatch", label)
+    if payload.get("non_claim") != EXPECTED_PREFLIGHT_NON_CLAIM:
+        add(
+            blockers,
+            "operational_window_preflight_non_claim_mismatch",
+            label,
+            expected=EXPECTED_PREFLIGHT_NON_CLAIM,
+            actual=payload.get("non_claim"),
+        )
 
 
 def validate_preflight_bindings(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:

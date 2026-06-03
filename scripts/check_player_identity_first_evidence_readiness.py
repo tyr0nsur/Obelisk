@@ -1660,6 +1660,11 @@ def player_identity_public_contract_gap_diagnosis(
         report_blockers,
         public_abi_preflight_report,
     )
+    planning_source_verification = public_contract_gap_report.validate_planning_source_verification(
+        public_contract_gap_report.planning_source_manifests.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+        public_contract_gap_report.DEFAULT_PLANNING_SOURCES_DIR,
+        report_blockers,
+    )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(
         decisions=decisions,
@@ -1667,6 +1672,10 @@ def player_identity_public_contract_gap_diagnosis(
         private_candidate_contract=private_candidate_contract,
         identifier_redaction_evidence=identifier_redaction_evidence,
         principal_invalidation_policy=principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
+        planning_sources_dir=public_contract_gap_report.DEFAULT_PLANNING_SOURCES_DIR,
+        planning_source_snapshot_root=(
+            public_contract_gap_report.planning_source_manifests.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT
+        ),
         private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_abi_preflight_candidate=public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         owner_token_sdk_consumer_contract=public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
@@ -1682,6 +1691,7 @@ def player_identity_public_contract_gap_diagnosis(
         candidate_payload,
         approved_runtime_evidence_gap_report,
         redaction_diagnosis,
+        planning_source_verification,
         principal_policy_gap_report,
         private_pod_layout_report,
         public_abi_preflight_report,

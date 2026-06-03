@@ -116,6 +116,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             report["resolved_inputs"],
             [
                 "runtime.lifecycle_evidence",
+                "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
                 "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
@@ -152,6 +153,19 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "lifetime.generation_scope_invalidation.candidate_policy",
         )
         self.assertFalse(report["principal_invalidation_policy"]["principal_invalidation_ready"])
+        source_verification = report["source_bound_planning_manifest_verification"]
+        self.assertTrue(source_verification["provided"])
+        self.assertTrue(source_verification["accepted_for_contract_review"])
+        self.assertEqual(
+            source_verification["resolved_input"],
+            "planning.source_bound_committed_manifests",
+        )
+        self.assertTrue(source_verification["planning_only"])
+        self.assertFalse(source_verification["promotion_ready"])
+        self.assertFalse(source_verification["public_sdk_ready"])
+        self.assertFalse(source_verification["runtime_ready"])
+        self.assertFalse(source_verification["public_abi_ready"])
+        self.assertFalse(source_verification["v1_completion_ready"])
         abi_preflight = report["public_abi_preflight_candidate"]
         self.assertTrue(abi_preflight["provided"])
         self.assertEqual(abi_preflight["status"], "blocked")
@@ -216,6 +230,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             [
                 "runtime.lifecycle_evidence",
                 "privacy.identifier_redaction",
+                "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
                 "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
@@ -256,6 +271,43 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
         self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
+
+    def test_rejects_stale_source_bound_planning_manifest_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            planning_dir = root / "planning"
+            subprocess.run(
+                [
+                    "cp",
+                    "-a",
+                    str(REPO_ROOT / "docs" / "research" / "player-identity-planning-sources"),
+                    str(planning_dir),
+                ],
+                check=True,
+            )
+            stale_path = planning_dir / "players-identity-principal-invalidation-policy.json"
+            stale = json.loads(stale_path.read_text(encoding="utf-8"))
+            stale["negative_consumer_rules"] = []
+            stale_path.write_text(json.dumps(stale), encoding="utf-8")
+
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--planning-sources-dir",
+                str(planning_dir),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_bound_planning_manifest_verification_not_accepted", report["blockers"])
+        source_verification = report["source_bound_planning_manifest_verification"]
+        self.assertFalse(source_verification["accepted_for_contract_review"])
+        self.assertFalse(source_verification["promotion_ready"])
+        self.assertFalse(source_verification["public_sdk_ready"])
+        self.assertFalse(source_verification["runtime_ready"])
+        self.assertFalse(source_verification["public_abi_ready"])
+        self.assertFalse(source_verification["v1_completion_ready"])
 
     def test_rejects_public_abi_preflight_sdk_consumer_overclaim(self) -> None:
         preflight = self.public_abi_preflight_candidate()

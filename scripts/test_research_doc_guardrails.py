@@ -85,6 +85,31 @@ class ResearchDocGuardrailTests(unittest.TestCase):
                     self.assertNotIn("--offline-only", command)
                     self.assertNotIn("--allow-stopped", command)
 
+    def test_stale_player_identity_offline_pack_gap_notes_are_marked_superseded(self) -> None:
+        curation = (
+            REPO_ROOT / "docs/research/2026-05-31-offline-artifact-curation.md"
+        ).read_text(encoding="utf-8")
+        inventory_audit = (
+            REPO_ROOT / "docs/research/2026-05-31-offline-artifact-inventory-audit.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+
+        for path, text in (
+            ("2026-05-31-offline-artifact-curation.md", curation),
+            ("2026-05-31-offline-artifact-inventory-audit.md", inventory_audit),
+        ):
+            compact = normalized(text)
+            with self.subTest(path=path):
+                self.assertIn("Historical status, superseded", compact)
+                self.assertIn("approved_runtime_evidence_missing", compact)
+                self.assertIn("source-bound planning manifests", compact)
+
+        curation_status = curation.split("## Player Identity Status", 1)[1]
+        self.assertNotIn("known snapshot gaps remain", curation_status)
+        readme_compact = normalized(readme)
+        self.assertIn("Historical/superseded for player identity", readme_compact)
+        self.assertIn("current identity blocker is `approved_runtime_evidence_missing`", readme_compact)
+
     def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
         documented_flags = self._documented_identity_bundle_flags(
             REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md",

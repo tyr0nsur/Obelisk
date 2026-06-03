@@ -843,6 +843,15 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 ),
                 "operational_window_preflight_mode_mismatch",
             ),
+            (
+                "preflight_non_claim",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda path: path.read_text(encoding="utf-8").replace(
+                    "not approved runtime evidence, ",
+                    "",
+                ),
+                "operational_window_preflight_non_claim_mismatch",
+            ),
         )
         for name, artifact_for_payload, mutate, expected_blocker in cases:
             with self.subTest(sidecar=name):

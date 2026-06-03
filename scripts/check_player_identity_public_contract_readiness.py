@@ -19,6 +19,7 @@ import check_player_identity_runtime_principal_lifecycle_approved_evidence as ap
 import check_player_identity_identifier_redaction_evidence as identifier_redaction
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 import check_player_identity_public_abi_preflight_candidate as public_abi_preflight_candidate
+import build_player_identity_planning_source_manifests as planning_source_manifests
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -50,6 +51,20 @@ DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
 DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT = Path(
     "docs/research/player-identity-planning-sources/player-identity-owner-token-sdk-consumer-contract.json"
 )
+DEFAULT_PLANNING_SOURCES_DIR = Path("docs/research/player-identity-planning-sources")
+REQUIRED_PLANNING_SOURCE_VERIFICATION_INTAKE_ID = "source_bound_planning_manifest_verification"
+REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT = "planning.source_bound_committed_manifests"
+REQUIRED_PLANNING_SOURCE_VERIFICATION_CHECKER = (
+    "scripts/build_player_identity_planning_source_manifests.py --verify-existing-dir"
+)
+REQUIRED_PLANNING_SOURCE_VERIFICATION_NON_CLAIM = (
+    "A valid source-bound planning manifest verification is contract-review provenance only; it does not "
+    "promote player identity, public SDK/header/runtime readiness, public ABI, runtime authorization, or v1 completion."
+)
+PLANNING_SOURCE_VERIFICATION_REPORT_NON_CLAIMS = [
+    "source-bound planning manifest verification is provenance-only contract-review input",
+    "source-bound planning manifest verification grants no authorization or promotion",
+]
 REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM = (
     "A valid public ABI preflight candidate is offline routing evidence only; it does not resolve the public "
     "POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote "
@@ -563,6 +578,18 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_PRINCIPAL_INVALIDATION_POLICY,
         help="Candidate-only principal invalidation policy for lifetime/generation/scope review intake only.",
     )
+    parser.add_argument(
+        "--planning-sources-dir",
+        type=Path,
+        default=DEFAULT_PLANNING_SOURCES_DIR,
+        help="Committed source-bound player identity planning manifests directory.",
+    )
+    parser.add_argument(
+        "--planning-source-snapshot-root",
+        type=Path,
+        default=planning_source_manifests.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+        help="Sanitized UFunction snapshot root used to verify committed planning manifests.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     parser.add_argument(
         "--public-header",
@@ -856,6 +883,122 @@ def principal_invalidation_policy_report(path: Path | None, blockers: list[dict[
         "public_header_allowed": False,
         "principal_invalidation_ready": False,
         "blockers": report.get("blockers", []),
+    }
+
+
+def planning_source_verification_report(
+    snapshot_root: Path,
+    existing_dir: Path,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    try:
+        verified_snapshot_root = planning_source_manifests.safe_snapshot_root(snapshot_root)
+        verified_existing_dir = planning_source_manifests.safe_existing_dir(existing_dir)
+        report = planning_source_manifests.verify_existing_dir(
+            snapshot_root=verified_snapshot_root,
+            existing_dir=verified_existing_dir,
+        )
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        add(
+            blockers,
+            "source_bound_planning_manifest_verification_unreadable_or_rejected",
+            "$.source_bound_planning_manifest_verification",
+            snapshot_root=str(snapshot_root),
+            existing_dir=str(existing_dir),
+            error=str(exc),
+        )
+        return {
+            "provided": False,
+            "accepted_for_contract_review": False,
+            "resolved_input": None,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_abi_ready": False,
+            "v1_completion_ready": False,
+            "server_operations_authorized": False,
+            "runtime_work_authorized": False,
+            "blockers": ["source_bound_planning_manifest_verification_unreadable_or_rejected"],
+        }
+    if report.get("schema") != planning_source_manifests.REPORT_SCHEMA:
+        add(
+            blockers,
+            "source_bound_planning_manifest_verification_schema_mismatch",
+            "$.source_bound_planning_manifest_verification.schema",
+            value=report.get("schema"),
+        )
+    if report.get("mode") != "verify_existing":
+        add(
+            blockers,
+            "source_bound_planning_manifest_verification_mode_mismatch",
+            "$.source_bound_planning_manifest_verification.mode",
+            value=report.get("mode"),
+        )
+    if report.get("valid") is not True or report.get("accepted_for_planning") is not True:
+        add(
+            blockers,
+            "source_bound_planning_manifest_verification_not_accepted",
+            "$.source_bound_planning_manifest_verification",
+            verification_blockers=report.get("blockers", []),
+        )
+    if report.get("planning_only") is not True:
+        add(
+            blockers,
+            "source_bound_planning_manifest_verification_not_planning_only",
+            "$.source_bound_planning_manifest_verification.planning_only",
+            value=report.get("planning_only"),
+        )
+    for key in (
+        "promotion_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "runtime_ready",
+        "v1_completion_ready",
+        "server_operations_authorized",
+        "runtime_work_authorized",
+    ):
+        if report.get(key) is not False:
+            add(
+                blockers,
+                "source_bound_planning_manifest_verification_readiness_flag_not_false",
+                f"$.source_bound_planning_manifest_verification.{key}",
+                value=report.get(key),
+            )
+    accepted = (
+        report.get("valid") is True
+        and report.get("accepted_for_planning") is True
+        and report.get("planning_only") is True
+        and all(
+            report.get(key) is False
+            for key in (
+                "promotion_ready",
+                "public_sdk_ready",
+                "public_abi_ready",
+                "runtime_ready",
+                "v1_completion_ready",
+                "server_operations_authorized",
+                "runtime_work_authorized",
+            )
+        )
+    )
+    return {
+        "provided": True,
+        "accepted_for_contract_review": accepted,
+        "resolved_input": REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT if accepted else None,
+        "planning_only": report.get("planning_only") is True,
+        "snapshot_root": report.get("snapshot_root"),
+        "verify_existing_dir": report.get("verify_existing_dir"),
+        "checked_outputs": report.get("checked_outputs", {}),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "blockers": report.get("blockers", []),
+        "non_claims": PLANNING_SOURCE_VERIFICATION_REPORT_NON_CLAIMS,
     }
 
 
@@ -1761,6 +1904,26 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             if principal_policy_intake.get(key) is not False:
                 add(blockers, f"principal_invalidation_policy_evidence_intake_{key}_not_false", f"$.principal_invalidation_policy_evidence_intake.{key}")
 
+    planning_source_intake = decisions.get("source_bound_planning_manifest_verification_intake")
+    if not isinstance(planning_source_intake, dict):
+        add(blockers, "source_bound_planning_manifest_verification_intake_missing", "$.source_bound_planning_manifest_verification_intake")
+    else:
+        if planning_source_intake.get("id") != REQUIRED_PLANNING_SOURCE_VERIFICATION_INTAKE_ID:
+            add(blockers, "source_bound_planning_manifest_verification_intake_id_mismatch", "$.source_bound_planning_manifest_verification_intake.id")
+        if planning_source_intake.get("status") != "repo_source_bound_verification_required":
+            add(blockers, "source_bound_planning_manifest_verification_intake_status_mismatch", "$.source_bound_planning_manifest_verification_intake.status")
+        if planning_source_intake.get("resolved_input") != REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT:
+            add(blockers, "source_bound_planning_manifest_verification_intake_resolved_input_mismatch", "$.source_bound_planning_manifest_verification_intake.resolved_input")
+        if planning_source_intake.get("required_checker") != REQUIRED_PLANNING_SOURCE_VERIFICATION_CHECKER:
+            add(blockers, "source_bound_planning_manifest_verification_intake_checker_mismatch", "$.source_bound_planning_manifest_verification_intake.required_checker")
+        if planning_source_intake.get("default_manifest_dir") != str(DEFAULT_PLANNING_SOURCES_DIR):
+            add(blockers, "source_bound_planning_manifest_verification_intake_default_manifest_dir_mismatch", "$.source_bound_planning_manifest_verification_intake.default_manifest_dir")
+        if planning_source_intake.get("non_claim") != REQUIRED_PLANNING_SOURCE_VERIFICATION_NON_CLAIM:
+            add(blockers, "source_bound_planning_manifest_verification_intake_non_claim_mismatch", "$.source_bound_planning_manifest_verification_intake.non_claim")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed", "public_abi_ready", "v1_completion_evidence"):
+            if planning_source_intake.get(key) is not False:
+                add(blockers, f"source_bound_planning_manifest_verification_intake_{key}_not_false", f"$.source_bound_planning_manifest_verification_intake.{key}")
+
     public_abi_preflight_intake = decisions.get("public_abi_preflight_candidate_intake")
     if not isinstance(public_abi_preflight_intake, dict):
         add(blockers, "public_abi_preflight_candidate_intake_missing", "$.public_abi_preflight_candidate_intake")
@@ -1930,10 +2093,12 @@ def build_report(
     blockers: list[dict[str, Any]],
     check_mode: str,
     principal_policy_report: dict[str, Any] | None = None,
+    planning_source_report: dict[str, Any] | None = None,
     public_abi_preflight_report: dict[str, Any] | None = None,
     owner_token_sdk_consumer_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     principal_policy_report = principal_policy_report or {}
+    planning_source_report = planning_source_report or {}
     public_abi_preflight_report = public_abi_preflight_report or {}
     owner_token_sdk_consumer_report = owner_token_sdk_consumer_report or {}
     runtime_ready = (
@@ -1959,6 +2124,8 @@ def build_report(
         resolved_inputs.append(REQUIRED_RESOLVED_INPUT)
         if redaction_report.get("accepted_for_contract_review") is True:
             resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
+        if planning_source_report.get("accepted_for_contract_review") is True:
+            resolved_inputs.append(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
         if principal_policy_report.get("accepted_for_policy_review") is True:
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
         if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
@@ -2039,6 +2206,7 @@ def build_report(
             "public_header_allowed": False,
             "principal_invalidation_ready": False,
         },
+        "source_bound_planning_manifest_verification": planning_source_report,
         "public_abi_preflight_candidate": {
             "provided": public_abi_preflight_report.get("provided") is True,
             "status": public_abi_preflight_report.get("status"),
@@ -2075,6 +2243,7 @@ def build_report(
             NON_PROMOTIONAL_EVIDENCE_DENIAL,
             "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
             "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker or prove runtime lifecycle ordering",
+            "source-bound planning manifest verification is provenance for contract-review inputs only and does not promote public SDK/header/runtime readiness",
             "public ABI preflight candidate intake is candidate-only and does not resolve public ABI layout, SDK consumer tests, lifecycle cleanup, or v1 completion",
         ],
     }
@@ -2091,6 +2260,11 @@ def main() -> int:
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
     redaction_report = identifier_redaction_report(args.identifier_redaction_evidence, blockers)
+    planning_source_report = planning_source_verification_report(
+        args.planning_source_snapshot_root,
+        args.planning_sources_dir,
+        blockers,
+    )
     principal_policy_report = principal_invalidation_policy_report(args.principal_invalidation_policy, blockers)
     public_abi_preflight_report = public_abi_preflight_candidate_report(
         args.public_abi_preflight_candidate,
@@ -2113,6 +2287,7 @@ def main() -> int:
         blockers,
         check_mode,
         principal_policy_report,
+        planning_source_report,
         public_abi_preflight_report,
         owner_token_sdk_consumer_report,
     )
