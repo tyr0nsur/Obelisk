@@ -603,6 +603,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertFalse(report["post_window_replay"])
         self.assertFalse(report["post_window_replay_expiry_tolerated"])
+        self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertIn("operator_approval_receipt_requires_post_window_replay", report["blockers"])
 
     def test_rejects_receipt_replay_across_request_pack_bindings(self) -> None:

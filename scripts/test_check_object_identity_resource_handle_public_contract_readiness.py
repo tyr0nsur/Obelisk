@@ -385,6 +385,29 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_nested_public_event_resource_handle_lookup_readiness_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            events = json.loads(PUBLIC_EVENTS.read_text(encoding="utf-8"))
+            events["nested_claim"] = {
+                "notes": [
+                    "ResourceHandle lookup is ready for the public SDK.",
+                ]
+            }
+            events_path = write_json(root, "events.json", events)
+
+            result = run_checker("--public-events", str(events_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("public_events_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
     def test_rejects_symlinked_input_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

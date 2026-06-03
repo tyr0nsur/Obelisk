@@ -1544,6 +1544,14 @@ def validate_required_before_public_header(decisions: dict[str, Any], blockers: 
             by_id[requirement_id] = item
         if item.get("status") == "resolved":
             add(blockers, "required_before_public_header_resolved_without_public_gate", f"$.required_before_public_header[{index}]", requirement_id=requirement_id)
+        elif item.get("status") != "unresolved":
+            add(
+                blockers,
+                "required_before_public_header_status_mismatch",
+                f"$.required_before_public_header[{index}].status",
+                requirement_id=requirement_id,
+                status=item.get("status"),
+            )
 
     if observed_ids != REQUIRED_BEFORE_PUBLIC_HEADER:
         add(

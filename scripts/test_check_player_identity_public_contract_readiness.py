@@ -1359,6 +1359,33 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             with self.subTest(blocker=blocker):
                 self.assertIn(blocker, report["blockers"])
 
+    def test_rejects_stale_required_before_public_header_status(self) -> None:
+        decisions = self.decisions()
+        requirements = {
+            item["id"]: item
+            for item in decisions["required_before_public_header"]
+        }
+        requirements["privacy.public_identifier_form"]["status"] = "stale"
+        requirements["abi.payload_shape"]["status"] = "candidate_accepted"
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        status_blockers = [
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "required_before_public_header_status_mismatch"
+        ]
+        self.assertEqual(
+            [blocker["requirement_id"] for blocker in status_blockers],
+            ["privacy.public_identifier_form", "abi.payload_shape"],
+        )
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+
     def test_rejects_pre_header_test_overclaims(self) -> None:
         decisions = self.decisions()
         for item in decisions["required_tests_before_public_header"]:

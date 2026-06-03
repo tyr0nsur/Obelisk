@@ -212,8 +212,9 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest supervised rounds integrated readiness/overclaim guardrails, SDK route-blocker
-  accounting, stricter post-window artifact reporting, identity runtime-evidence linkage,
-  certificate and nested-claim scanning, command response/replies handwritten-report
-  rejection, and scratch-vs-durable lifecycle evidence wording. Agents closed; route/SDK
-  remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  accounting, stricter post-window artifact/reporting, receipt replay verification,
+  identity runtime/stale-input checks, ResourceHandle nested-claim scanning, command
+  response/replies handwritten-report rejection, scratch-vs-durable lifecycle evidence
+  wording, and static timer guardrails. Agents closed; route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

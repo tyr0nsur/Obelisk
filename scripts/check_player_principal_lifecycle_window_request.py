@@ -1289,7 +1289,7 @@ def main() -> int:
         operator_request_verified = False
     operator_approval_receipt_verified = False
     if args.operator_approval_receipt is not None:
-        operator_approval_receipt_verified = validate_operator_approval_receipt(
+        receipt_valid = validate_operator_approval_receipt(
             payload=payload,
             request_json_path=args.request_json,
             env_file_path=args.env_file,
@@ -1297,6 +1297,7 @@ def main() -> int:
             receipt_path=args.operator_approval_receipt,
             blockers=validation.blockers,
         )
+        operator_approval_receipt_verified = bool(args.post_window_replay and receipt_valid)
     post_window_replay_expiry_tolerated = False
     if args.post_window_replay:
         post_window_replay_expiry_tolerated = tolerate_post_window_expiry_only(validation.blockers)

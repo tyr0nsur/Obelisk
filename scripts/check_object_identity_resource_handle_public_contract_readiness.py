@@ -179,32 +179,30 @@ def positive_surface_text_claim(text: str) -> bool:
     return SURFACE_NEGATED_CLAIM_RE.search(text) is None
 
 
-def walk_surface_text_claims(value: Any, blockers: list[str], trail: str) -> None:
+def walk_text_claims(value: Any, blockers: list[str], trail: str, blocker_prefix: str) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            walk_surface_text_claims(child, blockers, f"{trail}.{key}")
+            walk_text_claims(child, blockers, f"{trail}.{key}", blocker_prefix)
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            walk_surface_text_claims(child, blockers, f"{trail}[{index}]")
+            walk_text_claims(child, blockers, f"{trail}[{index}]", blocker_prefix)
     elif isinstance(value, str):
         for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
             normalized = clause.strip()
             if normalized and positive_surface_text_claim(normalized):
-                blockers.append(f"surface_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
+                blockers.append(f"{blocker_prefix}:{trail}[clause:{clause_index}]")
+
+
+def walk_surface_text_claims(value: Any, blockers: list[str], trail: str) -> None:
+    walk_text_claims(value, blockers, trail, "surface_positive_resource_handle_claim")
 
 
 def walk_decisions_text_claims(value: Any, blockers: list[str], trail: str) -> None:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            walk_decisions_text_claims(child, blockers, f"{trail}.{key}")
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            walk_decisions_text_claims(child, blockers, f"{trail}[{index}]")
-    elif isinstance(value, str):
-        for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
-            normalized = clause.strip()
-            if normalized and positive_surface_text_claim(normalized):
-                blockers.append(f"decisions_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
+    walk_text_claims(value, blockers, trail, "decisions_positive_resource_handle_claim")
+
+
+def walk_public_event_text_claims(value: Any, blockers: list[str], trail: str) -> None:
+    walk_text_claims(value, blockers, trail, "public_events_positive_resource_handle_claim")
 
 
 def surface_entry(surfaces: Any, blockers: list[str]) -> dict[str, Any] | None:
@@ -313,6 +311,7 @@ def validate_public_events(events: Any, blockers: list[str]) -> None:
         if term in text:
             blockers.append(f"public_events_forbidden_term:{term}")
     walk_claims(events, blockers)
+    walk_public_event_text_claims(events, blockers, "$.public_events")
     if isinstance(events, dict):
         metadata_surfaces = events.get("metadata_surfaces")
         resource_surface = None
