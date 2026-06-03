@@ -1461,6 +1461,21 @@ priorities, and do not use history files as the active source of truth.
   valid/planning-only, SDK JSON blocked by design, py_compile, and `git diff --check`.
   Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent binding/P0/SDK/reflection hardening round: command response
+  and commands/replies readiness reports now emit `source_artifact_hashes`; SDK completion
+  requires those downstream P0 source artifact SHA-256 bindings and rejects missing, invalid,
+  unavailable, or mismatched hashes. Player-principal request tests scope the fake `git` env to
+  subprocesses only so later suites can still exercise stale-commit/current-HEAD guards.
+  Window-manifest UTC timestamps are canonical seconds-only `YYYY-MM-DDThh:mm:ssZ`; fractional
+  timestamps fail closed. Buff side-lane accounting was refreshed: compact bool-tail repair is
+  no longer recorded as missing, but Buff remains candidate-only until a dedicated Buff
+  consume/readiness checker exists. SDK guardrails prove scoped release-statement bookkeeping
+  and route-gate non-counting rows never increase complete/full/production/stable SDK claim
+  progress. Validations passed: command readiness 79, docs/accounting 51, manifest 75, full SDK
+  completion/guardrails 410, route JSON valid/planning-only, mission/transfer/dino/tribe/buff
+  accounting JSON valid/candidate-only, SDK JSON blocked by design. Route/SDK remain fail-closed
+  at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
+  no runtime/server operation.
 
 ## Agent Coordination
 

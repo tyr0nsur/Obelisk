@@ -142,6 +142,8 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("lookup_ownership_lifetime", accounting["leaf_family_gaps"]["dino_policy"]["missing_public_gates"])
         self.assertIn("privacy_redaction_contract", accounting["leaf_family_gaps"]["tribe_policy"]["missing_public_gates"])
         self.assertIn("buff_class_object_redaction_contract", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
+        self.assertIn("buff_leaf_readiness_checker", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
+        self.assertNotIn("refreshed_compact_evidence", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
 
         mission = report["mission_leaf_blocker_accounting"]
@@ -247,6 +249,9 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             ["mission", "dino_policy", "transfer", "buff_status", "tribe_policy"],
         )
         self.assertEqual(priority["ranked_leaves"][0]["missing_public_gate_count"], 6)
+        buff_priority = next(item for item in priority["ranked_leaves"] if item["leaf"] == "buff_status")
+        self.assertIn("Buff-specific consume/readiness checker", " ".join(buff_priority["blocking_risk"]))
+        self.assertIn("Add a Buff-specific consume/readiness checker", buff_priority["next_v1_reuse_step"])
         self.assertFalse(any(item["public_sdk_ready"] for item in priority["ranked_leaves"]))
         self.assertFalse(any(item["runtime_ready"] for item in priority["ranked_leaves"]))
         self.assertFalse(any(item["promotion_ready"] for item in priority["ranked_leaves"]))

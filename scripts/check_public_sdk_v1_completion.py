@@ -3294,6 +3294,37 @@ def resolve_report_source_artifact(raw_path: Any, reason_prefix: str) -> tuple[P
     return resolved, []
 
 
+def source_artifact_hash_bindings_missing(
+    report: dict[str, Any],
+    resolved: dict[str, Path],
+    keys: tuple[str, ...],
+    reason_prefix: str,
+) -> list[str]:
+    if not resolved:
+        return []
+    bindings = report.get("source_artifact_hashes")
+    if not isinstance(bindings, dict):
+        return [f"{reason_prefix}:source_artifact_hashes_missing"]
+    missing: list[str] = []
+    for key in keys:
+        path = resolved.get(key)
+        if path is None:
+            continue
+        expected_sha256 = bindings.get(key)
+        if not isinstance(expected_sha256, str) or not expected_sha256.strip():
+            missing.append(f"{reason_prefix}:{key}:source_artifact_sha256_missing")
+            continue
+        if SHA256_RE.fullmatch(expected_sha256.strip()) is None:
+            missing.append(f"{reason_prefix}:{key}:source_artifact_sha256_invalid")
+            continue
+        actual_sha256 = sha256_file(path)
+        if actual_sha256 is None:
+            missing.append(f"{reason_prefix}:{key}:source_artifact_sha256_unavailable")
+        elif expected_sha256.lower() != actual_sha256:
+            missing.append(f"{reason_prefix}:{key}:source_artifact_sha256_mismatch")
+    return missing
+
+
 def report_path_matches_default(path: Path | None, expected: Path) -> bool:
     if path is None:
         return False
@@ -3360,6 +3391,14 @@ def command_response_public_readiness_source_artifacts_missing(
         missing.extend(errors)
         if path is not None:
             resolved[key] = path
+    missing.extend(
+        source_artifact_hash_bindings_missing(
+            report,
+            resolved,
+            COMMAND_RESPONSE_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS,
+            reason_prefix,
+        )
+    )
     if not report_path_matches_default(
         resolved.get("decisions_path"),
         DEFAULT_COMMAND_RESPONSE_PUBLIC_CONTRACT_DECISIONS,
@@ -3412,6 +3451,16 @@ def commands_replies_public_readiness_source_artifacts_missing(
         f"{reason_prefix}:response_path_report_path",
     )
     missing.extend(response_path_report_errors)
+    if response_path_report_path is not None:
+        resolved["response_path_report_path"] = response_path_report_path
+    missing.extend(
+        source_artifact_hash_bindings_missing(
+            report,
+            resolved,
+            (*COMMANDS_REPLIES_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS, "response_path_report_path"),
+            reason_prefix,
+        )
+    )
     response_path_report_root_value = report.get("response_path_report_root")
     response_path_report_root: Path | None = None
     if not isinstance(response_path_report_root_value, str) or not response_path_report_root_value.strip():

@@ -56,6 +56,10 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def source_artifact_hashes(**paths: Path) -> dict[str, str]:
+    return {key: sha256_file(path) for key, path in paths.items()}
+
+
 def current_repo_head() -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -8890,11 +8894,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "public_header_path": str(PUBLIC_HEADER),
                 "response_path_report_path": str(response_path_report),
                 "response_path_report_root": str(response_path_report_root),
+                "source_artifact_hashes": source_artifact_hashes(
+                    decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                    surfaces_path=PUBLIC_SDK_SURFACES,
+                    public_header_path=PUBLIC_HEADER,
+                    response_path_report_path=response_path_report,
+                ),
             }
             active_report = {
                 **stale_report,
                 "surfaces_path": str(manifest_path),
                 "public_header_path": str(header_path),
+                "source_artifact_hashes": source_artifact_hashes(
+                    decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                    surfaces_path=manifest_path,
+                    public_header_path=header_path,
+                    response_path_report_path=response_path_report,
+                ),
             }
 
             stale_missing = module.commands_replies_public_readiness_source_artifacts_missing(
@@ -8913,6 +8929,117 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("public_readiness_report:surfaces_path_mismatch", stale_missing)
         self.assertIn("public_readiness_report:public_header_path_mismatch", stale_missing)
         self.assertEqual(active_missing, [])
+
+    def test_command_response_source_artifacts_require_current_hashes(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandResponseSourceHashes",
+        ) as core_dir:
+            root = Path(core_dir)
+            readiness = root / "command-chat-response-route-planning-readiness.json"
+            readiness.write_text(
+                json.dumps(
+                    {
+                        "source_root": str(root),
+                        "producer": {
+                            "script": "scripts/compare_reflection_snapshots.py",
+                            "output_name": "command-chat-response-route-planning-readiness.json",
+                            "argv": [
+                                "scripts/compare_reflection_snapshots.py",
+                                "--target-set",
+                                "command-chat-response-route-planning",
+                                "--readiness-report",
+                                str(readiness),
+                                "--json",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = {
+                "readiness_root": str(root),
+                "readiness_path": str(readiness),
+                "decisions_path": str(REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"),
+                "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                "public_header_path": str(PUBLIC_HEADER),
+                "source_artifact_hashes": source_artifact_hashes(
+                    readiness_path=readiness,
+                    decisions_path=REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json",
+                    surfaces_path=PUBLIC_SDK_SURFACES,
+                    public_header_path=PUBLIC_HEADER,
+                ),
+            }
+            current_missing = module.command_response_public_readiness_source_artifacts_missing(
+                report,
+                "public_readiness_report",
+            )
+            report["source_artifact_hashes"]["readiness_path"] = "0" * 64
+            stale_missing = module.command_response_public_readiness_source_artifacts_missing(
+                report,
+                "public_readiness_report",
+            )
+
+        self.assertEqual(current_missing, [])
+        self.assertIn(
+            "public_readiness_report:readiness_path:source_artifact_sha256_mismatch",
+            stale_missing,
+        )
+
+    def test_commands_replies_source_artifacts_require_response_report_hash(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesSourceHashes",
+        ) as core_dir:
+            root = Path(core_dir)
+            response_report_root = root / "command-chat-response-public-readiness"
+            response_report_root.mkdir()
+            response_report = response_report_root / "command-chat-response-public-readiness.json"
+            response_report.write_text("{}", encoding="utf-8")
+            report = {
+                "decisions_path": str(REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"),
+                "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                "public_header_path": str(PUBLIC_HEADER),
+                "response_path_report_path": str(response_report),
+                "response_path_report_root": str(response_report_root),
+                "source_artifact_hashes": source_artifact_hashes(
+                    decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                    surfaces_path=PUBLIC_SDK_SURFACES,
+                    public_header_path=PUBLIC_HEADER,
+                    response_path_report_path=response_report,
+                ),
+            }
+            current_missing = module.commands_replies_public_readiness_source_artifacts_missing(
+                report,
+                "public_readiness_report",
+            )
+            response_report.write_text('{"changed": true}', encoding="utf-8")
+            stale_missing = module.commands_replies_public_readiness_source_artifacts_missing(
+                report,
+                "public_readiness_report",
+            )
+
+        self.assertEqual(current_missing, [])
+        self.assertIn(
+            "public_readiness_report:response_path_report_path:source_artifact_sha256_mismatch",
+            stale_missing,
+        )
 
     def test_permissions_admin_structured_promotion_requires_identity_promotion_certificate(self) -> None:
         with tempfile.TemporaryDirectory(
@@ -9267,6 +9394,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         ),
                         "surfaces_path": str(PUBLIC_SDK_SURFACES),
                         "public_header_path": str(PUBLIC_HEADER),
+                        "source_artifact_hashes": source_artifact_hashes(
+                            readiness_path=response_readiness,
+                            decisions_path=REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json",
+                            surfaces_path=PUBLIC_SDK_SURFACES,
+                            public_header_path=PUBLIC_HEADER,
+                        ),
                         "blockers": [],
                     }
                 ),
@@ -9302,6 +9435,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_header_path": str(PUBLIC_HEADER),
                         "response_path_report_path": str(response_report),
                         "response_path_report_root": str(response_report_root),
+                        "source_artifact_hashes": source_artifact_hashes(
+                            decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                            surfaces_path=PUBLIC_SDK_SURFACES,
+                            public_header_path=PUBLIC_HEADER,
+                            response_path_report_path=response_report,
+                        ),
                         "blockers": [],
                     }
                 ),
@@ -9406,6 +9545,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         ),
                         "surfaces_path": str(PUBLIC_SDK_SURFACES),
                         "public_header_path": str(PUBLIC_HEADER),
+                        "source_artifact_hashes": source_artifact_hashes(
+                            readiness_path=response_readiness,
+                            decisions_path=REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json",
+                            surfaces_path=PUBLIC_SDK_SURFACES,
+                            public_header_path=PUBLIC_HEADER,
+                        ),
                         "blockers": [],
                     }
                 ),
@@ -9505,6 +9650,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         ),
                         "surfaces_path": str(manifest_path),
                         "public_header_path": str(header_path),
+                        "source_artifact_hashes": source_artifact_hashes(
+                            readiness_path=response_readiness,
+                            decisions_path=REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json",
+                            surfaces_path=manifest_path,
+                            public_header_path=header_path,
+                        ),
                         "blockers": [],
                     }
                 ),
@@ -9540,6 +9691,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_header_path": str(header_path),
                         "response_path_report_path": str(response_report),
                         "response_path_report_root": str(response_report_root),
+                        "source_artifact_hashes": source_artifact_hashes(
+                            decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                            surfaces_path=manifest_path,
+                            public_header_path=header_path,
+                            response_path_report_path=response_report,
+                        ),
                         "blockers": [],
                     }
                 ),

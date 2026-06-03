@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -455,6 +456,17 @@ def resolve_expected_path(path: Path, label: str, blockers: list[dict[str, Any]]
             detail=str(exc),
         )
         return None
+
+
+def sha256_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def source_artifact_hashes(paths: dict[str, Path | None]) -> dict[str, str | None]:
+    return {key: sha256_file(path) if path is not None else None for key, path in paths.items()}
 
 
 def validate_response_path_report_location(
@@ -1402,6 +1414,14 @@ def build_report(
         "surfaces_path": str(surfaces_path),
         "public_header_path": str(public_header_path),
         "response_path_report_path": str(response_path_report_path) if response_path_report_path is not None else None,
+        "source_artifact_hashes": source_artifact_hashes(
+            {
+                "decisions_path": decisions_path,
+                "surfaces_path": surfaces_path,
+                "public_header_path": public_header_path,
+                "response_path_report_path": response_path_report_path,
+            }
+        ),
         "response_path_report_root": str(expected_report_root) if expected_report_root is not None else None,
         "decisions_status": decisions.get("status") if isinstance(decisions, dict) else None,
         "commands_replies_surface_status": (

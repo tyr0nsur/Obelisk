@@ -164,7 +164,7 @@ LEAF_MISSING_PUBLIC_GATES = {
         "buff_class_object_redaction_contract",
         "copied_payload_policy",
         "lifecycle_stacking_invalidation_semantics",
-        "refreshed_compact_evidence",
+        "buff_leaf_readiness_checker",
         "dispatcher_lifecycle",
         "runtime_observation",
         "resource_handle_policy",
@@ -243,11 +243,12 @@ LEAF_PRIORITY_PROFILES = {
             "class/object redaction contract",
             "copied payload policy",
             "lifecycle, stacking, and invalidation semantics",
-            "fresh compact BoolProperty tail evidence",
+            "missing Buff-specific consume/readiness checker",
         ),
         "next_v1_reuse_step": (
-            "Refresh compact evidence before treating Buff as a scalar/status lane; "
-            "keep class/object pointers, lifecycle claims, ResourceHandle, mutation, and return override excluded."
+            "Add a Buff-specific consume/readiness checker before treating Buff as a "
+            "scalar/status lane; keep class/object pointers, lifecycle claims, "
+            "ResourceHandle, mutation, and return override excluded."
         ),
     },
     "tribe_policy": {

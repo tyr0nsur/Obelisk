@@ -2970,6 +2970,79 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(summary["p0_dependency_chain_promoted_for_claim_count"], 0)
         self.assertEqual(summary["p0_dependency_chain_remaining_for_claim_count"], 4)
 
+    def test_scoped_release_statement_bookkeeping_does_not_increment_sdk_claim_progress(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        report = checker["build_report"](
+            PUBLIC_SDK_SURFACES_MANIFEST,
+            release_statement_path=REPO_ROOT
+            / "release"
+            / "v1"
+            / "public-sdk"
+            / "scoped-release-statement-template.md",
+        )
+        checker["add_scoped_release_statement_result"](report)
+
+        progress = report["v1_sdk_progress"]
+        summary = report["v1_sdk_blocker_outcome_summary"]
+        scoped = report["scoped_release_statement"]
+
+        self.assertTrue(scoped["ready"])
+        self.assertFalse(scoped["stable_v1_sdk_claim_allowed"])
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertEqual(progress["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
+        self.assertEqual(progress["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(progress["completion_blockers_with_release_statement_post_v1_or_excluded_outcome_count"], 7)
+        self.assertEqual(summary["non_p0_release_statement_post_v1_or_excluded_outcome_count"], 7)
+        self.assertEqual(summary["release_statement_scoped_non_complete_bookkeeping_count"], 7)
+        self.assertEqual(summary["route_gate_non_counting_surface_count"], 0)
+        self.assertIn("does not authorize v1.0 stable", scoped["non_claim"])
+        self.assertIn("bookkeeping only", progress["completion_blockers_with_post_v1_or_excluded_outcome_note"])
+        self.assertIn("never contribute", progress["outcome_accounting_note"])
+
+    def test_route_gate_non_counting_rows_do_not_increment_p0_sdk_claim_progress(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        rows_function_globals = checker["completion_blocker_outcome_rows"].__globals__
+        rows_function_globals["surface_has_promotion_evidence"] = lambda surface: True
+        rows_function_globals["surface_missing_required_promotion_evidence"] = lambda surface: []
+        rows_function_globals["surface_missing_structured_promotion_evidence"] = (
+            lambda surface, manifest_path, public_header_path: []
+        )
+
+        rows = checker["completion_blocker_outcome_rows"](
+            ["obelisk.player_identity.v1"],
+            {
+                "obelisk.player_identity.v1": {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "support_tier": "release-supported surface",
+                },
+            },
+            set(),
+            "obelisk.player_identity.v1: promoted - reviewed identity evidence",
+            {"current_blocker": "approved_runtime_evidence_missing"},
+        )
+        summary = checker["completion_blocker_outcome_summary"](rows)
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertFalse(row["counts_toward_complete_sdk_claim"])
+        self.assertTrue(row["manifest_promoted_but_non_counting"])
+        self.assertEqual(row["route_gate_non_counting_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn("route_gate_blocker:approved_runtime_evidence_missing", row["non_counting_reasons"])
+        self.assertIn("resolve the command/permission route gate", row["next_action"])
+        self.assertEqual(summary["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(summary["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(summary["route_gate_non_counting_surface_count"], 1)
+        self.assertEqual(summary["route_gate_non_counting_blockers"], ["approved_runtime_evidence_missing"])
+
     def test_public_sdk_completion_checker_blocks_claim_wording_for_blocked_surface_synonyms(self) -> None:
         checker = runpy.run_path(
             str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),

@@ -38,7 +38,10 @@ exit 1
     encoding="utf-8",
 )
 _FAKE_GIT.chmod(0o755)
-os.environ["PATH"] = f"{_FAKE_GIT_DIR.name}{os.pathsep}{os.environ['PATH']}"
+_FAKE_GIT_ENV = {
+    **os.environ,
+    "PATH": f"{_FAKE_GIT_DIR.name}{os.pathsep}{os.environ['PATH']}",
+}
 
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("check_player_principal_lifecycle_window_request", CHECK)
@@ -98,6 +101,7 @@ def prepare_pack(output_dir: Path) -> None:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=_FAKE_GIT_ENV,
     )
 
 
@@ -153,6 +157,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=_FAKE_GIT_ENV,
         )
         if check and result.returncode != 0:
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")

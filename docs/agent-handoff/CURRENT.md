@@ -375,3 +375,19 @@ This file is an active routing table only. Durable evidence belongs in
   valid/planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked by design
   with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, py_compile, and
   `git diff --check`. No runtime/server operation. Agents closed.
+- Latest round delegated approved runtime evidence binding audit, downstream P0 structured
+  promotion audit, SDK release/accounting guardrail audit, and UE4 reflection stale-evidence
+  audit. Integrated result: command response and commands/replies readiness reports now emit
+  `source_artifact_hashes`, and SDK completion rejects missing/invalid/mismatched SHA-256
+  bindings for those downstream P0 source artifacts. The player-principal request test
+  harness now scopes its fake `git` through subprocess env only, avoiding cross-suite masking
+  of stale-commit/current-HEAD guards. Window-manifest timestamps are canonical
+  `YYYY-MM-DDThh:mm:ssZ` only; fractional UTC values now fail closed. Buff side-lane
+  accounting no longer treats compact bool-tail repair as missing; the current blocker is a
+  missing Buff-specific consume/readiness checker, with Buff still candidate-only. SDK
+  guardrail tests now prove scoped release-statement bookkeeping and route-gate non-counting
+  rows do not increment stable SDK claim progress. Validation passed: command readiness 79,
+  docs/accounting 51, manifest 75, full SDK completion/guardrails 410, route JSON
+  valid/planning-only at `approved_runtime_evidence_missing`, mission/transfer/dino/tribe/
+  buff accounting JSON valid/candidate-only, SDK JSON blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and no runtime/server operation. Agents closed.

@@ -78,6 +78,24 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --js
 
 The next true P0 blocker remains approved copied runtime principal lifecycle
 evidence under a current-turn operator-approved live-ops window. After that
+the public identity contract can be reviewed, then permissions/admin, command
+response path, and commands/replies can proceed in order.
+
+## 2026-06-03 Later Guardrail Update
+
+Later supervised hardening did not change the P0 count: SDK remains `0/12`,
+the dependency chain remains `0/4`, and `stable_claim_allowed=false`.
+
+Additional offline guardrails now bind downstream command response and
+commands/replies readiness reports to their source artifacts through SHA-256
+hashes, scope the request-checker test fake `git` to subprocesses, reject
+fractional UTC timestamps in runtime window manifests, and refresh Buff
+side-lane accounting so the current Buff blocker is the missing dedicated
+Buff consume/readiness checker rather than stale compact bool-tail repair.
+
+These updates reduce false positives only. They are not approved runtime
+evidence and do not authorize SDK completion, runtime work, server operations,
+publication, or stable-release wording.
 evidence is accepted, the route may advance only to locked planning blocker
 `identity_public_contract_gate_missing`, with all public SDK, public ABI,
 runtime, promotion, permissions/admin, command response, commands/replies, and

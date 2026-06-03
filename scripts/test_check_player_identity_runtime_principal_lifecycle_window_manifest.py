@@ -531,6 +531,22 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertFalse(report["operational_window_manifest_ready"])
 
+    def test_rejects_fractional_utc_timestamp_fields(self) -> None:
+        def mutate(_root: Path, fields: dict[str, str]) -> None:
+            fields["actual_capture_end_utc"] = fields["actual_capture_end_utc"].replace("Z", ".250Z")
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("utc_timestamp_invalid", report["blockers"])
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["operational_window_manifest_ready"])
+
     def test_rejects_sidecar_in_other_approved_directory_even_with_matching_sha(self) -> None:
         def move_request_pack(exact_dir: Path, fields: dict[str, str]) -> None:
             original = Path(fields["request_pack_path"])

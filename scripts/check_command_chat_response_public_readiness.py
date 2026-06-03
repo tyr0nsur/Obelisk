@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -601,6 +602,17 @@ def validate_readiness_path_bound_to_root(
             root=str(resolved_root),
         )
     return resolved_root
+
+
+def sha256_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def source_artifact_hashes(paths: dict[str, Path]) -> dict[str, str | None]:
+    return {key: sha256_file(path) for key, path in paths.items()}
 
 
 def validate_target_detail_path(
@@ -1304,6 +1316,14 @@ def build_report(
         "decisions_path": str(decisions_path),
         "surfaces_path": str(surfaces_path),
         "public_header_path": str(public_header_path),
+        "source_artifact_hashes": source_artifact_hashes(
+            {
+                "readiness_path": readiness_path,
+                "decisions_path": decisions_path,
+                "surfaces_path": surfaces_path,
+                "public_header_path": public_header_path,
+            }
+        ),
         "readiness_status": readiness.get("second_source_status") if isinstance(readiness, dict) else None,
         "decisions_status": decisions.get("status") if isinstance(decisions, dict) else None,
         "surfaces_status": (

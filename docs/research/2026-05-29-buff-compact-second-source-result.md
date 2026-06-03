@@ -115,10 +115,11 @@ Consume gate accepted the readiness report. This is still internal layout eviden
 no public Buff SDK, runtime hooks, callbacks, object/class exposure, mutation, return
 override, raw params, `ResourceHandle`, or gameplay semantics are promoted.
 
-## 2026-06-01 Current Comparator Refresh Gap
+## 2026-06-01 Historical Comparator Refresh Gap
 
-A fresh check with the current comparator keeps `buff-breadth-intake` accepted `3/3`, but
-`buff-compact-intake` now reports `1/3` because two stale compact candidate snapshots lack
+This subsection records the pre-repair gap that the next subsection resolves. A fresh
+check with the then-current comparator kept `buff-breadth-intake` accepted `3/3`, but
+`buff-compact-intake` reported `1/3` because two stale compact candidate snapshots lacked
 the current `BoolProperty` tail fields:
 
 - `PrimalBuff.AllowPostProcessEffect`
@@ -126,7 +127,7 @@ the current `BoolProperty` tail fields:
 
 The missing fields are `bool_property_semantics`, `bool_field_size`,
 `bool_byte_offset`, `byte_mask`, `field_mask`, and `native_bool`. The zero-param
-`PrimalBuff.BP_OnBuffLifetimeUpdated` snapshot still accepts. This is a fixture freshness
+`PrimalBuff.BP_OnBuffLifetimeUpdated` snapshot still accepted. This is a fixture freshness
 gap, not a reason to hand-edit values into old snapshots.
 
 Fast safe repair route:

@@ -48,7 +48,7 @@ EXPECTED_INSTALLED_WRAPPER_PATH = "/servidor/ark/serverfiles/ShooterGame/Binarie
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PREFLIGHT_SCHEMA = "obelisk.player-principal-lifecycle-preflight.v1"
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
-UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
+UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 FORBIDDEN_KEY_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
     r"platform[_-]?ids?|transfer[_-]?ids?|private[_-]?(?:identifier|user[_-]?data)|"
