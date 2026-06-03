@@ -81,9 +81,13 @@ Offline validation passed:
 - Do not enable this on a shared/live instance as the normal path. Use an isolated debug
   instance or a short controlled dev capture.
 
-## Next steps
+## Current No-Repeat Checkpoint
 
-- Run an isolated capture with `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.
-- Inspect both startup and delayed retry lines before rejecting a zero startup slot.
-- Analyze copied logs with `scripts/analyze_reflectionscanner_capture.py --json`.
-- If accepted, add independent static xref evidence before using it for name resolution.
+Do not rerun the startup or delayed static-root ReflectionScanner probe for the current
+binary hash. The reviewed root slot `0x5956f30` is already preserved as
+binary-hash-specific evidence and should be passed explicitly to offline no-scan
+consumers.
+
+Only reopen static-root probing for a new binary hash or contradictory artifact evidence.
+Current promotion blockers are downstream runtime/public-contract gates, including
+`approved_runtime_evidence_missing`, not another FName probe.

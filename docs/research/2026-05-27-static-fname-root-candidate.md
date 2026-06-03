@@ -138,19 +138,16 @@ and still needs a second validation path.
 - A direct hardcoded offset in runtime code would be fragile unless guarded by binary hash
   and explicit opt-in.
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-1. Add an isolated-only explicit FName root probe path that can read candidate global
-   pointer slots supplied by environment/config, for example `0x5956f30`, then run the
-   existing `None`, `ClientMessage`, and `ServerChat` clue checks against `*slot`.
-2. Require binary SHA256 match before testing a static root.
-3. Capture a short debug run with:
-   - plugins disabled,
-   - native exec probes unset,
-   - FName reject logging enabled,
-   - explicit static root candidate list enabled.
-4. Promote only if the runtime probe logs `matched_clues=3/3` for known indices and the
-   analyzer records an evidence pack against the same binary hash.
+The explicit static-root probe path and later core evidence supersede this original
+follow-up for the current binary hash. Do not capture another debug run, rerun broad FName
+reject logging, or route future work through this candidate-discovery list unless a new
+binary hash or contradictory artifact evidence invalidates the reviewed root.
+
+For current offline consumers, reuse `0x5956f30` as binary-hash-specific evidence and keep
+runtime/public promotion blocked by the active downstream gates, including
+`approved_runtime_evidence_missing`.
 
 ## Skill Updates Needed
 

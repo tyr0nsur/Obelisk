@@ -149,9 +149,10 @@ A `GObjects` candidate remains inconclusive until all of these are available:
 - static xrefs explaining the global slot;
 - bounded core evidence showing plausible root/count/chunk or array shape;
 - multiple object samples with names resolved through the validated FName table;
-- a second isolated capture or independent static path before runtime code.
+- a second isolated capture or independent static path before runtime code when the route
+  is reopened for a new binary hash or contradictory artifact evidence.
 
-## Current Follow-Up
+## Current No-Repeat Checkpoint
 
 The original slot-finding step is superseded by `0x595b7e0`, now documented in
 `2026-05-27-core-gobjects-candidate.md` as a binary-hash-specific
@@ -159,6 +160,8 @@ The original slot-finding step is superseded by `0x595b7e0`, now documented in
 path for this candidate; the older legacy `--gobjects-candidate` preview treats `ADDR` as
 an indirect slot and is only useful for unresolved slot-style candidates.
 
-After `0x595b7e0`, the next offline step is not another broad candidate search. Improve
-the xref grouping output so broad nearest-symbol ranges are flagged, then repeat the
-classified static/context checks on a second isolated core or future binary.
+After `0x595b7e0`, the next offline step is not another broad candidate search. The
+current binary already has reviewed no-scan FName/GObjects inputs and later second-core
+reconciliation. Do not repeat classified static/context checks, core capture, or
+GObjects/FName discovery for this hash unless a new binary hash or contradictory artifact
+evidence invalidates the route.

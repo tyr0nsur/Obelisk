@@ -177,6 +177,24 @@ class OperationalDocGuardrailTests(unittest.TestCase):
             self.assertIn("OBELISK_WRAPPER_PROFILE=observer-debug", text)
             self.assertIn("allow-observer-debug-window", text)
 
+    def test_server_restore_runtime_checks_stay_inside_approved_window(self) -> None:
+        restore_doc = (REPO_ROOT / "docs" / "SERVER_RESTORE.md").read_text(encoding="utf-8")
+        normalized_restore_doc = " ".join(restore_doc.split())
+
+        self.assertIn(
+            "before any `/servidor/ark` read/write, stop/start/restart, backup, restore, runtime observation, or live log read",
+            normalized_restore_doc,
+        )
+        self.assertIn("After starting inside the same approved maintenance window:", restore_doc)
+        self.assertIn(
+            "These are live runtime/log observations, not offline receipts or copied-log review",
+            normalized_restore_doc,
+        )
+        self.assertIn(
+            "Skip them unless the current approval names the target instances, restart window, evidence paths, rollback, and shutdown/posture expectation",
+            normalized_restore_doc,
+        )
+
     def test_skills_reference_canonical_public_api_header(self) -> None:
         offenders: list[str] = []
         for path in sorted((REPO_ROOT / "agent-skills").rglob("SKILL.md")):

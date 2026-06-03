@@ -22,6 +22,7 @@ from evaluate_resource_handle_revalidation import (  # noqa: E402
     RESOURCE_HANDLE_LIFETIME_BLOCKERS,
     RESOURCE_HANDLE_NON_CLAIMS,
     SCHEMA as RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
+    collect_source_metadata_overclaim_issues,
 )
 from snapshot_evidence_pack import reject_protected_input_path, reject_protected_output_path  # noqa: E402
 
@@ -141,6 +142,12 @@ def reject_positive_source_aliases(value: Any, trail: str = "source") -> None:
 
 def validate_source(source: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
     reject_positive_source_aliases(source)
+    source_overclaims = collect_source_metadata_overclaim_issues(source)
+    if source_overclaims:
+        raise SystemExit(
+            "source overclaims public/runtime/v1 ResourceHandle readiness: "
+            + ",".join(source_overclaims)
+        )
     if source.get("schema") != RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA:
         raise SystemExit("source schema is not resource-handle revalidation evaluator")
     identity = source_output_identity(source)

@@ -119,12 +119,15 @@ Remaining blocker:
 no bounded decompiler/static path proves 0x595b838 is base+0x58 of the same FUObjectArray rooted at 0x595b7e0
 ```
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-Install or provide one bounded decompiler-capable tool path, preferably Ghidra headless
-with an existing project or a temporary no-auto-analysis project. If only rizin/radare is
-available later, run only the fixed seeks from the plan and treat the output as
-instruction-level corroboration unless it recovers a local base-derived access.
+The tooling availability gap below is historical. Do not use it as a reason to rerun broad
+GObjects/FName discovery, core capture, or decompiler sweeps for the current binary hash.
+Use the later reviewed no-scan inputs and bounded static artifacts when a new evidence
+question consumes this lane.
+
+Reopen decompiler work only for a new binary hash, a bounded static question not already
+answered by the reviewed artifacts, or contradictory artifact evidence.
 
 ## 2026-05-29 Tooling Update
 

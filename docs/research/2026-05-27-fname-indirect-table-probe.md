@@ -3,8 +3,9 @@
 Superseded note: this historical probe used stale clue indices
 `9619 -> ClientMessage` and `9622 -> ServerChat`. Current core evidence for this binary is
 `4884 -> ClientMessage`, `9619 -> ServerChat`, and
-`9622 -> SetActiveMissionDebugFlags`. Do not reuse the stale clue mapping for new
-validation.
+`9622 -> SetActiveMissionDebugFlags`. Do not reuse the stale clue mapping, and do not use
+this note to rerun ReflectionScanner or broad FName/GObjects discovery for the current
+binary hash.
 
 ## Objective
 
@@ -80,15 +81,16 @@ Code support exists for collecting one more bounded signal during isolated
 - The assumed indirect array layout may be wrong for this ARK build.
 - `FNameEntry` string offset/encoding is still unknown; previews are a triage aid only.
 
-## Next steps
+## Current No-Repeat Checkpoint
 
-1. Run `ReflectionScanner` only on an isolated/debug instance with plugins disabled.
-2. Capture any `FName indirect-table probe` lines together with existing `UObject`
-   validation scores.
-3. If a high-scoring table repeats across captures, add a dedicated static search for
-   references to that global and validate index `0 == None` plus nearby well-known names.
-4. Only after name resolution is reproducible, use it to label `UFunction` candidates and
-   continue toward metadata-backed parameter decoding.
+Do not rerun this indirect-table scanner path for the current binary hash. The reviewed
+FName root and corrected clue indices are already available, and later no-scan consumers
+should receive the root explicitly instead of rediscovering it.
+
+Reopen indirect-table probing only when a new binary hash or contradictory artifact
+evidence invalidates the reviewed root. Current route blockers are downstream runtime or
+public-contract gates, including `approved_runtime_evidence_missing`, not another broad
+FName scan.
 
 ## Skill updates needed
 

@@ -128,6 +128,23 @@ SURFACE_NEGATED_CLAIM_RE = re.compile(
     r"without|not[_ -]?included|does[_ -]?not|do[_ -]?not)",
     re.IGNORECASE,
 )
+SURFACE_UNBLOCKING_NEGATION_RE = re.compile(
+    r"(?:not|no[_ -]?longer)\s+(?:blocked|excluded|post[_ -]?v1|deferred)|"
+    r"(?:blocked|excluded|post[_ -]?v1)\s*[:=]\s*false",
+    re.IGNORECASE,
+)
+PUBLIC_CONTRACT_FIELD_KEYS = frozenset(
+    (
+        "public_contract",
+        "public_contracts",
+        "sdk_contract",
+        "sdk_contracts",
+        "public_api_contract",
+        "public_abi_contract",
+        "capability",
+        "capabilities",
+    )
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -199,7 +216,9 @@ def positive_surface_text_claim(text: str) -> bool:
         return False
     if not SURFACE_POSITIVE_CLAIM_RE.search(text):
         return False
-    return SURFACE_NEGATED_CLAIM_RE.search(text) is None
+    if SURFACE_NEGATED_CLAIM_RE.search(text) and not SURFACE_UNBLOCKING_NEGATION_RE.search(text):
+        return False
+    return True
 
 
 def walk_text_claims(value: Any, blockers: list[str], trail: str, blocker_prefix: str) -> None:
@@ -226,6 +245,31 @@ def walk_decisions_text_claims(value: Any, blockers: list[str], trail: str) -> N
 
 def walk_public_event_text_claims(value: Any, blockers: list[str], trail: str) -> None:
     walk_text_claims(value, blockers, trail, "public_events_positive_resource_handle_claim")
+
+
+def value_contains_forbidden_public_contract(value: Any) -> bool:
+    if isinstance(value, str):
+        return DESCRIPTOR_FORBIDDEN_PUBLIC_CONTRACT_RE.search(value) is not None
+    if isinstance(value, dict):
+        return any(value_contains_forbidden_public_contract(child) for child in value.values())
+    if isinstance(value, list):
+        return any(value_contains_forbidden_public_contract(child) for child in value)
+    return False
+
+
+def walk_public_contract_fields(value: Any, blockers: list[str], trail: str, blocker_prefix: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            if (
+                normalized_claim_key(key_text) in PUBLIC_CONTRACT_FIELD_KEYS
+                and value_contains_forbidden_public_contract(child)
+            ):
+                blockers.append(f"{blocker_prefix}:{trail}.{key_text}")
+            walk_public_contract_fields(child, blockers, f"{trail}.{key_text}", blocker_prefix)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            walk_public_contract_fields(child, blockers, f"{trail}[{index}]", blocker_prefix)
 
 
 def surface_entry(surfaces: Any, blockers: list[str]) -> dict[str, Any] | None:
@@ -273,6 +317,12 @@ def validate_decisions(decisions: Any, blockers: list[str]) -> None:
             blockers.append("required_non_claims_missing")
     walk_claims(decisions, blockers, "$.decisions")
     walk_decisions_text_claims(decisions, blockers, "$.decisions")
+    walk_public_contract_fields(
+        decisions,
+        blockers,
+        "$.decisions",
+        "decisions_forbidden_public_contract_field",
+    )
 
 
 def validate_surface(surfaces: Any, blockers: list[str]) -> None:
@@ -300,6 +350,12 @@ def validate_surface(surfaces: Any, blockers: list[str]) -> None:
             blockers.append(f"surface_missing_boundary_term:{term}")
     walk_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
     walk_surface_text_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
+    walk_public_contract_fields(
+        entry,
+        blockers,
+        f"$.surfaces[{SURFACE_ID}]",
+        "surface_forbidden_public_contract_field",
+    )
 
 
 def validate_promoted_descriptor_surfaces(surfaces: Any, blockers: list[str]) -> None:
@@ -317,6 +373,12 @@ def validate_promoted_descriptor_surfaces(surfaces: Any, blockers: list[str]) ->
         )
         if not is_descriptor_surface:
             continue
+        walk_public_contract_fields(
+            entry,
+            blockers,
+            f"$.surfaces[{index}]",
+            "surface_forbidden_public_contract_field",
+        )
         for key in ("public_contract", "capabilities", "public_name"):
             value = entry.get(key)
             for item_index, item in enumerate(value if isinstance(value, list) else [value]):
@@ -335,6 +397,12 @@ def validate_public_events(events: Any, blockers: list[str]) -> None:
             blockers.append(f"public_events_forbidden_term:{term}")
     walk_claims(events, blockers)
     walk_public_event_text_claims(events, blockers, "$.public_events")
+    walk_public_contract_fields(
+        events,
+        blockers,
+        "$.public_events",
+        "public_events_forbidden_public_contract_field",
+    )
     if isinstance(events, dict):
         metadata_surfaces = events.get("metadata_surfaces")
         resource_surface = None

@@ -485,6 +485,46 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_nested_route_readiness_and_runtime_authorization_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "permissionsAdminRouteReady": True,
+                    "publicBridgeAbiAllowed": True,
+                    "publicHeaderReady": True,
+                    "publicReplyAbiReady": True,
+                    "publicResponseAbiAllowed": True,
+                    "publicResponsePathReady": True,
+                    "publicSdk": True,
+                    "runtimeApproval": True,
+                    "runtimeApprovalGranted": True,
+                    "runtimeWorkAuthorized": True,
+                    "sendChatReady": True,
+                    "serverOperationsAuthorized": True,
+                }
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.permissionsAdminRouteReady"),
+                ("public_surface_overclaim", "$.secondary_report.publicBridgeAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicHeaderReady"),
+                ("public_surface_overclaim", "$.secondary_report.publicReplyAbiReady"),
+                ("public_surface_overclaim", "$.secondary_report.publicResponseAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicResponsePathReady"),
+                ("public_surface_overclaim", "$.secondary_report.publicSdk"),
+                ("public_surface_overclaim", "$.secondary_report.runtimeApproval"),
+                ("public_surface_overclaim", "$.secondary_report.runtimeApprovalGranted"),
+                ("public_surface_overclaim", "$.secondary_report.runtimeWorkAuthorized"),
+                ("public_surface_overclaim", "$.secondary_report.sendChatReady"),
+                ("public_surface_overclaim", "$.secondary_report.serverOperationsAuthorized"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_missing_response_path_report(self) -> None:
         result = self.run_checker("--json", check=False)
         report = json.loads(result.stdout)

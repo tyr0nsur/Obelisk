@@ -554,6 +554,42 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_nested_router_abi_and_runtime_authorization_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "secondary_report": {
+                    "commandRouterAllowed": True,
+                    "operatorApprovalGranted": True,
+                    "publicAbiAllowed": True,
+                    "publicBridgeAbiAllowed": True,
+                    "publicCommandRouterAllowed": True,
+                    "publicResponseAbiAllowed": True,
+                    "replySendChatRouterClaimsAllowed": True,
+                    "runtimeWorkAuthorized": True,
+                    "serverOperationsAuthorized": True,
+                    "sendChatReady": True,
+                }
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.commandRouterAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.operatorApprovalGranted"),
+                ("public_surface_overclaim", "$.secondary_report.publicAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicBridgeAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicCommandRouterAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicResponseAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.replySendChatRouterClaimsAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.runtimeWorkAuthorized"),
+                ("public_surface_overclaim", "$.secondary_report.serverOperationsAuthorized"),
+                ("public_surface_overclaim", "$.secondary_report.sendChatReady"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_default_root_is_repo_local_and_provenance_bound(self) -> None:
         self.assertTrue(READINESS.DEFAULT_ROOT.is_relative_to(REPO_ROOT))
         self.assertNotIn("/servidor/ark", str(READINESS.DEFAULT_ROOT))

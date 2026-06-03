@@ -198,20 +198,18 @@ This file is an active routing table only. Durable evidence belongs in
 - Lead handles delegation directly when asked; before finishing, record delegated scopes,
   skills, integrated findings, and pending findings so compaction does not erase them.
 
-- Latest integration note: last supervised 4-agent round closed three offline bypasses
-  without changing the active blocker. Runtime evidence/preflight wording now rejects
-  claims that request packs, preflight sidecars, window manifests, completed receipts,
-  copied logs/bundles, stale bundles, sidecars, or generic artifacts count as approved
-  runtime evidence. SDK completion treats certificate/dependency/manifest/record/
-  release-statement/section child objects as independent secondary report contexts.
-  Inventory copied-signal stability scans source-marker/source-label, marker, alias,
-  report-section, artifact/evidence marker, and plural alias text for Inventory SDK,
-  Items SDK, ResourceHandle, return override, runtime readiness, promotion, public
-  readiness, and v1 completion claims. `STATUS.md` names `stable_claim_allowed=false`
-  and `approved_runtime_evidence_missing`. Core runtime audit made no edits and confirmed
-  plugin cleanup/default-deny guardrails remain covered. Evidence: integrated suite 457,
-  public SDK guardrails 194, route JSON valid/planning-only, inventory JSON ready with
-  public SDK/v1 false, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, core runtime delegated validations 29/6 plus
-  `build/plugin_manager_tests`, and `git diff --check`. No runtime/server operation.
-  See `COMPACT_CONTEXT.md` and `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.
+
+- Latest integration note: last supervised 4-agent round closed four offline guardrail
+  gaps without changing the active blocker. Downstream permissions/admin, command response,
+  and commands/replies direct readiness now reject additional nested public/runtime/route/
+  reply/send-chat/accounting aliases. ResourceHandle/object identity artifacts now reject
+  nested source markers, public-contract/capability fields, and text such as "not blocked
+  and ready" that implies public lookup/identity/runtime/SDK/v1 readiness. `SERVER_RESTORE`
+  now keeps post-start log/proc checks inside the same current-turn approved maintenance
+  window, and `check_release_readiness.sh` says "Public SDK v1 stable claim gate" rather
+  than generic completion. Historical FName/GObjects notes now carry no-repeat checkpoints
+  instead of broad scan/rerun next steps. Evidence: integrated suite 253, route JSON
+  valid/planning-only, ResourceHandle JSON planning-only with all readiness false, SDK JSON
+  blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, release-options shell,
+  and `git diff --check`. No runtime/server operation. See `COMPACT_CONTEXT.md` and
+  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.

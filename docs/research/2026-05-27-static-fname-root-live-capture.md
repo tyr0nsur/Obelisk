@@ -149,13 +149,13 @@ Do not promote `0x5956f30` as accepted `GNames`. Treat it as a useful negative/p
 signal and pivot to deriving clue indices from observed `UObject.NamePrivate` values or
 from the table contents itself.
 
-## Next steps
+## Current No-Repeat Checkpoint
 
-- Stop treating `ClientMessage=9619` and `ServerChat=9622` as fixed acceptance clues for
-  this table.
-- Add a bounded table-content sampler for explicit static roots that reads selected
-  indices and/or a short range around observed `UObject.NamePrivate` indices, still gated
-  behind `OBELISK_REFLECTION_STATIC_FNAME_ROOTS`.
-- Use observed `UObject.NamePrivate` values from `ServerChat`, `ClientMessage`, and related
-  objects to validate `FName -> string` instead of relying only on prior hardcoded clue
-  indices.
+The stale clue mapping in this capture was corrected by later core evidence. Do not add or
+rerun a table-content sampler, ReflectionScanner capture, or FName/GObjects rediscovery
+for the current binary hash from this note.
+
+Reuse the reviewed binary-scoped clue mapping (`ClientMessage=4884`,
+`ServerChat=9619`, `SetActiveMissionDebugFlags=9622`) and the reviewed root slot in
+offline no-scan consumers. Reopen sampling only for a new binary hash or contradictory
+artifact evidence.

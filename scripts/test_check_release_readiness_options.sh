@@ -118,6 +118,19 @@ if [[ -z "${v1_gate_line}" || -z "${configure_line}" || "${v1_gate_line}" -ge "$
     exit 1
 fi
 
+if ! grep -Fq -- "Public SDK v1 stable claim gate passed." scripts/check_release_readiness.sh; then
+    printf 'missing precise v1 stable-claim pass wording in release gate\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- "Public SDK v1 stable claim gate was not run." scripts/check_release_readiness.sh; then
+    printf 'missing precise v1 stable-claim skipped wording in release gate\n' >&2
+    exit 1
+fi
+if grep -Fq -- "Public SDK v1 completion gate completed." scripts/check_release_readiness.sh; then
+    printf 'release gate must not use generic v1 completion completed wording\n' >&2
+    exit 1
+fi
+
 if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
     printf 'missing production symbol-surface help text\n' >&2
     exit 1

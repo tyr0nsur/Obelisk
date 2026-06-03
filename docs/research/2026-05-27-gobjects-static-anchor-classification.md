@@ -110,9 +110,12 @@ The hardened pass labels the top contaminated groups directly:
 - Static classification does not prove runtime lifetime safety or offset stability across
   ARK updates.
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-1. Prefer concrete instruction-window evidence around root/chunks/count/serial accesses
-   when updating research notes.
-2. Repeat the same classification after a second isolated core or binary update before
-   promoting stable contracts.
+Prefer concrete instruction-window evidence around root/chunks/count/serial accesses when
+updating research notes, but do not repeat this classification, broad GObjects scans, or
+isolated-core capture for the current binary hash. Later notes already preserve the
+reviewed no-scan route and second-core reconciliation for `0x595b7e0`.
+
+Reopen classification only for a new binary hash or contradictory artifact evidence.
+Stable runtime/public contracts remain blocked by separate promotion gates.

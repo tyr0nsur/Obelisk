@@ -95,6 +95,16 @@ class ResourceHandlePostCallbackContractBuilderTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     builder.build_contract(source, capture_id="post-callback-test", evidence_pack_id="post-callback-pack")
 
+    def test_rejects_source_text_and_public_contract_overclaims(self) -> None:
+        source = source_revalidation()
+        source["metadata"] = {
+            "claim": "ResourceHandle is not blocked and public SDK ready for v1 lookup.",
+            "public_contract": ["ObeliskObjectLookup"],
+        }
+
+        with self.assertRaises(SystemExit):
+            builder.build_contract(source, capture_id="post-callback-test", evidence_pack_id="post-callback-pack")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -143,6 +143,16 @@ class ResourceHandleSerialPolicyBuilderTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     builder.build_policy(source, capture_id="serial-policy-test", evidence_pack_id="serial-policy-pack")
 
+    def test_rejects_source_text_and_public_contract_overclaims(self) -> None:
+        source = source_revalidation()
+        source["metadata"] = {
+            "claim": "ResourceHandle is not blocked and public SDK ready for v1 lookup.",
+            "public_contract": ["ObeliskResourceHandle"],
+        }
+
+        with self.assertRaises(SystemExit):
+            builder.build_policy(source, capture_id="serial-policy-test", evidence_pack_id="serial-policy-pack")
+
     def test_rejects_malformed_source_counts_cleanly(self) -> None:
         source = source_revalidation()
         source["reconciliation_summary"]["serial_candidate_nonzero_count"] = True  # type: ignore[index]

@@ -120,12 +120,14 @@ ReflectionScanner clue indices were corrected to:
 - `OBELISK_DEBUG_ALLOW_PTRACE=1` is a temporary debug posture and must not remain enabled
   during stable operation.
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-1. Build and deploy the corrected ReflectionScanner.
-2. Run a short scanner capture with
-   `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30` only on
-   `arkserver-obelisk-debug`, or on `arkserver2` during an approved fallback window.
-3. Require analyzer strict success plus static xref evidence before promoting runtime
-   name-resolution code.
-4. Use this FName resolver evidence as the base for `GObjects` discovery.
+The original scanner follow-up is complete/superseded for the current binary hash. Do not
+build, deploy, or rerun ReflectionScanner, ptrace, `gcore`, broad FName scans, GObjects
+discovery, or core capture from this note. Reuse the reviewed root slot `0x5956f30` only
+as binary-hash-specific offline evidence and pass it explicitly to no-scan consumers.
+
+Reopen this route only for a new binary hash or contradictory artifact evidence that
+invalidates the reviewed root. Current player-identity and ResourceHandle routing is
+blocked on `approved_runtime_evidence_missing` or ResourceHandle runtime semantics, not on
+more FName/core discovery.

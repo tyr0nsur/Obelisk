@@ -128,13 +128,12 @@ It proves the sampler's counter gate is too strict for this table shape.
 partial structure match.
 - The static root slot remains binary-hash-specific research evidence.
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-- Run this only on an isolated/debug ARK instance.
-- Relax only the sampler path so it can attempt bounded entry reads even when
-  `num_elements/num_chunks` are zero, while still logging those counters and never
-  promoting from samples alone.
-- Capture copied logs with `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`.
-- Analyze with `scripts/analyze_reflectionscanner_capture.py --json`.
-- Promote only after repeated samples, no reject markers, and independent static or
-second-capture validation.
+Do not rerun static-root sampling or capture copied logs for the current binary hash. The
+reviewed root and corrected clue mapping are already available as binary-scoped offline
+inputs; later work should consume them directly instead of reopening scanner sampling.
+
+Sampling may be reconsidered only for a new binary hash or contradictory artifact
+evidence. It must remain non-promoting and cannot bypass current downstream blockers such
+as `approved_runtime_evidence_missing`.

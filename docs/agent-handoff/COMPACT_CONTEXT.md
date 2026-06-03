@@ -1583,6 +1583,25 @@ priorities, and do not use history files as the active source of truth.
   `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent downstream-route/ResourceHandle/live-ops-docs/
+  reversing-stale-route round plus lead release-gate wording patch: downstream
+  permissions/admin, command response, and commands/replies child readiness now include
+  the parent route gate's forbidden alias coverage for nested public/runtime/route/
+  reply/send-chat/accounting claims. ResourceHandle/object identity revalidation,
+  serial-policy, post-callback, and public-contract readiness now reject nested source
+  markers, public-contract/capability fields, and positive text such as `not blocked and
+  ready` that implies public lookup/identity/runtime/SDK/v1 readiness. `SERVER_RESTORE.md`
+  now scopes post-start `/proc` and live-log checks to the same current-turn approved
+  maintenance window and distinguishes them from offline receipt/copied-log review.
+  `check_release_readiness.sh` now reports `Public SDK v1 stable claim gate` wording
+  instead of generic completion wording. Historical FName/GObjects research notes now use
+  `Current No-Repeat Checkpoint` language and no longer direct broad FName/GObjects/core/
+  decompiler reruns for the current blocker. Validations passed: integrated suite 253,
+  release-options shell, operational docs 10, route JSON valid/planning-only,
+  ResourceHandle JSON planning-only with all readiness false, SDK JSON blocked by design,
+  and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

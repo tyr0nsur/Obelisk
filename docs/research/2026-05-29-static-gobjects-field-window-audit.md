@@ -291,9 +291,9 @@ Therefore the exact static evidence still missing is one of:
    relying on oversized nearest-symbol buckets, immediate-only piggybacking, or global
    xref aggregation.
 
-Even if that static gap is closed, static evidence remains non-promotable by itself. A
-second isolated runtime/core evidence pack with distinct artifact identity is still
-needed before the `GUObjectArray` contract can move beyond candidate-only.
+Even if that static gap is closed, static evidence remains non-promotable by itself. Later
+second-core reconciliation strengthens offline reflection use of `0x595b7e0`, but it does
+not make the `GUObjectArray` contract runtime-stable or public.
 
 ## Cross-Note Consistency
 
@@ -379,14 +379,16 @@ objdump -d -M intel --start-address=0x1cdb239 --stop-address=0x1cdb37d /home/flo
 jq -r '.xrefs | to_entries[] as $target | $target.value[] | [.instruction_address, .target_label, .access, .semantic.field, .semantic.role, .target_address, .instruction] | @tsv' /home/flowcommunity-ark/obelisk-artifacts/static-global-preflight-20260529/static-global-xrefs.json | gawk 'function h(x){return strtonum(x)} BEGIN{ranges[1]="0x1d4a8b8 0x1d4aa27"; ranges[2]="0x1d56970 0x1d56eb0"; ranges[3]="0x79ce22 0x79cea6"; ranges[4]="0x1cdb239 0x1cdb37d"} {addr=h($1); for (i=1;i<=4;i++){split(ranges[i],r," "); if(addr>=h(r[1]) && addr<h(r[2])) print i "\t" $0}}'
 ```
 
-## Next Validation Needed
+## Current No-Repeat Checkpoint
 
 Before any promotion beyond research-candidate, require either:
 
 1. a narrower independent static path that uses the root/base address to derive
    `chunks`, `count`, and `serial` in one coherent local control-flow region; or
-2. a second isolated runtime/core evidence pack that repeats the object enumeration
-   and serial/count/chunk layout under the same binary hash.
+2. separately approved runtime/public-contract evidence that names the promotion being
+   attempted.
 
-Until then, `0x595b7e0` remains binary-hash-specific research evidence, not a stable
-runtime offset contract.
+Do not rerun broad FName/GObjects scans, core capture, or isolated-core enumeration for
+the current binary hash from this note. Reopen this route only for a new binary hash or
+contradictory artifact evidence. Until a separate promotion gate accepts more, `0x595b7e0`
+remains binary-hash-specific research evidence, not a stable runtime offset contract.

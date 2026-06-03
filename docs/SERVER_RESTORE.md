@@ -5,7 +5,7 @@ LinuxGSM instances need to be restored quickly.
 
 Operator-only runbook: these commands are not contributor authorization. They require
 current-turn approval before any `/servidor/ark` read/write, stop/start/restart, backup,
-or restore.
+restore, runtime observation, or live log read.
 
 ## Current Instances
 
@@ -123,7 +123,7 @@ ls -la /servidor/ark/lgsm/config-lgsm/arkserver/
 ls -la /servidor/ark/obelisk/lib /servidor/ark/obelisk/state
 ```
 
-After starting:
+After starting inside the same approved maintenance window:
 
 ```bash
 pgrep -af '^./ShooterGameServer'
@@ -131,6 +131,10 @@ tail -n 100 /servidor/ark/obelisk/logs/arkserver/Obelisk.log
 tail -n 100 /servidor/ark/obelisk/logs/arkserver2/Obelisk.log
 tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/environ | rg 'OBELISK_INSTANCE_ID|OBELISK_ROOT|OBELISK_LOG_DIR'
 ```
+
+These are live runtime/log observations, not offline receipts or copied-log review.
+Skip them unless the current approval names the target instances, restart window,
+evidence paths, rollback, and shutdown/posture expectation.
 
 Expected safe Obelisk posture for development baseline:
 

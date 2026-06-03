@@ -502,6 +502,56 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             self.assertIn("arkserver-obelisk-debug", text, str(note))
             self.assertNotIn("/servidor/ark/arkserver start", text, str(note))
 
+    def test_historical_fname_gobjects_routes_do_not_reopen_current_hash_discovery(self) -> None:
+        route_docs = [
+            REPO_ROOT / "docs/research/2026-05-27-arkserver-core-fname-evidence.md",
+            REPO_ROOT / "docs/research/2026-05-27-fname-indirect-table-probe.md",
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-candidate.md",
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-live-capture.md",
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-probe.md",
+            REPO_ROOT / "docs/research/2026-05-27-static-fname-root-sampling.md",
+            REPO_ROOT / "docs/research/2026-05-27-core-gobjects-candidate.md",
+            REPO_ROOT / "docs/research/2026-05-27-core-gobjects-next-development.md",
+            REPO_ROOT / "docs/research/2026-05-27-gobjects-static-anchor-classification.md",
+            REPO_ROOT / "docs/research/2026-05-29-static-gobjects-decompiler-tool-check.md",
+            REPO_ROOT / "docs/research/2026-05-29-static-gobjects-field-window-audit.md",
+            REPO_ROOT / "docs/research/2026-05-29-static-gobjects-same-fuobjectarray.md",
+        ]
+        stale_current_hash_instructions = (
+            "Build and deploy the corrected ReflectionScanner.",
+            "Run a short scanner capture with",
+            "Use this FName resolver evidence as the base for `GObjects` discovery.",
+            "Run `ReflectionScanner` only on an isolated/debug instance with plugins disabled.",
+            "Run an isolated capture with `OBELISK_REFLECTION_STATIC_FNAME_ROOTS=0x5956f30`.",
+            "Capture a short debug run with:",
+            "Add a bounded table-content sampler",
+            "Run this only on an isolated/debug ARK instance.",
+            "Capture copied logs with `OBELISK_REFLECTION_SAMPLE_STATIC_FNAME_ROOTS=1`.",
+            "Repeat the core/object enumeration against a second isolated capture",
+            "repeat the classified static/context checks on a second isolated core or future binary.",
+            "Repeat the same classification after a second isolated core or binary update",
+            "Install or provide one bounded decompiler-capable tool path",
+            "Run an independent static or isolated-core reconciliation",
+            "second isolated runtime/core evidence pack with distinct artifact identity is still needed",
+        )
+
+        for path in route_docs:
+            text = path.read_text(encoding="utf-8")
+            compact = normalized(text)
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                self.assertIn("Current No-Repeat Checkpoint", text)
+                self.assertIn("new binary hash", compact)
+                self.assertIn("contradictory artifact evidence", compact)
+                for phrase in stale_current_hash_instructions:
+                    self.assertNotIn(phrase, compact)
+
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        player_identity_route = readme.split("| Players identity lifecycle |", 1)[1].split(
+            "\n", 1
+        )[0]
+        self.assertIn("approved_runtime_evidence_missing", player_identity_route)
+        self.assertIn("Do not rerun broad FName/GObjects/core discovery", player_identity_route)
+
     def test_module_readiness_uses_current_debug_target_language(self) -> None:
         notes = [
             REPO_ROOT / "docs/research/2026-05-27-module-readiness-matrix.md",

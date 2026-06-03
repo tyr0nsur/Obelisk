@@ -853,7 +853,7 @@ else
     printf '\nRelease readiness baseline checks completed; gameplay/module second-source promotion gate was not run.\n'
 fi
 if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
-    printf 'Public SDK v1 completion gate completed.\n'
+    printf 'Public SDK v1 stable claim gate passed.\n'
 else
-    printf 'Public SDK v1 completion gate was not run.\n'
+    printf 'Public SDK v1 stable claim gate was not run.\n'
 fi

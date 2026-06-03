@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -136,6 +137,80 @@ ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS = (
         "satisfied": False,
     },
 )
+FORBIDDEN_SOURCE_CLAIM_KEYS = frozenset(
+    (
+        "promotion_ready",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "release_ready",
+        "runtime_ready",
+        "stable_claim_allowed",
+        "v1_sdk_ready",
+        "object_identity_ready",
+        "post_callback_resource_handle_ready",
+        "public_object_identity_ready",
+        "public_object_lookup_ready",
+        "public_resource_handle_ready",
+        "resource_handle_ready",
+        "runtime_object_samples_present",
+        "runtime_rejection_samples_present",
+        "runtime_serial_semantics_present",
+        "serial_reuse_or_wraparound_safety_proven",
+    )
+)
+FORBIDDEN_SOURCE_ALIAS_SUBJECT_RE = re.compile(
+    r"(?:resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|object_?handle|"
+    r"runtime_?object|serial_?reuse|wraparound)",
+    re.IGNORECASE,
+)
+FORBIDDEN_SOURCE_ALIAS_CONTEXT_RE = re.compile(
+    r"(?:public|runtime|v1|sdk|abi|release|promot|ready|readiness|enabled|allowed|available|"
+    r"post_?callback|samples?|safety|present|complete)",
+    re.IGNORECASE,
+)
+FORBIDDEN_SOURCE_TERM_RE = re.compile(
+    r"(?:resourcehandle|resource[_ -]?handle|resource[_ -]?lookup|object[_ -]?identity|object[_ -]?lookup|"
+    r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity)|"
+    r"runtime[_ -]?object[_ -]?samples?|serial[_ -]?reuse|wraparound)",
+    re.IGNORECASE,
+)
+FORBIDDEN_SOURCE_POSITIVE_CLAIM_RE = re.compile(
+    r"(?:public[_ -]?sdk|ready|readiness|allowed|available|enabled|included|"
+    r"includes?|ships?|part[_ -]?of[_ -]?v1|promoted|supported|lookup[_ -]?api|handle[_ -]?api|"
+    r"satisf(?:y|ies)|complete|present|proven)",
+    re.IGNORECASE,
+)
+SOURCE_NEGATED_CLAIM_RE = re.compile(
+    r"(?:\bno\b|\bnot\b|must[_ -]?not|cannot|blocked|excluded|post[_ -]?v1|"
+    r"without|not[_ -]?included|does[_ -]?not|do[_ -]?not)",
+    re.IGNORECASE,
+)
+SOURCE_UNBLOCKING_NEGATION_RE = re.compile(
+    r"(?:not|no[_ -]?longer)\s+(?:blocked|excluded|post[_ -]?v1|deferred)|"
+    r"(?:blocked|excluded|post[_ -]?v1)\s*[:=]\s*false",
+    re.IGNORECASE,
+)
+PUBLIC_CONTRACT_FIELD_KEYS = frozenset(
+    (
+        "public_contract",
+        "public_contracts",
+        "sdk_contract",
+        "sdk_contracts",
+        "public_api_contract",
+        "public_abi_contract",
+        "capability",
+        "capabilities",
+    )
+)
+PUBLIC_CONTRACT_FORBIDDEN_VALUE_RE = re.compile(
+    r"(?:"
+    r"\bObelisk(?:ResourceHandle|ObjectIdentity|ObjectLookup)[A-Za-z0-9_]*\b|"
+    r"\bOBELISK_API_CAPABILITY_(?:RESOURCE_HANDLE|OBJECT_IDENTITY|OBJECT_LOOKUP)\b|"
+    r"\b(?:resourcehandle|resource[_ -]?handle|resource[_ -]?lookup|object[_ -]?identity|object[_ -]?lookup|"
+    r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity))\b"
+    r")",
+    re.IGNORECASE,
+)
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
     try:
@@ -149,6 +224,75 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit(f"{label} must be a JSON object: {path}")
     return payload
+
+
+def positive_claim(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.casefold() in {"allowed", "available", "enabled", "live", "promoted", "ready", "true", "yes"}
+    return False
+
+
+def normalized_claim_key(key: str) -> str:
+    key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return re.sub(r"[^a-zA-Z0-9]+", "_", key).strip("_").casefold()
+
+
+def forbidden_positive_source_alias_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    return bool(
+        normalized in FORBIDDEN_SOURCE_CLAIM_KEYS
+        or (
+            FORBIDDEN_SOURCE_ALIAS_SUBJECT_RE.search(normalized)
+            and FORBIDDEN_SOURCE_ALIAS_CONTEXT_RE.search(normalized)
+        )
+    )
+
+
+def positive_source_text_claim(text: str) -> bool:
+    if not FORBIDDEN_SOURCE_TERM_RE.search(text):
+        return False
+    if not FORBIDDEN_SOURCE_POSITIVE_CLAIM_RE.search(text):
+        return False
+    if SOURCE_NEGATED_CLAIM_RE.search(text) and not SOURCE_UNBLOCKING_NEGATION_RE.search(text):
+        return False
+    return True
+
+
+def value_contains_forbidden_public_contract(value: Any) -> bool:
+    if isinstance(value, str):
+        return PUBLIC_CONTRACT_FORBIDDEN_VALUE_RE.search(value) is not None
+    if isinstance(value, dict):
+        return any(value_contains_forbidden_public_contract(child) for child in value.values())
+    if isinstance(value, list):
+        return any(value_contains_forbidden_public_contract(child) for child in value)
+    return False
+
+
+def collect_source_metadata_overclaim_issues(value: Any, *, trail: str = "$") -> list[str]:
+    issues: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            normalized_key = normalized_claim_key(key_text)
+            if forbidden_positive_source_alias_key(key_text) and positive_claim(child):
+                issues.append(f"source_metadata_positive_readiness_claim:{trail}.{key_text}")
+            if (
+                normalized_key in PUBLIC_CONTRACT_FIELD_KEYS
+                and value_contains_forbidden_public_contract(child)
+            ):
+                issues.append(f"source_metadata_forbidden_public_contract_field:{trail}.{key_text}")
+            issues.extend(collect_source_metadata_overclaim_issues(child, trail=f"{trail}.{key_text}"))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            issues.extend(collect_source_metadata_overclaim_issues(child, trail=f"{trail}[{index}]"))
+    elif isinstance(value, str):
+        for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
+            normalized = clause.strip()
+            if normalized and positive_source_text_claim(normalized):
+                issues.append(f"source_metadata_positive_text_claim:{trail}[clause:{clause_index}]")
+    return issues
 
 
 def collect_identity_hashes(value: object, hashes: set[str]) -> None:
@@ -363,6 +507,7 @@ def validate_policy_candidates(candidates: object) -> tuple[dict[str, str], list
 def build_internal_uobject_revalidation_candidate(report: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     issues: list[str] = []
     source_hashes = identity_hashes(report)
+    issues.extend(collect_source_metadata_overclaim_issues(report))
 
     if report.get("schema") != UOBJECT_FLAG_POLICY_REPORT_SCHEMA:
         issues.append("uobject_flag_policy_schema_mismatch")
@@ -536,6 +681,7 @@ def zero_serial_negative_samples_canonical_report(report: dict[str, Any]) -> dic
 
 def validate_zero_serial_negative_samples_report(report: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     issues: list[str] = []
+    issues.extend(collect_source_metadata_overclaim_issues(report))
     source_count = 0
     zero_serial_sample_count = 0
     positive_anchor_count = 0
@@ -754,6 +900,8 @@ def build_evaluation(
         "serial_candidate_missing_count": 0,
     }
     for report in reconciliation_reports:
+        if collect_source_metadata_overclaim_issues(report):
+            blockers.append("reconciliation_source_metadata_overclaim")
         report_hashes = identity_hashes(report)
         collected_identity_hashes.update(report_hashes)
         identity_status, strict_hashes = classify_artifact_identity(report)
@@ -788,6 +936,8 @@ def build_evaluation(
     coherent_window_proven = False
     static_gobjects_candidate_count = 0
     if static_global_evidence is not None:
+        if collect_source_metadata_overclaim_issues(static_global_evidence):
+            blockers.append("static_global_evidence_source_metadata_overclaim")
         static_hashes = identity_hashes(static_global_evidence)
         collected_identity_hashes.update(static_hashes)
         identity_status, strict_hashes = classify_artifact_identity(static_global_evidence)

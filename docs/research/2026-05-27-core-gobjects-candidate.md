@@ -126,20 +126,21 @@ The current best model from this core is:
   checks and a second independent evidence path.
 - `0x595b7e0` is binary-hash-specific evidence.
 
-## Next Steps
+## Current No-Repeat Checkpoint
 
-Completed/superseded by `scripts/enumerate_core_uobjects.py` and
-`2026-05-27-core-uobject-enumeration.md`:
+Completed/superseded by `scripts/enumerate_core_uobjects.py`,
+`2026-05-27-core-uobject-enumeration.md`, later static context notes, and the
+second-core GObjects reconciliation notes:
 
 1. Validate several `FUObjectItem` indices from the candidate `GUObjectArray`.
 2. Resolve object `NamePrivate` through the confirmed FName table.
 3. Check that `InternalIndex` matches the array index for sampled objects.
 
-Remaining:
+Do not repeat core/object enumeration, GObjects discovery, FName discovery, or isolated
+core capture for the current binary hash from this note. Reuse `0x595b7e0` only as a
+binary-hash-specific `GUObjectArray research-candidate` for offline reflection work.
 
-1. Check that `ClassPrivate` and non-null `OuterPrivate` are plausible UObjects or appear
-   in the object array.
-2. Classify static xrefs around the candidate to identify initialization, reset,
-   destructor, and lookup paths.
-3. Repeat the core/object enumeration against a second isolated capture before promoting
-   runtime-stable reflection contracts.
+Reopen enumeration only for a new binary hash or contradictory artifact evidence.
+Runtime-stable/public object identity, lookup, `ResourceHandle`, mutation, return
+override, and SDK surfaces remain blocked by separate runtime/public-contract gates,
+including `approved_runtime_evidence_missing` where applicable.

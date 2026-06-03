@@ -513,3 +513,35 @@ valid/planning-only, inventory JSON ready with `public_sdk_ready=false` and
 validations 29/6 plus `build/plugin_manager_tests`, and `git diff --check`.
 The stable state remains `current_route_blocker=approved_runtime_evidence_missing`,
 SDK progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Downstream Readiness, ResourceHandle, Live-Ops Docs, And Stale Research Hardening
+
+The next supervised 4-agent round plus a lead release-gate wording patch closed
+additional offline gaps without changing the P0 blocker:
+
+- Downstream permissions/admin, command response, and commands/replies child
+  readiness collectors now cover the parent route gate's forbidden alias set for
+  nested public/runtime/route/reply/send-chat/accounting claims. Direct child
+  runs can no longer miss aliases such as public ABI allowed, public SDK,
+  runtime work authorized, send-chat ready, or similar route-readiness claims.
+- ResourceHandle/object identity revalidation, serial-policy, post-callback,
+  and public-contract readiness now reject nested source markers, public-contract
+  or capability fields, and positive text such as `not blocked and ready` when
+  they imply public lookup, object identity, runtime readiness, public SDK,
+  promotion, or v1 completion.
+- `docs/SERVER_RESTORE.md` now states that live log and `/proc` post-start
+  checks are runtime observations inside the same current-turn approved
+  maintenance window, not offline receipts or copied-log review.
+- `scripts/check_release_readiness.sh` now reports `Public SDK v1 stable claim
+  gate` wording instead of generic v1 completion wording, so a release-gate
+  message cannot be read as partial SDK progress.
+- Historical FName/GObjects notes now use `Current No-Repeat Checkpoint`
+  sections and no longer direct broad FName/GObjects/core/decompiler reruns for
+  the current blocker.
+
+Validated offline: integrated suite 253, release-options shell, operational docs
+10, route JSON valid/planning-only, ResourceHandle JSON planning-only with all
+readiness false, SDK JSON blocked by design, research doc guardrails, and
+`git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.

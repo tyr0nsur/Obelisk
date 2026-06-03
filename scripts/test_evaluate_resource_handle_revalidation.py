@@ -763,6 +763,47 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         self.assertFalse(candidate["accepted"])
         self.assertIn("uobject_flag_policy_promotion_ready_overclaim", candidate["issues"])
 
+    def test_uobject_flag_policy_rejects_nested_source_marker_overclaims(self) -> None:
+        policy = uobject_flag_policy_report()
+        policy["source_markers"] = {
+            "runtimeObjectSamplesPresent": True,
+            "claim": "ResourceHandle is not blocked and public SDK ready for v1 lookup.",
+            "public_contract": ["ObeliskResourceHandle"],
+        }
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            uobject_flag_policy=policy,
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["internal_uobject_revalidation_candidate_present"])
+        self.assertIn(evaluator.BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE, payload["blockers"])
+        candidate = payload["internal_uobject_revalidation_candidate"]
+        self.assertFalse(candidate["accepted"])
+        self.assertTrue(
+            any(issue.startswith("source_metadata_positive_readiness_claim:") for issue in candidate["issues"]),
+            candidate["issues"],
+        )
+        self.assertTrue(
+            any(issue.startswith("source_metadata_positive_text_claim:") for issue in candidate["issues"]),
+            candidate["issues"],
+        )
+        self.assertTrue(
+            any(issue.startswith("source_metadata_forbidden_public_contract_field:") for issue in candidate["issues"]),
+            candidate["issues"],
+        )
+
+    def test_reconciliation_source_marker_overclaim_adds_blocker(self) -> None:
+        report = reconciliation_report(serial_values=[17])
+        report["source_marker"] = {"publicResourceHandleReady": True}
+
+        payload = evaluator.build_evaluation([report], static_evidence(coherent=True))
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertIn("reconciliation_source_metadata_overclaim", payload["blockers"])
+        self.assertFalse(payload["public_resource_handle_ready"])
+
     def test_require_artifact_identity_blocks_policy_without_top_level_identity(self) -> None:
         payload = evaluator.build_evaluation(
             [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
@@ -1057,6 +1098,28 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
         report_summary = payload["offline_zero_serial_negative_samples_summary"]["reports"][0]
         self.assertIn("zero_serial_negative_samples_promotion_ready_overclaim", report_summary["issues"])
         self.assertIn("zero_serial_negative_samples_public_resourcehandle_overclaim", report_summary["issues"])
+
+    def test_zero_serial_negative_samples_nested_contract_field_is_invalid(self) -> None:
+        report = zero_serial_negative_samples_report()
+        report["sources"][0]["metadata"]["public_contract"] = ["ObeliskObjectLookup"]  # type: ignore[index]
+
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            zero_serial_negative_samples=[report],
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES, payload["blockers"])
+        report_summary = payload["offline_zero_serial_negative_samples_summary"]["reports"][0]
+        self.assertTrue(
+            any(
+                issue.startswith("source_metadata_forbidden_public_contract_field:")
+                for issue in report_summary["issues"]
+            ),
+            report_summary["issues"],
+        )
 
     def test_cli_zero_serial_negative_samples_output_is_redacted_and_runtime_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

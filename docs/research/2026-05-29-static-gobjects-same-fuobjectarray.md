@@ -193,14 +193,19 @@ promotion_gate.ready=false
 - Reject Ghidra headless as necessary for this turn; keep it for decompiler confirmation if
   a later question needs recovered control flow beyond these windows.
 
-## Next Test Needed
+## Current No-Repeat Checkpoint
 
-Run an independent static or isolated-core reconciliation that ties the constructor-field
-evidence to object samples from the same binary/artifact:
+The independent static/core reconciliation requested here was later addressed by the
+GObjects second-core and durable-pack notes for the current binary hash. Do not rerun
+static/global sweeps, broad GObjects scans, or isolated-core reconciliation from this note
+unless a new binary hash or contradictory artifact evidence invalidates the reviewed
+route.
+
+When consuming this historical checklist, keep these requirements as interpretation
+rules, not fresh work items:
 
 1. Use the reviewed artifact-specific FName root.
 2. Sample `GObjects=0x595b7e0` at known indices such as `0`, `1`, and `25447`.
 3. Require `GObjects[index] -> UObject.InternalIndex -> same index` round trips, plus class
    and outer membership checks.
-4. Keep promotion blocked until a second independent static path or isolated runtime/core
-   evidence agrees for the same binary hash.
+4. Keep runtime/public promotion blocked unless a separate promotion gate accepts it.

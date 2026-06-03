@@ -483,6 +483,38 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_nested_child_route_alias_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "permissionReady": True,
+                    "permissionsAdminReady": True,
+                    "permissions-ready": True,
+                    "publicSdk": True,
+                    "publicReplyApi": True,
+                    "replyAllowed": True,
+                    "replyApiAllowed": True,
+                    "sendChatApiAllowed": True,
+                }
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.permissionReady"),
+                ("public_surface_overclaim", "$.secondary_report.permissionsAdminReady"),
+                ("public_surface_overclaim", "$.secondary_report.permissions-ready"),
+                ("public_surface_overclaim", "$.secondary_report.publicSdk"),
+                ("public_surface_overclaim", "$.secondary_report.publicReplyApi"),
+                ("public_surface_overclaim", "$.secondary_report.replyAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.replyApiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.sendChatApiAllowed"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims(

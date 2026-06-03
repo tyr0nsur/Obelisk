@@ -113,6 +113,43 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_unblocking_resource_handle_readiness_text_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["release_claim"] = "ResourceHandle is not blocked and public SDK ready for v1 lookup."
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("decisions_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
+    def test_rejects_nested_public_contract_field_for_resource_handle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["metadata"] = {
+                "public_contract": ["ObeliskResourceHandle"],
+            }
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "decisions_forbidden_public_contract_field:$.decisions.metadata.public_contract",
+            report["blockers"],
+        )
+
     def test_rejects_positive_resource_handle_metadata_in_decisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
