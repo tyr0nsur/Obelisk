@@ -199,14 +199,12 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 side-lane SDK blocker guardrail round after
-  `b5df8fb` delegated four scopes: lifecycle/tick support-tier readiness claims,
-  operator ingress/storage public header/capability claims, player services/economy/
-  mobility affirmative `non_claims`, and SDK completion active side-lane accounting.
-  Integrated checkers preserve lifecycle ops recovery, gameplay tick callbacks, operator
-  ingress/storage, and player services/economy/mobility as non-promoted/post-v1 blockers.
-  Lead validation: lifecycle/tick 8, operator ingress/storage 11, player services 10,
-  SDK completion 227, side-lane JSONs ok/candidate-only, route JSON planning-only at
+- Latest integration note: 2026-06-03 P0/side-lane non-claim hardening after `7594e36`
+  delegated four scopes: bound route identity sources, runtime request-pack replay
+  sidecars, ResourceHandle/object identity, and Mission/Transfer/Dino/Tribe/Buff
+  accounting. Integrated checkers reject path aliases, nested public/runtime/v1 claims,
+  blocker-clearance wording, release/support-tier/stable-SDK overclaims, and unexpected
+  replay sidecars. Lead validation: bound route 11, lifecycle window 76, ResourceHandle
+  26, mission accounting 34, handoff 14, route JSON planning-only at
   `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, `py_compile`, and `git diff --check`. No
-  runtime/server/Discord/GitHub operation.
+  `stable_claim_allowed=false`, `py_compile`. No runtime/server/Discord/GitHub operation.

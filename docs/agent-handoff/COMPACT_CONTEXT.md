@@ -19,6 +19,31 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 P0/side-lane non-claim hardening round after `7594e36` delegated four
+  scopes: bound command/permission route identity sources, player-identity runtime
+  request-pack replay sidecars, ResourceHandle/object identity, and
+  Mission/Transfer/Dino/Tribe/Buff outcome accounting.
+- Integrated changes: the bound route wrapper rejects accepted-runtime evidence route
+  reports unless the downstream diagnosis is ready and bound to the exact canonical
+  manifest path, and recursively rejects nested public/runtime/v1 readiness claims;
+  request-pack post-window replay sidecars must use the complete fixed key set, reject
+  unexpected keys, reject symlink components, and reject textual path aliases; the
+  ResourceHandle/object identity checker rejects blocker/gate clearance wording such as
+  cleared/resolved/unblocked/unlocked/passed; Mission/Transfer/Dino/Tribe/Buff candidate
+  accounting rejects release readiness, support-tier, stable-SDK, and status/support-tier
+  overclaims in statements, leaves, and evidence notes.
+- Validation observed: bound route identity sources 11 OK, runtime principal lifecycle
+  window manifest 76 OK, ResourceHandle/object identity 26 OK,
+  Mission/Transfer/Dino/Tribe/Buff accounting 34 OK, agent handoff guardrails 14 OK,
+  `py_compile` OK, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`, ResourceHandle JSON
+  valid/planning-only with public/runtime flags false, mission accounting JSON
+  candidate-only/non-promoted, and SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 side-lane SDK blocker guardrail round after `b5df8fb` delegated four
   scopes: lifecycle ops recovery/gameplay tick support-tier claims, operator
   ingress/storage public header/capability claims, player services/economy/mobility

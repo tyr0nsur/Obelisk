@@ -333,6 +333,25 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_release_statement_rejects_support_tier_release_and_stable_sdk_overclaims(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission excluded; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded; buff_status excluded. "
+            "Support-tier is active. Release readiness is satisfied. Stable SDK is allowed.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_ready_overclaims", report["blockers"])
+        claims = report["release_statement"]["ready_claims"]
+        self.assertIn("Support-tier is active", claims)
+        self.assertIn("Release readiness is satisfied", claims)
+        self.assertIn("Stable SDK is allowed", claims)
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_release_statement_rejects_leaf_promotion_wording_without_promoted_evidence(self) -> None:
         statement = (
             f"{SURFACE_ID}: excluded - mission excluded and promoted; transfer excluded; "
@@ -839,6 +858,46 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         }
         self.assertIn("counts toward the complete SDK claim", claims)
 
+    def test_candidate_leaf_metadata_rejects_status_support_tier_and_release_overclaims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["transfer"]["status"] = "release_ready"
+        leaf_units["transfer"]["support_tier"] = "release-supported"
+        leaf_units["transfer"]["release_supported"] = True
+        leaf_units["transfer"]["notes"] = (
+            "Support-tier is active. Release readiness is satisfied. Stable SDK is allowed."
+        )
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        self.assertIn("leaf_candidate_metadata_marker_overclaim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim" and "label" in item
+        }
+        self.assertIn("$.leaf_decision_units[transfer].status", fields)
+        self.assertIn("$.leaf_decision_units[transfer].release_supported", fields)
+        marker_fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_metadata_marker_overclaim"
+        }
+        self.assertIn("$.leaf_decision_units[transfer].status", marker_fields)
+        self.assertIn("$.leaf_decision_units[transfer].support_tier", marker_fields)
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim" and "claim" in item
+        }
+        self.assertIn("Support-tier is active", claims)
+        self.assertIn("Release readiness is satisfied", claims)
+        self.assertIn("Stable SDK is allowed", claims)
+
     def test_candidate_leaf_rejects_public_module_alias_true_fields(self) -> None:
         manifest = load_manifest()
         gameplay = surface(manifest)
@@ -1014,12 +1073,14 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         manifest = load_manifest()
         gameplay = surface(manifest)
         gameplay["evidence"]["notes"] = (
-            "The copied bool policy slice makes the module SDK available and header callbacks published."
+            "The copied bool policy slice makes the module SDK available, header callbacks published, "
+            "support-tier active, and release readiness satisfied."
         )
         leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
         leaf_units["buff_status"]["evidence"] = {
             "bool_tail_evidence": (
-                "Bool-tail evidence completes the module SDK and ABI header callbacks are ready."
+                "Bool-tail evidence completes the module SDK, ABI header callbacks are ready, "
+                "and stable SDK is allowed."
             )
         }
 
@@ -1039,6 +1100,15 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("module SDK", claims)
         self.assertIn("header callbacks", claims)
         self.assertIn("ABI header callbacks", claims)
+        ready_claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] in {"surface_candidate_ready_overclaim", "leaf_candidate_ready_overclaim"}
+            and "claim" in item
+        }
+        self.assertIn("support-tier active", ready_claims)
+        self.assertIn("release readiness satisfied", ready_claims)
+        self.assertIn("stable SDK is allowed", ready_claims)
 
     def test_candidate_evidence_allows_negated_module_sdk_and_header_callback_non_claims(self) -> None:
         manifest = load_manifest()

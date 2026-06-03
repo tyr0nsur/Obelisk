@@ -96,7 +96,7 @@ FORBIDDEN_ALIAS_SUBJECT_RE = re.compile(
 FORBIDDEN_ALIAS_CONTEXT_RE = re.compile(
     r"(?:public|runtime|v1|sdk|abi|release|promot|ready|readiness|enabled|allowed|available|"
     r"post_?callback|lookup|identity|samples?|safety|policy|proven|complete|completion|satisfied|"
-    r"stable|supported|included)",
+    r"stable|supported|included|blockers?|gates?)",
     re.IGNORECASE,
 )
 SURFACE_FORBIDDEN_TERM_RE = re.compile(
@@ -112,7 +112,8 @@ SURFACE_FORBIDDEN_TERM_RE = re.compile(
 SURFACE_POSITIVE_CLAIM_RE = re.compile(
     r"(?:public[_ -]?sdk|ready|readiness|allowed|available|enabled|included|"
     r"includes?|ships?|part[_ -]?of[_ -]?v1|promoted|promotion|supported|stable|accepted|"
-    r"complete|completion|satisf(?:y|ies|ied)|prove[ns]?|lookup[_ -]?api|handle[_ -]?api)",
+    r"complete|completion|satisf(?:y|ies|ied)|prove[ns]?|lookup[_ -]?api|handle[_ -]?api|"
+    r"cleared|resolved|unblocked|unlocked|passed)",
     re.IGNORECASE,
 )
 DESCRIPTOR_SURFACE_IDS = frozenset(
@@ -200,11 +201,16 @@ def positive_claim(value: Any) -> bool:
             "live",
             "promoted",
             "proven",
+            "cleared",
+            "resolved",
             "ready",
             "satisfied",
             "stable",
             "supported",
             "true",
+            "unblocked",
+            "unlocked",
+            "passed",
             "yes",
         }
     return False

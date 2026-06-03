@@ -71,6 +71,26 @@ def route_manifest_sources(lifecycle: Path | None = None, principal: Path | None
     }
 
 
+def approved_runtime_route_diagnosis(path: Path) -> dict:
+    return {
+        "provided": True,
+        "path": str(path.resolve()),
+        "ready": True,
+        "approved_runtime_evidence_present": True,
+        "runtime_evidence_ready": True,
+        "promotion_ready": False,
+        "public_header_allowed": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
+        "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
+        "remaining_blockers": [],
+        "blockers": [],
+    }
+
+
 class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase):
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
@@ -170,6 +190,13 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                                 lifecycle=lifecycle_output,
                                 principal=principal_output,
                             )["manifests"]
+                    if approved_runtime_check is not None and approved_runtime_check[0] and approved_runtime_path:
+                        phase = route_report.get("critical_path_phase")
+                        if isinstance(phase, dict):
+                            phase.setdefault(
+                                "source_checker_approved_runtime_evidence_manifest",
+                                approved_runtime_route_diagnosis(approved_runtime_path),
+                            )
                     return 0, route_report, "", None
 
                 CHECKER.run_route_gate = fake_run_route_gate
@@ -342,6 +369,44 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertEqual(["reviewed_identity_public_contract"], report["route_lock"]["blocked_until"])
         self.assertTrue(report["approved_runtime_evidence_check"]["accepted"])
 
+    def test_bound_route_rejects_accepted_runtime_evidence_path_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            approved_runtime = root / "approved-runtime-principal-lifecycle.json"
+            write_json(approved_runtime, {"schema": "test.approved-runtime"})
+            alias_text = str(root / "alias" / ".." / approved_runtime.name)
+            route_report = self.base_route_report(blocker="identity_public_contract_gate_missing")
+            route_report["critical_path_phase"]["source_checker_approved_runtime_evidence_manifest"] = {
+                **approved_runtime_route_diagnosis(approved_runtime),
+                "path": alias_text,
+            }
+
+            report = self.run_with_fake_route_report(
+                route_report,
+                approved_runtime_path=approved_runtime,
+                approved_runtime_check=(
+                    True,
+                    {
+                        "ready": True,
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "v1_completion_ready": False,
+                    },
+                    0,
+                    "",
+                    None,
+                ),
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("route_gate_approved_runtime_evidence_path_alias", report["blockers"])
+
     def test_rejects_stale_lifecycle_anchor_snapshot_hash_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -442,6 +507,28 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
 
                 self.assertFalse(report["valid"])
                 self.assertIn(expected, report["blockers"])
+
+    def test_rejects_nested_route_gate_public_runtime_or_v1_readiness_claims(self) -> None:
+        route_report = self.base_route_report()
+        route_report["checks"] = [
+            {
+                "name": "injected_nested_claim",
+                "valid": True,
+                "nested": {
+                    "public_sdk_ready": True,
+                    "runtimeReady": True,
+                    "v1_completion_ready": True,
+                },
+            }
+        ]
+
+        report = self.run_with_fake_route_report(route_report)
+
+        self.assertFalse(report["valid"])
+        self.assertIn("route_gate_public_or_runtime_claims_overclaim", report["blockers"])
+        self.assertIn("checks[0].nested.public_sdk_ready", report["route_gate"]["public_or_runtime_claims"])
+        self.assertIn("checks[0].nested.runtimeReady", report["route_gate"]["public_or_runtime_claims"])
+        self.assertIn("checks[0].nested.v1_completion_ready", report["route_gate"]["public_or_runtime_claims"])
 
     def test_rejects_partial_manifest_inputs_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

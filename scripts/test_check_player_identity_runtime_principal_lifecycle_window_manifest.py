@@ -2328,6 +2328,58 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("request_pack_post_window_replay_contract_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_request_pack_post_window_replay_contract_sidecar_alias(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["sidecars"]["preflight_pre_path"] = str(
+                root / "sidecar-alias" / ".." / "preflight-pre.json"
+            )
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            observer_env = Path(fields["observer_env_path"])
+            if not observer_env.is_absolute():
+                observer_env = root / observer_env
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            operator_request.write_text(
+                markdown_request(payload, observer_env.read_text(encoding="utf-8").splitlines()),
+                encoding="utf-8",
+            )
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_alias", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_post_window_replay_contract_missing_operator_request_sidecar(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["sidecars"].pop("operator_approval_request_path")
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_request_pack_post_window_replay_contract_check_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
             request_pack = Path(fields["request_pack_path"])

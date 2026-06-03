@@ -336,6 +336,28 @@ def route_manifest_path_matches(manifest: dict[str, Any], expected_path: Path) -
     )
 
 
+def approved_runtime_evidence_diagnosis_matches_path(diagnosis: dict[str, Any], expected_path: Path) -> bool:
+    expected = str(expected_path.resolve())
+    observed = diagnosis.get("path")
+    if not isinstance(observed, str) or observed != expected:
+        return False
+    return str(Path(observed).resolve()) == expected
+
+
+def approved_runtime_evidence_diagnosis_ready(diagnosis: dict[str, Any]) -> bool:
+    return (
+        diagnosis.get("ready") is True
+        and diagnosis.get("approved_runtime_evidence_present") is True
+        and diagnosis.get("runtime_evidence_ready") is True
+        and diagnosis.get("remaining_blockers") == []
+        and diagnosis.get("promotion_ready") is False
+        and diagnosis.get("public_sdk_ready") is False
+        and diagnosis.get("public_abi_ready") is False
+        and diagnosis.get("runtime_ready") is False
+        and diagnosis.get("v1_completion_ready") is False
+    )
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     snapshot_root = safe_snapshot_root(args.snapshot_root)
     args.snapshot_root = snapshot_root
@@ -417,6 +439,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             phase.get("source_checker_accepted_for_internal_planning") if isinstance(phase, dict) else None
         )
         manifest_sources = phase.get("source_checker_manifest_sources") if isinstance(phase, dict) else None
+        approved_runtime_diagnosis = (
+            phase.get("source_checker_approved_runtime_evidence_manifest") if isinstance(phase, dict) else None
+        )
+        route_public_or_runtime_claims = route_gate.collect_public_or_runtime_claims(
+            route_report,
+            include_text_claims=False,
+        )
         if route_report.get("schema") != ROUTE_GATE_SCHEMA:
             blockers.append("route_gate_schema_mismatch")
         if route_report.get("valid") is not True or route_report.get("accepted_for_planning") is not True:
@@ -428,6 +457,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
             if route_report.get(key) is not False:
                 blockers.append(f"route_gate_{key}_overclaim")
+        if route_public_or_runtime_claims:
+            blockers.append("route_gate_public_or_runtime_claims_overclaim")
         if current_blocker != expected_blocker:
             blockers.append("route_gate_bound_identity_blocker_unexpected")
         if current_blocker is None:
@@ -440,6 +471,21 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append("route_gate_identity_readiness_ready_flag_overclaim")
         if source_checker_internal_planning is not False:
             blockers.append("route_gate_identity_readiness_internal_planning_overclaim")
+        if accepted_approved_runtime is not None:
+            if not isinstance(approved_runtime_diagnosis, dict):
+                blockers.append("route_gate_approved_runtime_evidence_manifest_missing")
+            else:
+                if not approved_runtime_evidence_diagnosis_ready(approved_runtime_diagnosis):
+                    blockers.append("route_gate_approved_runtime_evidence_not_ready")
+                if not approved_runtime_evidence_diagnosis_matches_path(
+                    approved_runtime_diagnosis,
+                    accepted_approved_runtime,
+                ):
+                    blockers.append("route_gate_approved_runtime_evidence_path_alias")
+        elif isinstance(approved_runtime_diagnosis, dict) and approved_runtime_evidence_diagnosis_ready(
+            approved_runtime_diagnosis
+        ):
+            blockers.append("route_gate_approved_runtime_evidence_unexpected")
         if not isinstance(manifest_sources, dict):
             blockers.append("route_gate_bound_identity_manifest_sources_missing")
         else:
@@ -509,6 +555,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "stderr": route_stderr,
             "parse_error": route_parse_error,
             "report": route_report,
+            "public_or_runtime_claims": (
+                route_gate.collect_public_or_runtime_claims(route_report, include_text_claims=False)
+                if isinstance(route_report, dict)
+                else []
+            ),
         },
         "non_claims": NON_CLAIMS,
     }

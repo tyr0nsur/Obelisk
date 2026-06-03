@@ -118,6 +118,7 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "public_tribe_sdk_ready",
     "release_readiness",
     "release_ready",
+    "release_supported",
     "resource_handle_available",
     "resource_handle_ready",
     "runtime_available",
@@ -133,8 +134,12 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "sdk_completion",
     "sdk_ready",
     "stable_claim_allowed",
+    "stable_sdk_ready",
     "stable_release_claim_allowed",
     "stable_sdk_claim_allowed",
+    "support_tier_active",
+    "support_tier_ready",
+    "support_tier_supported",
     "v1_accounted",
     "transfer_sdk_ready",
     "tribe_sdk_ready",
@@ -148,8 +153,20 @@ CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS = {
     "status",
 }
 CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES = {
+    "active",
+    "available",
+    "complete",
+    "completed",
+    "enabled",
     "per_leaf_promoted",
     "promoted",
+    "ready",
+    "release_ready",
+    "release_supported",
+    "stable",
+    "stable_sdk",
+    "supported",
+    "v1_complete",
 }
 LEAF_ALIASES = {
     "mission": ("mission",),
@@ -381,7 +398,7 @@ FORBIDDEN_CLAIM_RE = re.compile("|".join(f"(?:{pattern})" for pattern in FORBIDD
 CANDIDATE_READY_CLAIM_PATTERNS = (
     r"\b(?:public\s+SDK|public\s+ABI|runtime|runtime\s+observer|runtime\s+hook|"
     r"v1|v1\s+SDK|module\s+SDK|module\s+API|header\s+callbacks?|"
-    r"ABI\s+header\s+callbacks?|C\s+ABI\s+header\s+callbacks?|promotion|release)\s+"
+    r"ABI\s+header\s+callbacks?|C\s+ABI\s+header\s+callbacks?|promotion)\s+"
     r"(?:is\s+|are\s+)?(?:ready|readiness|complete|completion|available|published|enabled)\b",
     r"\b(?:ready|complete)\s+for\s+v1\b",
     r"\b(?:ready|complete|available|published|enabled)\s+"
@@ -392,13 +409,17 @@ CANDIDATE_READY_CLAIM_PATTERNS = (
     r"(?:is\s+)?(?:allowed|ready|complete)\b",
     r"\b(?:stable\s+claim|complete\s+SDK\s+claim)\s+(?:is\s+)?allowed\b",
     r"\bcounts?\s+toward\s+(?:the\s+)?(?:complete|full|production)\s+SDK\s+claim\b",
+    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|enabled|approved)\b",
+    r"\brelease[- ]supported\b",
+    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|enabled|supported|release[- ]supported)\b",
+    r"\bstable\s+SDK\s+(?:is\s+)?(?:allowed|ready|complete|available|enabled)\b",
 )
 CANDIDATE_READY_CLAIM_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
     re.IGNORECASE,
 )
 CANDIDATE_MARKER_KEY_RE = re.compile(
-    r"(?:target[_ -]?sets?|source[_ -]?(?:markers?|target[_ -]?sets?)|"
+    r"(?:status|support[_ -]?tier|target[_ -]?sets?|source[_ -]?(?:markers?|target[_ -]?sets?)|"
     r"artifact[_ -]?status|evidence[_ -]?status|reflection[_ -]?(?:evidence|status))",
     re.IGNORECASE,
 )
@@ -406,7 +427,7 @@ CANDIDATE_MARKER_PROMOTION_RE = re.compile(
     r"\b(?:public|sdk|api|abi|runtime|observer|hook|wiring|dispatch|dispatcher|callback|"
     r"descriptor|capability|promot(?:e|ed|ion)?|approved(?:\s+runtime)?\s+bundle|"
     r"resource\s+handle|resourcehandle|identity|lookup|mutation|return\s+override|"
-    r"v1|completion|complete|stable|release|ready|available|enabled)\b",
+    r"v1|completion|complete|stable|release|support|tier|supported|ready|available|enabled)\b",
     re.IGNORECASE,
 )
 CANDIDATE_MARKER_NON_PROMOTION_RE = re.compile(
@@ -1079,10 +1100,14 @@ def validate_candidate_leaf_metadata(
         if leaf_id == "mission"
         else "leaf_candidate_metadata_forbidden_claim"
     )
+    for field in collect_true_ready_overclaims(leaf, label):
+        add(blockers, ready_reason, field, leaf=leaf_id)
     for claim in forbidden_claims("\n".join(flattened_strings(leaf))):
         add(blockers, claim_reason, label, leaf=leaf_id, claim=claim)
     for claim in candidate_ready_claims("\n".join(flattened_strings(leaf))):
         add(blockers, ready_reason, label, leaf=leaf_id, claim=claim)
+    for field, value in collect_candidate_marker_overclaims(leaf, label):
+        add(blockers, "leaf_candidate_metadata_marker_overclaim", field, leaf=leaf_id, value=value)
 
 
 def non_counting_allowed_v1_outcome(leaf: dict[str, Any], accounted_by: str | None) -> str | None:

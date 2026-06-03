@@ -715,6 +715,65 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## P0 And Side-Lane Non-Claim Hardening Round
+
+The next supervised 4-agent round hardened additional offline bypasses without changing
+the active route blocker or promoting any SDK surface.
+
+Delegated scopes and integrated findings:
+
+- Bound command/permission route identity sources: accepted-runtime evidence route
+  reports must include a ready downstream diagnosis bound to the exact canonical manifest
+  path. Textual aliases such as `alias/../manifest.json` fail closed, and nested
+  public/runtime/v1 readiness claims inside route JSON are rejected.
+- Player-identity runtime request-pack replay sidecars: post-window replay sidecars now
+  require the complete fixed sidecar key set, reject unexpected sidecar keys, reject
+  symlink components, and reject textual aliases such as
+  `sidecar-alias/../preflight-pre.json` even if they resolve to the expected file.
+- ResourceHandle/object identity: blocker/gate clearance wording such as
+  `cleared`, `resolved`, `unblocked`, `unlocked`, and `passed` is treated as positive
+  public/runtime readiness wording and rejected in decisions metadata.
+- Mission/Transfer/Dino/Tribe/Buff accounting: release readiness, release-supported,
+  support-tier active/ready/supported, stable-SDK, status, and support-tier metadata
+  overclaims are rejected in release statements, candidate leaf metadata, and evidence
+  notes.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_object_identity_resource_handle_public_contract_readiness.py --json`:
+  valid/planning-only, with public ResourceHandle, post-callback ResourceHandle, public
+  SDK, runtime, and promotion readiness all false.
+- `check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`: candidate-only,
+  all five leaves still missing/non-promoted, `v1_accounted=false`, public SDK/runtime
+  readiness false.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with SDK `0/12`,
+  P0 `0/4`, `stable_claim_allowed=false`, and the current route blocker still
+  `approved_runtime_evidence_missing`.
+
+Validation remained offline-only:
+
+- `python3 scripts/test_check_command_permission_route_gate_bound_identity_sources.py`
+  passed 11 tests.
+- `python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed 76 tests.
+- `python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed 26 tests.
+- `python3 scripts/test_check_mission_transfer_dino_tribe_v1_outcome_accounting.py`
+  passed 34 tests.
+- `python3 -m unittest scripts.test_agent_handoff_guardrails` passed 14 tests.
+- `py_compile` passed for the four changed checkers.
+
+Non-claims:
+
+- These changes do not create approved runtime evidence and do not authorize server
+  operations, marker/env changes, runtime observation, ReflectionScanner, ptrace/gcore,
+  broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub publication,
+  support-tier activation, stable SDK wording, or v1 SDK completion.
+
 ## Turbo SDK Guardrail Round After Compaction
 
 This follow-up round was delegated directly after compacted conversation recovery. It

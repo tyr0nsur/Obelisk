@@ -197,6 +197,18 @@ EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS = frozenset(
         "player_private_data_included",
     )
 )
+EXPECTED_REQUEST_PACK_REPLAY_SIDECAR_KEYS = frozenset(
+    (
+        "request_pack_path",
+        "observer_env_path",
+        "operator_approval_request_path",
+        "operator_approval_receipt_path",
+        "preflight_pre_path",
+        "preflight_post_path",
+        "window_manifest_path",
+        "copied_log_path",
+    )
+)
 PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
     (
         "runtime_work_authorized",
@@ -1555,6 +1567,11 @@ def validate_request_pack_replay_contract(
         "observer_env_path": manifest_relative_path(fields["observer_env_path"], manifest_path)
         if fields.get("observer_env_path")
         else None,
+        "operator_approval_request_path": (
+            manifest_relative_path(fields["request_pack_path"], manifest_path).parent / "operator-approval-request.md"
+            if fields.get("request_pack_path")
+            else None
+        ),
         "operator_approval_receipt_path": manifest_relative_path(fields["operator_approval_receipt_path"], manifest_path)
         if fields.get("operator_approval_receipt_path")
         else None,
@@ -1565,7 +1582,17 @@ def validate_request_pack_replay_contract(
         if fields.get("preflight_post_path")
         else None,
         "window_manifest_path": expected_manifest_path,
+        "copied_log_path": manifest_relative_path(fields["copied_log_path"], manifest_path)
+        if fields.get("copied_log_path")
+        else None,
     }
+    for key in sorted(set(sidecars) - EXPECTED_REQUEST_PACK_REPLAY_SIDECAR_KEYS):
+        add(
+            blockers,
+            "request_pack_post_window_replay_contract_unexpected_sidecar",
+            "request_pack_path",
+            sidecar=key,
+        )
     for key, expected_path in expected_by_contract_key.items():
         actual = sidecars.get(key)
         if not isinstance(actual, str):
@@ -1574,6 +1601,15 @@ def validate_request_pack_replay_contract(
         if expected_path is None:
             add(blockers, "request_pack_post_window_replay_contract_mismatch", "request_pack_path", sidecar=key, actual=actual)
             continue
+        symlink = protected_paths.first_symlink_component(Path(actual))
+        if symlink is not None:
+            add(
+                blockers,
+                "request_pack_post_window_replay_contract_sidecar_symlink",
+                "request_pack_path",
+                sidecar=key,
+                symlink=str(symlink),
+            )
         status = protected_paths.protected_path_status(
             Path(actual),
             protected_root=SERVER_ROOT,
@@ -1584,6 +1620,17 @@ def validate_request_pack_replay_contract(
             protected_root=SERVER_ROOT,
             approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
         )
+        expected_text = str(expected_status.resolved)
+        if actual != expected_text:
+            add(
+                blockers,
+                "request_pack_post_window_replay_contract_alias",
+                "request_pack_path",
+                sidecar=key,
+                expected=expected_text,
+                actual=actual,
+                resolved=str(status.resolved),
+            )
         if status.resolved != expected_status.resolved:
             add(
                 blockers,
