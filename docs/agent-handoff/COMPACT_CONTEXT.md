@@ -1936,6 +1936,21 @@ priorities, and do not use history files as the active source of truth.
   `py_compile` and `git diff --check` OK. Full approved-evidence suites writing under
   `/servidor/ark/workspace-offline` intentionally not run. No runtime/server/Discord/
   GitHub operation.
+- 2026-06-03 split-claim/runtime-cleanup follow-up after `f3fa7cf`: request/preflight/
+  window/bundle reports carry explicit false aliases for observer env, operator request,
+  copied-log metadata, preflight/window/receipt/bundle output, route readiness, SDK
+  accounting, and P0 accounting; P0 downstream route/permissions/command checks reject
+  split `key`/`field`/`name` plus `value`/`status`/`state` claims; PluginManager chat/
+  gameplay owner-cleanup fallbacks treat `0` removed callbacks as cleanup failure for
+  `dlclose` safety; scoped release statements reject positive outcome-progress wording
+  such as outcomes being ready/complete; the 2026-06-02 SDK priority map is marked a
+  historical ledger unless its current-route boundary is read. Validation: downstream P0
+  route/readiness 211 OK, scoped SDK/plugin/research 76 OK, focused release-statement 4 OK,
+  route JSON valid/planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked
+  with SDK `0/12`, P0 `0/4`, stable false. Discipline incident: one worker ran suites
+  that created temp dirs under `/servidor/ark/workspace-offline`; do not delete them or
+  rerun those suites while `/servidor/ark` writes are forbidden. No servers, markers/env,
+  restarts, runtime probes, Discord, GitHub, tags, or publication.
 
 ## Agent Coordination
 

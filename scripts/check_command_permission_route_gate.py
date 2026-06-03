@@ -168,6 +168,7 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "runtime_readiness_allowed",
     "route_ready",
     "route_readiness_ready",
+    "route_gate_unlocked",
     "public_response_path_allowed",
     "v1_completion_evidence",
     "v1_completion_ready",
@@ -192,6 +193,23 @@ BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE = re.compile(
     r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
     r")$"
 )
+SPLIT_CLAIM_NAME_KEYS = {
+    "alias",
+    "claim",
+    "field",
+    "flag",
+    "key",
+    "name",
+    "property",
+}
+SPLIT_CLAIM_VALUE_KEYS = {
+    "allowed",
+    "enabled",
+    "ready",
+    "state",
+    "status",
+    "value",
+}
 
 
 def route_lock_blocked_until(current_blocker: Any) -> list[str]:
@@ -734,6 +752,29 @@ def collect_public_or_runtime_claims(
         )
 
     if isinstance(value, dict):
+        declared_claim_names = [
+            str(item)
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_NAME_KEYS and isinstance(item, str)
+        ]
+        declared_claim_values = [
+            item
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_VALUE_KEYS
+        ]
+        for claim_name in declared_claim_names:
+            claim_key = normalized_key(claim_name)
+            claim_path = path or "$"
+            if (
+                claim_key in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS
+                or BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE.fullmatch(claim_key)
+            ) and any(is_positive_claim_value(item) for item in declared_claim_values):
+                claims.append(claim_path)
+            if (
+                claim_key in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS
+                and any(contains_forbidden_claim_source(item) for item in declared_claim_values)
+            ):
+                claims.append(claim_path)
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
             key_name = normalized_key(key)

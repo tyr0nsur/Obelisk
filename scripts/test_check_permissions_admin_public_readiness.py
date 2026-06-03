@@ -655,6 +655,28 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("pre_runtime_principal_or_authority_claim_source", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
 
+    def test_collect_overclaims_rejects_split_key_value_aliases(self) -> None:
+        blockers: list[dict] = []
+        READINESS.collect_overclaims(
+            {
+                "claims": [
+                    {"key": "permissionsAdminReady", "value": True},
+                    {"field": "public-route-ready", "state": "ready"},
+                    {"claim": "identity_claim_source", "value": "runtime_lifecycle_evidence"},
+                    {"name": "principal-source", "status": "operator-config"},
+                    {"key": "permissionsAdminReady", "value": False},
+                ]
+            },
+            blockers,
+        )
+
+        paths = {(item["reason"], item["label"]) for item in blockers}
+        self.assertIn(("public_surface_overclaim", "$.claims[0]"), paths)
+        self.assertIn(("public_surface_overclaim", "$.claims[1]"), paths)
+        self.assertIn(("pre_runtime_principal_or_authority_claim_source", "$.claims[2]"), paths)
+        self.assertIn(("pre_runtime_principal_or_authority_claim_source", "$.claims[3]"), paths)
+        self.assertNotIn(("public_surface_overclaim", "$.claims[4]"), paths)
+
     def test_rejects_surface_promoted_before_player_identity_or_public_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

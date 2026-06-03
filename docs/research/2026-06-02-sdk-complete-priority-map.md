@@ -19,6 +19,24 @@ Plugin Hub scope, or a public SDK readiness claim.
 - Plugin Hub remains post-SDK-complete planning. Package examples, catalog/intake work,
   package hardening, and marketplace polish must not be routed ahead of SDK blockers.
 
+## Current Route Boundary
+
+This note is an accumulated ledger with historical validation snapshots. Read every later
+`lifecycle_anchor_first_evidence_provenance_unbound` line as historical status only; it
+must not be routed as an active blocker. The active default blocker is
+`approved_runtime_evidence_missing`. Only after accepted approved runtime principal
+lifecycle evidence may the identity route advance to the locked planning blocker
+`identity_public_contract_gate_missing`, with public SDK, ABI, runtime, promotion,
+permissions/admin, command response, commands/replies, and v1 completion flags still
+false until their separate gates pass.
+
+Do not use historical validation lines in this ledger to rerun broad
+FName/GObjects/core/admin/lifecycle-layout discovery, start servers, change markers/env,
+run ReflectionScanner, ptrace/gcore, broad tracing, or consume live/protected paths.
+ArkServerApi/AseApi/NextGenPlugins remain names/demand signals only; they are not
+authority for offsets, layouts, ABI, command parser behavior, return semantics,
+architecture, ergonomics, source code, or implementation copying.
+
 ## Reorganization Checkpoint
 
 After the 2026-06-02 compaction/reorganization, the lead reran the canonical offline

@@ -138,11 +138,18 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["v1_completion_ready"])
         self.assertFalse(report["stable_claim_allowed"])
         self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["observer_env_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["operator_request_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["copied_log_metadata_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["bundle_output_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["preflight_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["window_manifest_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["completed_receipt_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
+        self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         for name, filename in (
             ("observer_env", "observer-window.env"),

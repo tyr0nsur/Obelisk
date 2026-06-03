@@ -1169,6 +1169,24 @@ FORBIDDEN_RELEASE_STATEMENT_NEGATED_GOVERNING_VERB_PREFIX = re.compile(
     r"proves?|satisf(?:y|ies|ied)|turns?|unlocks?|validates?)$",
     re.IGNORECASE,
 )
+RELEASE_STATEMENT_OUTCOME_PROGRESS_CLAIM_RE = re.compile(
+    r"\b(?:release[-_\s]?statement|scoped[-_\s]?statement|non[-_\s]?p0|"
+    r"post[-_\s]?v1|excluded)\b.{0,80}"
+    r"\b(?:outcomes?|records?|bookkeeping)\b.{0,80}"
+    r"\b(?:ready|complete|completed|passed|green|satisf(?:y|ies|ied)|"
+    r"unlocked|counts?|counted|progress)\b|"
+    r"\b(?:outcomes?|records?|bookkeeping)\b.{0,80}"
+    r"\b(?:ready|complete|completed|passed|green|satisf(?:y|ies|ied)|"
+    r"unlocked|counts?|counted|progress)\b.{0,80}"
+    r"\b(?:release[-_\s]?statement|scoped[-_\s]?statement|non[-_\s]?p0|"
+    r"post[-_\s]?v1|excluded)\b",
+    re.IGNORECASE,
+)
+RELEASE_STATEMENT_OUTCOME_PROGRESS_NEGATORS = re.compile(
+    r"\b(?:blocked|cannot|can't|does\s+not|do\s+not|false|insufficient|"
+    r"must\s+not|never|no|not|without)\b",
+    re.IGNORECASE,
+)
 PLUGIN_HUB_DEFERRED_CONTEXT = re.compile(
     r"\b(?:post[- ]?sdk(?:[- ]?complete)?|after\s+sdk\s+completion)\b",
     re.IGNORECASE,
@@ -3101,6 +3119,27 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
     offenders: list[str] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         lowered = line.lower()
+        for match in RELEASE_STATEMENT_OUTCOME_PROGRESS_CLAIM_RE.finditer(lowered):
+            prefix = lowered[: match.start()]
+            clause_start = 0
+            for boundary in BROAD_CLAIM_CLAUSE_START_PATTERN.finditer(prefix):
+                clause_start = boundary.end()
+            claim_prefix = lowered[clause_start : match.start()]
+            full_claim = lowered[clause_start : match.end()]
+            if (
+                RELEASE_STATEMENT_OUTCOME_PROGRESS_NEGATORS.search(claim_prefix)
+                or re.search(
+                    r"\b(?:not|never|cannot|can't|must\s+not)\s+"
+                    r"(?:be\s+)?(?:ready|complete|completed|passed|green|"
+                    r"satisf(?:y|ies|ied)|unlocked|counts?|counted|progress)\b",
+                    full_claim,
+                )
+            ):
+                continue
+            offenders.append(f"line {line_number}: {line.strip()}")
+            break
+        if offenders and offenders[-1].startswith(f"line {line_number}:"):
+            continue
         for pattern in FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS:
             for match in re.finditer(pattern, lowered, flags=re.IGNORECASE):
                 prefix = lowered[: match.start()]

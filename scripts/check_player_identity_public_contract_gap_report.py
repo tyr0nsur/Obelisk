@@ -405,6 +405,23 @@ EMPTY_PUBLIC_LIST_KEYS = {
     "public_callbacks",
     "public_callback_abi_now",
 }
+SPLIT_CLAIM_NAME_KEYS = {
+    "alias",
+    "claim",
+    "field",
+    "flag",
+    "key",
+    "name",
+    "property",
+}
+SPLIT_CLAIM_VALUE_KEYS = {
+    "allowed",
+    "enabled",
+    "ready",
+    "state",
+    "status",
+    "value",
+}
 NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
     ".private_pod_layout_candidate.accepted_for_contract_review",
     ".identifier_redaction_evidence.accepted_for_contract_review",
@@ -630,6 +647,53 @@ def normalize_contract_key(key: object) -> str:
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
+def is_positive_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+        return normalized in {
+            "allowed",
+            "available",
+            "enabled",
+            "live",
+            "operational",
+            "promoted",
+            "public",
+            "ready",
+            "supported",
+            "true",
+            "unlocked",
+            "yes",
+        }
+    return False
+
+
+def split_claim_overclaims(value: dict[str, Any], path: str) -> list[dict[str, Any]]:
+    declared_claim_names = [
+        str(item)
+        for key, item in value.items()
+        if normalize_contract_key(key) in SPLIT_CLAIM_NAME_KEYS and isinstance(item, str)
+    ]
+    declared_claim_values = [
+        item
+        for key, item in value.items()
+        if normalize_contract_key(key) in SPLIT_CLAIM_VALUE_KEYS
+    ]
+    overclaims: list[dict[str, Any]] = []
+    for claim_name in declared_claim_names:
+        claim_key = normalize_contract_key(claim_name)
+        if (
+            claim_key in READINESS_FALSE_KEYS
+            or claim_key in EMPTY_PUBLIC_LIST_KEYS
+            or APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(claim_key) is not None
+        ) and any(is_positive_claim_value(item) for item in declared_claim_values):
+            overclaims.append({"path": path, "term": "split_readiness_alias", "value": value})
+    return overclaims
+
+
 def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -711,6 +775,7 @@ def validate_empty_public_lists(value: Any, blockers: list[dict[str, Any]], labe
 def public_text_overclaims(value: Any, path: str = "$") -> list[dict[str, str]]:
     claims: list[dict[str, str]] = []
     if isinstance(value, dict):
+        claims.extend(split_claim_overclaims(value, path))
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
@@ -750,6 +815,7 @@ def non_promotional_contract_review_report_overclaims(
 ) -> list[dict[str, Any]]:
     overclaims: list[dict[str, Any]] = []
     if isinstance(value, dict):
+        overclaims.extend(split_claim_overclaims(value, path))
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
@@ -802,6 +868,14 @@ def sanitize_non_promotional_report(
     root_path = root_path or path
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
+        for overclaim in split_claim_overclaims(value, path):
+            add(
+                blockers,
+                "nested_readiness_split_claim_overclaim",
+                overclaim["path"],
+                input=input_label,
+                value=overclaim["value"],
+            )
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
@@ -1612,6 +1686,7 @@ def candidate_exposures(candidate: dict[str, Any]) -> list[dict[str, str]]:
 def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dict[str, Any]]:
     overclaims: list[dict[str, Any]] = []
     if isinstance(report, dict):
+        overclaims.extend(split_claim_overclaims(report, path))
         for key, item in report.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)

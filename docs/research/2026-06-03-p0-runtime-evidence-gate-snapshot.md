@@ -715,6 +715,58 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Split-Claim, Runtime Cleanup, And Workspace-Offline Discipline Round
+
+The next delegated round plus lead integration hardened more offline false-positive
+routes while keeping the same active blocker.
+
+Integrated changes:
+
+- Runtime-evidence preparation reports now expose explicit false aliases for observer env,
+  operator request, copied-log metadata, preflight, window manifest, completed receipt,
+  bundle output, route readiness, SDK accounting, and P0 accounting. These artifacts remain
+  preparation or consume-only evidence and do not authorize runtime work or SDK progress.
+- P0 downstream checkers now reject split `key`/`field`/`name`/`claim` plus
+  `value`/`status`/`state` reports, so aliases such as `routeGateUnlocked`,
+  `permissionsAdminReady`, public reply ABI, runtime evidence source, or reviewed identity
+  public contract source cannot unlock permissions/admin, command response, commands/
+  replies, public/runtime readiness, or v1 accounting.
+- PluginManager cleanup retry paths no longer treat owner-wide fallback cleanup returning
+  `0` removed callbacks as success for chat/gameplay public registrations. This preserves
+  the fail-closed `dlclose` blocker when callback ownership cleanup cannot be proven.
+- Scoped v1 release-statement validation now rejects positive outcome-progress wording
+  such as release-statement outcomes being `ready` or `complete`, even when the phrase also
+  says bookkeeping-only. Recorded non-promotional bookkeeping remains allowed and still
+  contributes `0` complete-SDK claim progress.
+- Research docs now mark the 2026-06-02 SDK priority map as a historical ledger unless
+  its current-route boundary is read first. Historical `lifecycle_anchor_first_evidence_
+  provenance_unbound` lines are not active route blockers; the active route remains
+  `approved_runtime_evidence_missing`.
+
+Validation stayed offline except for one discipline incident:
+
+- Lead safe validations: downstream P0/route suites `211 OK`; scoped SDK/plugin/research
+  suite `76 OK`; focused scoped release-statement tests `4 OK`; shell syntax and
+  `py_compile` passed; `check_command_permission_route_gate.py --json` remained valid and
+  planning-only at `approved_runtime_evidence_missing`; `check_public_sdk_v1_completion.py
+  --json` remained blocked with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+- One delegated worker accidentally ran existing runtime-evidence suites that create temp
+  dirs under `/servidor/ark/workspace-offline`, violating this round's hard rule against
+  writes under `/servidor/ark`. No servers, markers/env, restarts, runtime probes, Discord,
+  GitHub, tags, or live paths were used. The residual temp dirs were not removed because
+  deletion would also write under `/servidor/ark`.
+- Tooling discipline was updated so `/servidor/ark/workspace-offline` is only an offline
+  exception when the active turn allows it; when a hard rule forbids `/servidor/ark` writes,
+  agents must use focused tests outside `/servidor/ark` and document skipped full suites.
+
+Non-claims:
+
+- This round does not produce approved runtime evidence, does not promote identity,
+  permissions/admin, command response, commands/replies, ResourceHandle, items, chat,
+  Plugin Hub, or any new public ABI, and does not authorize server operations, marker/env
+  changes, runtime probes, Discord sends, GitHub publication, tags, stable SDK wording, or
+  v1 SDK completion.
+
 ## Runtime Evidence Provenance And SDK Package Guardrail Follow-Up
 
 The next delegated hardening round kept the route blocked while closing more

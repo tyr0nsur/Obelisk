@@ -554,6 +554,26 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_collect_surface_overclaims_rejects_split_key_value_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "claims": [
+                    {"key": "publicResponsePathReady", "value": True},
+                    {"field": "public-reply-abi-ready", "state": "ready"},
+                    {"name": "routeGateUnlocked", "enabled": "yes"},
+                    {"key": "publicResponsePathReady", "value": False},
+                ]
+            },
+            blockers,
+        )
+
+        paths = {(item["reason"], item["label"]) for item in blockers}
+        self.assertIn(("public_surface_overclaim", "$.claims[0]"), paths)
+        self.assertIn(("public_surface_overclaim", "$.claims[1]"), paths)
+        self.assertIn(("public_surface_overclaim", "$.claims[2]"), paths)
+        self.assertNotIn(("public_surface_overclaim", "$.claims[3]"), paths)
+
     def test_rejects_nested_router_abi_and_runtime_authorization_aliases(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_surface_overclaims(

@@ -217,4 +217,4 @@ This file is an active routing table only. Durable evidence belongs in
   SDK `0/12`, P0 `0/4`, generated scoped statement `ready=true` as non-complete
   bookkeeping only, `py_compile` and `git diff --check` OK. No runtime/server/Discord/
   GitHub operation.
-- Active SDK guardrail follow-up integrated: runtime-evidence provenance/report-contract checks, downstream P0 false-only aliases, installed SDK/header guardrails, and four-note source-boundary indexing are hardened; baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, stable false.
+- Active SDK split-claim/runtime-cleanup round integrated: request/preflight/window/bundle false aliases, downstream P0 split key/value claim rejection, PluginManager owner-cleanup fallback `0`-removed fail-closed behavior, scoped release-statement outcome-progress rejection, and historical-ledger route boundary are hardened; baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, stable false. Do not rerun full runtime-evidence suites that write `/servidor/ark/workspace-offline` while the active rule forbids `/servidor/ark` writes.

@@ -1707,6 +1707,29 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.authz_principal_source", claims)
         self.assertNotIn("nested.candidate_source", claims)
 
+    def test_collect_public_or_runtime_claims_rejects_split_key_value_claims(self) -> None:
+        payload = {
+            "nested": [
+                {"key": "publicSdkReady", "value": True},
+                {"field": "public_reply_abi_allowed", "state": "ready"},
+                {"name": "identity_claim_source", "value": "runtime_lifecycle_evidence"},
+                {"claim": "principal-source", "status": "approved_runtime_principal_lifecycle_evidence"},
+                {"flag": "routeGateUnlocked", "enabled": "yes"},
+                {"key": "publicSdkReady", "value": False},
+                {"field": "identity_claim_source", "value": "unit-test-fixture"},
+            ]
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(payload)
+
+        self.assertIn("nested[0]", claims)
+        self.assertIn("nested[1]", claims)
+        self.assertIn("nested[2]", claims)
+        self.assertIn("nested[3]", claims)
+        self.assertIn("nested[4]", claims)
+        self.assertNotIn("nested[5]", claims)
+        self.assertNotIn("nested[6]", claims)
+
     def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:
         original = ROUTE_GATE.run_check
 

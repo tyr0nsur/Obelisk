@@ -1599,6 +1599,44 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, report["blocker_details"])
         self.assertEqual(report["blockers"], [])
 
+    def test_public_text_overclaims_rejects_split_key_value_aliases(self) -> None:
+        claims = checker.public_text_overclaims(
+            {
+                "claims": [
+                    {"key": "publicIdentityReady", "value": True},
+                    {"field": "principalHandleAbiReady", "state": "ready"},
+                    {"claim": "identityHeaderAllowed", "enabled": "yes"},
+                    {"key": "publicIdentityReady", "value": False},
+                ]
+            }
+        )
+        paths = {claim["path"] for claim in claims}
+
+        self.assertIn("$.claims[0]", paths)
+        self.assertIn("$.claims[1]", paths)
+        self.assertIn("$.claims[2]", paths)
+        self.assertNotIn("$.claims[3]", paths)
+
+    def test_sanitize_non_promotional_report_rejects_split_key_value_aliases(self) -> None:
+        blockers: list[dict] = []
+        checker.sanitize_non_promotional_report(
+            {
+                "nested": [
+                    {"key": "publicSdkReady", "value": True},
+                    {"field": "public_header_symbols_now", "state": "ready"},
+                    {"key": "publicSdkReady", "value": False},
+                ]
+            },
+            blockers,
+            input_label="unit_test",
+            path="$.unit_test",
+        )
+        paths = {(item["reason"], item["label"]) for item in blockers}
+
+        self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[0]"), paths)
+        self.assertIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[1]"), paths)
+        self.assertNotIn(("nested_readiness_split_claim_overclaim", "$.unit_test.nested[2]"), paths)
+
 
 if __name__ == "__main__":
     unittest.main()

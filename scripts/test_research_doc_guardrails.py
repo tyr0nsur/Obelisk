@@ -1053,6 +1053,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             "ArkApi/AseApi material remains a names/demand reference only, not an architecture, ergonomics, behavior, or implementation reference.",
             "ArkServerApi/AseApi/NextGenPlugins material is never authority for porting targets, API ergonomics, wrapper semantics, command parser behavior, timer behavior, return semantics, return override semantics, support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.",
             "ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change the support tier without a named promotion gate.",
+            "old `lifecycle_anchor_first_evidence_provenance_unbound` validation lines are historical only and the active default blocker is `approved_runtime_evidence_missing`.",
             "Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns.",
             "Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source.",
             "Maps high-demand dictionary-only plugin capability families to candidate Obelisk surfaces and likely UE4 names without promoting SDK, runtime, mutation, or Plugin Hub work.",
@@ -1131,6 +1132,30 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(file="v1-sdk-demand-chain-from-aseapi-nextgen", phrase=phrase):
                 self.assertIn(phrase, demand_chain_compact)
+
+    def test_sdk_complete_priority_map_historical_blockers_are_not_active_route(self) -> None:
+        priority_map = (
+            REPO_ROOT / "docs/research/2026-06-02-sdk-complete-priority-map.md"
+        ).read_text(encoding="utf-8")
+        boundary = priority_map.split("## Current Route Boundary", 1)[1].split(
+            "## Reorganization Checkpoint", 1
+        )[0]
+        boundary_compact = normalized(boundary)
+
+        for phrase in (
+            "Read every later `lifecycle_anchor_first_evidence_provenance_unbound` line as historical status only",
+            "must not be routed as an active blocker",
+            "The active default blocker is `approved_runtime_evidence_missing`",
+            "Only after accepted approved runtime principal lifecycle evidence",
+            "identity_public_contract_gate_missing",
+            "permissions/admin, command response, commands/replies, and v1 completion flags still false",
+            "Do not use historical validation lines in this ledger to rerun broad FName/GObjects/core/admin/lifecycle-layout discovery",
+            "start servers, change markers/env, run ReflectionScanner, ptrace/gcore, broad tracing",
+            "ArkServerApi/AseApi/NextGenPlugins remain names/demand signals only",
+            "not authority for offsets, layouts, ABI, command parser behavior, return semantics, architecture, ergonomics, source code, or implementation copying",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, boundary_compact)
 
 
 if __name__ == "__main__":

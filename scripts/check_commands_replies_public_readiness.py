@@ -393,6 +393,27 @@ FALSE_ONLY_KEYS = frozenset(
         "v1_completion_ready",
     )
 )
+SPLIT_CLAIM_NAME_KEYS = frozenset(
+    (
+        "alias",
+        "claim",
+        "field",
+        "flag",
+        "key",
+        "name",
+        "property",
+    )
+)
+SPLIT_CLAIM_VALUE_KEYS = frozenset(
+    (
+        "allowed",
+        "enabled",
+        "ready",
+        "state",
+        "status",
+        "value",
+    )
+)
 NEGATIVE_CONTEXT_TOKENS = (
     "blocker",
     "blockers",
@@ -628,6 +649,30 @@ def normalized_key(key: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
+def is_positive_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+        return normalized in {
+            "allowed",
+            "available",
+            "enabled",
+            "live",
+            "operational",
+            "promoted",
+            "public",
+            "ready",
+            "supported",
+            "true",
+            "unlocked",
+            "yes",
+        }
+    return False
+
+
 def is_negative_context(trail: str) -> bool:
     lowered = trail.casefold()
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
@@ -720,6 +765,20 @@ def has_unnegated_positive_claim(text: str) -> bool:
 
 def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
+        declared_claim_names = [
+            str(item)
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_NAME_KEYS and isinstance(item, str)
+        ]
+        declared_claim_values = [
+            item
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_VALUE_KEYS
+        ]
+        for claim_name in declared_claim_names:
+            claim_key = normalized_key(claim_name)
+            if claim_key in FALSE_ONLY_KEYS and any(is_positive_claim_value(item) for item in declared_claim_values):
+                add(blockers, "public_surface_overclaim", trail, field=claim_name, value=value)
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             if normalized_key(key) in FALSE_ONLY_KEYS and child is not False:

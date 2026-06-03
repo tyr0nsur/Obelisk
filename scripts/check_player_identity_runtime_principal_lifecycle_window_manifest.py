@@ -192,7 +192,10 @@ EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS = frozenset(
         "public_abi_ready",
         "public_sdk_ready",
         "runtime_ready",
+        "route_ready",
         "v1_completion_ready",
+        "sdk_accounting_counts_as_completed_surface",
+        "p0_accounting_counts_as_promoted_surface",
         "secrets_included",
         "player_private_data_included",
     )
@@ -227,8 +230,16 @@ PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
         "preflight_counts_as_approved_runtime_evidence",
         "window_manifest_counts_as_approved_runtime_evidence",
         "completed_receipt_counts_as_approved_runtime_evidence",
+        "observer_env_counts_as_approved_runtime_evidence",
+        "operator_request_counts_as_approved_runtime_evidence",
+        "copied_log_metadata_counts_as_approved_runtime_evidence",
+        "bundle_output_counts_as_approved_runtime_evidence",
         "approved_runtime_evidence_present",
         "approved_runtime_evidence_ready",
+        "route_ready",
+        "stable_claim_allowed",
+        "sdk_accounting_counts_as_completed_surface",
+        "p0_accounting_counts_as_promoted_surface",
     )
 )
 PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
@@ -245,8 +256,16 @@ PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
         "preflight_counts_as_approved_runtime_evidence",
         "window_manifest_counts_as_approved_runtime_evidence",
         "completed_receipt_counts_as_approved_runtime_evidence",
+        "observer_env_counts_as_approved_runtime_evidence",
+        "operator_request_counts_as_approved_runtime_evidence",
+        "copied_log_metadata_counts_as_approved_runtime_evidence",
+        "bundle_output_counts_as_approved_runtime_evidence",
         "approved_runtime_evidence_present",
         "approved_runtime_evidence_ready",
+        "route_ready",
+        "stable_claim_allowed",
+        "sdk_accounting_counts_as_completed_surface",
+        "p0_accounting_counts_as_promoted_surface",
     )
 )
 PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(
@@ -1243,22 +1262,7 @@ def validate_operator_approval_receipt(
     if not isinstance(flags, dict):
         add(blockers, "operator_approval_receipt_non_authorization_flags_missing", "operator_approval_receipt_path")
         flags = {}
-    for key in (
-        "request_pack_acceptance_authorizes_runtime",
-        "generated_template_authorizes_runtime",
-        "server_operations_authorized_by_template",
-        "runtime_work_authorized_by_template",
-        "discord_authorized",
-        "github_publication_authorized",
-        "publication_authorized",
-        "promotion_ready",
-        "public_abi_ready",
-        "public_sdk_ready",
-        "runtime_ready",
-        "v1_completion_ready",
-        "secrets_included",
-        "player_private_data_included",
-    ):
+    for key in EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS:
         if flags.get(key) is not False:
             add(blockers, f"operator_approval_receipt_{key}_not_false", "operator_approval_receipt_path")
 
@@ -2269,11 +2273,18 @@ def build_report(
         "runtime_ready": False,
         "stable_claim_allowed": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
         "approved_runtime_evidence_present": False,
         "approved_runtime_evidence_ready": False,
+        "route_ready": False,
+        "sdk_accounting_counts_as_completed_surface": False,
+        "p0_accounting_counts_as_promoted_surface": False,
         "remaining_blockers": [] if accepted else ["window_manifest_not_accepted"],
         "next_blocker": NEXT_BLOCKER_AFTER_WINDOW_MANIFEST if accepted else "window_manifest_not_accepted",
         "run_id": fields.get("run_id"),

@@ -1348,7 +1348,9 @@ namespace Obelisk::Core
                 if (!ownerCleanupRetry)
                     return false;
 
-                (void)registration.Dispatcher->UnregisterCallbacksForOwner(owner);
+                const size_t fallbackRemoved = registration.Dispatcher->UnregisterCallbacksForOwner(owner);
+                if (fallbackRemoved == 0)
+                    return false;
             }
 
             std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
@@ -1387,6 +1389,23 @@ namespace Obelisk::Core
                 ++removed;
             }
             return removed;
+        }
+
+        void ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup(
+            void* owner,
+            ChatEventDispatcher* dispatcher)
+        {
+            if (!owner || !dispatcher)
+                return;
+
+            std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
+            for (auto it = ChatMessageRegistrations().begin(); it != ChatMessageRegistrations().end();)
+            {
+                if (it->second.Owner == owner && it->second.Dispatcher == dispatcher)
+                    it = ChatMessageRegistrations().erase(it);
+                else
+                    ++it;
+            }
         }
 
         uint64_t AllocateGameplayPolicyRegistrationIdLocked()
@@ -1625,8 +1644,9 @@ namespace Obelisk::Core
                         registration.StructureRegistrationId);
                     if (!structureRemoved && ownerCleanupRetry)
                     {
-                        (void)StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        structureRemoved = true;
+                        const size_t fallbackRemoved =
+                            StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        structureRemoved = fallbackRemoved != 0;
                     }
                 }
                 cleanupSucceeded = cleanupSucceeded && structureRemoved;
@@ -1640,8 +1660,9 @@ namespace Obelisk::Core
                         registration.InventoryRegistrationId);
                     if (!inventoryRemoved && ownerCleanupRetry)
                     {
-                        (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        inventoryRemoved = true;
+                        const size_t fallbackRemoved =
+                            InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        inventoryRemoved = fallbackRemoved != 0;
                     }
                 }
                 cleanupSucceeded = cleanupSucceeded && inventoryRemoved;
@@ -1655,8 +1676,9 @@ namespace Obelisk::Core
                         registration.ItemReturnRegistrationId);
                     if (!itemReturnRemoved && ownerCleanupRetry)
                     {
-                        (void)ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        itemReturnRemoved = true;
+                        const size_t fallbackRemoved =
+                            ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        itemReturnRemoved = fallbackRemoved != 0;
                     }
                 }
                 cleanupSucceeded = cleanupSucceeded && itemReturnRemoved;
@@ -1716,6 +1738,44 @@ namespace Obelisk::Core
                 ++removed;
             }
             return removed;
+        }
+
+        void ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup(
+            void* owner,
+            bool structureCleaned,
+            bool inventoryCleaned,
+            bool itemReturnCleaned)
+        {
+            if (!owner)
+                return;
+
+            std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+            for (auto it = GameplayPolicyRegistrations().begin(); it != GameplayPolicyRegistrations().end();)
+            {
+                if (it->second.Owner != owner)
+                {
+                    ++it;
+                    continue;
+                }
+
+                if (structureCleaned)
+                    it->second.StructureRegistrationId = 0;
+                if (inventoryCleaned)
+                    it->second.InventoryRegistrationId = 0;
+                if (itemReturnCleaned)
+                    it->second.ItemReturnRegistrationId = 0;
+
+                if (it->second.StructureRegistrationId == 0 &&
+                    it->second.InventoryRegistrationId == 0 &&
+                    it->second.ItemReturnRegistrationId == 0)
+                {
+                    it = GameplayPolicyRegistrations().erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
         }
 
         void SafeLogInfoNoThrow(const char* message, const std::string& detail) noexcept
@@ -2483,7 +2543,9 @@ namespace Obelisk::Core
     bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
     {
         bool cleanupSucceeded = true;
-        const auto cleanupFamily = [&](const char* label, auto cleanup) -> size_t {
+        const auto cleanupFamily = [&](const char* label, auto cleanup, bool* familySucceeded = nullptr) -> size_t {
+            if (familySucceeded)
+                *familySucceeded = true;
             try
             {
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
@@ -2497,6 +2559,8 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName).c_str(),
                                     e.what());
                 cleanupSucceeded = false;
+                if (familySucceeded)
+                    *familySucceeded = false;
                 return 0;
             }
             catch (...)
@@ -2504,19 +2568,23 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow((std::string("Failed to remove ") + label + " callbacks for plugin " + pluginName +
                                     " with unknown exception").c_str());
                 cleanupSucceeded = false;
+                if (familySucceeded)
+                    *familySucceeded = false;
                 return 0;
             }
         };
 
+        bool gameplayPolicyCleanupSucceeded = true;
+        bool publicChatCleanupSucceeded = true;
         const size_t gameplayPolicyRemoved = cleanupFamily("gameplay policy", [&]() {
             return UnregisterGameplayPolicyRegistrationsForOwner(owner);
-        });
+        }, &gameplayPolicyCleanupSucceeded);
         const size_t eventRemoved = cleanupFamily("ProcessEvent", [&]() {
             return EventManager::Get().UnregisterCallbacksForOwner(owner);
         });
         const size_t publicChatRemoved = cleanupFamily("public chat", [&]() {
             return UnregisterChatMessageRegistrationsForOwner(owner);
-        });
+        }, &publicChatCleanupSucceeded);
         const size_t timerRemoved = cleanupFamily("timer", [&]() {
             return TimerManager::Get().UnregisterCallbacksForOwner(owner);
         });
@@ -2535,6 +2603,18 @@ namespace Obelisk::Core
         const size_t playerPrincipalRemoved = cleanupFamily("player principal", [&]() {
             return PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
         });
+
+        if (!publicChatCleanupSucceeded && chatRemoved != 0)
+            ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup(owner, m_ChatDispatcher);
+        if (!gameplayPolicyCleanupSucceeded &&
+            (structureRemoved != 0 || inventoryRemoved != 0 || itemReturnRemoved != 0))
+        {
+            ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup(
+                owner,
+                structureRemoved != 0,
+                inventoryRemoved != 0,
+                itemReturnRemoved != 0);
+        }
 
         const auto logRemoved = [&](size_t count, const char* label) {
             if (count == 0)

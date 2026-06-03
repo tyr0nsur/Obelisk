@@ -402,6 +402,60 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(build_result.returncode, 2)
         self.assertIn("forbidden broad claim", build_result.stderr)
 
+    def test_release_statement_forbids_scoped_outcome_progress_claims(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        for statement in (
+            "Release statement outcomes 7/7 ready as bookkeeping only.",
+            "Scoped release-statement bookkeeping 7/7 complete.",
+            "All seven non-P0 release-statement outcomes are ready.",
+        ):
+            with self.subTest(statement=statement):
+                self.assertTrue(module.release_statement_forbidden_broad_claims(statement))
+
+        allowed = (
+            "7/7 scoped release-statement outcomes recorded; stable SDK remains blocked."
+        )
+        self.assertEqual(module.release_statement_forbidden_broad_claims(allowed), [])
+
+    def test_scoped_release_statement_builder_rejects_generated_outcome_progress_claim(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.inventory_items_mutation.v1":
+                surface["v1_decision_contract"] = {
+                    "exclusion_requires": [
+                        "the v1 release statement names obelisk.inventory_items_mutation.v1 as post-v1",
+                        "the v1 release statement states that release-statement outcomes are ready as bookkeeping only",
+                    ],
+                }
+                break
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            build_result = subprocess.run(
+                [
+                    "python3",
+                    str(SCOPED_RELEASE_STATEMENT_BUILDER),
+                    "--manifest",
+                    str(manifest_path),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(build_result.returncode, 2)
+        self.assertIn("forbidden broad claim", build_result.stderr)
+
     def route_gate_override_env(self) -> dict[str, str]:
         return {"OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS": "1"}
 

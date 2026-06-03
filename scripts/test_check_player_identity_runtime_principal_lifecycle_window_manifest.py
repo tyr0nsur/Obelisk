@@ -26,6 +26,7 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    AUTHORIZATION_FLAGS,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
@@ -168,18 +169,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         },
         "restart_expectation": "restart",
         "final_posture": "stable",
-        "authorization_flags": {
-            "server_operations_authorized": False,
-            "runtime_work_authorized": False,
-            "request_pack_counts_as_approved_runtime_evidence": False,
-            "publication_authorized": False,
-            "stable_claim_allowed": False,
-            "public_sdk_ready": False,
-            "public_abi_ready": False,
-            "runtime_ready": False,
-            "promotion_ready": False,
-            "v1_completion_ready": False,
-        },
+        "authorization_flags": dict(AUTHORIZATION_FLAGS),
         "user_policy": fields.get("user_policy", "no_regular_users"),
         "notice_path": "not_applicable",
         "copied_evidence_dir": str(copied_log_path.parent),
@@ -230,6 +220,10 @@ def preflight_payload(
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -241,6 +235,10 @@ def preflight_payload(
         "promotion_ready": False,
         "public_header_allowed": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "route_ready": False,
+        "sdk_accounting_counts_as_completed_surface": False,
+        "p0_accounting_counts_as_promoted_surface": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -508,11 +506,18 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["stable_claim_allowed"])
         self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["observer_env_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["operator_request_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["copied_log_metadata_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["bundle_output_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["preflight_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["window_manifest_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["completed_receipt_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
+        self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
 
     def test_post_window_replay_rejects_future_operational_window(self) -> None:
         result = self.run_checker_in_approved_workspace(

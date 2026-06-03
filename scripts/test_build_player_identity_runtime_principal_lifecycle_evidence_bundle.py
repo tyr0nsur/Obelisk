@@ -131,6 +131,10 @@ def preflight_payload(
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -142,6 +146,10 @@ def preflight_payload(
         "promotion_ready": False,
         "public_header_allowed": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "route_ready": False,
+        "sdk_accounting_counts_as_completed_surface": False,
+        "p0_accounting_counts_as_promoted_surface": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -570,6 +578,12 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["bundle_inputs_ready"])
         self.assertTrue(report["request_pack_ready"])
         self.assertFalse(report["request_pack_is_runtime_evidence"])
+        self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["observer_env_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["operator_request_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["copied_log_metadata_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["window_manifest_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["bundle_output_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
@@ -583,6 +597,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
+        self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
         self.assertEqual(report["public_capability_bits_now"], [])
         self.assertEqual(report["public_callback_abi_now"], [])
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
@@ -631,6 +649,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["approved_runtime_manifest_present"])
         self.assertTrue(report["approved_runtime_evidence_present"])
         self.assertTrue(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
+        self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checked"])
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["ready"])
@@ -1425,6 +1446,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             report = json.loads(result.stdout)
             self.assertEqual(report["status"], "accepted")
+            self.assertEqual(report["ready_scope"], "runtime_evidence_only")
+            self.assertTrue(report["approved_runtime_evidence_present"])
+            self.assertTrue(report["runtime_evidence_ready"])
             self.assertEqual(report["summary_modules"], ["player_principal_lifecycle"])
             self.assertFalse(report["server_operations_authorized"])
             self.assertFalse(report["runtime_work_authorized"])
@@ -1434,6 +1458,18 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertFalse(report["public_abi_ready"])
             self.assertFalse(report["v1_completion_ready"])
             self.assertFalse(report["runtime_ready"])
+            self.assertFalse(report["stable_claim_allowed"])
+            self.assertFalse(report["route_ready"])
+            self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["observer_env_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["operator_request_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["copied_log_metadata_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["preflight_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["window_manifest_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["completed_receipt_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["bundle_report_counts_as_approved_runtime_evidence"])
+            self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
+            self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
             self.assertEqual(
                 report["negative_readiness_checks"],
                 {
@@ -2012,6 +2048,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_negative_readiness_report(
                 {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "public_readiness",
+                    "ready_scope": "runtime_evidence_only",
                     "ready": False,
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,
@@ -2031,6 +2070,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_negative_readiness_report(
                 {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "public_readiness",
+                    "ready_scope": "runtime_evidence_only",
                     "ready": False,
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,
@@ -2051,6 +2093,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_consume_only_check_report(
                 {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "consume",
+                    "ready_scope": "runtime_evidence_only",
                     "ready": True,
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,
@@ -2074,6 +2119,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_consume_only_check_report(
                 {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "consume",
+                    "ready_scope": "runtime_evidence_only",
                     "ready": True,
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,
@@ -2155,6 +2203,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_negative_readiness_report(
                 {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "mode": "promote",
+                    "ready_scope": "runtime_evidence_only",
                     "ready": False,
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,

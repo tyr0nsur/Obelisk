@@ -29,6 +29,10 @@ a symlink to an outside workspace, and a path outside `/servidor/ark` is rejecte
 resolves back under the protected server tree. The approved exception is
 `/servidor/ark/workspace-offline`, which may hold hardlinks or copied artifacts for
 offline analysis; do not point tools directly at `/servidor/ark/obelisk/dumps`.
+This exception is subordinate to the active turn's hard rules. If the current
+operator/lead instruction forbids all writes under `/servidor/ark`, do not run tests or
+tools that create temporary fixtures in `/servidor/ark/workspace-offline`; use focused
+mock/temp-dir tests outside `/servidor/ark` and record the skipped coverage instead.
 
 Isolated-debug only:
 

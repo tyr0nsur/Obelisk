@@ -117,6 +117,10 @@ required_false_flags = (
     "server_operations_authorized",
     "runtime_work_authorized",
     "request_pack_counts_as_approved_runtime_evidence",
+    "observer_env_counts_as_approved_runtime_evidence",
+    "operator_request_counts_as_approved_runtime_evidence",
+    "copied_log_metadata_counts_as_approved_runtime_evidence",
+    "bundle_output_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
     "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
@@ -128,6 +132,10 @@ required_false_flags = (
     "promotion_ready",
     "public_header_allowed",
     "v1_completion_ready",
+    "stable_claim_allowed",
+    "route_ready",
+    "sdk_accounting_counts_as_completed_surface",
+    "p0_accounting_counts_as_promoted_surface",
 )
 assert payload["schema"] == "obelisk.player-principal-lifecycle-preflight.v1"
 assert payload["ready"] is True
@@ -207,6 +215,10 @@ required_false_flags = (
     "server_operations_authorized",
     "runtime_work_authorized",
     "request_pack_counts_as_approved_runtime_evidence",
+    "observer_env_counts_as_approved_runtime_evidence",
+    "operator_request_counts_as_approved_runtime_evidence",
+    "copied_log_metadata_counts_as_approved_runtime_evidence",
+    "bundle_output_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
     "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
@@ -218,6 +230,10 @@ required_false_flags = (
     "promotion_ready",
     "public_header_allowed",
     "v1_completion_ready",
+    "stable_claim_allowed",
+    "route_ready",
+    "sdk_accounting_counts_as_completed_surface",
+    "p0_accounting_counts_as_promoted_surface",
 )
 assert payload["ready"] is True
 for flag in required_false_flags:

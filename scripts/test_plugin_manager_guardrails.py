@@ -748,6 +748,104 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("registration.Dispatcher->UnregisterCallbackForOwner", chat_unregister_body)
         self.assertNotIn("registration.Dispatcher->Unregister(registration.InternalRegistrationId)", chat_unregister_body)
 
+    def test_public_registration_cleanup_fallbacks_check_owner_cleanup_removed_count(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        chat_unregister_body = extract_function_body(
+            text,
+            r"bool UnregisterChatMessageRegistrationForOwner\(.*?\)",
+        )
+        self.assertNotIn(
+            "(void)registration.Dispatcher->UnregisterCallbacksForOwner(owner)",
+            chat_unregister_body,
+            "Public chat cleanup fallback must not ignore a zero removed count.",
+        )
+        self.assertIn(
+            "const size_t fallbackRemoved = registration.Dispatcher->UnregisterCallbacksForOwner(owner)",
+            chat_unregister_body,
+        )
+        self.assertIn("if (fallbackRemoved == 0)\n                    return false;", chat_unregister_body)
+
+        gameplay_unregister_body = extract_function_body(
+            text,
+            r"bool UnregisterGameplayPolicyRegistrationForOwner\(.*?\)",
+        )
+        for dispatcher, removed_flag in (
+            ("StructureEventDispatcher", "structureRemoved"),
+            ("InventoryPolicyEventDispatcher", "inventoryRemoved"),
+            ("ItemReturnEventDispatcher", "itemReturnRemoved"),
+        ):
+            with self.subTest(dispatcher=dispatcher):
+                self.assertNotIn(
+                    f"(void){dispatcher}::Get().UnregisterCallbacksForOwner(owner)",
+                    gameplay_unregister_body,
+                    "Gameplay policy cleanup fallback must not ignore a zero removed count.",
+                )
+                fallback_call = (
+                    f"const size_t fallbackRemoved =\n"
+                    f"                            {dispatcher}::Get().UnregisterCallbacksForOwner(owner)"
+                )
+                self.assertIn(fallback_call, gameplay_unregister_body)
+                self.assertIn(f"{removed_flag} = fallbackRemoved != 0;", gameplay_unregister_body)
+
+    def test_public_registration_tracking_is_reconciled_after_direct_dispatcher_cleanup(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        cleanup_body = extract_function_body(
+            text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+        self.assertIn("bool gameplayPolicyCleanupSucceeded = true", cleanup_body)
+        self.assertIn("bool publicChatCleanupSucceeded = true", cleanup_body)
+        self.assertIn("&gameplayPolicyCleanupSucceeded", cleanup_body)
+        self.assertIn("&publicChatCleanupSucceeded", cleanup_body)
+        self.assertIn(
+            "if (!publicChatCleanupSucceeded && chatRemoved != 0)",
+            cleanup_body,
+        )
+        self.assertIn(
+            "ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup(owner, m_ChatDispatcher)",
+            cleanup_body,
+        )
+        self.assertIn(
+            "if (!gameplayPolicyCleanupSucceeded &&\n"
+            "            (structureRemoved != 0 || inventoryRemoved != 0 || itemReturnRemoved != 0))",
+            cleanup_body,
+        )
+        self.assertIn(
+            "ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup(",
+            cleanup_body,
+        )
+        self.assertLess(
+            cleanup_body.index("m_ChatDispatcher->UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup"),
+        )
+        self.assertLess(
+            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup"),
+        )
+
+        chat_reconcile_body = extract_function_body(
+            text,
+            r"void ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup\(.*?\)",
+        )
+        self.assertIn("it->second.Owner == owner", chat_reconcile_body)
+        self.assertIn("it->second.Dispatcher == dispatcher", chat_reconcile_body)
+        self.assertIn("ChatMessageRegistrations().erase(it)", chat_reconcile_body)
+
+        gameplay_reconcile_body = extract_function_body(
+            text,
+            r"void ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup\(.*?\)",
+        )
+        for token in (
+            "it->second.StructureRegistrationId = 0",
+            "it->second.InventoryRegistrationId = 0",
+            "it->second.ItemReturnRegistrationId = 0",
+            "GameplayPolicyRegistrations().erase(it)",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, gameplay_reconcile_body)
+
     def test_public_owner_token_handle_apis_have_owner_cleanup_backstops(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")

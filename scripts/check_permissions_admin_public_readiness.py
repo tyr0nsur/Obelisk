@@ -465,13 +465,48 @@ FALSE_ONLY_KEYS = frozenset(
         "v1_completion_ready",
     )
 )
+SPLIT_CLAIM_NAME_KEYS = frozenset(
+    (
+        "alias",
+        "claim",
+        "field",
+        "flag",
+        "key",
+        "name",
+        "property",
+    )
+)
+SPLIT_CLAIM_VALUE_KEYS = frozenset(
+    (
+        "allowed",
+        "enabled",
+        "ready",
+        "state",
+        "status",
+        "value",
+    )
+)
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
     (
         "authority_claim_source",
+        "identity_claim_source",
+        "permission_principal_source",
+        "principal_claim_source",
         "principal_source",
     )
 )
-FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(("command_text", "operator_config"))
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(
+    (
+        "approved_runtime_evidence",
+        "approved_runtime_principal_lifecycle_evidence",
+        "command_text",
+        "identity_public_contract",
+        "operator_config",
+        "reviewed_identity_public_contract",
+        "runtime_lifecycle_evidence",
+        "runtime_principal_lifecycle_evidence",
+    )
+)
 NEGATIVE_CONTEXT_TOKENS = (
     "blocker",
     "blockers",
@@ -601,6 +636,29 @@ def normalized_claim_source(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value).casefold()).strip("_")
 
 
+def is_positive_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        return normalized_claim_source(value) in {
+            "allowed",
+            "available",
+            "enabled",
+            "live",
+            "operational",
+            "promoted",
+            "public",
+            "ready",
+            "supported",
+            "true",
+            "unlocked",
+            "yes",
+        }
+    return False
+
+
 def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
     if isinstance(value, str):
         return normalized_claim_source(value) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
@@ -661,6 +719,25 @@ def c_identifier_prefix_re(prefix: str) -> re.Pattern[str]:
 
 def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
+        declared_claim_names = [
+            str(item)
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_NAME_KEYS and isinstance(item, str)
+        ]
+        declared_claim_values = [
+            item
+            for key, item in value.items()
+            if normalized_key(key) in SPLIT_CLAIM_VALUE_KEYS
+        ]
+        for claim_name in declared_claim_names:
+            claim_key = normalized_key(claim_name)
+            if claim_key in FALSE_ONLY_KEYS and any(is_positive_claim_value(item) for item in declared_claim_values):
+                add(blockers, "public_surface_overclaim", trail, field=claim_name, value=value)
+            if (
+                claim_key in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS
+                and contains_forbidden_pre_runtime_claim_source(declared_claim_values)
+            ):
+                add(blockers, "pre_runtime_principal_or_authority_claim_source", trail, field=claim_name, value=value)
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             key_name = normalized_key(key)

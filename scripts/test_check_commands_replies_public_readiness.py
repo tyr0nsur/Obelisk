@@ -1002,6 +1002,26 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_collect_overclaims_rejects_split_key_value_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "claims": [
+                    {"key": "commandsRepliesReady", "value": True},
+                    {"field": "public-send-chat-abi-allowed", "state": "ready"},
+                    {"name": "routeGateUnlocked", "enabled": "yes"},
+                    {"key": "commandsRepliesReady", "value": False},
+                ]
+            },
+            blockers,
+        )
+
+        paths = {(item["reason"], item["label"]) for item in blockers}
+        self.assertIn(("public_surface_overclaim", "$.claims[0]"), paths)
+        self.assertIn(("public_surface_overclaim", "$.claims[1]"), paths)
+        self.assertIn(("public_surface_overclaim", "$.claims[2]"), paths)
+        self.assertNotIn(("public_surface_overclaim", "$.claims[3]"), paths)
+
     def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims({"note": "reply API ready remains blocked"}, blockers)
