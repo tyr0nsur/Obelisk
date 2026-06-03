@@ -9604,6 +9604,94 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            response_executed_path = core_path / "command_response_executed_tests.json"
+            response_executed_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.promoted-surface-test-execution-artifact.v1",
+                        "surface_id": "obelisk.command_chat_response_path.v1",
+                        "producer": "obelisk.promoted-surface-test-execution-runner.v1",
+                        "checker": "scripts/check_public_sdk_v1_completion.py",
+                        "produced_at_utc": "2026-06-02T00:00:00+00:00",
+                        "obelisk_commit": "0" * 40,
+                        "exit_code": 0,
+                        "output_sha256": "0" * 64,
+                        "command": "python3 -m unittest command_response_promotion",
+                        "inputs": {
+                            "public_sdk_surfaces": {
+                                "path": str(PUBLIC_SDK_SURFACES.relative_to(REPO_ROOT)),
+                                "sha256": sha256_file(PUBLIC_SDK_SURFACES),
+                            },
+                            "public_header": {
+                                "path": str(PUBLIC_HEADER.relative_to(REPO_ROOT)),
+                                "sha256": sha256_file(PUBLIC_HEADER),
+                            },
+                        },
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            response_executed = str(response_executed_path.relative_to(REPO_ROOT))
+            original_dependency = module.permissions_admin_structured_promotion_evidence_missing
+            original_current_head = module.current_repo_head
+            try:
+                module.permissions_admin_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.current_repo_head = lambda: "0" * 40
+                missing = module.command_response_structured_promotion_evidence_missing(
+                    {
+                        "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": response_executed,
+                    }
+                )
+            finally:
+                module.permissions_admin_structured_promotion_evidence_missing = original_dependency
+                module.current_repo_head = original_current_head
+
+        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+
+    def test_command_response_structured_promotion_rejects_nested_readiness_overclaims(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandResponseReportClaims",
+        ) as core_dir:
+            core_path = Path(core_dir)
+            response_report = core_path / "command_response_public_readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "nested_public_contract_report": {
+                            "public_sdk_ready": True,
+                            "v1_completion_ready": True,
+                        },
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
             response_executed = write_executed_test_artifact(
                 core_path / "command_response_executed_tests.json",
                 "obelisk.command_chat_response_path.v1",
@@ -9621,7 +9709,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             finally:
                 module.permissions_admin_structured_promotion_evidence_missing = original_dependency
 
-        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+        self.assertIn("public_readiness_report:public_or_runtime_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:completion_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:not_promoted_evidence", missing)
 
     def test_commands_replies_structured_promotion_rejects_summary_only_readiness_report(self) -> None:
         import importlib.util
@@ -9803,6 +9893,98 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            replies_executed_path = core_path / "commands_replies_executed_tests.json"
+            replies_executed_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.promoted-surface-test-execution-artifact.v1",
+                        "surface_id": "obelisk.commands_replies.v1",
+                        "producer": "obelisk.promoted-surface-test-execution-runner.v1",
+                        "checker": "scripts/check_public_sdk_v1_completion.py",
+                        "produced_at_utc": "2026-06-02T00:00:00+00:00",
+                        "obelisk_commit": "0" * 40,
+                        "exit_code": 0,
+                        "output_sha256": "0" * 64,
+                        "argv": ["cmake", "--build", "commands_replies_sdk_consumer"],
+                        "inputs": {
+                            "public_sdk_surfaces": {
+                                "path": str(PUBLIC_SDK_SURFACES.relative_to(REPO_ROOT)),
+                                "sha256": sha256_file(PUBLIC_SDK_SURFACES),
+                            },
+                            "public_header": {
+                                "path": str(PUBLIC_HEADER.relative_to(REPO_ROOT)),
+                                "sha256": sha256_file(PUBLIC_HEADER),
+                            },
+                        },
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            replies_executed = str(replies_executed_path.relative_to(REPO_ROOT))
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            original_current_head = module.current_repo_head
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.current_repo_head = lambda: "0" * 40
+                missing = module.commands_replies_structured_promotion_evidence_missing(
+                    {
+                        "public_readiness_report": str(replies_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": replies_executed,
+                    }
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+                module.current_repo_head = original_current_head
+
+        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+
+    def test_commands_replies_structured_promotion_rejects_nested_readiness_overclaims(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesReportClaims",
+        ) as core_dir:
+            core_path = Path(core_dir)
+            replies_report = core_path / "commands_replies_public_readiness.json"
+            replies_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.commands-replies-public-readiness-check.v1",
+                        "surface": "obelisk.commands_replies.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "public_command_router_allowed": False,
+                        "public_reply_or_send_chat_abi_allowed": False,
+                        "public_response_path_allowed": False,
+                        "decisions_status": "blocked",
+                        "commands_replies_surface_status": "planning",
+                        "dependency_chain": [
+                            "obelisk.player_identity.v1",
+                            "obelisk.permissions_admin.v1",
+                            "obelisk.command_chat_response_path.v1",
+                        ],
+                        "nested_response_path_report": {
+                            "runtime_ready": "ready",
+                            "stable_claim_allowed": "yes",
+                        },
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
             replies_executed = write_executed_test_artifact(
                 core_path / "commands_replies_executed_tests.json",
                 "obelisk.commands_replies.v1",
@@ -9820,7 +10002,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             finally:
                 module.command_response_structured_promotion_evidence_missing = original_dependency
 
-        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+        self.assertIn("public_readiness_report:public_or_runtime_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:completion_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:not_promoted_evidence", missing)
 
     def test_dependency_chain_accounting_keeps_invalid_promoted_identity_visible(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

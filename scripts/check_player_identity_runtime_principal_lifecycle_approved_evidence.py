@@ -847,7 +847,7 @@ def parse_observer_env(text: str, label: str, blockers: list[dict[str, Any]]) ->
     env: dict[str, str] = {}
     for line_number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
-        if not line:
+        if not line or line.startswith("#"):
             continue
         if "=" not in line:
             add(blockers, "operational_window_observer_env_line_invalid", label, line=line_number)
@@ -875,7 +875,11 @@ def validate_observer_env_binding(
         "OBELISK_INSTANCE_ID": target.get("instance"),
         **REQUIRED_OBSERVER_ENV_VALUES,
     }
-    observed_order = [line.split("=", 1)[0] for line in text.splitlines() if line.strip() and "=" in line]
+    observed_order = [
+        line.split("=", 1)[0]
+        for raw in text.splitlines()
+        if (line := raw.strip()) and not line.startswith("#") and "=" in line
+    ]
     if tuple(observed_order) != EXPECTED_OBSERVER_ENV_KEYS:
         add(
             blockers,

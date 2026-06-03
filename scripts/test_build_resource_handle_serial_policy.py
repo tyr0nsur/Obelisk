@@ -127,6 +127,20 @@ class ResourceHandleSerialPolicyBuilderTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             builder.build_policy(source, capture_id="serial-policy-test", evidence_pack_id="serial-policy-pack")
 
+    def test_rejects_source_public_runtime_v1_alias_overclaims(self) -> None:
+        for key, value in (
+            ("publicResourceHandleReady", True),
+            ("runtime_resource_handle_enabled", "yes"),
+            ("v1ResourceHandlePromoted", "promoted"),
+            ("serialReuseWraparoundSafetyProven", True),
+        ):
+            with self.subTest(key=key):
+                source = source_revalidation()
+                source["alias_claims"] = {key: value}
+
+                with self.assertRaises(SystemExit):
+                    builder.build_policy(source, capture_id="serial-policy-test", evidence_pack_id="serial-policy-pack")
+
     def test_rejects_malformed_source_counts_cleanly(self) -> None:
         source = source_revalidation()
         source["reconciliation_summary"]["serial_candidate_nonzero_count"] = True  # type: ignore[index]

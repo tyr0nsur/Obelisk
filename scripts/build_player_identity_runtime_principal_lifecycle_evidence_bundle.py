@@ -188,6 +188,28 @@ def require_approved_copied_log(path: Path) -> Path:
     return status.resolved
 
 
+def require_exact_sibling_window_manifest(path: Path, copied_log: Path) -> Path:
+    reject_symlink_component(path, "--window-manifest")
+    status = protected_paths.protected_path_status(
+        path.expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected:
+        raise SystemExit(f"--window-manifest must be an offline copy, not a live server path: {status.resolved}")
+    if not status.approved_offline_workspace:
+        raise SystemExit("--window-manifest must be under /servidor/ark/workspace-offline")
+    expected = copied_log.parent / "window-manifest.env"
+    if status.resolved != expected:
+        raise SystemExit(
+            "--window-manifest must be the exact sibling window-manifest.env beside --copied-log: "
+            f"expected {expected}, got {status.resolved}"
+        )
+    if not status.resolved.is_file():
+        raise SystemExit(f"--window-manifest does not exist: {status.resolved}")
+    return status.resolved
+
+
 def add_blocker(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
     blocker = {"reason": reason, "label": label}
     blocker.update(extra)
@@ -866,6 +888,7 @@ def main() -> int:
     if not is_reviewed_obelisk_commit(args.obelisk_commit):
         raise SystemExit("--obelisk-commit must be a reviewed 40-character lowercase Git SHA")
     copied_log = require_approved_copied_log(args.copied_log)
+    window_manifest = require_exact_sibling_window_manifest(args.window_manifest, copied_log)
     output_dir = args.output_dir.expanduser()
     reject_symlink_component(output_dir, "--output-dir")
     output_dir = reject_protected_output_path(output_dir, "--output-dir")
@@ -888,7 +911,7 @@ def main() -> int:
                 str(WINDOW_MANIFEST_CHECKER),
                 "--json",
                 "--post-window-replay",
-                str(args.window_manifest),
+                str(window_manifest),
             ],
             stdout_path=window_check_path,
         ),

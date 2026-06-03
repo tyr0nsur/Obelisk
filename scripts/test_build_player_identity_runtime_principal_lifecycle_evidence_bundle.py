@@ -22,11 +22,13 @@ import check_player_identity_first_evidence_readiness as first_evidence_checker
 import build_player_identity_runtime_principal_lifecycle_evidence_bundle as bundle_builder
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_TEXT,
+    AUTHORIZATION_FLAGS,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
     WINDOW_MARKERS,
+    env_file_lines,
     env_lines,
     markdown_request,
     operator_approval_receipt_payload,
@@ -36,7 +38,7 @@ from prepare_player_principal_lifecycle_window_request import (
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
+WINDOW_START = (datetime.now(timezone.utc) - timedelta(minutes=20)).replace(microsecond=0)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 TEST_COMMIT = subprocess.check_output(
@@ -194,7 +196,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )()
         observer_env_sha256 = write_sidecar(
             observer_env,
-            "\n".join(env_lines(request_args))
+            "\n".join(env_file_lines(request_args))
             + "\n",
         )
         request_payload = {
@@ -213,6 +215,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             },
             "restart_expectation": "restart",
             "final_posture": "stable",
+            "authorization_flags": dict(AUTHORIZATION_FLAGS),
             "user_policy": "no_regular_users",
             "notice_path": "not_applicable",
             "copied_evidence_dir": str(copied_log.parent),
@@ -227,11 +230,11 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             },
             "non_claims": NON_CLAIMS,
         }
+        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
             request_payload,
             env_lines(request_args),
         )
-        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(request_payload, sort_keys=True) + "\n",
@@ -638,7 +641,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             approved_manifest = output_dir / "approved-runtime-principal-lifecycle-evidence.json"
 
             try:
-                alternate_start = old_window_start + timedelta(minutes=15)
+                alternate_start = old_window_start + timedelta(minutes=2)
                 globals()["WINDOW_START"] = alternate_start
                 globals()["RUN_ID"] = alternate_start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
                 alternate_log = copied_log_path(temp_dir)
@@ -1461,6 +1464,27 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--copied-log must be an offline copy, not a live server path", result.stderr)
+            self.assertFalse((output_dir / "runtime-observer-summary.json").exists())
+
+    def test_rejects_non_sibling_window_manifest_before_outputs(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            original_manifest = self.write_window_manifest(temp_dir, copied_log)
+            alternate_manifest = temp_dir / "alternate-window" / "window-manifest.env"
+            alternate_manifest.parent.mkdir(parents=True)
+            alternate_manifest.write_bytes(original_manifest.read_bytes())
+            output_dir = temp_dir / "bundle"
+
+            result = self.run_bundle(copied_log, output_dir, window_manifest=alternate_manifest)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "--window-manifest must be the exact sibling window-manifest.env beside --copied-log",
+                result.stderr,
+            )
             self.assertFalse((output_dir / "runtime-observer-summary.json").exists())
 
     def test_rejects_protected_output_dir_before_writing(self) -> None:

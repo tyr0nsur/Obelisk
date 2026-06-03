@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +41,31 @@ NON_CLAIMS = tuple(RESOURCE_HANDLE_NON_CLAIMS) + (
     "does_not_promote_persistent_handles",
     "does_not_claim_serial_reuse_or_wraparound_safety",
     "does_not_claim_slot_reuse_safety_without_fresh_serial",
+)
+FORBIDDEN_SOURCE_CLAIM_KEYS = frozenset(
+    (
+        "promotion_ready",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "release_ready",
+        "runtime_ready",
+        "v1_sdk_ready",
+        "object_identity_ready",
+        "post_callback_resource_handle_ready",
+        "public_object_identity_ready",
+        "public_object_lookup_ready",
+        "public_resource_handle_ready",
+        "resource_handle_ready",
+        "serial_reuse_or_wraparound_safety_proven",
+    )
+)
+FORBIDDEN_SOURCE_ALIAS_SUBJECT_RE = re.compile(
+    r"(?:resource_?handle|resourcehandle|object_?identity|object_?lookup|object_?handle|serial_?reuse|wraparound)",
+    re.IGNORECASE,
+)
+FORBIDDEN_SOURCE_ALIAS_CONTEXT_RE = re.compile(
+    r"(?:public|runtime|v1|sdk|abi|release|promot|ready|readiness|enabled|allowed|available|post_?callback|safety)",
+    re.IGNORECASE,
 )
 
 
@@ -82,7 +108,44 @@ def required_int(mapping: dict[str, Any], key: str, label: str) -> int:
     return value
 
 
+def positive_claim(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.casefold() in {"allowed", "available", "enabled", "live", "promoted", "ready", "true", "yes"}
+    return False
+
+
+def normalized_claim_key(key: str) -> str:
+    key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return re.sub(r"[^a-zA-Z0-9]+", "_", key).strip("_").casefold()
+
+
+def forbidden_positive_source_alias_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    return bool(
+        normalized in FORBIDDEN_SOURCE_CLAIM_KEYS
+        or (
+            FORBIDDEN_SOURCE_ALIAS_SUBJECT_RE.search(normalized)
+            and FORBIDDEN_SOURCE_ALIAS_CONTEXT_RE.search(normalized)
+        )
+    )
+
+
+def reject_positive_source_aliases(value: Any, trail: str = "source") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            if forbidden_positive_source_alias_key(key_text) and positive_claim(child):
+                raise SystemExit(f"{trail}.{key_text} overclaims public/runtime/v1 ResourceHandle readiness")
+            reject_positive_source_aliases(child, f"{trail}.{key_text}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_positive_source_aliases(child, f"{trail}[{index}]")
+
+
 def validate_source(source: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    reject_positive_source_aliases(source)
     if source.get("schema") != RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA:
         raise SystemExit("source schema is not resource-handle revalidation evaluator")
     identity = source_output_identity(source)

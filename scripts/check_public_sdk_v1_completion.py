@@ -2821,6 +2821,15 @@ def report_is_limited_to_non_promotional_readiness(report: Any) -> bool:
     }
 
 
+def structured_readiness_report_claim_blockers(report: dict[str, Any], reason_prefix: str) -> list[str]:
+    missing: list[str] = []
+    if command_permission_route_gate_public_or_runtime_claims(report):
+        missing.append(f"{reason_prefix}:public_or_runtime_claim_without_blocker")
+    if secondary_report_completion_claims_without_blocker(report):
+        missing.append(f"{reason_prefix}:completion_claim_without_blocker")
+    return missing
+
+
 def promotion_evidence_path_is_specific_to_leaf(raw_path: str, leaf_id: str) -> bool:
     relative = repo_relative_evidence_path(raw_path)
     if relative is None:
@@ -3942,17 +3951,19 @@ def command_response_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
-    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
-        missing.append("public_readiness_report:not_promoted_evidence")
     else:
-        missing.extend(
-            command_response_public_readiness_source_artifacts_missing(
-                readiness_report,
-                "public_readiness_report",
-                manifest_path,
-                public_header_path,
+        missing.extend(structured_readiness_report_claim_blockers(readiness_report, "public_readiness_report"))
+        if not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+            missing.append("public_readiness_report:not_promoted_evidence")
+        else:
+            missing.extend(
+                command_response_public_readiness_source_artifacts_missing(
+                    readiness_report,
+                    "public_readiness_report",
+                    manifest_path,
+                    public_header_path,
+                )
             )
-        )
 
     missing.extend(
         executed_test_report_missing(
@@ -4012,17 +4023,19 @@ def commands_replies_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
-    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
-        missing.append("public_readiness_report:not_promoted_evidence")
     else:
-        missing.extend(
-            commands_replies_public_readiness_source_artifacts_missing(
-                readiness_report,
-                "public_readiness_report",
-                manifest_path,
-                public_header_path,
+        missing.extend(structured_readiness_report_claim_blockers(readiness_report, "public_readiness_report"))
+        if not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+            missing.append("public_readiness_report:not_promoted_evidence")
+        else:
+            missing.extend(
+                commands_replies_public_readiness_source_artifacts_missing(
+                    readiness_report,
+                    "public_readiness_report",
+                    manifest_path,
+                    public_header_path,
+                )
             )
-        )
 
     missing.extend(
         executed_test_report_missing(

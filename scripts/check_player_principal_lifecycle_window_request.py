@@ -26,6 +26,7 @@ from snapshot_evidence_pack import first_symlink_component, reject_symlink_compo
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_RECEIPT_SCHEMA,
     APPROVAL_TEXT,
+    AUTHORIZATION_FLAGS,
     BRIEF_NON_AUTHORIZATION,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
@@ -72,6 +73,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "approved_window",
         "restart_expectation",
         "final_posture",
+        "authorization_flags",
         "user_policy",
         "notice_path",
         "copied_evidence_dir",
@@ -128,6 +130,7 @@ EXPECTED_EVIDENCE_CAPTURE_KEYS = frozenset(
         "window_manifest_path",
         "observer_env_file",
         "observer_env_path",
+        "operator_approval_request_path",
         "operator_approval_receipt_path",
         "operator_approval_receipt_required",
         "preflight_pre_path",
@@ -151,10 +154,12 @@ EXPECTED_ARTIFACT_BINDING_SIDECAR_KEYS = frozenset(
     (
         "window_request_json",
         "observer_window_env",
+        "operator_approval_request_md",
         "operator_approval_receipt_json",
         "preflight_pre_json",
         "preflight_post_json",
         "window_manifest_env",
+        "copied_obelisk_log",
     )
 )
 EXPECTED_POST_RUN_KEYS = frozenset(
@@ -171,12 +176,15 @@ EXPECTED_REPLAY_CONTRACT_SIDECAR_KEYS = frozenset(
     (
         "request_pack_path",
         "observer_env_path",
+        "operator_approval_request_path",
         "operator_approval_receipt_path",
         "preflight_pre_path",
         "preflight_post_path",
         "window_manifest_path",
+        "copied_log_path",
     )
 )
+EXPECTED_AUTHORIZATION_FLAG_KEYS = frozenset(AUTHORIZATION_FLAGS)
 EXPECTED_REPLAY_CONTRACT_CHECK_KEYS = frozenset(("window_manifest_replay",))
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_TOP_LEVEL_KEYS = frozenset(
     (
@@ -677,10 +685,12 @@ def validate_post_window_replay_contract(payload: dict[str, Any], blockers: list
     for key, expected_name in (
         ("request_pack_path", "window-request.json"),
         ("observer_env_path", "observer-window.env"),
+        ("operator_approval_request_path", "operator-approval-request.md"),
         ("operator_approval_receipt_path", "operator-approval-receipt.json"),
         ("preflight_pre_path", "preflight-pre.json"),
         ("preflight_post_path", "preflight-post.json"),
         ("window_manifest_path", "window-manifest.env"),
+        ("copied_log_path", "Obelisk.log"),
     ):
         value = sidecars.get(key)
         if not isinstance(value, str):
@@ -770,6 +780,9 @@ def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) ->
                 "window_manifest_path": payload["window_manifest_path"],
                 "observer_env_file": payload["observer_env_file"],
                 "observer_env_path": payload["post_window_replay_contract"]["sidecars"]["observer_env_path"],
+                "operator_approval_request_path": payload["post_window_replay_contract"]["sidecars"][
+                    "operator_approval_request_path"
+                ],
                 "operator_approval_receipt_path": payload["post_window_replay_contract"]["sidecars"][
                     "operator_approval_receipt_path"
                 ],
@@ -876,6 +889,24 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
         add(blockers, "forbidden_markers_mismatch", "forbidden_markers")
     if payload.get("non_claims") != NON_CLAIMS:
         add(blockers, "non_claims_mismatch", "non_claims")
+    authorization_flags = require_keys(
+        payload.get("authorization_flags"),
+        required=EXPECTED_AUTHORIZATION_FLAG_KEYS,
+        label="authorization_flags",
+        blockers=blockers,
+    )
+    if authorization_flags is not None:
+        if authorization_flags != AUTHORIZATION_FLAGS:
+            add(
+                blockers,
+                "authorization_flags_mismatch",
+                "authorization_flags",
+                expected=AUTHORIZATION_FLAGS,
+                actual=authorization_flags,
+            )
+        for key in EXPECTED_AUTHORIZATION_FLAG_KEYS:
+            if authorization_flags.get(key) is not False:
+                add(blockers, f"authorization_flag_{key}_not_false", f"authorization_flags.{key}")
     if payload.get("observer_env_file") != "observer-window.env":
         add(blockers, "observer_env_file_mismatch", "observer_env_file")
     validate_post_window_replay_contract(payload, blockers)
@@ -895,6 +926,9 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
         prepared_at_dt = parse_utc(prepared_at)
         if prepared_at_dt is None:
             add(blockers, "prepared_at_utc_invalid", "prepared_at_utc")
+    now = datetime.now(timezone.utc)
+    if prepared_at_dt is not None and (prepared_at_dt - now).total_seconds() > 5:
+        add(blockers, "prepared_at_utc_in_future", "prepared_at_utc", value=prepared_at)
     if window:
         start = window.get("start_utc")
         end = window.get("end_utc")
@@ -920,7 +954,6 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
                 "prepared_at_utc",
                 max_seconds=MAX_REQUEST_PREPARATION_LEAD_SECONDS,
             )
-        now = datetime.now(timezone.utc)
         if start_dt is not None and start_dt <= now and (end_dt is None or end_dt > now):
             add(
                 blockers,
@@ -1145,6 +1178,13 @@ def validate_operator_approval_receipt(
     approval_recorded_dt = parse_utc(approval_recorded_at) if isinstance(approval_recorded_at, str) else None
     if approval_recorded_dt is None:
         add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt")
+    elif (approval_recorded_dt - datetime.now(timezone.utc)).total_seconds() > 5:
+        add(
+            blockers,
+            "operator_approval_receipt_approved_in_future",
+            "operator_approval_receipt",
+            approval_recorded_at_utc=approval_recorded_at,
+        )
     request_prepared_dt = parse_utc(payload.get("prepared_at_utc")) if isinstance(payload.get("prepared_at_utc"), str) else None
     approved_window = payload.get("approved_window")
     window_start_dt = None
@@ -1321,6 +1361,8 @@ def build_report(
         "public_sdk_ready": False,
         "runtime_ready": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "request_pack_counts_as_approved_runtime_evidence": False,
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
         "next_blocker": "operator_current_turn_runtime_window_approval_required" if accepted else "request_pack_not_accepted",
@@ -1344,6 +1386,21 @@ def tolerate_post_window_expiry_only(blockers: list[dict[str, Any]]) -> bool:
         return False
     blockers.clear()
     return True
+
+
+def validate_post_window_replay_window_completed(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    approved_window = payload.get("approved_window")
+    if not isinstance(approved_window, dict):
+        return
+    end_utc = approved_window.get("end_utc")
+    end_dt = parse_utc(end_utc) if isinstance(end_utc, str) else None
+    if end_dt is not None and end_dt > datetime.now(timezone.utc):
+        add(
+            blockers,
+            "post_window_replay_window_not_completed",
+            "approved_window.end_utc",
+            value=end_utc,
+        )
 
 
 def main() -> int:
@@ -1398,6 +1455,8 @@ def main() -> int:
             blockers=validation.blockers,
         )
         operator_approval_receipt_verified = bool(args.post_window_replay and receipt_valid)
+    if args.post_window_replay:
+        validate_post_window_replay_window_completed(payload, validation.blockers)
     post_window_replay_expiry_tolerated = False
     if args.post_window_replay:
         post_window_replay_expiry_tolerated = tolerate_post_window_expiry_only(validation.blockers)

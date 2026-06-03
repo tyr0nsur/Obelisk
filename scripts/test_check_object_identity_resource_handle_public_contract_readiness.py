@@ -167,6 +167,35 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 report["blockers"],
             )
 
+    def test_rejects_public_runtime_v1_alias_metadata_in_decisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["metadata"] = {
+                "publicResourceHandleReady": True,
+                "runtime_resource_handle_enabled": "yes",
+                "v1ObjectLookupPromoted": "promoted",
+                "runtimeObjectSamplesPresent": True,
+                "serialReuseWraparoundSafetyProven": True,
+            }
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in (
+            "publicResourceHandleReady",
+            "runtime_resource_handle_enabled",
+            "v1ObjectLookupPromoted",
+            "runtimeObjectSamplesPresent",
+            "serialReuseWraparoundSafetyProven",
+        ):
+            self.assertIn(
+                f"forbidden_positive_resource_handle_claim:$.decisions.metadata.{key}",
+                report["blockers"],
+            )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -328,6 +357,39 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 report["blockers"],
             )
 
+    def test_rejects_public_runtime_v1_alias_metadata_in_surface_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
+                    surface["metadata"] = {
+                        "publicResourceHandleReady": True,
+                        "runtime_resource_handle_enabled": "yes",
+                        "v1ObjectLookupPromoted": "promoted",
+                        "runtimeObjectSamplesPresent": True,
+                        "serialReuseWraparoundSafetyProven": True,
+                    }
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in (
+            "publicResourceHandleReady",
+            "runtime_resource_handle_enabled",
+            "v1ObjectLookupPromoted",
+            "runtimeObjectSamplesPresent",
+            "serialReuseWraparoundSafetyProven",
+        ):
+            self.assertIn(
+                "forbidden_positive_resource_handle_claim:"
+                f"$.surfaces[obelisk.object_identity_resource_handle.v1].metadata.{key}",
+                report["blockers"],
+            )
+
     def test_rejects_public_header_resource_handle_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -407,6 +469,33 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             ),
             report["blockers"],
         )
+
+    def test_rejects_public_runtime_v1_alias_metadata_in_public_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            events = json.loads(PUBLIC_EVENTS.read_text(encoding="utf-8"))
+            events["metadata_surfaces"][0]["publicResourceHandleReady"] = True
+            events["metadata_surfaces"][0]["runtime_resource_handle_enabled"] = "yes"
+            events["metadata_surfaces"][0]["v1ObjectLookupPromoted"] = "promoted"
+            events["metadata_surfaces"][0]["runtimeObjectSamplesPresent"] = True
+            events["metadata_surfaces"][0]["serialReuseWraparoundSafetyProven"] = True
+            events_path = write_json(root, "events.json", events)
+
+            result = run_checker("--public-events", str(events_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in (
+            "publicResourceHandleReady",
+            "runtime_resource_handle_enabled",
+            "v1ObjectLookupPromoted",
+            "runtimeObjectSamplesPresent",
+            "serialReuseWraparoundSafetyProven",
+        ):
+            self.assertIn(
+                f"forbidden_positive_resource_handle_claim:$.metadata_surfaces[0].{key}",
+                report["blockers"],
+            )
 
     def test_rejects_symlinked_input_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

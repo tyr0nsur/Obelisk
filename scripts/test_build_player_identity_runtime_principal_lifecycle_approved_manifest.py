@@ -21,7 +21,7 @@ CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approv
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
+WINDOW_START = (datetime.now(timezone.utc) - timedelta(minutes=20)).replace(microsecond=0)
 WINDOW_END = WINDOW_START + timedelta(minutes=10)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
@@ -33,6 +33,7 @@ TEST_COMMIT = subprocess.check_output(
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
+    AUTHORIZATION_FLAGS,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
@@ -193,6 +194,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             },
             "restart_expectation": "restart",
             "final_posture": "stable",
+            "authorization_flags": dict(AUTHORIZATION_FLAGS),
             "user_policy": "no_regular_users",
             "notice_path": "not_applicable",
             "copied_evidence_dir": str(Path(source["path"]).parent),
@@ -207,11 +209,11 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             },
             "non_claims": NON_CLAIMS,
         }
+        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
             request_payload,
             observer_env_lines,
         )
-        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(request_payload, sort_keys=True) + "\n",

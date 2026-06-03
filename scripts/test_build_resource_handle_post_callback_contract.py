@@ -79,6 +79,20 @@ class ResourceHandlePostCallbackContractBuilderTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             builder.build_contract(source, capture_id="post-callback-test", evidence_pack_id="post-callback-pack")
 
+    def test_rejects_source_public_runtime_v1_alias_overclaims(self) -> None:
+        for key, value in (
+            ("publicResourceHandleReady", True),
+            ("runtime_resource_handle_enabled", "yes"),
+            ("v1ObjectLookupPromoted", "promoted"),
+            ("runtimeObjectSamplesPresent", True),
+        ):
+            with self.subTest(key=key):
+                source = source_revalidation()
+                source["alias_claims"] = {key: value}
+
+                with self.assertRaises(SystemExit):
+                    builder.build_contract(source, capture_id="post-callback-test", evidence_pack_id="post-callback-pack")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -45,6 +45,18 @@ ARTIFACT_BINDING_NON_AUTHORIZATION = (
     "artifact binding only; does not authorize runtime work, server operations, "
     "marker/env changes, public readiness, or promotion"
 )
+AUTHORIZATION_FLAGS = {
+    "server_operations_authorized": False,
+    "runtime_work_authorized": False,
+    "request_pack_counts_as_approved_runtime_evidence": False,
+    "publication_authorized": False,
+    "promotion_ready": False,
+    "public_abi_ready": False,
+    "public_sdk_ready": False,
+    "runtime_ready": False,
+    "v1_completion_ready": False,
+    "stable_claim_allowed": False,
+}
 REQUEST_ROLLBACK_DELTA = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
 POSTURE_GUARDRAIL_TEXT = (
     "player-principal lifecycle request packs require --final-posture stable; "
@@ -217,6 +229,15 @@ def env_lines(args: argparse.Namespace) -> list[str]:
     return [f"{key}={values[key]}" for key in OBSERVER_ENV_KEYS]
 
 
+def env_file_lines(args: argparse.Namespace) -> list[str]:
+    return [
+        "# request-pack-only; does not authorize marker/env changes, runtime work, or server operations",
+        "# request_pack_counts_as_approved_runtime_evidence=false",
+        "# stable_claim_allowed=false",
+        *env_lines(args),
+    ]
+
+
 def request_payload(args: argparse.Namespace) -> dict[str, Any]:
     evidence_dir = EVIDENCE_ROOT / args.run_id
     prepared_at_utc = datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -236,6 +257,7 @@ def request_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "restart_expectation": args.restart_expectation,
         "final_posture": args.final_posture,
+        "authorization_flags": dict(AUTHORIZATION_FLAGS),
         "user_policy": args.user_policy,
         "notice_path": args.notice_path,
         "copied_evidence_dir": str(evidence_dir),
@@ -265,10 +287,12 @@ def post_window_replay_contract(
         "sidecars": {
             "request_pack_path": str(evidence_dir / "window-request.json"),
             "observer_env_path": str(evidence_dir / "observer-window.env"),
+            "operator_approval_request_path": str(evidence_dir / "operator-approval-request.md"),
             "operator_approval_receipt_path": str(evidence_dir / "operator-approval-receipt.json"),
             "preflight_pre_path": str(evidence_dir / "preflight-pre.json"),
             "preflight_post_path": str(evidence_dir / "preflight-post.json"),
             "window_manifest_path": str(evidence_dir / "window-manifest.env"),
+            "copied_log_path": str(evidence_dir / "Obelisk.log"),
         },
         "checks": {
             "window_manifest_replay": [
@@ -295,10 +319,12 @@ def artifact_binding(payload: dict[str, Any]) -> dict[str, Any]:
         "required_sidecars": {
             "window_request_json": sidecars["request_pack_path"],
             "observer_window_env": sidecars["observer_env_path"],
+            "operator_approval_request_md": sidecars["operator_approval_request_path"],
             "operator_approval_receipt_json": sidecars["operator_approval_receipt_path"],
             "preflight_pre_json": sidecars["preflight_pre_path"],
             "preflight_post_json": sidecars["preflight_post_path"],
             "window_manifest_env": sidecars["window_manifest_path"],
+            "copied_obelisk_log": sidecars["copied_log_path"],
         },
         "binding_claim": "exact_run_id_window_artifacts_only",
         "non_authorization": ARTIFACT_BINDING_NON_AUTHORIZATION,
@@ -344,6 +370,7 @@ def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str
             "window_manifest_path": payload["window_manifest_path"],
             "observer_env_file": payload["observer_env_file"],
             "observer_env_path": replay_contract["sidecars"]["observer_env_path"],
+            "operator_approval_request_path": replay_contract["sidecars"]["operator_approval_request_path"],
             "operator_approval_receipt_path": replay_contract["sidecars"]["operator_approval_receipt_path"],
             "operator_approval_receipt_required": "completed_operator_receipt",
             "preflight_pre_path": replay_contract["sidecars"]["preflight_pre_path"],
@@ -473,6 +500,8 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         "Post-run verification commands:",
         "",
         "```text",
+        "requires_current_turn_operator_approval_before_execution=true",
+        "commands_authorize_runtime_or_public_readiness=false",
         *[" ".join(command) for command in post_run_verification_commands(payload)],
         "```",
         "",
@@ -492,10 +521,12 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
             for key in (
                 "request_pack_path",
                 "observer_env_path",
+                "operator_approval_request_path",
                 "operator_approval_receipt_path",
                 "preflight_pre_path",
                 "preflight_post_path",
                 "window_manifest_path",
+                "copied_log_path",
             )
         ],
         "operator_approval_receipt_requirement=completed operator-approval-receipt.json; generated template is not replay evidence",
@@ -660,7 +691,7 @@ def main() -> int:
     request_md_path = output_dir / "operator-approval-request.md"
     receipt_template_path = output_dir / "operator-approval-receipt.template.json"
 
-    env_path.write_text("\n".join(env) + "\n", encoding="utf-8")
+    env_path.write_text("\n".join(env_file_lines(args)) + "\n", encoding="utf-8")
     request_json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     request_md_path.write_text(markdown_request(payload, env), encoding="utf-8")
     receipt_template_path.write_text(
@@ -691,6 +722,9 @@ def main() -> int:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "request_pack_counts_as_approved_runtime_evidence": False,
+        "next_blocker": "operator_current_turn_runtime_window_approval_required",
         "outputs": {
             "observer_env": artifact(env_path),
             "request_json": artifact(request_json_path),

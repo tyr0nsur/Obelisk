@@ -270,3 +270,25 @@ This file is an active routing table only. Durable evidence belongs in
   JSON valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`, full SDK completion suite 211, and `git diff --check`.
   No runtime/server operation. Agents closed.
+- Latest round delegated request-pack hardening, approved-runtime replay/bundle binding,
+  SDK completion nested evidence scanning, and ResourceHandle serial/post-callback
+  boundary audit. Integrated result: generated player-principal lifecycle request packs
+  now include explicit false `authorization_flags`, `stable_claim_allowed=false`, and
+  `request_pack_counts_as_approved_runtime_evidence=false`; `observer-window.env` includes
+  request-pack-only no-claim comments; request-pack checking rejects future
+  `prepared_at_utc`, future operator receipts, and `--post-window-replay` before the
+  approved window has completed. Evidence bundles now require `--window-manifest` to
+  resolve to the exact sibling `window-manifest.env` beside the copied `Obelisk.log`
+  before output creation. Approved-evidence env parsing ignores no-claim comment lines
+  while still enforcing exact env key order/set. SDK completion now rejects nested
+  public/runtime/v1 overclaims inside command response and commands/replies structured
+  readiness reports. ResourceHandle serial and post-callback builders plus public
+  readiness checker now reject camel/snake/hyphen public/runtime/v1 alias overclaims
+  while keeping artifacts candidate-only. Offline request-pack sample in `/tmp` validated
+  as `ready=true` with `next_blocker=operator_current_turn_runtime_window_approval_required`
+  and all auth/readiness flags false. Validation passed: request-pack prepare 13,
+  request-pack check 54, evidence-bundle 46, approved-evidence/manifest 80,
+  ResourceHandle 33, consolidated touched suite 159, route JSON valid/planning-only, SDK
+  JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`,
+  py_compile, full SDK completion suite 213, and `git diff --check`. No runtime/server
+  operation. Agents closed.

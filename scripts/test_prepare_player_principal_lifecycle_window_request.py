@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import subprocess
 import sys
 import tempfile
@@ -16,15 +17,32 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 sys.path.insert(0, str(SCRIPT_DIR))
-from prepare_player_principal_lifecycle_window_request import EXPECTED_BINARY_SHA256  # noqa: E402
+from prepare_player_principal_lifecycle_window_request import AUTHORIZATION_FLAGS, EXPECTED_BINARY_SHA256  # noqa: E402
 
 
 SHA = EXPECTED_BINARY_SHA256
-TEST_COMMIT = subprocess.check_output(
-    ["git", "rev-parse", "HEAD"],
-    cwd=SCRIPT_DIR.parents[0],
-    text=True,
-).strip()
+TEST_COMMIT = "1" * 40
+_FAKE_GIT_DIR = tempfile.TemporaryDirectory()
+_FAKE_GIT = Path(_FAKE_GIT_DIR.name) / "git"
+_FAKE_GIT.write_text(
+    f"""#!/bin/sh
+if [ "$1" = "rev-parse" ]; then
+  printf '%s\\n' "{TEST_COMMIT}"
+  exit 0
+fi
+if [ "$1" = "cat-file" ] && [ "$2" = "-e" ]; then
+  commit="$3"
+  commit="${{commit%%^*}}"
+  if [ "$commit" = "{TEST_COMMIT}" ]; then
+    exit 0
+  fi
+fi
+exit 1
+""",
+    encoding="utf-8",
+)
+_FAKE_GIT.chmod(0o755)
+os.environ["PATH"] = f"{_FAKE_GIT_DIR.name}{os.pathsep}{os.environ['PATH']}"
 
 
 def future_window() -> tuple[str, str, str]:
@@ -90,7 +108,8 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
             report = json.loads(result.stdout)
             request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
-            env = (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines()
+            env_file = (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines()
+            env = [line for line in env_file if not line.startswith("#")]
             markdown = (output_dir / "operator-approval-request.md").read_text(encoding="utf-8")
             receipt_template = json.loads(
                 (output_dir / "operator-approval-receipt.template.json").read_text(encoding="utf-8")
@@ -117,6 +136,9 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+        self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         for name, filename in (
             ("observer_env", "observer-window.env"),
             ("request_json", "window-request.json"),
@@ -142,6 +164,7 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             self.assertFalse(value)
         self.assertEqual(request["schema"], "obelisk.player-principal-lifecycle-window-request.v1")
         self.assertEqual(request["status"], "candidate_only_request_pack")
+        self.assertEqual(request["authorization_flags"], AUTHORIZATION_FLAGS)
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")
         self.assertRegex(request["prepared_at_utc"], r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
         self.assertLess(request["prepared_at_utc"], request["approved_window"]["start_utc"])
@@ -163,6 +186,14 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             replay_contract["sidecars"]["operator_approval_receipt_path"],
             f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/operator-approval-receipt.json",
         )
+        self.assertEqual(
+            replay_contract["sidecars"]["operator_approval_request_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/operator-approval-request.md",
+        )
+        self.assertEqual(
+            replay_contract["sidecars"]["copied_log_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log",
+        )
         self.assertIn("--post-window-replay", replay_contract["checks"]["window_manifest_replay"])
         self.assertIn("does not authorize runtime work, server operations", replay_contract["non_authorization"])
         binding = request["operator_live_ops_brief"]["artifact_binding"]
@@ -178,9 +209,14 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             replay_contract["sidecars"]["operator_approval_receipt_path"],
         )
         self.assertEqual(
+            binding["required_sidecars"]["operator_approval_request_md"],
+            replay_contract["sidecars"]["operator_approval_request_path"],
+        )
+        self.assertEqual(
             binding["required_sidecars"]["preflight_post_json"],
             replay_contract["sidecars"]["preflight_post_path"],
         )
+        self.assertEqual(binding["required_sidecars"]["copied_obelisk_log"], replay_contract["sidecars"]["copied_log_path"])
         self.assertIn("enable-player-principal-lifecycle-observer", request["marker_set"])
         self.assertIn("enable-reflection-scanner", request["forbidden_markers"])
         self.assertIn("does not claim stable principal identity", request["non_claims"])
@@ -192,6 +228,10 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(
             evidence_capture["observer_env_path"],
             f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/observer-window.env",
+        )
+        self.assertEqual(
+            evidence_capture["operator_approval_request_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/operator-approval-request.md",
         )
         self.assertEqual(
             evidence_capture["preflight_pre_path"],
@@ -243,14 +283,22 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 "OBELISK_PE_TRACE_LIMIT=0",
             ],
         )
+        self.assertIn("# request-pack-only; does not authorize marker/env changes, runtime work, or server operations", env_file)
+        self.assertIn("# request_pack_counts_as_approved_runtime_evidence=false", env_file)
+        self.assertIn("# stable_claim_allowed=false", env_file)
         self.assertIn("This is a request pack only. It does not authorize server operations.", markdown)
         self.assertIn("dispatch limit=0", markdown)
         self.assertIn("log limit=10", markdown)
         self.assertIn("Post-window replay contract:", markdown)
         self.assertIn("preflight_pre_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
+        self.assertIn("operator_approval_request_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
         self.assertIn("operator_approval_receipt_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
+        self.assertIn("copied_log_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
         self.assertIn("completed operator-approval-receipt.json", markdown)
         self.assertIn("Required evidence sidecar commands:", markdown)
+        post_run_lines = fenced_section(markdown, "Post-run verification commands:")
+        self.assertEqual(post_run_lines[0], "requires_current_turn_operator_approval_before_execution=true")
+        self.assertEqual(post_run_lines[1], "commands_authorize_runtime_or_public_readiness=false")
         sidecar_lines = fenced_section(markdown, "Required evidence sidecar commands:")
         self.assertEqual(sidecar_lines[0], "requires_current_turn_operator_approval_before_execution=true")
         self.assertEqual(sidecar_lines[1], "commands_authorize_runtime_or_public_readiness=false")

@@ -85,6 +85,16 @@ FORBIDDEN_READY_VALUE_KEYS = {
     "resource_handle",
     "ResourceHandle",
 }
+FORBIDDEN_ALIAS_SUBJECT_RE = re.compile(
+    r"(?:resource_?handle|resourcehandle|object_?identity|object_?lookup|object_?handle|"
+    r"runtime_?object|serial_?reuse|wraparound)",
+    re.IGNORECASE,
+)
+FORBIDDEN_ALIAS_CONTEXT_RE = re.compile(
+    r"(?:public|runtime|v1|sdk|abi|release|promot|ready|readiness|enabled|allowed|available|"
+    r"post_?callback|samples?|safety|policy)",
+    re.IGNORECASE,
+)
 SURFACE_FORBIDDEN_TERM_RE = re.compile(
     r"(?:resourcehandle|resource[_ -]?handle|object[_ -]?identity|object[_ -]?lookup|"
     r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity)|"
@@ -158,12 +168,24 @@ def positive_claim(value: Any) -> bool:
     return False
 
 
+def normalized_claim_key(key: str) -> str:
+    key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return re.sub(r"[^a-zA-Z0-9]+", "_", key).strip("_").casefold()
+
+
+def forbidden_positive_alias_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    return bool(FORBIDDEN_ALIAS_SUBJECT_RE.search(normalized) and FORBIDDEN_ALIAS_CONTEXT_RE.search(normalized))
+
+
 def walk_claims(value: Any, blockers: list[str], trail: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
             if key in FORBIDDEN_TRUE_KEYS and positive_claim(child):
                 blockers.append(f"forbidden_positive_resource_handle_claim:{trail}.{key}")
             if key in FORBIDDEN_READY_VALUE_KEYS and positive_claim(child):
+                blockers.append(f"forbidden_positive_resource_handle_claim:{trail}.{key}")
+            if forbidden_positive_alias_key(str(key)) and positive_claim(child):
                 blockers.append(f"forbidden_positive_resource_handle_claim:{trail}.{key}")
             walk_claims(child, blockers, f"{trail}.{key}")
     elif isinstance(value, list):

@@ -37,6 +37,7 @@ WINDOW_NON_CLAIMS = [
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
+    AUTHORIZATION_FLAGS,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
@@ -236,6 +237,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "approved_window": approved_window,
         "restart_expectation": "restart",
         "final_posture": "stable",
+        "authorization_flags": dict(AUTHORIZATION_FLAGS),
         "user_policy": "no_regular_users",
         "notice_path": "not_applicable",
         "copied_evidence_dir": str(live_dir),
@@ -250,11 +252,11 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         },
         "non_claims": NON_CLAIMS,
     }
+    request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
     request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
         request_payload,
         observer_env_lines,
     )
-    request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
     request = write_sidecar(
         request_pack_path,
         json.dumps(request_payload, sort_keys=True) + "\n",

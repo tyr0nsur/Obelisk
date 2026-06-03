@@ -106,12 +106,9 @@ priorities, and do not use history files as the active source of truth.
   runtime, or v1-completion claims block planning alignment even if a leaf report says
   `valid=true`.
   Identity has repo-local lifecycle/principal planning artifacts in
-  `docs/research/player-identity-planning-sources/`, but accepted lifecycle anchors now
-  fail closed until non-placeholder provenance and accepted report hashes are rebound.
-  The default no-runtime route is blocked at
-  `lifecycle_anchor_first_evidence_provenance_unbound`, remains locked/planning-only, and
-  keeps all public/runtime/promotion/SDK readiness flags false; after provenance binding
-  it may advance to `approved_runtime_evidence_missing`, and with accepted approved
+  `docs/research/player-identity-planning-sources/`, but the default no-runtime route is
+  now blocked at `approved_runtime_evidence_missing`, remains locked/planning-only, and
+  keeps all public/runtime/promotion/SDK readiness flags false. With accepted approved
   runtime evidence it may advance only to `identity_public_contract_gate_missing`, still
   locked/planning-only. Inventory copied signals remain the higher-value side lane
   after identity -> permissions/admin -> command response -> commands/replies, while Structure census is
@@ -1364,6 +1361,28 @@ priorities, and do not use history files as the active source of truth.
   JSON valid/planning-only, SDK JSON blocked by design, full SDK completion suite 211,
   and `git diff --check`. Route/SDK remain fail-closed
   at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent request/replay/SDK/ResourceHandle hardening round:
+  player-principal lifecycle request packs now emit explicit false `authorization_flags`,
+  `stable_claim_allowed=false`, and
+  `request_pack_counts_as_approved_runtime_evidence=false`; generated
+  `observer-window.env` includes request-pack-only no-claim comments. Request-pack checks
+  reject future `prepared_at_utc`, future completed receipts, and `--post-window-replay`
+  before the approved window has completed. Evidence bundles require `--window-manifest`
+  to resolve to the exact sibling `window-manifest.env` beside copied `Obelisk.log`
+  before any bundle output is created, and approved-evidence env parsing ignores no-claim
+  comments while preserving exact env key order/set enforcement. SDK completion rejects
+  nested public/runtime/v1 overclaims inside command response and commands/replies
+  structured readiness reports. ResourceHandle serial/post-callback candidate builders and
+  public readiness checks reject camel/snake/hyphen public/runtime/v1 alias overclaims
+  without promoting ResourceHandle. Offline `/tmp` request-pack sample validated as
+  `ready=true`, `next_blocker=operator_current_turn_runtime_window_approval_required`,
+  with all auth/readiness flags false. Validations passed: request-pack prepare 13,
+  request-pack check 54, evidence-bundle 46, approved-evidence/manifest 80,
+  ResourceHandle 33, consolidated touched suite 159, route JSON valid/planning-only, SDK
+  JSON blocked by design, py_compile, full SDK completion suite 213, and `git diff --check`.
+  Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination

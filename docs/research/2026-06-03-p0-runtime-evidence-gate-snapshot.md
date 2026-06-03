@@ -210,3 +210,41 @@ completion suite 211, py_compile, route JSON valid/planning-only, SDK JSON
 blocked by design, and `git diff --check`. The stable
 state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
 progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Request Pack And Replay Binding Hardening
+
+The next supervised 4-agent round prepared the runtime-evidence path further
+without running a server or changing the blocker:
+
+- Player-principal lifecycle request packs now carry explicit false
+  `authorization_flags`, including `server_operations_authorized=false`,
+  `runtime_work_authorized=false`,
+  `request_pack_counts_as_approved_runtime_evidence=false`,
+  `publication_authorized=false`, `stable_claim_allowed=false`, and false
+  public/runtime/v1 readiness flags.
+- Generated `observer-window.env` now includes request-pack-only comments. The
+  request checker ignores those comments for env parsing; approved-evidence
+  replay also ignores comment lines while still enforcing exact env key order
+  and values for real env entries.
+- Request-pack validation rejects future `prepared_at_utc`, future completed
+  operator receipts, and `--post-window-replay` before the approved window has
+  completed. A fresh `/tmp` request-pack sample validated as `ready=true` only
+  for pre-window planning, with
+  `next_blocker=operator_current_turn_runtime_window_approval_required` and all
+  authorization/readiness flags false.
+- Evidence-bundle generation now requires the supplied `--window-manifest` to
+  resolve to the exact sibling `window-manifest.env` beside the copied
+  `Obelisk.log` before output creation.
+- SDK completion now rejects nested public/runtime/v1 overclaims inside command
+  response and commands/replies structured readiness reports.
+- ResourceHandle serial-policy, post-callback contract, and public-readiness
+  checkers reject camel-case, snake-case, and hyphenated aliases that claim
+  ResourceHandle/object identity/object lookup/runtime/v1 promotion while
+  preserving candidate-only status.
+
+Validated offline: request-pack prepare 13, request-pack check 54,
+evidence-bundle 46, approved-evidence/manifest 80, ResourceHandle 33,
+consolidated touched suite 159, route JSON valid/planning-only, SDK JSON
+blocked by design, py_compile, full SDK completion suite 213, and `git diff --check`.
+The stable state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
+progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.

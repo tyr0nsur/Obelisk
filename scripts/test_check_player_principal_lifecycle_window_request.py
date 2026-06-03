@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -16,11 +17,28 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
-TEST_COMMIT = subprocess.check_output(
-    ["git", "rev-parse", "HEAD"],
-    cwd=SCRIPT_DIR.parents[0],
-    text=True,
-).strip()
+TEST_COMMIT = "1" * 40
+_FAKE_GIT_DIR = tempfile.TemporaryDirectory()
+_FAKE_GIT = Path(_FAKE_GIT_DIR.name) / "git"
+_FAKE_GIT.write_text(
+    f"""#!/bin/sh
+if [ "$1" = "rev-parse" ]; then
+  printf '%s\\n' "{TEST_COMMIT}"
+  exit 0
+fi
+if [ "$1" = "cat-file" ] && [ "$2" = "-e" ]; then
+  commit="$3"
+  commit="${{commit%%^*}}"
+  if [ "$commit" = "{TEST_COMMIT}" ]; then
+    exit 0
+  fi
+fi
+exit 1
+""",
+    encoding="utf-8",
+)
+_FAKE_GIT.chmod(0o755)
+os.environ["PATH"] = f"{_FAKE_GIT_DIR.name}{os.pathsep}{os.environ['PATH']}"
 
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("check_player_principal_lifecycle_window_request", CHECK)
@@ -29,6 +47,7 @@ REQUEST_CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = REQUEST_CHECKER
 SPEC.loader.exec_module(REQUEST_CHECKER)
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    AUTHORIZATION_FLAGS,
     EXPECTED_BINARY_SHA256,
     operator_approval_receipt_payload,
 )
@@ -158,9 +177,12 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         self.assertRegex(request["prepared_at_utc"], r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
         self.assertLess(request["prepared_at_utc"], request["approved_window"]["start_utc"])
+        self.assertEqual(AUTHORIZATION_FLAGS, request["authorization_flags"])
         self.assertTrue(report["operator_request_verified"])
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
@@ -185,6 +207,10 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             brief["evidence_capture"]["observer_env_path"],
         )
         self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["operator_approval_request_path"],
+            brief["evidence_capture"]["operator_approval_request_path"],
+        )
+        self.assertEqual(
             request["post_window_replay_contract"]["sidecars"]["preflight_pre_path"],
             brief["evidence_capture"]["preflight_pre_path"],
         )
@@ -196,6 +222,14 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(
             request["post_window_replay_contract"]["sidecars"]["window_manifest_path"],
             brief["artifact_binding"]["required_sidecars"]["window_manifest_env"],
+        )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["operator_approval_request_path"],
+            brief["artifact_binding"]["required_sidecars"]["operator_approval_request_md"],
+        )
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["copied_log_path"],
+            brief["artifact_binding"]["required_sidecars"]["copied_obelisk_log"],
         )
         self.assertEqual("exact_run_id_window_artifacts_only", brief["artifact_binding"]["binding_claim"])
         self.assertEqual("completed_operator_receipt", brief["evidence_capture"]["operator_approval_receipt_required"])
@@ -258,6 +292,21 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_authorization_flags_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["authorization_flags"]["runtime_work_authorized"] = True
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("authorization_flags_mismatch", report["blockers"])
+        self.assertIn("authorization_flag_runtime_work_authorized_not_false", report["blockers"])
 
     def test_rejects_operator_live_ops_brief_artifact_binding_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -348,6 +397,30 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("prepared_at_utc_too_far_before_approved_window", report["blockers"])
         self.assertFalse(report["runtime_work_authorized"])
 
+    def test_rejects_request_pack_prepared_in_future(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            start = datetime.fromisoformat(
+                request["approved_window"]["start_utc"].replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+            request["prepared_at_utc"] = (start - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("prepared_at_utc_in_future", report["blockers"])
+
     def test_rejects_receipt_approved_before_request_prepared(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -426,6 +499,29 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertIn("operator_approval_receipt_approved_too_far_before_window_start", report["blockers"])
+
+    def test_rejects_receipt_approved_in_future(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
+            start = datetime.fromisoformat(
+                request["approved_window"]["start_utc"].replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+            receipt_path = write_completed_receipt(
+                output_dir,
+                approved_at_utc=(start - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_approved_in_future", report["blockers"])
 
     def test_rejects_operator_request_markdown_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -538,6 +634,38 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             "post_window_replay_contract_preflight_post_path_not_exact_expected_path",
             report["blockers"],
         )
+
+    def test_rejects_post_window_replay_contract_missing_bound_operator_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["post_window_replay_contract"]["sidecars"].pop("operator_approval_request_path")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("post_window_replay_contract_sidecars_missing_required", report["blockers"])
+        self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
+        self.assertIn("operator_request_markdown_projection_failed", report["blockers"])
+
+    def test_post_window_replay_rejects_window_not_completed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ready"])
+        self.assertIn("post_window_replay_window_not_completed", report["blockers"])
 
     def test_post_window_replay_tolerates_expired_window_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
