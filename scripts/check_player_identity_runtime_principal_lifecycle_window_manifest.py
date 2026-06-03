@@ -288,6 +288,11 @@ ALLOWED_FIELDS = frozenset(
         "notice_sent",
     )
 )
+PATH_VALUE_FIELDS = frozenset(
+    key
+    for key in REQUIRED_SIMPLE_FIELDS
+    if key.endswith("_path")
+)
 
 
 @dataclass
@@ -1751,10 +1756,11 @@ def validate_manifest(
             add(blockers, "unexpected_field", key)
         if key not in ALLOWED_FIELDS and FORBIDDEN_KEY_RE.search(key):
             add(blockers, "forbidden_identity_or_ue_field", key)
-        if FORBIDDEN_VALUE_RE.search(fields[key]):
-            add(blockers, "forbidden_identity_or_ue_value", key)
-        if POSITIVE_CAPABILITY_VALUE_RE.search(fields[key]):
-            add(blockers, "forbidden_public_capability_or_readiness_value", key)
+        if key not in PATH_VALUE_FIELDS:
+            if FORBIDDEN_VALUE_RE.search(fields[key]):
+                add(blockers, "forbidden_identity_or_ue_value", key)
+            if POSITIVE_CAPABILITY_VALUE_RE.search(fields[key]):
+                add(blockers, "forbidden_public_capability_or_readiness_value", key)
     for key in REQUIRED_SIMPLE_FIELDS:
         if key not in fields:
             add(blockers, "required_field_missing", key)

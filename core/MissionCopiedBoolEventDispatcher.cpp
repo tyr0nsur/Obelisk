@@ -384,10 +384,15 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Mission copied-bool event owner unregister failed with an unknown exception.");
             return false;
         }
-        for (const MissionCopiedBoolEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        std::exception_ptr cleanupFailure;
+        std::vector<MissionCopiedBoolEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
         return after != before;
     }
 

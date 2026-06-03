@@ -592,6 +592,107 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "deferred destroy item return callback survived cleanup");
     }
 
+    struct RetryingGranularDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 2;
+    };
+
+    void BlockingGranularDestroyCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<RetryingGranularDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FailsTwiceGranularDestroy(void* userData)
+    {
+        auto* state = static_cast<RetryingGranularDestroyState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected granular item return destroy failure");
+        }
+    }
+
+    void TestOwnerGranularUnregisterRetainsFailedDeferredDestroyForCleanupRetry()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        RetryingGranularDestroyState state;
+        std::atomic<bool> unregisterThrew{false};
+        std::atomic<bool> unregisterFinished{false};
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeScalars();
+
+        const uint64_t id = dispatcher.Register(&owner, {
+            BlockingGranularDestroyCallback,
+            &state,
+            FailsTwiceGranularDestroy,
+        });
+        Require(id != 0, "granular deferred destroy item return registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "granular deferred destroy item return callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "granular deferred destroy item return callback did not enter");
+        }
+
+        std::thread unregisterThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbackForOwner(&owner, id);
+            }
+            catch (const std::runtime_error&)
+            {
+                unregisterThrew.store(true, std::memory_order_release);
+            }
+            unregisterFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "granular owner unregister did not remove item return callback during dispatch");
+        Require(!unregisterFinished.load(std::memory_order_acquire),
+                "granular owner unregister completed before deferred item return dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        unregisterThread.join();
+
+        Require(unregisterThrew.load(std::memory_order_acquire),
+                "granular owner unregister hid deferred item return DestroyUserData failure");
+        Require(state.DestroyCalls == 2,
+                "granular owner unregister did not retain the failed item return DestroyUserData retry");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "owner cleanup retry did not report retained granular item return DestroyUserData");
+        Require(state.DestroyCalls == 3,
+                "owner cleanup retry did not rerun retained granular item return DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed granular item return cleanup retry was not idempotent");
+    }
+
     struct OwnerCleanupNoDispatchState
     {
         int Calls = 0;
@@ -763,6 +864,7 @@ int main()
         TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
+        TestOwnerGranularUnregisterRetainsFailedDeferredDestroyForCleanupRetry();
         TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks();
         TestCallbackExceptionDoesNotStopDispatch();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();

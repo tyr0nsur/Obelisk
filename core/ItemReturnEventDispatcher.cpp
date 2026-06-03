@@ -326,10 +326,15 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Item return event owner unregister failed with an unknown exception.");
             return false;
         }
-        for (const ItemReturnEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        std::exception_ptr cleanupFailure;
+        std::vector<ItemReturnEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
         return after != before;
     }
 

@@ -1835,6 +1835,40 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("forbidden_identity_or_ue_value", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_path_fields_are_not_scanned_as_identity_payload_text(self) -> None:
+        sidecar_dir = (
+            Path("/servidor/ark/workspace-offline")
+            / "obelisk-test-player-principal-ip_fixture"
+            / "live-validation-logs"
+            / RUN_ID
+        )
+        lines = manifest_lines(
+            copied_log_path=str(sidecar_dir / "Obelisk.log"),
+            request_pack_path=str(sidecar_dir / "window-request.json"),
+            observer_env_path=str(sidecar_dir / "observer-window.env"),
+            operator_approval_receipt_path=str(sidecar_dir / "operator-approval-receipt.json"),
+            preflight_pre_path=str(sidecar_dir / "preflight-pre.json"),
+            preflight_post_path=str(sidecar_dir / "preflight-post.json"),
+        )
+        fields = dict(line.split("=", 1) for line in lines)
+        validation = CHECKER.validate_manifest(fields, sidecar_dir / "window-manifest.env", post_window_replay=True)
+
+        path_labels = {
+            "copied_log_path",
+            "request_pack_path",
+            "observer_env_path",
+            "operator_approval_receipt_path",
+            "preflight_pre_path",
+            "preflight_post_path",
+        }
+        self.assertFalse(
+            any(
+                blocker["reason"] == "forbidden_identity_or_ue_value"
+                and blocker["label"] in path_labels
+                for blocker in validation.blockers
+            )
+        )
+
     def test_rejects_extended_private_identity_terms_from_current_notes(self) -> None:
         result = self.run_checker(
             manifest_lines(rollback_delta="removed_observer_env_after_permission_state_and_identity_hash_redaction"),

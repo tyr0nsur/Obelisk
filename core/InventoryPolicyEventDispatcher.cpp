@@ -364,10 +364,15 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Inventory policy event owner unregister failed with an unknown exception.");
             return false;
         }
-        for (const InventoryPolicyEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        std::exception_ptr cleanupFailure;
+        std::vector<InventoryPolicyEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
         return after != before;
     }
 

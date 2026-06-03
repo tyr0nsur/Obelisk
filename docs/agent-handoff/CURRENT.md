@@ -203,14 +203,14 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest round delegated runtime-evidence prep, SDK accounting, reversing/static audit,
-  and runtime ABI. Integrated result: request packs now bind exact run-id artifacts in the
-  operator brief and replay sidecars, planning smoke JSON exposes the required runtime
-  event/consumer cases for the next approved manifest, route checks forward supplied
-  approved runtime evidence into the identity public-contract gap checker, SDK accounting
-  accepts `identity_public_contract_gate_missing` only when that runtime input was
-  forwarded, and Mission copied-bool granular unregister now propagates deferred
-  `DestroyUserData` failures. Window-manifest replay uses the shared replay
-  non-authorization constant. Route JSON remains valid/planning-only at
+- Latest round delegated SDK accounting, runtime ABI, UE4/static contract audit, and
+  live-ops/request-pack drift. Integrated result: SDK completion rejects
+  `runtime_replay`/`post_window_replay` aliases as promotion evidence; the identity
+  public-contract decision manifest now declares the owner-token SDK consumer contract as
+  candidate-only cleanup/lifecycle review evidence; approved-runtime evidence replay uses
+  the canonical request-pack digest helper; window-manifest path fields avoid private-term
+  false positives while retaining path/sibling/SHA checks; PluginManager chat cleanup now
+  uses owner-scoped unregister and copied dispatchers retain failed granular owner
+  `DestroyUserData` cleanup for retry. Route JSON remains valid/planning-only at
   `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.

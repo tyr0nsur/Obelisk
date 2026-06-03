@@ -47,6 +47,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     operator_approval_receipt_payload,
     operator_live_ops_brief,
     post_window_replay_contract,
+    request_pack_digest,
 )
 
 
@@ -634,6 +635,10 @@ def manifest_for_copied_log(copied_log: Path, *, log_lines: list[str] | None = N
 
 
 class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
+    def test_request_pack_digest_uses_prepare_helper(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_digest")
+        self.assertIs(checker.request_pack_digest, request_pack_digest)
+
     def test_operational_window_allowed_keys_are_replayed(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_replay_keys")
         self.assertEqual(

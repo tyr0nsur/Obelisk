@@ -441,8 +441,14 @@ PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
     "placeholder_provenance",
     "preflight",
     "preflight_only",
+    "post_window_replay",
+    "post_window_replay_only",
     "request_pack",
     "request_pack_only",
+    "runtime_replay",
+    "runtime_replay_fixture",
+    "runtime_replay_fixture_only",
+    "runtime_replay_only",
     "runtime_window",
     "live_ops_sidecar_only",
     "live_validation_sidecar_only",
@@ -584,9 +590,15 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "preflight",
     "preflight-pre",
     "preflight-post",
+    "post_window_replay",
+    "post-window-replay",
     "readiness",
     "request_pack",
     "request-pack",
+    "runtime_replay",
+    "runtime-replay",
+    "runtime_replay_fixture",
+    "runtime-replay-fixture",
     "operator_approval_receipt",
     "operator-approval-receipt",
     "operator_receipt",
@@ -635,6 +647,8 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"lifecycle[-_ ]?anchor[-_ ]?candidates?|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
     r"operator[-_ ]?(?:approval[-_ ]?)?receipts?|window[-_ ]?manifests?|"
+    r"(?:(?:post[-_ ]?window[-_ ]?)?runtime[-_ ]?replay(?:[-_ ]?fixtures?)?|"
+    r"post[-_ ]?window[-_ ]?replay(?:[-_ ]?fixtures?)?)|"
     r"live[-_ ]?(?:validation|ops)(?:[-_ ]?sidecars?)?|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
     r"static[-_ ]?(?:orientation|candidate|target|discovery)|native[-_ ]?ufunction[-_ ]?registration[-_ ]?static[-_ ]?discovery|"

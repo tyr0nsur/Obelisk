@@ -1245,6 +1245,19 @@ priorities, and do not use history files as the active source of truth.
   route/SDK JSON, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent SDK/runtime guardrail round: SDK accounting now rejects
+  `runtime_replay`, `runtime_replay_fixture`, and `post_window_replay` aliases as
+  promotion evidence; identity public-contract decisions declare
+  `owner_token_sdk_consumer_contract_intake` as candidate-only lifecycle/cleanup review
+  evidence; approved-runtime evidence replay imports the canonical request-pack digest;
+  window-manifest private-value scanning skips canonical path fields only while preserving
+  path/sibling/SHA checks; PluginManager chat cleanup uses owner-scoped unregister, and
+  copied dispatchers retain failed granular owner `DestroyUserData` cleanup for retry.
+  Validation passed: public-contract gap suite, live-ops/request-window suite, full SDK
+  completion suite, PluginManager guardrails, targeted dispatcher/PluginManager CTest,
+  route/SDK JSON, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

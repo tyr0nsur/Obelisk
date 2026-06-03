@@ -242,6 +242,91 @@ namespace Obelisk::Core
         return after != before;
     }
 
+    bool ChatEventDispatcher::UnregisterCallbackForOwner(void* owner, uint64_t registrationId)
+    {
+        if (!owner || registrationId == 0)
+            return false;
+
+        std::vector<ChatMessageSubscription> removed;
+        std::exception_ptr deferredFailure;
+        size_t before = 0;
+        size_t after = 0;
+        try
+        {
+            std::unique_lock<std::mutex> lock(m_Mutex);
+            before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [owner, registrationId](const Registration& item) {
+                                  return item.Owner == owner && item.Id == registrationId;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return false;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [owner, registrationId, &removed](const Registration& item) {
+                                              if (item.Owner != owner || item.Id != registrationId)
+                                                  return false;
+                                              removed.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            {
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                removed = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
+            }
+            else if (!IsInsideAnyGameplayCallback() &&
+                     !IsInsideDispatcherCleanup() &&
+                     !IsDispatchCleanupComplete())
+                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event owner unregister failed: {}", e.what());
+            return false;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event owner unregister failed with an unknown exception.");
+            return false;
+        }
+        std::exception_ptr cleanupFailure;
+        std::vector<ChatMessageSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
+        if (deferredFailure)
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
+        return after != before;
+    }
+
     size_t ChatEventDispatcher::UnregisterCallbacksForOwner(void* owner)
     {
         if (!owner)

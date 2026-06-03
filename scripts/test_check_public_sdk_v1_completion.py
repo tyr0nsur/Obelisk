@@ -5979,6 +5979,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "post_window_replay_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "runtime_replay_fixture",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "window_manifest_only",
             },
             {
@@ -6064,12 +6072,25 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "schemas": ["obelisk.player-identity-approved-runtime-replay-fixture.v1"],
+            },
+            {
+                **base_evidence,
                 "source_kind": "runtime-principal-lifecycle-evidence",
+            },
+            {
+                **base_evidence,
+                "source_kind": "post-window-runtime-replay",
             },
             {
                 **base_evidence,
                 "abi_tests": ["tests/core/player_identity_approved_bundle.cpp"],
                 "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_approved_bundle.c"],
+            },
+            {
+                **base_evidence,
+                "abi_tests": ["tests/core/player_identity_runtime_replay.cpp"],
+                "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_runtime_replay.c"],
             },
             {
                 **base_evidence,
@@ -6738,6 +6759,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ("claim_scope", "preflight-only"),
                 ("artifactScope", "window_manifest_only"),
                 ("validation_scope", "operator-approval-receipt-only"),
+                ("source_scope", "runtime-replay-fixture-only"),
+                ("ready_scope", "post-window-replay"),
             )
             for key, value in cases:
                 with self.subTest(scope_key=key):

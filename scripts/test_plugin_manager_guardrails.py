@@ -525,6 +525,13 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 for direct_token in direct_dispatcher_cleanup_tokens:
                     self.assertLess(public_index, body.index(direct_token))
 
+        chat_unregister_body = extract_function_body(
+            text,
+            r"bool UnregisterChatMessageRegistrationForOwner\(.*?\)",
+        )
+        self.assertIn("registration.Dispatcher->UnregisterCallbackForOwner", chat_unregister_body)
+        self.assertNotIn("registration.Dispatcher->Unregister(registration.InternalRegistrationId)", chat_unregister_body)
+
     def test_public_owner_token_handle_apis_have_owner_cleanup_backstops(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -906,7 +913,26 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                         "TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure)" in body,
                         "granular cleanup must retrieve deferred cleanup failures",
                     )
-                    self.assertIn("std::rethrow_exception(deferredFailure)", body)
+                    self.assertTrue(
+                        "std::rethrow_exception(deferredFailure)" in body or
+                        "std::rethrow_exception(cleanupFailure)" in body,
+                        "granular cleanup must rethrow retained/deferred cleanup failures",
+                    )
+
+    def test_owner_granular_event_dispatchers_retain_cleanup_failures_for_owner_retry(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "UnregisterCallbackForOwner" not in text:
+                continue
+            body = extract_function_body(
+                text,
+                r"bool \w+EventDispatcher::UnregisterCallbackForOwner\(void\* owner, uint64_t registrationId\)",
+            )
+            with self.subTest(source=source.name):
+                self.assertIn("std::exception_ptr cleanupFailure", body)
+                self.assertIn("DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure)", body)
+                self.assertIn("RetainFailedOwnerDestroySubscriptions(owner, failed)", body)
+                self.assertIn("std::rethrow_exception(cleanupFailure)", body)
 
     def test_deferred_event_dispatcher_finish_dispatch_does_not_throw_before_notify(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):

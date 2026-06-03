@@ -1340,7 +1340,9 @@ namespace Obelisk::Core
             if (!registration.Dispatcher)
                 return false;
 
-            bool unregistered = registration.Dispatcher->Unregister(registration.InternalRegistrationId);
+            bool unregistered = registration.Dispatcher->UnregisterCallbackForOwner(
+                owner,
+                registration.InternalRegistrationId);
             if (!unregistered)
             {
                 if (!ownerCleanupRetry)

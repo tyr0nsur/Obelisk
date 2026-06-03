@@ -22,7 +22,10 @@ from typing import Any
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
 import check_player_principal_lifecycle_window_manifest as window_manifest_checker
-from prepare_player_principal_lifecycle_window_request import NON_CLAIMS as EXPECTED_REQUEST_PACK_NON_CLAIMS
+from prepare_player_principal_lifecycle_window_request import (
+    NON_CLAIMS as EXPECTED_REQUEST_PACK_NON_CLAIMS,
+    request_pack_digest,
+)
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import first_symlink_component, reject_protected_input_path, reject_symlink_component
 
@@ -799,31 +802,6 @@ def load_text_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]
     except OSError as exc:
         add(blockers, "operational_window_text_artifact_unreadable", label, error=str(exc))
         return None
-
-
-def request_pack_digest(
-    *,
-    request_json_path: Path,
-    request_md_path: Path,
-    env_path: Path,
-) -> dict[str, str]:
-    domain = b"obelisk.player-principal-lifecycle.request-pack.v1"
-    material = b"\0".join(
-        (
-            domain,
-            b"window-request.json",
-            request_json_path.read_bytes(),
-            b"observer-window.env",
-            env_path.read_bytes(),
-            b"operator-approval-request.md",
-            request_md_path.read_bytes(),
-        )
-    )
-    return {
-        "algorithm": "sha256",
-        "domain": domain.decode("ascii"),
-        "sha256": hashlib.sha256(material).hexdigest(),
-    }
 
 
 def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[str, Any]], trail: str = "$") -> None:

@@ -607,6 +607,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         decisions["approved_runtime_evidence_intake"]["promotion_ready"] = True
         decisions["identifier_redaction_evidence_intake"]["public_sdk_ready"] = True
         decisions["public_abi_preflight_candidate_intake"]["public_abi_ready"] = True
+        decisions["owner_token_sdk_consumer_contract_intake"]["lifecycle_owner_cleanup_ready"] = True
         decisions["proposed_public_pod_abi_candidate"]["runtime_ready"] = True
         self.player_identity_surface(surfaces)["evidence"]["candidate_policy_artifacts"][0]["public_sdk_ready"] = True
         candidate["runtime_ready"] = True
@@ -621,6 +622,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.approved_runtime_evidence_intake.promotion_ready", labels)
         self.assertIn("$.identifier_redaction_evidence_intake.public_sdk_ready", labels)
         self.assertIn("$.public_abi_preflight_candidate_intake.public_abi_ready", labels)
+        self.assertIn("$.owner_token_sdk_consumer_contract_intake.lifecycle_owner_cleanup_ready", labels)
         self.assertIn("$.proposed_public_pod_abi_candidate.runtime_ready", labels)
         self.assertIn("$.evidence.candidate_policy_artifacts[0].public_sdk_ready", labels)
         self.assertIn("$.runtime_ready", labels)
@@ -690,6 +692,34 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("decisions_public_abi_preflight_candidate_intake_missing", report["blockers"])
+
+    def test_rejects_missing_or_weakened_owner_token_sdk_consumer_contract_intake(self) -> None:
+        decisions = self.load_decisions()
+        decisions["owner_token_sdk_consumer_contract_intake"]["id"] = "owner_token_contract"
+        decisions["owner_token_sdk_consumer_contract_intake"]["status"] = "accepted"
+        decisions["owner_token_sdk_consumer_contract_intake"]["resolved_input"] = "lifecycle.owner_cleanup"
+        decisions["owner_token_sdk_consumer_contract_intake"]["required_checker"] = "scripts/other.py"
+        decisions["owner_token_sdk_consumer_contract_intake"]["default_manifest"] = "docs/research/other.json"
+        decisions["owner_token_sdk_consumer_contract_intake"]["non_claim"] = "promotes owner cleanup"
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_id_mismatch", report["blockers"])
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_status_mismatch", report["blockers"])
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_resolved_input_mismatch", report["blockers"])
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_checker_mismatch", report["blockers"])
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_default_manifest_mismatch", report["blockers"])
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_non_claim_mismatch", report["blockers"])
+
+        decisions = self.load_decisions()
+        decisions.pop("owner_token_sdk_consumer_contract_intake")
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_owner_token_sdk_consumer_contract_intake_missing", report["blockers"])
 
     def test_rejects_public_abi_preflight_sdk_consumer_overclaim(self) -> None:
         preflight = self.load_public_abi_preflight_candidate()
@@ -935,16 +965,17 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         )
 
         report = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 0)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_bound_planning_manifest_verification_not_accepted", report["blockers"])
         source_verification = report["source_bound_planning_manifest_verification"]
-        self.assertTrue(source_verification["accepted_for_contract_review"])
-        self.assertEqual(
-            "lifecycle_anchor_first_evidence_provenance_unbound",
-            source_verification["current_route_blocker"],
-        )
+        self.assertFalse(source_verification["accepted_for_contract_review"])
+        source_reasons = [
+            blocker["reason"] if isinstance(blocker, dict) else blocker
+            for blocker in source_verification["blockers"]
+        ]
         self.assertIn(
-            "accepted_anchor_second_source_report_hash_missing",
-            source_verification["blockers"],
+            "stale_or_mismatched_planning_manifest",
+            source_reasons,
         )
         self.assertFalse(source_verification["promotion_ready"])
         self.assertFalse(source_verification["public_sdk_ready"])

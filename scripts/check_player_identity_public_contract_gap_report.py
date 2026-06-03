@@ -106,6 +106,18 @@ REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM = (
     "POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote "
     "player identity, or count toward v1 completion."
 )
+REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_INTAKE_ID = "owner_token_sdk_consumer_contract"
+REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT = (
+    "lifecycle.owner_cleanup.owner_token_sdk_consumer_contract"
+)
+REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_CHECKER = (
+    "scripts/check_player_identity_owner_token_sdk_consumer_contract.py"
+)
+REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_NON_CLAIM = (
+    "A valid owner-token SDK consumer contract is candidate-only cleanup/lifecycle review evidence; it does "
+    "not resolve lifecycle.owner_cleanup, add public header symbols, add capability bits, expose callbacks, "
+    "promote player identity, or count toward v1 completion."
+)
 REQUIRED_PROMOTION_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -1035,6 +1047,63 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                     f"$.public_abi_preflight_candidate_intake.{key}",
                     input="public_abi_preflight_candidate_intake",
                     value=public_abi_preflight_intake.get(key),
+                )
+    owner_token_intake = decisions.get("owner_token_sdk_consumer_contract_intake")
+    if not isinstance(owner_token_intake, dict):
+        add(blockers, "decisions_owner_token_sdk_consumer_contract_intake_missing", "$.owner_token_sdk_consumer_contract_intake")
+    else:
+        if owner_token_intake.get("id") != REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_INTAKE_ID:
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_id_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.id",
+            )
+        if owner_token_intake.get("status") != "repo_candidate_contract_required":
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_status_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.status",
+            )
+        if owner_token_intake.get("resolved_input") != REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT:
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_resolved_input_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.resolved_input",
+            )
+        if owner_token_intake.get("required_checker") != REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_CHECKER:
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_checker_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.required_checker",
+            )
+        if owner_token_intake.get("default_manifest") != str(DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT):
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_default_manifest_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.default_manifest",
+            )
+        if owner_token_intake.get("non_claim") != REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_NON_CLAIM:
+            add(
+                blockers,
+                "decisions_owner_token_sdk_consumer_contract_intake_non_claim_mismatch",
+                "$.owner_token_sdk_consumer_contract_intake.non_claim",
+            )
+        for key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_header_allowed",
+            "public_abi_ready",
+            "v1_completion_evidence",
+            "lifecycle_owner_cleanup_ready",
+        ):
+            if owner_token_intake.get(key) is not False:
+                add(
+                    blockers,
+                    "readiness_flag_not_false",
+                    f"$.owner_token_sdk_consumer_contract_intake.{key}",
+                    input="owner_token_sdk_consumer_contract_intake",
+                    value=owner_token_intake.get(key),
                 )
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):

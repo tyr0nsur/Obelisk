@@ -93,6 +93,21 @@
     "default_manifest": "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json",
     "non_claim": "A valid public ABI preflight candidate is offline routing evidence only; it does not resolve the public POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote player identity, or count toward v1 completion."
   },
+  "owner_token_sdk_consumer_contract_intake": {
+    "id": "owner_token_sdk_consumer_contract",
+    "status": "repo_candidate_contract_required",
+    "resolved_input": "lifecycle.owner_cleanup.owner_token_sdk_consumer_contract",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "public_header_allowed": false,
+    "public_abi_ready": false,
+    "v1_completion_evidence": false,
+    "lifecycle_owner_cleanup_ready": false,
+    "required_checker": "scripts/check_player_identity_owner_token_sdk_consumer_contract.py",
+    "default_manifest": "docs/research/player-identity-planning-sources/player-identity-owner-token-sdk-consumer-contract.json",
+    "non_claim": "A valid owner-token SDK consumer contract is candidate-only cleanup/lifecycle review evidence; it does not resolve lifecycle.owner_cleanup, add public header symbols, add capability bits, expose callbacks, promote player identity, or count toward v1 completion."
+  },
   "approved_runtime_evidence_not_sufficient": {
     "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
     "why": [
