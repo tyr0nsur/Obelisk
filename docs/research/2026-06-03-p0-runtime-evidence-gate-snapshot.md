@@ -620,6 +620,83 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Turbo SDK Guardrail Round After Compaction
+
+This follow-up round was delegated directly after compacted conversation recovery. It
+remained offline-only: no server start/stop/restart, marker/env edit, runtime probe,
+ReflectionScanner, ptrace/gcore, broad tracing, Discord, GitHub publication, tag, push,
+commit, or staging occurred during delegated work.
+
+Delegated scopes:
+
+- P0 lifecycle/request-window route safety: request/window/preflight/receipt/env/marker/
+  copied-log artifacts must not count as approved runtime evidence.
+- Permissions/command downstream: nested dependency reports must not smuggle
+  public/reply/send-chat/command router/runtime/v1 readiness claims.
+- Operator ingress/storage: storage/RCON/webhook/operator ingress planning must not imply
+  support-tier activation, release support, public SDK, external services, Plugin Hub,
+  runtime readiness, or v1 completion.
+- C ABI/runtime cleanup/default-deny: owner-token cleanup, callback unregister,
+  `CallProcessEvent`, raw ProcessEvent gates, and append-only ABI were audited.
+
+Integrated findings:
+
+- `check_command_copied_response_intent_planning.py` now rejects nested dependency
+  positive public response claims with `dependency_positive_public_response_claim` and
+  rejects nested public/runtime/v1 readiness aliases such as `publicSdkReady`,
+  `runtimeReady`, `countsTowardV1Completion`, and `v1CompletionReady`.
+- `check_command_copied_response_intent_lifecycle_planning.py` rejects the same nested
+  public/runtime/v1 readiness alias family for lifecycle planning.
+- `check_operator_ingress_storage_offline_contract.py` rejects support-tier,
+  release-ready/release-supported, public SDK, external ingress/services, Plugin Hub,
+  stable/production/complete/full SDK, and v1 ready/complete wording, including
+  camelCase/snake/kebab variants. Canonical false-key exemptions are path-specific, so
+  misplaced nested `public_sdk_ready`, `runtime_services`, `public_sdk`, or `runtime`
+  fields no longer bypass field-name scanning.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` treats receipt
+  authorization negation as action-specific, so unrelated `not` text before
+  `runtime work authorized` does not hide a positive authorization claim.
+- The C ABI/runtime audit reported no code change; raw ProcessEvent and `CallProcessEvent`
+  remain default-deny/debug-gated.
+
+Observed validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_command_copied_response_intent_planning.py`
+  passed 16 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_command_copied_response_intent_lifecycle_planning.py`
+  passed 10 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_operator_ingress_storage_offline_contract.py`
+  passed 11 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_player_identity_runtime_principal_lifecycle_window_manifest.py`
+  passed 73 tests.
+- Focused checker JSONs for command intent planning, command intent lifecycle planning,
+  and operator ingress/storage remained planning-only/non-claim.
+- `python3 scripts/check_command_permission_route_gate.py --json` returned `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.
+- `python3 scripts/check_public_sdk_v1_completion.py --json` exited blocked by design,
+  with complete SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+- Runtime/C ABI worker validation passed plugin manager guardrails, event manager
+  guardrails, and focused PluginManager/EventManager/ABI CTest.
+- Downstream command/permissions worker validation passed 189 focused unittest cases and
+  51 command permission route-gate unittest cases.
+- `git diff --check` passed.
+
+Test-environment caveat:
+
+- The P0 window/request focused unittest path may create temporary offline fixture
+  directories under `/servidor/ark/workspace-offline`. These are not server operations or
+  runtime probes, and no markers/env/server state were intentionally changed. Future
+  workers should keep this caveat in mind when interpreting `/servidor/ark` hygiene.
+
+Non-claims:
+
+- This round does not create approved runtime principal lifecycle evidence and does not
+  promote player identity/principal, permissions/admin, command response, commands/replies,
+  operator ingress/storage, public ABI/header readiness, runtime readiness, Plugin Hub
+  readiness/publication, support-tier activation, release readiness, stable SDK wording,
+  or v1 SDK completion.
+
 ## Offline Reversing Research Hygiene Audit
 
 Delegated worker 4/4 audited the current research index, current P0 snapshot,

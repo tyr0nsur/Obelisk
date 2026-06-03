@@ -109,8 +109,14 @@ FORBIDDEN_RECEIPT_AUTHORIZATION_CLAIM_RE = re.compile(
     r"player[_ -]?identity|promotion|lookup|permissions?|admin|commands?)\b)",
     re.IGNORECASE,
 )
-RECEIPT_NEGATED_CLAIM_RE = re.compile(
-    r"\b(?:does\s+not|do\s+not|not|non[_ -]?authorization|no)\b",
+RECEIPT_NEGATED_AUTHORIZATION_ACTION_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|doesn't|don't|cannot|can't|must\s+not|never|no|not)\s+"
+    r"(?:authorize|authorise|approve|allow|enable|permit|promote|support|claim|make|mark|"
+    r"treat|count|provide|record)\b",
+    re.IGNORECASE,
+)
+RECEIPT_NEGATED_PREFIX_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|doesn't|don't|cannot|can't|must\s+not|never|no|not)\s*$",
     re.IGNORECASE,
 )
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
@@ -736,7 +742,7 @@ def receipt_string_has_forbidden_authorization_claim(value: str) -> bool:
         if match is None:
             continue
         prefix = segment[: match.start()]
-        if RECEIPT_NEGATED_CLAIM_RE.search(prefix):
+        if RECEIPT_NEGATED_AUTHORIZATION_ACTION_RE.search(prefix) or RECEIPT_NEGATED_PREFIX_RE.search(prefix):
             continue
         return True
     return False

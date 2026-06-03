@@ -58,18 +58,33 @@ FALSE_ONLY_ALIAS_KEYS = frozenset(
         "canonical_route_ready",
         "command_router_ready",
         "complete_sdk_claim_allowed",
+        "complete_sdk_ready",
+        "counts_toward_public_sdk",
+        "counts_toward_runtime",
+        "counts_toward_v1_completion",
         "public_sdk_complete",
+        "public_sdk_ready",
         "public_sdk_stable",
+        "public_abi_ready",
+        "public_or_runtime_accounting_allowed",
         "public_header_ready",
         "public_header_symbols_ready",
+        "public_readiness_ready",
+        "promotion_ready",
+        "public_response_path_allowed",
+        "public_response_path_ready",
         "reply_abi_allowed",
         "reply_abi_ready",
+        "reply_allowed",
+        "reply_api_allowed",
         "reply_api_ready",
         "reply_ready",
         "route_claim_allowed",
         "route_gate_ready",
         "route_ready",
         "runtime_delivery_ready",
+        "runtime_delivery_allowed",
+        "runtime_ready",
         "runtime_readiness_allowed",
         "runtime_readiness_ready",
         "sdk_complete",
@@ -85,9 +100,12 @@ FALSE_ONLY_ALIAS_KEYS = frozenset(
         "send_chat_api_ready",
         "stable_claim_allowed",
         "stable_sdk",
+        "stable_sdk_ready",
         "v1_complete",
+        "v1_completion_ready",
         "v1_completion_allowed",
         "v1_completion_evidence",
+        "v1_0_stable_ready",
         "v1_sdk_complete",
     )
 )
@@ -307,6 +325,26 @@ NEGATED_RE = re.compile(
     r"\b(blocked|cannot|does not|fail[s-]?closed|false|forbidden|missing|must|never|no|not|only|planning|reject(?:s|ed)?|without|until)\b",
     re.IGNORECASE,
 )
+NEGATIVE_CONTEXT_TOKENS = (
+    "blocker",
+    "blockers",
+    "blocked",
+    "decision_required",
+    "deny_or_unknown",
+    "exclusion",
+    "exclusions",
+    "fail_closed",
+    "forbidden",
+    "non_claim",
+    "not_sufficient",
+    "promotion_requires",
+    "required",
+    "required_behavior",
+    "required_exclusions",
+    "required_properties",
+    "separation",
+    "v1_sequence_gate",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -365,6 +403,11 @@ def positive_claim_is_negated(value: str, match: re.Match[str]) -> bool:
         or NEGATED_RE.search(match.group(0)) is not None
         or NEGATED_RE.search(suffix_sentence) is not None
     )
+
+
+def is_negative_context(trail: str) -> bool:
+    trail_folded = trail.casefold()
+    return any(token in trail_folded for token in NEGATIVE_CONTEXT_TOKENS)
 
 
 def collect_structured_alias_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
@@ -788,7 +831,7 @@ def find_positive_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
             found = find_positive_claim(child, f"{trail}[{index}]")
             if found is not None:
                 return found
-    elif isinstance(value, str):
+    elif isinstance(value, str) and not is_negative_context(trail):
         for match in POSITIVE_CLAIM_RE.finditer(value):
             if not positive_claim_is_negated(value, match):
                 return value, trail
@@ -820,6 +863,16 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     if positive_claim is not None:
         value, trail = positive_claim
         add(blockers, "positive_public_response_claim", trail, value=value)
+    for label, payload in (
+        ("command_response", command_response),
+        ("bridge", bridge),
+        ("commands_replies", commands_replies),
+        ("permissions", permissions),
+    ):
+        positive_claim = find_positive_claim(payload, f"$.{label}")
+        if positive_claim is not None:
+            value, trail = positive_claim
+            add(blockers, "dependency_positive_public_response_claim", trail, source=label, value=value)
 
     valid = not blockers
     return {

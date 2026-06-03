@@ -142,6 +142,8 @@ CLAIM_KEY_EXEMPTIONS = frozenset(
         "operator_shortcut_barrier",
         *SHORTCUT_BARRIER_TRUE_FLAGS,
         *SHORTCUT_BARRIER_FALSE_FLAGS,
+        "public_sdk",
+        "public_sdk_ready",
         "public_abi_ready",
         "runtime",
         "runtime_ready",
@@ -149,6 +151,7 @@ CLAIM_KEY_EXEMPTIONS = frozenset(
         "runtime_services",
     )
 )
+LANE_RUNTIME_REQUIRED_PATH_RE = re.compile(r"^\$\.lanes\[\d+\]\.runtime_required$")
 
 PROHIBITED_CLAIM_RE = re.compile(
     r"secret[-_ ]?manager|secret(s)?|rcon|webhook|database|"
@@ -156,6 +159,14 @@ PROHIBITED_CLAIM_RE = re.compile(
     r"(?<![A-Za-z0-9])storage[-_ ]?(?:service|api|runtime|implementation|backend|provider|connector|adapter)(?![A-Za-z0-9])|"
     r"(?<![A-Za-z0-9])cross[-_ ]?instance[-_ ]?(?:persistence|persistent[-_ ]?storage|"
     r"storage[-_ ]?(?:api|service|persistence)|state[-_ ]?persistence|db|database)(?![A-Za-z0-9])|"
+    r"\bsupport[-_ ]?tier\b|\bsupported\b|"
+    r"\brelease[-_ ]?(?:ready|readiness|supported|support)\b|"
+    r"\bready[-_ ]?for[-_ ]?release\b|"
+    r"\bpublic[-_ ]?sdk(?:[-_ ]?(?:ready|readiness|supported|support|surface|claim))?\b|"
+    r"\b(?:complete|full|production|stable)[-_ ]?sdk\b|"
+    r"\bv1(?:\.0)?[-_ ]?(?:ready|complete|stable|support(?:ed)?)\b|"
+    r"\bexternal[-_ ]?(?:ingress|services?|storage|operator[-_ ]?(?:ingress|services?))\b|"
+    r"\bplugin[-_ ]?hub(?:[-_ ]?(?:ready|readiness|supported|support|runtime|completion))?\b|"
     r"\bapi\b|"
     r"\bruntime(?:[-_ ]?(?:ready|readiness|services?|validated|validation|entrypoint|"
     r"code|hook|wiring|implementation))?\b|public[_ -]?(?:c[_ -]?)?abi|"
@@ -222,6 +233,33 @@ def _is_allowed_required_field_name(path: str, value: str) -> bool:
 def _prohibited_shortcut_claim_match(value: str) -> re.Match[str] | None:
     normalized = re.sub(r"[-_]+", " ", value)
     return PROHIBITED_SHORTCUT_CLAIM_RE.search(normalized)
+
+
+def _claim_scan_text(value: str) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    return re.sub(r"[-_]+", " ", separated)
+
+
+def _prohibited_claim_match(value: str) -> re.Match[str] | None:
+    return PROHIBITED_CLAIM_RE.search(_claim_scan_text(value))
+
+
+def _is_claim_key_exempt(path: str, key: str) -> bool:
+    if key not in CLAIM_KEY_EXEMPTIONS:
+        return False
+    if key in {"blocked_dependency_chain", "operator_shortcut_barrier"}:
+        return path == f"$.{key}"
+    if key in SHORTCUT_BARRIER_TRUE_FLAGS or key in SHORTCUT_BARRIER_FALSE_FLAGS:
+        return path == f"$.operator_shortcut_barrier.{key}"
+    if key in {"public_abi_ready", "public_sdk_ready", "runtime_ready", "runtime_services"}:
+        return path == f"$.{key}"
+    if key == "public_sdk":
+        return path == "$.promotion.public_sdk"
+    if key == "runtime":
+        return path == "$.promotion.runtime"
+    if key == "runtime_required":
+        return bool(LANE_RUNTIME_REQUIRED_PATH_RE.match(path))
+    return False
 
 
 def load_contract(path: pathlib.Path) -> dict[str, Any]:
@@ -353,7 +391,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
             path, value
         ):
             continue
-        match = PROHIBITED_CLAIM_RE.search(value)
+        match = _prohibited_claim_match(value)
         if match:
             errors.append(f"prohibited claim {match.group(0)!r} at {path}")
         shortcut_match = _prohibited_shortcut_claim_match(value)
@@ -363,7 +401,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
             )
 
     for path, key in _walk_json_keys(contract):
-        if key in CLAIM_KEY_EXEMPTIONS:
+        if _is_claim_key_exempt(path, key):
             continue
         if key == ALLOWED_REJECTION_CLASSIFICATION_FIELD:
             errors.append(
@@ -371,7 +409,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
                 f"required rejection/classification field at {path}"
             )
             continue
-        match = PROHIBITED_CLAIM_RE.search(key)
+        match = _prohibited_claim_match(key)
         if match:
             errors.append(f"prohibited claim {match.group(0)!r} at field {path}")
         shortcut_match = _prohibited_shortcut_claim_match(key)

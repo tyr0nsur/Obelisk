@@ -191,6 +191,28 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "cross-instance storage API",
             "API",
             "runtime ready",
+            "support tier",
+            "supportTier",
+            "supported",
+            "release ready",
+            "release readiness",
+            "releaseSupported",
+            "ready for release",
+            "public SDK",
+            "publicSdkReady",
+            "stable SDK",
+            "production SDK",
+            "complete SDK",
+            "full SDK",
+            "v1 ready",
+            "v1 complete",
+            "v1.0 stable",
+            "external ingress",
+            "external ingress service",
+            "externalIngressService",
+            "external services",
+            "Plugin Hub ready",
+            "pluginHubReady",
             "public ABI",
             "v1 completion",
             "v1_completion_required",
@@ -228,6 +250,16 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "storage_service",
             "db_persistence",
             "cross_instance_persistence",
+            "support_tier",
+            "supportTier",
+            "release_readiness",
+            "release_supported",
+            "releaseSupported",
+            "publicSdkReady",
+            "stable_sdk",
+            "externalIngressService",
+            "pluginHubReady",
+            "runtimeServices",
             "public_c_abi",
             "runtime_storage_service",
             "operator_ingress_authorizes_command_response",
@@ -242,6 +274,20 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
                     or any("prohibited shortcut claim" in error for error in errors),
                     errors,
                 )
+
+    def test_canonical_false_keys_are_only_exempt_at_contract_paths(self) -> None:
+        contract = self.load_valid_contract()
+        contract["lanes"][0]["public_sdk_ready"] = False
+        contract["lanes"][0]["runtime_services"] = False
+        contract["lanes"][0]["promotion"] = {"public_sdk": False, "runtime": False}
+
+        errors = checker.validate_contract(contract)
+
+        for key in ("public_sdk_ready", "runtime_services", "public_sdk", "runtime"):
+            self.assertTrue(
+                any(key in error and "prohibited claim" in error for error in errors),
+                errors,
+            )
 
     def test_json_output_reports_errors(self) -> None:
         contract = self.load_valid_contract()

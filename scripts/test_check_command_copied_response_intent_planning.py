@@ -196,6 +196,85 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
         self.assertIn("accounting_credit_alias_overclaim", report["blockers"])
         self.assertIn("positive_public_response_claim", report["blockers"])
 
+    def test_rejects_nested_public_runtime_and_v1_readiness_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            payload["dependency_rollup"] = {
+                "nested": {
+                    "publicSdkReady": True,
+                    "publicAbiReady": True,
+                    "runtimeReady": True,
+                    "runtimeReadinessAllowed": True,
+                    "runtimeReadinessReady": True,
+                    "countsTowardPublicSdk": True,
+                    "countsTowardRuntime": True,
+                    "countsTowardV1Completion": True,
+                    "publicOrRuntimeAccountingAllowed": True,
+                    "v1CompletionReady": True,
+                    "v1_0_stable_ready": True,
+                }
+            }
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_or_runtime_alias_overclaim", report["blockers"])
+        labels = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "public_or_runtime_alias_overclaim"
+        }
+        self.assertIn("$.decisions.dependency_rollup.nested.publicSdkReady", labels)
+        self.assertIn("$.decisions.dependency_rollup.nested.runtimeReady", labels)
+        self.assertIn("$.decisions.dependency_rollup.nested.v1CompletionReady", labels)
+
+    def test_rejects_nested_dependency_source_positive_claims_without_alias_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            command_response = json.loads(
+                (REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            command_response["source_summary"] = {
+                "nested": [
+                    {
+                        "summary": "public SDK is ready for reply API delivery",
+                    }
+                ]
+            }
+            command_response_decisions = write_json(root, "command-response.json", command_response)
+
+            result = run_checker(
+                "--command-response-decisions",
+                str(command_response_decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("dependency_positive_public_response_claim", report["blockers"])
+        blocker = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "dependency_positive_public_response_claim"
+        )
+        self.assertEqual(blocker["source"], "command_response")
+        self.assertEqual(blocker["label"], "$.command_response.source_summary.nested[0].summary")
+
     def test_rejects_missing_intent_provenance_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

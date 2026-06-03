@@ -121,6 +121,42 @@ class CommandCopiedResponseIntentLifecyclePlanningTests(unittest.TestCase):
         self.assertIn("accounting_credit_alias_overclaim", report["blockers"])
         self.assertIn("positive_public_or_runtime_claim", report["blockers"])
 
+    def test_rejects_nested_public_runtime_and_v1_readiness_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            payload["dependency_rollup"] = {
+                "nested": {
+                    "publicSdkReady": True,
+                    "publicAbiReady": True,
+                    "runtimeReady": True,
+                    "runtimeReadinessAllowed": True,
+                    "runtimeReadinessReady": True,
+                    "countsTowardPublicSdk": True,
+                    "countsTowardRuntime": True,
+                    "countsTowardV1Completion": True,
+                    "publicOrRuntimeAccountingAllowed": True,
+                    "v1CompletionReady": True,
+                    "v1_0_stable_ready": True,
+                }
+            }
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker("--decisions", str(decisions), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_or_runtime_alias_overclaim", report["blockers"])
+        labels = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "public_or_runtime_alias_overclaim"
+        }
+        self.assertIn("$.decisions.dependency_rollup.nested.publicSdkReady", labels)
+        self.assertIn("$.decisions.dependency_rollup.nested.runtimeReady", labels)
+        self.assertIn("$.decisions.dependency_rollup.nested.runtimeReadinessAllowed", labels)
+        self.assertIn("$.decisions.dependency_rollup.nested.v1CompletionReady", labels)
+
     def test_rejects_dependency_chain_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

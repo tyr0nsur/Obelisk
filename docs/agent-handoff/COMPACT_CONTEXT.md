@@ -19,6 +19,37 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 turbo SDK guardrail round after compaction delegated four scopes directly:
+  P0 lifecycle/request-window route safety, permissions/command downstream,
+  operator ingress/storage, and C ABI/runtime cleanup/default-deny. Two new workers were
+  spawned and two existing workers were reused because the sub-agent thread limit was
+  reached.
+- Integrated changes at this checkpoint: command copied response intent planning now
+  recursively scans nested dependency reports for positive public/reply/send-chat SDK
+  claims while ignoring explicitly negative context fields and rejects nested public/
+  runtime/v1 readiness alias flags. Command copied response intent lifecycle planning now
+  rejects the same nested alias family. Operator ingress/storage offline contract checking
+  rejects support-tier, release-ready, release-supported, public SDK, external ingress/
+  services, Plugin Hub readiness, stable SDK, production SDK, complete/full SDK, and v1
+  ready/complete wording, including camelCase/snake/kebab variants and misplaced
+  canonical false-key fields. Player identity runtime window manifest receipt scanning
+  now rejects positive authorization claims after unrelated `not` text.
+- Runtime/C ABI scoped audit reported no patchable gap and passed
+  `scripts/test_plugin_manager_guardrails.py`, `scripts/test_event_manager_guardrails.py`,
+  and `ctest --test-dir build -R 'PluginManagerTests|EventManagerTests|AbiLayoutTests|CAbiLayoutTests'
+  --output-on-failure`. Worker reports covered all four delegated scopes and none
+  advanced SDK/P0 readiness.
+- Lead validation observed: command intent planning focused tests pass, command lifecycle
+  planning focused tests pass, operator ingress/storage focused tests pass, window
+  manifest focused tests pass, downstream command/permissions tests passed 189 cases,
+  route-gate tests passed 51 cases, focused checker JSONs remain planning-only, route
+  gate remains `valid=true`, `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `promotion_ready=false`, `public_sdk_ready=false`, `runtime_ready=false`, and SDK
+  completion remains blocked with `stable_claim_allowed=false` and P0 `0/4`.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 follow-up supervised 4-agent hardening plus lead integration closed more
   offline guardrail gaps only. No server/runtime operation, protected live-path write,
   marker/env change, ReflectionScanner, ptrace/gcore, broad tracing, Discord send,

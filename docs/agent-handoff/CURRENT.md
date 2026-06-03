@@ -199,7 +199,28 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: supervised 4-agent round plus lead integration closed offline
+- Latest integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
+  directly after compaction: P0 lifecycle/request-window route safety to Hypatia,
+  permissions/command downstream to Harvey, operator ingress/storage to Russell, and
+  C ABI/runtime cleanup/default-deny to Carver. Due the active thread limit, two scopes
+  used existing agents. Integrated disk changes harden command response intent planning
+  against nested dependency positive public/reply/send-chat SDK claims and nested
+  public/runtime/v1 alias flags, lifecycle intent planning against nested public/runtime/v1
+  aliases, operator ingress/storage against support-tier, release-readiness,
+  public/external/Plugin Hub service, stable/production/complete SDK, and v1
+  ready/complete wording, and the player identity runtime window manifest receipt scanner
+  against unrelated `not ... runtime work authorized` wording. A runtime/C ABI report
+  found no patchable gap and passed PluginManager/EventManager/ABI validations. Worker
+  reports covered all four delegated scopes and none advanced SDK/P0 readiness. Evidence
+  observed by the lead: command intent planning, lifecycle planning, operator
+  ingress/storage, and window manifest tests pass, downstream command/permissions tests
+  passed 189 cases, route-gate tests passed 51 cases, focused checker JSONs preserve
+  planning-only non-claim state, route JSON remains valid/planning-only with
+  `approved_runtime_evidence_missing`, SDK JSON remains blocked with P0 `0/4`,
+  `stable_claim_allowed=false`, and `git diff --check` passes. No
+  runtime/server/Discord/GitHub operation. See `COMPACT_CONTEXT.md` and
+  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.
+- Previous integration note: supervised 4-agent round plus lead integration closed offline
   guardrail gaps without changing the active blocker. P0 route/evidence scanners now
   reject window-request/operator-request/observer-env/source-marker aliases as approved
   runtime evidence. SDK completion now rejects split `name/status` section claims and
