@@ -776,6 +776,76 @@ Non-claims:
   support-tier activation, stable SDK wording, public identity readiness, public
   permissions/admin readiness, command response/replies readiness, or v1 SDK completion.
 
+## P0 Runtime-Evidence Preparation And Route Binding Hardening
+
+The next delegated integration round focused on the active P0 blocker:
+`approved_runtime_evidence_missing`. It did not run runtime work; it reduced offline
+ambiguity before a future operator-approved runtime window.
+
+Delegated scopes and integrated findings:
+
+- Request-pack, preflight, window-manifest, and receipt sidecars now carry explicit false
+  metadata for request/preflight/window/receipt/evidence-ready claims. Preflight outputs
+  record `authorization_source=none_preflight_sidecar_only` and
+  `approved_runtime_evidence_source=none_preflight_sidecar_only`. Approved-evidence replay
+  preserves and validates those false operational-window metadata.
+- The route gate now treats approved runtime evidence as accepted only when the identity
+  source diagnosis is bound to the exact approved-runtime manifest path passed by the
+  caller and keeps required promotion/public/runtime/capability/callback/completion fields
+  false or empty. Ready-looking sidecars, stale/minimal diagnoses, generated receipts,
+  request-pack JSON, or route-report text cannot advance the route to
+  `identity_public_contract_gate_missing`.
+- Player identity public-contract checkers reject contract/header/identity aliases such
+  as `contractReviewed`, `identityContractReady`, `publicIdentityReady`,
+  `principalHandleAbiReady`, and `identityHeaderAllowed`. Accepted runtime evidence still
+  cannot promote public identity, public ABI/header, permissions/admin, command route, or
+  SDK completion without reviewed public-contract evidence.
+- `scripts/build_v1_scoped_release_statement.py` generates canonical non-complete
+  release-statement rows for the seven non-P0 post-v1/excluded SDK blockers. The generated
+  statement removes missing release-statement bookkeeping for those rows but keeps
+  complete-SDK progress at `0/12`, P0 at `0/4`, and `stable_claim_allowed=false`.
+- Research notes that still read like current offline command recipes were marked
+  recovery-only. The current route retains `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout` as accepted planning anchors and does not redirect agents
+  back into core evidence-pack construction, admin focal planning, second-source layout,
+  lifecycle layout, broad FName/GObjects/core scans, or external-framework porting.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_player_principal_lifecycle_planning_blocker_smoke.py --json`: planning sources
+  ready, accepted start anchor `ShooterGameMode.HandleNewPlayer`, accepted end anchor
+  `ShooterGameMode.OnLogout`, `approved_runtime_evidence_present=false`,
+  `runtime_work_authorized=false`, and `server_operations_authorized=false`.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with
+  `ready=false`, SDK completion `0/12`, P0 dependency chain `0/4`,
+  `stable_claim_allowed=false`, and current route blocker
+  `approved_runtime_evidence_missing`.
+
+Validation remained offline-only:
+
+- Route gate: 53 tests passed.
+- Bound identity route: 11 tests passed.
+- Player identity public contract: 101 tests passed.
+- Preflight shell check passed.
+- Request/window-manifest suite: 147 tests passed.
+- Approved runtime evidence manifest/bundle/checker suite: 136 tests passed.
+- Public SDK completion and public SDK guardrails: 427 tests passed.
+- `py_compile` passed for changed Python scripts.
+- `git diff --check` passed.
+
+Non-claims:
+
+- This round does not create approved runtime evidence and does not authorize runtime
+  work, server operations, marker/env changes, runtime observation, ReflectionScanner,
+  ptrace/gcore, broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub
+  publication, support-tier activation, stable SDK wording, public identity readiness,
+  public permissions/admin readiness, command response/replies readiness, or v1 SDK
+  completion.
+
 ## P0 And Side-Lane Non-Claim Hardening Round
 
 The next supervised 4-agent round hardened additional offline bypasses without changing

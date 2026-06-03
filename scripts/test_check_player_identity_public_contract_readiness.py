@@ -1352,6 +1352,10 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         def overclaiming_report(payload, validation, *, check_mode: str):
             report = original_build_report(payload, validation, check_mode=check_mode)
             report["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+            report["contractReviewed"] = True
+            report["identityContractReady"] = True
+            report["principalHandleAbiReady"] = True
+            report["identityHeaderAllowed"] = True
             report["claims"] = {
                 "public_contract_ready": True,
                 "summary": "public player identity ready",
@@ -1363,10 +1367,14 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=overclaiming_report,
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", return_value=mock.Mock(blockers=[])),
+                mock.patch.object(
+                    checker.approved_evidence,
+                    "build_report",
+                    side_effect=overclaiming_report,
+                ),
             ):
                 runtime_report = checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1375,6 +1383,16 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "approved_runtime_evidence_report_public_readiness_overclaim",
             [blocker["reason"] for blocker in blockers],
         )
+        overclaims = next(
+            blocker["overclaims"]
+            for blocker in blockers
+            if blocker["reason"] == "approved_runtime_evidence_report_public_readiness_overclaim"
+        )
+        paths = {claim["path"] for claim in overclaims}
+        self.assertIn("$.contractReviewed", paths)
+        self.assertIn("$.identityContractReady", paths)
+        self.assertIn("$.principalHandleAbiReady", paths)
+        self.assertIn("$.identityHeaderAllowed", paths)
 
         report = checker.build_report(
             self.decisions(),

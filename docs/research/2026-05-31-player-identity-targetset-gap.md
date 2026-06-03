@@ -98,7 +98,17 @@ not by public SDK tooling. Minimal shape:
 - Second source: if supplied, compare layouts only and still report no promotion because
   the target set is planning-only.
 
-Useful existing commands for a future approved offline pass, in the required order:
+Historical recovery-only commands, not the current route:
+
+The command sequence below is preserved to explain how the old fixture/admin gap was
+closed. It must not be used as the next P0 action for the current binary. The current
+route already has the required non-protected core evidence, reflection inventory,
+admin-surface snapshots, source-bound lifecycle/principal planning manifests, and
+accepted `ShooterGameMode.HandleNewPlayer` / `ShooterGameMode.OnLogout` planning
+anchors. The active blocker is approved copied runtime principal lifecycle evidence; do
+not restart core evidence-pack construction, admin focal planning, second-source layout,
+or lifecycle layout work unless the binary hash changes or a reviewed artifact
+contradicts the source-bound manifests.
 
 First produce or approve a complete `obelisk.core-dump-evidence-pack.v1` manifest from a
 non-protected offline core. This note intentionally does not prescribe a server, dump

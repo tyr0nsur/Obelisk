@@ -595,6 +595,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "consumer_cases": ["malformed_or_unsupported_evidence", "stale_after_logout"],
                 "consumer_boundary_assertions": ["malformed_or_unsupported_evidence", "stale_after_logout"],
                 "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+                "contractReviewed": True,
+                "identityContractReady": True,
+                "principalHandleAbiReady": True,
+                "identityHeaderAllowed": True,
                 "claims": {
                     "public_contract_ready": True,
                     "publicSdkReady": True,
@@ -630,6 +634,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.claims.public-header-allowed", paths)
         self.assertIn("$.claims.publicHeaderSymbolsNow", paths)
         self.assertIn("$.claims.nested.v1CompletionReady", paths)
+        self.assertIn("$.contractReviewed", paths)
+        self.assertIn("$.identityContractReady", paths)
+        self.assertIn("$.principalHandleAbiReady", paths)
+        self.assertIn("$.identityHeaderAllowed", paths)
         self.assertFalse(runtime_report["accepted_for_contract_review"])
         self.assertIsNone(runtime_report["resolved_input"])
         self.assertEqual(runtime_report["resolved_inputs"], [])
@@ -659,6 +667,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         decisions["identifier_redaction_evidence_intake"]["public_sdk_ready"] = True
         decisions["public_abi_preflight_candidate_intake"]["public_abi_ready"] = True
         decisions["owner_token_sdk_consumer_contract_intake"]["lifecycle_owner_cleanup_ready"] = True
+        decisions["contractReviewed"] = True
+        decisions["identityContractReady"] = True
+        decisions["principalHandleAbiReady"] = True
+        decisions["identityHeaderAllowed"] = True
         decisions["contract_gate_inputs"][0]["promotion_blocker_resolved"] = True
         decisions["contract_gate_inputs"][1]["public_sdk_ready"] = True
         decisions["proposed_public_pod_abi_candidate"]["runtime_ready"] = True
@@ -679,6 +691,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.proposed_public_pod_abi_candidate.runtime_ready", labels)
         self.assertIn("$.evidence.candidate_policy_artifacts[0].public_sdk_ready", labels)
         self.assertIn("$.runtime_ready", labels)
+        self.assertIn("$.contractReviewed", labels)
+        self.assertIn("$.identityContractReady", labels)
+        self.assertIn("$.principalHandleAbiReady", labels)
+        self.assertIn("$.identityHeaderAllowed", labels)
         self.assertIn("decisions_contract_gate_input_flag_not_false", report["blockers"])
 
     def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:

@@ -44,12 +44,21 @@ controller replacement, stable player identity, public principal readiness, comm
 sender authentication, permissions, persistence, lookup, `ResourceHandle`, mutation, or
 return override.
 
-## Offline Golden Path
+## Offline Recovery Reference
 
-Use a complete non-protected offline evidence pack or a staged non-protected offline core
-pair. Keep every path under a run-specific artifact root chosen by the operator, shown
-here as `<offline-root>`. Do not point commands at protected live-server paths or at
-symlinks that resolve into protected trees.
+The command sequence below is a historical recovery reference for a changed binary hash
+or a reviewed contradiction in the source-bound planning manifests. It is not the current
+P0 next action. For the current binary, do not rerun core evidence-pack construction,
+reflection inventory intake, second-source layout comparison, admin snapshots, or
+lifecycle layout routes; the next useful artifact remains approved copied runtime
+principal lifecycle evidence for `ShooterGameMode.HandleNewPlayer` and
+`ShooterGameMode.OnLogout`.
+
+If recovery is explicitly approved because the binary hash changed or accepted evidence
+was contradicted, use a complete non-protected offline evidence pack or a staged
+non-protected offline core pair. Keep every path under a run-specific artifact root chosen
+by the operator, shown here as `<offline-root>`. Do not point commands at protected
+live-server paths or at symlinks that resolve into protected trees.
 
 Validate the staged raw files before any pack build:
 

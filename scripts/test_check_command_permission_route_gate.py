@@ -75,13 +75,39 @@ def identity_manifest_sources(
     }
 
 
-def identity_phase(blocker: str = "approved_runtime_evidence_missing") -> dict:
+def approved_runtime_diagnosis(path: Path, *, ready: bool = True) -> dict:
+    return {
+        "provided": True,
+        "path": str(path),
+        "ready": ready,
+        "approved_runtime_evidence_present": ready,
+        "runtime_evidence_ready": ready,
+        "promotion_ready": False,
+        "public_header_allowed": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
+        "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
+        "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],
+        "blockers": [] if ready else ["approved_runtime_manifest_not_accepted"],
+    }
+
+
+def identity_phase(
+    blocker: str = "approved_runtime_evidence_missing",
+    *,
+    approved_runtime_path: Path | None = None,
+) -> dict:
     next_action_by_blocker = {
         "lifecycle_anchor_first_evidence_provenance_unbound": "bind_lifecycle_anchor_and_principal_policy_sources",
         "approved_runtime_evidence_missing": "produce_approved_runtime_principal_lifecycle_evidence",
         "identity_public_contract_gate_missing": "review_identity_public_contract_gate",
     }
     approved_runtime_ready = blocker == "identity_public_contract_gate_missing"
+    if approved_runtime_path is None:
+        approved_runtime_path = Path("/tmp/approved-runtime-principal-lifecycle.json")
     return {
         "current_surface": "obelisk.player_identity.v1",
         "current_blocker": blocker,
@@ -101,13 +127,10 @@ def identity_phase(blocker: str = "approved_runtime_evidence_missing") -> dict:
         "source_checker_accepted_for_internal_planning": False,
         "source_checker_blockers": [blocker],
         "source_checker_manifest_sources": identity_manifest_sources(),
-        "source_checker_approved_runtime_evidence_manifest": {
-            "provided": approved_runtime_ready,
-            "ready": approved_runtime_ready,
-            "approved_runtime_evidence_present": approved_runtime_ready,
-            "runtime_evidence_ready": approved_runtime_ready,
-            "remaining_blockers": [] if approved_runtime_ready else ["approved_runtime_evidence_missing"],
-        },
+        "source_checker_approved_runtime_evidence_manifest": approved_runtime_diagnosis(
+            approved_runtime_path,
+            ready=approved_runtime_ready,
+        ),
         "planning_only": True,
         "promotion_ready": False,
         "public_sdk_ready": False,
@@ -234,6 +257,23 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(check_names & ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS)
 
     def test_identity_lock_mode_allows_approved_runtime_evidence_to_reach_public_contract_gate(self) -> None:
+        approved_runtime = Path("approved-runtime.json")
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+        phase = {
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_approved_runtime_evidence_manifest": approved_runtime_diagnosis(approved_runtime),
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertEqual([], blockers)
+
+    def test_identity_lock_mode_rejects_ready_runtime_diagnosis_not_bound_to_cli_manifest(self) -> None:
         args = SimpleNamespace(
             player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
             player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
@@ -242,7 +282,31 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         phase = {
             "current_blocker": "identity_public_contract_gate_missing",
             "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_approved_runtime_evidence_manifest": approved_runtime_diagnosis(
+                Path("request-pack-sidecar.json")
+            ),
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn("critical_path_approved_runtime_evidence_path_unbound", blockers)
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'identity_public_contract_gate_missing'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
+
+    def test_identity_lock_mode_rejects_minimal_stale_ready_runtime_diagnosis(self) -> None:
+        approved_runtime = Path("approved-runtime.json")
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+        phase = {
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
             "source_checker_approved_runtime_evidence_manifest": {
+                "path": str(approved_runtime),
                 "ready": True,
                 "approved_runtime_evidence_present": True,
                 "runtime_evidence_ready": True,
@@ -252,7 +316,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
 
-        self.assertEqual([], blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_promotion_ready_not_false", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_public_capability_bits_now_not_empty", blockers)
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'identity_public_contract_gate_missing'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
 
     def test_identity_lock_mode_keeps_runtime_blocker_for_unaccepted_approved_runtime_argument(self) -> None:
         args = SimpleNamespace(
@@ -438,12 +507,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "source_checker_accepted_for_internal_planning": False,
                 "source_checker_blockers": ["identity_public_contract_gate_missing"],
                 "source_checker_manifest_sources": identity_manifest_sources(),
-                "source_checker_approved_runtime_evidence_manifest": {
-                    "ready": True,
-                    "approved_runtime_evidence_present": True,
-                    "runtime_evidence_ready": True,
-                    "remaining_blockers": [],
-                },
+                "source_checker_approved_runtime_evidence_manifest": approved_runtime_diagnosis(approved_runtime),
                 "planning_only": True,
                 "promotion_ready": False,
                 "public_sdk_ready": False,

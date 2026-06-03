@@ -159,6 +159,21 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
 
+    def test_public_contract_alias_guardrails_remain_false(self) -> None:
+        payload = self.load_decisions()
+        aliases = payload["alias_guardrails"]
+
+        for key in (
+            "contractReviewed",
+            "identityContractReady",
+            "publicIdentityReady",
+            "principalHandleAbiReady",
+            "identityHeaderAllowed",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(aliases[key])
+        self.assertIn("false-only", aliases["non_claim"])
+
     def test_proposed_public_pod_abi_candidate_is_candidate_only(self) -> None:
         payload = self.load_decisions()
         candidate = payload["proposed_public_pod_abi_candidate"]

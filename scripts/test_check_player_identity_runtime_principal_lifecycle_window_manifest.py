@@ -231,6 +231,7 @@ def preflight_payload(
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
+        "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
         "approved_runtime_evidence_present": False,
         "approved_runtime_evidence_ready": False,
@@ -520,6 +521,13 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["v1_completion_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertFalse(report["request_pack_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["preflight_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["window_manifest_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["completed_receipt_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
 
     def test_post_window_replay_rejects_future_operational_window(self) -> None:
         result = self.run_checker_in_approved_workspace(
@@ -985,6 +993,29 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("preflight_pre_path_runtime_work_authorized_missing_or_not_false", report["blockers"])
+
+    def test_rejects_preflight_sidecar_missing_window_manifest_evidence_false_flag(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields["preflight_pre_path"])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = json.loads(preflight_path.read_text(encoding="utf-8"))
+            payload.pop("window_manifest_counts_as_approved_runtime_evidence")
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "preflight_pre_path_window_manifest_counts_as_approved_runtime_evidence_missing_or_not_false",
+            report["blockers"],
+        )
 
     def test_rejects_stale_preflight_non_claim_wording(self) -> None:
         result = self.run_checker_in_approved_workspace(

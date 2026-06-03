@@ -29,6 +29,14 @@
   "public_header_symbols_now": [],
   "public_capability_bits_now": [],
   "public_callback_abi_now": [],
+  "alias_guardrails": {
+    "contractReviewed": false,
+    "identityContractReady": false,
+    "publicIdentityReady": false,
+    "principalHandleAbiReady": false,
+    "identityHeaderAllowed": false,
+    "non_claim": "Alias guardrails are false-only until identity_public_contract_gate is reviewed."
+  },
   "private_candidate_contract": "docs/research/2026-06-01-player-identity-private-candidate-contract.json",
   "approved_runtime_evidence_intake": {
     "id": "approved_runtime_principal_lifecycle_evidence",

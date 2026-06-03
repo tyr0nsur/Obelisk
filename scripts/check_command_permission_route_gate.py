@@ -77,6 +77,18 @@ REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS = (
     "counts_toward_v1_completion",
     "public_or_runtime_accounting_allowed",
 )
+APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS = (
+    "promotion_ready",
+    "public_header_allowed",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "runtime_ready",
+    "v1_completion_ready",
+)
+APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS = (
+    "public_capability_bits_now",
+    "public_callback_abi_now",
+)
 ALLOWED_IDENTITY_LOCK_BLOCKERS = {
     "lifecycle_anchor_first_evidence_provenance_unbound": {
         "next_action": "bind_lifecycle_anchor_and_principal_policy_sources",
@@ -550,7 +562,27 @@ def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[st
     return []
 
 
-def approved_runtime_evidence_ready_for_identity_lock(phase: dict[str, Any]) -> bool:
+def approved_runtime_evidence_diagnosis_path_matches(
+    args: argparse.Namespace | None,
+    diagnosis: dict[str, Any],
+) -> bool:
+    approved_runtime_manifest = (
+        getattr(args, "player_identity_approved_runtime_principal_lifecycle_evidence_manifest", None)
+        if args is not None
+        else None
+    )
+    if approved_runtime_manifest is None:
+        return False
+    observed = diagnosis.get("path")
+    if not isinstance(observed, str) or not observed:
+        return False
+    return Path(observed).resolve() == Path(approved_runtime_manifest).resolve()
+
+
+def approved_runtime_evidence_ready_for_identity_lock(
+    phase: dict[str, Any],
+    args: argparse.Namespace | None = None,
+) -> bool:
     diagnosis = phase.get("source_checker_approved_runtime_evidence_manifest")
     if not isinstance(diagnosis, dict):
         return False
@@ -559,17 +591,51 @@ def approved_runtime_evidence_ready_for_identity_lock(phase: dict[str, Any]) -> 
         and diagnosis.get("approved_runtime_evidence_present") is True
         and diagnosis.get("runtime_evidence_ready") is True
         and diagnosis.get("remaining_blockers") == []
+        and all(diagnosis.get(key) is False for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS)
+        and all(diagnosis.get(key) == [] for key in APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS)
+        and (args is None or approved_runtime_evidence_diagnosis_path_matches(args, diagnosis))
     )
 
 
-def expected_identity_lock_blocker_for_phase(phase: dict[str, Any]) -> str:
-    if approved_runtime_evidence_ready_for_identity_lock(phase):
+def approved_runtime_evidence_identity_lock_binding_blockers(
+    args: argparse.Namespace | None,
+    phase: dict[str, Any],
+) -> list[str]:
+    diagnosis = phase.get("source_checker_approved_runtime_evidence_manifest")
+    if not isinstance(diagnosis, dict):
+        return []
+    has_core_ready_signal = (
+        diagnosis.get("ready") is True
+        or diagnosis.get("approved_runtime_evidence_present") is True
+        or diagnosis.get("runtime_evidence_ready") is True
+        or diagnosis.get("remaining_blockers") == []
+    )
+    if not has_core_ready_signal:
+        return []
+
+    blockers: list[str] = []
+    if not approved_runtime_evidence_diagnosis_path_matches(args, diagnosis):
+        blockers.append("critical_path_approved_runtime_evidence_path_unbound")
+    for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS:
+        if diagnosis.get(key) is not False:
+            blockers.append(f"critical_path_approved_runtime_evidence_{key}_not_false")
+    for key in APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS:
+        if diagnosis.get(key) != []:
+            blockers.append(f"critical_path_approved_runtime_evidence_{key}_not_empty")
+    return blockers
+
+
+def expected_identity_lock_blocker_for_phase(
+    phase: dict[str, Any],
+    args: argparse.Namespace | None = None,
+) -> str:
+    if approved_runtime_evidence_ready_for_identity_lock(phase, args):
         return "identity_public_contract_gate_missing"
     return "approved_runtime_evidence_missing"
 
 
 def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any]) -> list[str]:
-    expected = expected_identity_lock_blocker_for_phase(phase)
+    expected = expected_identity_lock_blocker_for_phase(phase, args)
     observed = phase.get("current_blocker")
     source_observed = phase.get("source_checker_primary_blocker")
     blockers: list[str] = []
@@ -581,6 +647,7 @@ def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any])
         blockers.append(
             f"critical_path_identity_readiness_mode_unexpected_blocker:{source_observed!r}!={expected!r}"
         )
+    blockers.extend(approved_runtime_evidence_identity_lock_binding_blockers(args, phase))
     return blockers
 
 
@@ -939,7 +1006,10 @@ def validate_locked_child_route_alignment(
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     critical_path_phase = build_critical_path_phase(args)
     current_route_blocker = critical_path_phase.get("current_blocker")
-    approved_runtime_evidence_accepted = approved_runtime_evidence_ready_for_identity_lock(critical_path_phase)
+    approved_runtime_evidence_accepted = approved_runtime_evidence_ready_for_identity_lock(
+        critical_path_phase,
+        args,
+    )
     child_route_blocker = (
         None
         if current_route_blocker in UPSTREAM_IDENTITY_LOCK_BLOCKERS

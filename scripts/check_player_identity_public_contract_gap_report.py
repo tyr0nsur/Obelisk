@@ -342,8 +342,24 @@ REQUIRED_SEPARATION_FORBIDDEN = {
 
 READINESS_FALSE_KEYS = {
     "accepted_for_contract_review",
+    "contract_review_ready",
+    "contract_reviewed",
+    "identity_contract_ready",
+    "identity_contract_reviewed",
+    "identity_header_allowed",
+    "identity_header_ready",
+    "identity_public_contract_ready",
+    "identity_public_contract_reviewed",
+    "player_identity_promoted",
+    "player_identity_ready",
+    "player_principal_ready",
+    "principal_abi_ready",
+    "principal_handle_abi_ready",
+    "principal_handle_ready",
     "promotion",
     "promotion_ready",
+    "public_identity_allowed",
+    "public_identity_ready",
     "public_sdk_ready",
     "runtime_ready",
     "public_header_allowed",
@@ -409,6 +425,16 @@ FORBIDDEN_CANDIDATE_EXPOSURE_PATTERNS = {
 ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
     "approved_runtime_evidence_present",
     "runtime_evidence_ready",
+}
+APPROVED_RUNTIME_REPORT_EXPLICIT_FALSE_KEYS = {
+    "accepted_for_contract_review",
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_abi_ready",
+    "v1_completion_ready",
+    "v1_completion_evidence",
 }
 APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
     r"(?:"
@@ -1539,7 +1565,14 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
             if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
                 overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
             if (
+                normalized_key in READINESS_FALSE_KEYS
+                and not (path == "$" and normalized_key in APPROVED_RUNTIME_REPORT_EXPLICIT_FALSE_KEYS)
+                and item is not False
+            ):
+                overclaims.append({"path": item_path, "term": "readiness_alias", "value": item})
+            if (
                 normalized_key not in ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS
+                and normalized_key not in READINESS_FALSE_KEYS
                 and item not in (False, None, [], {})
                 and APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(normalized_key)
             ):

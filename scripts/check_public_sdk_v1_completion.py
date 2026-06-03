@@ -84,6 +84,11 @@ PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "separation.downstream_surfaces",
 }
 PLAYER_IDENTITY_PUBLIC_CONTRACT_GATE_INPUT_REQUIRED_FALSE_KEYS = (
+    "contract_reviewed",
+    "identity_contract_ready",
+    "identity_header_allowed",
+    "principal_handle_abi_ready",
+    "public_identity_ready",
     "promotion_blocker_resolved",
     "promotion_ready",
     "public_sdk_ready",
@@ -263,6 +268,11 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "top_level_planning_surfaces_unresolved_for_v1_claim",
 }
 COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
+    "contract_reviewed",
+    "identity_contract_ready",
+    "identity_header_allowed",
+    "principal_handle_abi_ready",
+    "public_identity_ready",
     "promotion_ready",
     "public_sdk_ready",
     "public_sdk",

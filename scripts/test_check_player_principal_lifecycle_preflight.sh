@@ -118,6 +118,7 @@ required_false_flags = (
     "runtime_work_authorized",
     "request_pack_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
+    "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
     "approved_runtime_evidence_present",
     "approved_runtime_evidence_ready",
@@ -142,6 +143,8 @@ assert payload["copied_log_path"] == copied_log
 assert payload["copied_evidence_dir"] == evidence_dir
 assert payload["server_binary"]["sha256"] == server_sha
 assert payload["env_file"] is None
+assert payload["authorization_source"] == "none_preflight_sidecar_only"
+assert payload["approved_runtime_evidence_source"] == "none_preflight_sidecar_only"
 assert datetime.fromisoformat(payload["checked_at_utc"].removesuffix("Z") + "+00:00").tzinfo == timezone.utc
 assert "not runtime approval" in payload["non_claim"]
 assert "not approved runtime evidence" in payload["non_claim"]
@@ -205,6 +208,7 @@ required_false_flags = (
     "runtime_work_authorized",
     "request_pack_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
+    "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
     "approved_runtime_evidence_present",
     "approved_runtime_evidence_ready",
@@ -224,6 +228,8 @@ assert payload["target"] == {"instance": "arkserver2", "map": "TheIsland"}
 assert payload["env_file"]["path"] == env_path
 assert payload["env_file"]["sha256"] == hashlib.sha256(open(env_path, "rb").read()).hexdigest()
 assert payload["posture_check"] == "accepted"
+assert payload["authorization_source"] == "none_preflight_sidecar_only"
+assert payload["approved_runtime_evidence_source"] == "none_preflight_sidecar_only"
 PY
 
 assert_fail observer-window-missing-env "${CHECK}" \

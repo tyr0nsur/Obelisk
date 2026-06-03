@@ -34,6 +34,7 @@ from test_check_player_identity_runtime_principal_lifecycle_approved_evidence im
 )
 
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
+SCOPED_RELEASE_STATEMENT_BUILDER = REPO_ROOT / "scripts" / "build_v1_scoped_release_statement.py"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 SCOPED_RELEASE_STATEMENT_TEMPLATE = (
     REPO_ROOT / "release" / "v1" / "public-sdk" / "scoped-release-statement-template.md"
@@ -284,6 +285,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
+    def test_scoped_release_statement_builder_generates_non_claim_blocker_outcomes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "scoped-release-statement.md"
+            build_result = subprocess.run(
+                [
+                    "python3",
+                    str(SCOPED_RELEASE_STATEMENT_BUILDER),
+                    "--output",
+                    str(statement_path),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(build_result.returncode, 0, build_result.stderr)
+            statement = statement_path.read_text(encoding="utf-8")
+            self.assertIn("bookkeeping only", statement)
+            self.assertIn("obelisk.inventory_items_mutation.v1: post-v1 - no Inventory SDK", statement)
+            self.assertIn("obelisk.structure_census.v1: excluded - no StructureEvents SDK", statement)
+            self.assertNotIn("obelisk.arkapi_compatibility.v1:", statement)
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(
+            payload["v1_sdk_progress"]["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
+            7,
+        )
+        self.assertEqual(payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertIn("v1_required_dependency_chain_unpromoted", payload["blockers"])
+
     def route_gate_override_env(self) -> dict[str, str]:
         return {"OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS": "1"}
 
@@ -340,7 +385,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
     def player_identity_contract_gate_inputs(self) -> list[dict[str, object]]:
-        return [
+        false_only_aliases = {
+            "contract_reviewed": False,
+            "identity_contract_ready": False,
+            "identity_header_allowed": False,
+            "principal_handle_abi_ready": False,
+            "public_identity_ready": False,
+        }
+        entries = [
             {
                 "id": "runtime.lifecycle_evidence",
                 "status": "unresolved",
@@ -446,6 +498,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "non_claim": "Identity promotion cannot unlock downstream surfaces.",
             },
         ]
+        for entry in entries:
+            entry.update(false_only_aliases)
+        return entries
 
     def write_player_identity_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
         runtime_manifest = root / "approved-runtime-principal-lifecycle-evidence.json"
@@ -9061,6 +9116,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(row["route_gate_non_counting_blocker"], "identity_public_contract_gate_missing")
         self.assertIn("route_gate_blocker:identity_public_contract_gate_missing", row["non_counting_reasons"])
         self.assertFalse(row["counts_toward_complete_sdk_claim"])
+
+    def test_route_gate_summary_aliases_do_not_count_as_public_identity_contract(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        claims = module.command_permission_route_gate_public_or_runtime_claims(
+            {
+                "schema": "obelisk.command-permission-route-gate-check.v1",
+                "valid": True,
+                "planning_only": True,
+                "current_route_blocker": "identity_public_contract_gate_missing",
+                "contractReviewed": True,
+                "identityContractReady": True,
+                "publicIdentityReady": True,
+                "principalHandleAbiReady": True,
+                "identityHeaderAllowed": True,
+                "counts_toward_v1_completion": False,
+                "blockers": [],
+            }
+        )
+
+        self.assertIn("contractReviewed", claims)
+        self.assertIn("identityContractReady", claims)
+        self.assertIn("publicIdentityReady", claims)
+        self.assertIn("principalHandleAbiReady", claims)
+        self.assertIn("identityHeaderAllowed", claims)
 
     def test_mixed_p0_non_counting_reasons_are_visible(self) -> None:
         import importlib.util

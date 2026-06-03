@@ -188,7 +188,21 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
         raise SystemExit("--window-manifest-check must be ready")
     if window.get("post_window_replay") is not True:
         raise SystemExit("--window-manifest-check must be generated with --post-window-replay")
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+    for key in (
+        "promotion_ready",
+        "public_header_allowed",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "v1_completion_ready",
+        "runtime_ready",
+        "stable_claim_allowed",
+        "request_pack_counts_as_approved_runtime_evidence",
+        "preflight_counts_as_approved_runtime_evidence",
+        "window_manifest_counts_as_approved_runtime_evidence",
+        "completed_receipt_counts_as_approved_runtime_evidence",
+        "approved_runtime_evidence_present",
+        "approved_runtime_evidence_ready",
+    ):
         if window.get(key) is not False:
             raise SystemExit(f"--window-manifest-check {key} must remain false")
     copied = window.get("copied_log")
@@ -285,8 +299,26 @@ def build_manifest(
             "user_policy": window.get("user_policy"),
             "notice_sent": window.get("notice_sent"),
             "promotion_ready": window.get("promotion_ready"),
+            "public_header_allowed": window.get("public_header_allowed"),
+            "public_abi_ready": window.get("public_abi_ready"),
             "public_sdk_ready": window.get("public_sdk_ready"),
+            "v1_completion_ready": window.get("v1_completion_ready"),
             "runtime_ready": window.get("runtime_ready"),
+            "stable_claim_allowed": window.get("stable_claim_allowed"),
+            "request_pack_counts_as_approved_runtime_evidence": window.get(
+                "request_pack_counts_as_approved_runtime_evidence"
+            ),
+            "preflight_counts_as_approved_runtime_evidence": window.get(
+                "preflight_counts_as_approved_runtime_evidence"
+            ),
+            "window_manifest_counts_as_approved_runtime_evidence": window.get(
+                "window_manifest_counts_as_approved_runtime_evidence"
+            ),
+            "completed_receipt_counts_as_approved_runtime_evidence": window.get(
+                "completed_receipt_counts_as_approved_runtime_evidence"
+            ),
+            "approved_runtime_evidence_present": window.get("approved_runtime_evidence_present"),
+            "approved_runtime_evidence_ready": window.get("approved_runtime_evidence_ready"),
             "non_claims": window.get("non_claims"),
         },
         "source_summary": summary,

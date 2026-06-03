@@ -132,6 +132,7 @@ def preflight_payload(
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
+        "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
         "approved_runtime_evidence_present": False,
         "approved_runtime_evidence_ready": False,

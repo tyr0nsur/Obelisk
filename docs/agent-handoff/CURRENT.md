@@ -199,16 +199,17 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 SDK side-lane/descriptor/runtime-evidence alias
-  hardening after `b1d2f31` delegated four scopes: release-statement delimiter parsing,
-  descriptor non-promotion metadata, inventory/structure side-lane overclaim aliases, and
-  approved runtime-principal evidence alias rejection. Integrated checkers now accept
-  Unicode colon/dash release-statement variants while still rejecting mixed records,
-  record descriptor `not_promoted` module SDK aliases without treating them as promoted
-  claims, reject compact runtime-evidence aliases such as `publicReady`/`countsTowardSdk`,
-  and keep inventory/structure reports non-promoting. Validation: public SDK/release
-  guardrails 250 OK; runtime evidence bundle/checker plus handoff 135 OK; SDK
-  completion/inventory/structure side-lane suite 300 OK; route JSON planning-only at
-  `approved_runtime_evidence_missing`; SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`; `py_compile` and `git diff --check` OK. No
+- Latest integration note: 2026-06-03 P0 runtime-evidence preparation hardening after
+  `7581cd9` delegated four scopes: request-pack/preflight/window sidecars, player
+  identity public-contract aliases, bound approved-runtime route evidence, and stale
+  offline reversing notes. Integrated changes keep request/preflight/window/receipt
+  artifacts explicitly non-evidence, require approved-runtime diagnoses to bind the exact
+  CLI manifest path plus false/empty public/runtime fields, reject identity contract
+  aliases such as `contractReviewed`/`publicIdentityReady`, add a scoped release-statement
+  draft builder for seven non-P0 post-v1/excluded blockers, and mark old core/admin/
+  second-source commands recovery-only. Validation: route gate 53 OK, bound route 11 OK,
+  identity public contract 101 OK, preflight shell OK, request/window 147 OK, approved
+  evidence 136 OK, public SDK/completion guardrails 427 OK, route JSON planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, `py_compile` and `git diff --check` OK. No
   runtime/server/Discord/GitHub operation.

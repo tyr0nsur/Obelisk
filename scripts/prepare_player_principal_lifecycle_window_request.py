@@ -724,6 +724,11 @@ def main() -> int:
         "v1_completion_ready": False,
         "stable_claim_allowed": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
+        "preflight_counts_as_approved_runtime_evidence": False,
+        "window_manifest_counts_as_approved_runtime_evidence": False,
+        "completed_receipt_counts_as_approved_runtime_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
         "next_blocker": "operator_current_turn_runtime_window_approval_required",
         "outputs": {
             "observer_env": artifact(env_path),

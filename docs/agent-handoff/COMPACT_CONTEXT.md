@@ -19,6 +19,33 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 P0 runtime-evidence preparation hardening round after `7581cd9`
+  delegated four scopes: request-pack/preflight/window sidecars, player identity
+  public-contract aliases, bound approved-runtime route evidence, and stale offline
+  reversing notes.
+- Integrated changes: request-pack/preflight/window/receipt reports now explicitly keep
+  request/preflight/window/receipt/evidence-ready flags false and preserve those false
+  operational-window metadata through approved-evidence replay; the route gate accepts
+  approved runtime evidence for the identity lock only when the source diagnosis is bound
+  to the exact CLI approved-runtime manifest path and has required false/empty public,
+  runtime, capability, callback, and completion fields; public identity contract tooling
+  rejects aliases such as `contractReviewed`, `identityContractReady`,
+  `publicIdentityReady`, `principalHandleAbiReady`, and `identityHeaderAllowed`; a scoped
+  release-statement builder generates the seven non-P0 post-v1/excluded blocker rows
+  without promoting SDK completion; old core/admin/second-source research commands are
+  marked recovery-only, with current anchors still `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout`.
+- Validation observed before final commit: route gate 53 OK, bound identity route 11 OK,
+  identity public contract 101 OK, preflight shell OK, request/window manifest 147 OK,
+  approved runtime evidence manifest/bundle/checker 136 OK, public SDK/completion
+  guardrails 427 OK, `py_compile` OK, `git diff --check` OK, planning smoke ready with
+  `approved_runtime_evidence_present=false`, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`, and SDK JSON blocked by
+  design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 SDK side-lane/descriptor/runtime-evidence alias hardening round after
   `b1d2f31` delegated four scopes: release-statement delimiter parsing, descriptor
   non-promotion metadata, inventory/structure side-lane overclaim aliases, and approved
