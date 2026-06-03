@@ -760,8 +760,14 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
         return [], [], []
     if contract.get("allow_without_provenance_allowed") is not False:
         add(blockers, "allow_without_provenance_allowed_not_false", "$.decision_contract.allow_without_provenance_allowed")
-    if contract.get("unknown_authority_result") not in {"deny", "unknown"}:
-        add(blockers, "unknown_authority_result_not_fail_closed", "$.decision_contract.unknown_authority_result")
+    if contract.get("unknown_authority_result") != "unknown":
+        add(
+            blockers,
+            "unknown_authority_result_not_explicit_unknown",
+            "$.decision_contract.unknown_authority_result",
+            expected="unknown",
+            value=contract.get("unknown_authority_result"),
+        )
 
     fields = contract.get("decision_fields")
     if not isinstance(fields, list):

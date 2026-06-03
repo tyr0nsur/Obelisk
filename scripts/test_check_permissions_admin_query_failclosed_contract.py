@@ -620,6 +620,16 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("allow_decision_missing_provenance_requirement", report["blockers"])
         self.assertIn("allow_without_provenance_allowed_not_false", report["blockers"])
 
+    def test_rejects_unknown_authority_decision_contract_deny_alias(self) -> None:
+        payload = manifest()
+        payload["decision_contract"]["unknown_authority_result"] = "deny"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unknown_authority_result_not_explicit_unknown", report["blockers"])
+
     def test_rejects_missing_fail_closed_blocker_cases(self) -> None:
         for case_name in (
             "scope_mismatch",

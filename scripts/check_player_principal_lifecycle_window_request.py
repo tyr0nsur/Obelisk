@@ -987,6 +987,7 @@ def validate_operator_approval_receipt(
     receipt_path: Path,
     blockers: list[dict[str, Any]],
 ) -> bool:
+    initial_blocker_count = len(blockers)
     try:
         reject_symlink_component(receipt_path, "operator_approval_receipt")
         resolved = protected_paths.reject_protected_input_path(
@@ -1196,7 +1197,7 @@ def validate_operator_approval_receipt(
         if flags.get(key) is not False:
             add(blockers, f"operator_approval_receipt_{key}_not_false", "operator_approval_receipt")
 
-    return not any(blocker.get("label") == "operator_approval_receipt" for blocker in blockers)
+    return len(blockers) == initial_blocker_count
 
 
 def build_report(

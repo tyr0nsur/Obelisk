@@ -651,6 +651,26 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
         self.assertEqual(["positive_public_surface_claim"], [item["reason"] for item in blockers])
 
+    def test_rejects_public_sdk_runtime_and_v1_completion_free_text_claims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "public_sdk_note": "public SDK readiness is ready",
+                "runtime_note": "runtime readiness is available",
+                "v1_note": "v1 completion is supported",
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                "positive_public_surface_claim",
+                "positive_public_surface_claim",
+                "positive_public_surface_claim",
+            ],
+            [item["reason"] for item in blockers],
+        )
+
     def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims({"note": "reply API ready remains blocked"}, blockers)

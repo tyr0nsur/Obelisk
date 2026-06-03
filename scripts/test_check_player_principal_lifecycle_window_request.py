@@ -568,6 +568,25 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_nested_receipt_shape_blocker_clears_receipt_verified(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["approval_scope"]["unexpected_runtime_authorization_note"] = False
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_scope_unexpected_keys", report["blockers"])
+
     def test_rejects_completed_receipt_without_post_window_replay(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"

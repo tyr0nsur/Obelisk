@@ -3,9 +3,12 @@
 ## Scope
 
 Offline-only audit of the public SDK ResourceHandle/object-identity blocker. The named
-decision manifest and dedicated readiness checker are absent in this checkout, so this
-note records the hardening target and the exact gate wording added to
-`docs/public_sdk_surfaces.json`.
+decision manifest and dedicated readiness checker were absent when this historical note
+was written. Later hardening added
+`docs/object_identity_resource_handle_public_contract_decisions.json`,
+`scripts/check_object_identity_resource_handle_public_contract_readiness.py`, focused
+tests, and SDK-completion integration. This note now records the original surface-map
+hardening target and the current remaining blockers.
 
 No runtime C++, public headers, build outputs, servers, Discord, Git state, or
 `/servidor/ark` paths were touched.
@@ -39,15 +42,15 @@ preserved or implied by existing copied events or metadata-only descriptors.
 
 ## Remaining Blockers
 
-- No dedicated `docs/object_identity_resource_handle_public_contract_decisions.json` gate
-  exists yet.
-- No dedicated `scripts/check_object_identity_resource_handle_public_contract_readiness.py`
-  checker exists yet.
-- No dedicated checker test exists yet.
-- Runtime lifecycle, stale/reuse, generation, UObject flag, callback-scope, owner-token
-  cleanup, privacy/redaction, ABI layout, and installed-SDK consumer evidence remain
-  missing.
+- Runtime lifecycle/reuse evidence, approved stale-object negative samples, and runtime
+  serial reuse/wraparound semantics remain missing.
+- UObject flag semantics, callback-scope behavior, owner-token cleanup, privacy/redaction,
+  ABI layout, and installed-SDK consumer evidence remain missing.
+- Existing decisions/checker/tests keep ResourceHandle/object identity blocked and
+  planning-only; they do not promote lookup, persistence-backed handles, mutation handles,
+  or post-callback object correlation.
 
-Until those artifacts exist and pass, `ResourceHandle`, object identity, lookup,
-persistence-backed handles, mutation handles, and post-callback object correlation must
-remain blocked or explicitly excluded from v1 release wording.
+Until the remaining runtime/ABI evidence is promoted and the existing guardrails pass,
+`ResourceHandle`, object identity, lookup, persistence-backed handles, mutation handles,
+and post-callback object correlation must remain blocked or explicitly excluded from v1
+release wording.

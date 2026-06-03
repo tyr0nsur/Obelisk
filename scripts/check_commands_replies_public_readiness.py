@@ -317,7 +317,8 @@ POSITIVE_CLAIM_RE = re.compile(
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
-    r"public\s+command\s+sdk|"
+    r"public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|runtime[_ -]?readiness|"
+    r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b.{0,100}\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b",
     re.IGNORECASE,
@@ -329,7 +330,8 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
-    r"public\s+command\s+sdk|"
+    r"public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|runtime[_ -]?readiness|"
+    r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b",
     re.IGNORECASE,
