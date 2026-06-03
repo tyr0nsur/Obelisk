@@ -28,8 +28,10 @@ instruction-boundary prologue used by the current trampoline copy size.
   - target bytes readable
   - first 18 bytes match the expected prologue
 - Required the pattern path to produce exactly one accepted candidate before using it.
-- Kept the direct `base + 0x1D34E20` fallback only for the no-pattern-candidate case, and
-  only after the same range and prologue validation succeeds.
+- Superseded on 2026-06-03: the direct `base + 0x1D34E20` fallback described by this
+  historical note is no longer active runtime behavior. Current hook code fails closed when
+  pattern candidates are absent and requires ProcessEvent to be rediscovered for the
+  current binary instead of installing from a direct offset.
 - Added a defensive readability check immediately before trampoline byte copying.
 
 ## Evidence
@@ -39,11 +41,10 @@ instruction-boundary prologue used by the current trampoline copy size.
 
 ## Result
 
-The hook no longer blindly installs on the first pattern match or on the direct offset
-fallback. A changed prologue, unreadable target, target outside executable text, or
-ambiguous pattern result prevents installation through the pattern path. The fallback is
-only attempted when no pattern candidates exist and is accepted only when it points to the
-same known-compatible prologue.
+The hook no longer blindly installs on the first pattern match. A changed prologue,
+unreadable target, target outside executable text, ambiguous pattern result, or missing
+pattern candidate prevents installation. The historical direct-offset fallback is
+superseded and must not be used in active runtime or operator briefs.
 
 ## Rejected paths
 
@@ -61,7 +62,9 @@ same known-compatible prologue.
 
 ## Next steps
 
-- Add binary hash validation if direct offsets remain as fallbacks across ARK builds.
+- Keep direct offsets out of active hook installation paths; if a future binary requires a
+  new target, rediscover and promote it with an evidence pack rather than reusing a
+  fallback offset.
 - Replace fixed-size prologue copying with an instruction decoder before supporting changed
   ProcessEvent prologues.
 

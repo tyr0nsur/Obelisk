@@ -113,6 +113,35 @@ require_dynamic_exports() {
     done
 }
 
+require_external_sdk_compile_commands() {
+    local compile_commands_path="$1"
+    local label="$2"
+    local private_root
+
+    if ! grep -F "${INSTALL_ROOT}/include" "${compile_commands_path}" >/dev/null; then
+        echo "${label} did not include headers from the installed SDK layout" >&2
+        cat "${compile_commands_path}" >&2
+        exit 1
+    fi
+
+    for private_root in \
+        "${REPO_DIR}/include" \
+        "${REPO_DIR}/plugins" \
+        "${REPO_DIR}/extern" \
+        "${REPO_DIR}/core" \
+        "${REPO_DIR}/runtime" \
+        "${REPO_DIR}/ue" \
+        "${REPO_DIR}/loader" \
+        "${REPO_DIR}/tests"
+    do
+        if grep -F "${private_root}" "${compile_commands_path}" >/dev/null; then
+            echo "${label} accidentally referenced repo-private paths: ${private_root}" >&2
+            cat "${compile_commands_path}" >&2
+            exit 1
+        fi
+    done
+}
+
 require_cmd "${CXX_BIN}"
 require_cmd nm
 require_cmd readelf
@@ -587,17 +616,9 @@ require_dynamic_exports "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}" \
     ObeliskPlugin_Init \
     ObeliskPlugin_Shutdown
 
-if ! grep -F "${INSTALL_ROOT}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Minimal SDK example did not include headers from the installed SDK layout" >&2
-    cat "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
-
-if grep -F "${REPO_DIR}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Minimal SDK example accidentally included headers from the source tree" >&2
-    cat "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
+require_external_sdk_compile_commands \
+    "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" \
+    "Minimal SDK example"
 
 "${WORK_DIR}/build/consumer_fixture" \
     "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}" \
@@ -623,17 +644,9 @@ require_dynamic_exports "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}" \
     ObeliskPlugin_Init \
     ObeliskPlugin_Shutdown
 
-if ! grep -F "${INSTALL_ROOT}/include" "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Descriptor catalog SDK example did not include headers from the installed SDK layout" >&2
-    cat "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
-
-if grep -F "${REPO_DIR}/include" "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Descriptor catalog SDK example accidentally included headers from the source tree" >&2
-    cat "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
+require_external_sdk_compile_commands \
+    "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" \
+    "Descriptor catalog SDK example"
 
 "${WORK_DIR}/build/consumer_fixture" \
     "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}" \
@@ -659,17 +672,9 @@ require_dynamic_exports "${SDK_TIMER_EXAMPLE_PLUGIN_PATH}" \
     ObeliskPlugin_Init \
     ObeliskPlugin_Shutdown
 
-if ! grep -F "${INSTALL_ROOT}/include" "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Timer SDK example did not include headers from the installed SDK layout" >&2
-    cat "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
-
-if grep -F "${REPO_DIR}/include" "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
-    echo "Timer SDK example accidentally included headers from the source tree" >&2
-    cat "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" >&2
-    exit 1
-fi
+require_external_sdk_compile_commands \
+    "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" \
+    "Timer SDK example"
 
 "${WORK_DIR}/build/consumer_fixture" \
     "${SDK_TIMER_EXAMPLE_PLUGIN_PATH}" \

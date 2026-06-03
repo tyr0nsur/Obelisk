@@ -783,6 +783,23 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
     return blockers
 
 
+def validate_locked_child_route_alignment(
+    checks: list[dict[str, Any]],
+    *,
+    current_route_blocker: Any,
+    remaining_route_blockers: list[Any],
+) -> list[str]:
+    blockers: list[str] = []
+    for check in checks:
+        if check["name"] not in REQUIRED_LOCKED_CHILD_CHECKS:
+            continue
+        if check.get("current_route_blocker") != current_route_blocker:
+            blockers.append(f"{check['name']}: current_route_blocker drifted from parent identity lock")
+        if check.get("remaining_route_blockers") != remaining_route_blockers:
+            blockers.append(f"{check['name']}: remaining_route_blockers drifted from parent identity lock")
+    return blockers
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     checks = []
     response_path_report: dict[str, Any] | None = None
@@ -856,6 +873,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     remaining_route_blockers = [current_route_blocker] if current_route_blocker is not None else []
     route_blocked = bool(remaining_route_blockers)
     route_lock_blockers = route_lock_blocked_until(current_route_blocker)
+    blockers.extend(
+        validate_locked_child_route_alignment(
+            checks,
+            current_route_blocker=current_route_blocker,
+            remaining_route_blockers=remaining_route_blockers,
+        )
+    )
 
     return {
         "schema": REPORT_SCHEMA,

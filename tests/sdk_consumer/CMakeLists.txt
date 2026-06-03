@@ -100,6 +100,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureCAbiPluginSkipsTimerWithoutUnregisterSlot
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal short-api-between-timer-register-unregister
+)
+
+add_test(
     NAME SdkConsumerFixtureCAbiPluginSkipsGameplayPolicyWithoutCapability
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:sdk_consumer_c_abi_plugin>" c_abi_minimal no-gameplay-policy-capability
 )

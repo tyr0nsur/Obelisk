@@ -62,6 +62,21 @@ class ProcessEventHookGuardrailTests(unittest.TestCase):
         )
         self.assertIn("ShutdownRuntimeAfterHookRemoval();", source)
 
+    def test_hook_does_not_reintroduce_direct_offset_fallback(self) -> None:
+        source = (REPO_ROOT / "hooks/ProcessEventHook.cpp").read_text(encoding="utf-8")
+        install_start = source.index("void ProcessEventHook::Install()")
+        install_body = source[install_start:]
+
+        self.assertIn("ProcessEvent pattern produced no candidates. Hook target must be rediscovered.", install_body)
+        self.assertRegex(
+            install_body,
+            r"else if \(candidates\.empty\(\)\)\s*\{[\s\S]*?Hook target must be rediscovered\.",
+        )
+        self.assertRegex(install_body, r"if \(!processEventAddr\)\s*\{[\s\S]*?Hook NOT installed\.[\s\S]*?return;")
+        self.assertNotIn("0x1D34E20", install_body)
+        self.assertNotIn("0x1d34e20", install_body)
+        self.assertNotRegex(install_body, r"base\s*\+\s*0x1D34E20")
+
 
 if __name__ == "__main__":
     unittest.main()

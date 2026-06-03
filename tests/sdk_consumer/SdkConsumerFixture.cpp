@@ -928,6 +928,11 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
+        if (mode == "short-api-between-timer-register-unregister")
+        {
+            api.struct_size = offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken));
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
         if (mode == "disabled-short-api-before-chat-slots")
         {
             api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
@@ -1478,6 +1483,15 @@ int main(int argc, char** argv)
             Require(!timerSeen(), "plugin reported timer event without registration");
             Require(!timerAccepted(), "plugin accepted timer event without registration");
         }
+        else if (hasTimerProbe && mode == "short-api-between-timer-register-unregister")
+        {
+            Require(g_TimerRegisterCount == 0,
+                "plugin registered timer callback without an advertised unregister slot");
+            Require(g_TimerUnregisterCount == 0,
+                "plugin unregistered timer callback without an advertised unregister slot");
+            Require(!timerSeen(), "plugin reported timer event without an advertised unregister slot");
+            Require(!timerAccepted(), "plugin accepted timer event without an advertised unregister slot");
+        }
         else if (hasTimerProbe && (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||
             std::strcmp(expectedPluginId, "oProcessTimer") != 0))
@@ -1758,6 +1772,13 @@ int main(int argc, char** argv)
                 "plugin registered timer callback without capability");
             Require(g_TimerUnregisterCount == 0,
                 "plugin unregistered timer callback without capability");
+        }
+        else if (hasTimerProbe && mode == "short-api-between-timer-register-unregister")
+        {
+            Require(g_TimerRegisterCount == 0,
+                "plugin registered timer callback without an advertised unregister slot");
+            Require(g_TimerUnregisterCount == 0,
+                "plugin unregistered timer callback without an advertised unregister slot");
         }
         else if (hasTimerProbe && (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||

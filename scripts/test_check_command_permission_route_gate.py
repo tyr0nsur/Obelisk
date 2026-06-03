@@ -236,6 +236,15 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertEqual(check["expected_schema"], check["report_schema"], check)
 
     def test_approved_runtime_evidence_routes_to_identity_public_contract_gate_without_unlocking_p0(self) -> None:
+        original_run_check = ROUTE_GATE.run_check
+
+        def aligned_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
+            result = original_run_check(name, argv)
+            if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+                result["current_route_blocker"] = "identity_public_contract_gate_missing"
+                result["remaining_route_blockers"] = ["identity_public_contract_gate_missing"]
+            return result
+
         with tempfile.TemporaryDirectory() as temp_dir:
             approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
             approved_runtime.write_text(
@@ -283,7 +292,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "public_abi_ready": False,
                 "runtime_ready": False,
             }
-            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
+            with (
+                mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
+                mock.patch.object(ROUTE_GATE, "run_check", side_effect=aligned_child_route_lock),
+            ):
                 report = ROUTE_GATE.build_report(args)
         phase = report["critical_path_phase"]
 
@@ -313,6 +325,72 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
             },
             report["route_lock"],
+        )
+
+    def test_approved_runtime_evidence_rejects_stale_child_route_locks(self) -> None:
+        args = SimpleNamespace(
+            query_failclosed_artifact=QUERY_CONTRACT,
+            player_identity_decisions=IDENTITY_DECISIONS,
+            public_sdk_surfaces=PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=Path("approved-runtime.json"),
+        )
+        phase = {
+            "current_surface": "obelisk.player_identity.v1",
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_next_blocker": None,
+            "next_action": "review_identity_public_contract_gate",
+            "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+            "permissions_admin_unlocked": False,
+            "command_response_unlocked": False,
+            "commands_replies_unlocked": False,
+            "source_checker": "check_player_identity_first_evidence_readiness.py",
+            "source_checker_exit_code": 1,
+            "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+            "source_checker_parse_error": None,
+            "source_checker_status": "blocked",
+            "source_checker_ready": False,
+            "source_checker_accepted_for_internal_planning": False,
+            "source_checker_blockers": ["identity_public_contract_gate_missing"],
+            "source_checker_manifest_sources": identity_manifest_sources(),
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+
+        with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
+            report = ROUTE_GATE.build_report(args)
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
+        self.assertTrue(report["route_blocked"])
+        self.assertFalse(report["route_lock_invariant_valid"])
+        self.assertIn(
+            "permissions_admin_public_readiness: current_route_blocker drifted from parent identity lock",
+            report["blockers"],
+        )
+        self.assertIn(
+            "command_chat_response_public_readiness: remaining_route_blockers drifted from parent identity lock",
+            report["blockers"],
+        )
+        self.assertIn(
+            "commands_replies_public_readiness: current_route_blocker drifted from parent identity lock",
+            report["blockers"],
         )
 
     def test_accepts_bound_player_identity_planning_sources_as_planning_only(self) -> None:
