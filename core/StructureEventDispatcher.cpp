@@ -604,14 +604,7 @@ namespace Obelisk::Core
                     continue;
                 try
                 {
-                    const bool alreadyCaptured = std::any_of(
-                        failures.begin(),
-                        failures.end(),
-                        [&item](const DeferredDestroyFailure& failure) {
-                            return failure.CleanupBatchId == item.CleanupBatchId;
-                        });
-                    if (!alreadyCaptured)
-                        failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()});
+                    failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()});
                 }
                 catch (...)
                 {

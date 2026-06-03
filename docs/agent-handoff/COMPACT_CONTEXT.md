@@ -1217,18 +1217,21 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline`; no output was used as evidence and no write/server op
   occurred.
 - 2026-06-03 supervised 4-agent follow-up: approved runtime principal lifecycle manifest
-  builder now rejects window-manifest checks unless they were generated with
-  `--post-window-replay`. Route and SDK accounting guardrails reject forged runtime
-  evidence source labels from request packs, preflight/window manifests, operator
-  receipts, live-ops/validation sidecars, placeholder evidence, and the placeholder
-  `players-identity-runtime-principal-lifecycle-evidence` schema. Runtime ABI fix:
-  `PlayerPrincipalEventDispatcher` now retains every failed deferred `DestroyUserData`
-  subscription in a cleanup batch for later retry; public ABI unchanged. Reversing/static
-  audit confirmed current repo-local evidence cannot clear
-  `approved_runtime_evidence_missing`; a fresh operator-approved runtime window with
-  copied-log post-window replay remains required. Validation included route tests, SDK
-  completion tests, PluginManager guardrails, py_compile, route/SDK JSON, and
-  `PlayerPrincipalEventDispatcherTests`; no runtime/server op.
+  builder rejects pre-window checks by requiring `--post-window-replay`, rejects broad
+  `ProcessEvent detour hit` traces through analyzer/runtime-summary guardrails, and
+  route/SDK accounting rejects forged runtime-evidence source labels plus placeholder
+  evidence schemas. Runtime request packs must be prepared within one hour of the approved
+  window, and completed operator receipts must be recorded within ten minutes before
+  window start. Route checks forward supplied approved runtime evidence into the identity
+  public-contract gap checker; SDK accounting reads canonical `current_route_blocker` so
+  `identity_public_contract_gate_missing` stays non-counting. Runtime ABI fix generalized
+  copied dispatchers so every failed deferred `DestroyUserData` subscription in a cleanup
+  batch is retained for retry; public ABI unchanged. Reversing/static audit confirmed
+  current repo-local evidence cannot clear `approved_runtime_evidence_missing`; a fresh
+  operator-approved runtime window with copied-log post-window replay remains required.
+  Validation included analyzer/approved-evidence/window/request/route/SDK tests, C++
+  dispatcher and PluginManager tests, guardrails, py_compile, route/SDK JSON, and
+  `git diff --check`; no runtime/server op.
 
 ## Agent Coordination
 

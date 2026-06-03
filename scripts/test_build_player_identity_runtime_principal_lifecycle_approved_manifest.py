@@ -441,6 +441,22 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("--window-manifest-check must be generated with --post-window-replay", result.stderr)
             self.assertFalse(manifest_path.exists())
 
+    def test_rejects_source_summary_with_broad_process_event_trace_lines(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["runtime"]["broad_process_event_trace_lines"] = 1
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must not include broad ProcessEvent detour trace lines", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
     def test_rejects_generated_manifest_that_fails_consume_checker(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

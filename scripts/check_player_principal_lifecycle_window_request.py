@@ -29,7 +29,9 @@ from prepare_player_principal_lifecycle_window_request import (
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
+    MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
     MAX_APPROVED_WINDOW_SECONDS,
+    MAX_REQUEST_PREPARATION_LEAD_SECONDS,
     NON_CLAIMS,
     REQUIRED_ENV,
     RUN_ID_RE,
@@ -833,6 +835,18 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_order_invalid", "approved_window")
         if prepared_at_dt is not None and start_dt is not None and prepared_at_dt >= start_dt:
             add(blockers, "prepared_at_utc_not_before_approved_window", "prepared_at_utc")
+        if (
+            prepared_at_dt is not None
+            and start_dt is not None
+            and prepared_at_dt < start_dt
+            and (start_dt - prepared_at_dt).total_seconds() > MAX_REQUEST_PREPARATION_LEAD_SECONDS
+        ):
+            add(
+                blockers,
+                "prepared_at_utc_too_far_before_approved_window",
+                "prepared_at_utc",
+                max_seconds=MAX_REQUEST_PREPARATION_LEAD_SECONDS,
+            )
         now = datetime.now(timezone.utc)
         if start_dt is not None and start_dt <= now and (end_dt is None or end_dt > now):
             add(
@@ -1077,6 +1091,20 @@ def validate_operator_approval_receipt(
             blockers,
             "operator_approval_receipt_approved_at_or_after_window_start",
             "operator_approval_receipt",
+            approved_window_start_utc=approved_window.get("start_utc") if isinstance(approved_window, dict) else None,
+            approval_recorded_at_utc=approval_recorded_at,
+        )
+    if (
+        approval_recorded_dt is not None
+        and window_start_dt is not None
+        and approval_recorded_dt < window_start_dt
+        and (window_start_dt - approval_recorded_dt).total_seconds() > MAX_OPERATOR_APPROVAL_LEAD_SECONDS
+    ):
+        add(
+            blockers,
+            "operator_approval_receipt_approved_too_far_before_window_start",
+            "operator_approval_receipt",
+            max_seconds=MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
             approved_window_start_utc=approved_window.get("start_utc") if isinstance(approved_window, dict) else None,
             approval_recorded_at_utc=approval_recorded_at,
         )

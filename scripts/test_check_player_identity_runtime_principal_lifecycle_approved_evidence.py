@@ -1272,6 +1272,38 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             {blocker["reason"] for blocker in rejected.blockers},
         )
 
+    def test_rejects_broad_process_event_trace_lines_in_source_summary(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_broad_trace")
+        old_env = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+        os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        with temp_offline_workspace() as tmp:
+            copied_log = Path(tmp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            lines = runtime_log_lines()
+            lines.insert(
+                5,
+                "[info] ProcessEvent detour hit #1 object=0x111 function=0x222 params=0x333 "
+                "fname_index=6252 fname_number=0",
+            )
+            copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            try:
+                payload = manifest_for_copied_log(copied_log, log_lines=lines)
+                rejected = checker.validate_manifest(payload, check_mode="consume")
+            finally:
+                if old_env is None:
+                    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+                else:
+                    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_env
+
+        self.assertIn(
+            "source_summary_runtime_posture_mismatch",
+            {blocker["reason"] for blocker in rejected.blockers},
+        )
+        self.assertIn(
+            "$.source_summary.runtime.broad_process_event_trace_lines",
+            {blocker.get("label") for blocker in rejected.blockers},
+        )
+
     def test_rejects_symlinked_operational_copied_log_run_id_alias(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_symlink")
         old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS

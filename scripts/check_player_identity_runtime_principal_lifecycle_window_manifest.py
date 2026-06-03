@@ -26,6 +26,7 @@ from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_RECEIPT_SCHEMA,
     APPROVAL_TEXT as REQUEST_APPROVAL_TEXT,
     EXPECTED_SERVER_BINARY_PATH,
+    MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
     request_pack_digest,
 )
 from snapshot_evidence_pack import reject_symlink_component
@@ -999,6 +1000,20 @@ def validate_operator_approval_receipt(
             blockers,
             "operator_approval_receipt_approved_at_or_after_window_start",
             "operator_approval_receipt_path",
+            approved_window_start_utc=approved_window_start,
+            approval_recorded_at_utc=approved_at,
+        )
+    if (
+        approved_at_dt is not None
+        and approved_window_start_dt is not None
+        and approved_at_dt < approved_window_start_dt
+        and (approved_window_start_dt - approved_at_dt).total_seconds() > MAX_OPERATOR_APPROVAL_LEAD_SECONDS
+    ):
+        add(
+            blockers,
+            "operator_approval_receipt_approved_too_far_before_window_start",
+            "operator_approval_receipt_path",
+            max_seconds=MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
             approved_window_start_utc=approved_window_start,
             approval_recorded_at_utc=approved_at,
         )

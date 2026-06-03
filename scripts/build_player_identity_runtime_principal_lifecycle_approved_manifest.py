@@ -150,6 +150,11 @@ def validate_source_summary(summary: dict[str, Any]) -> None:
         raise SystemExit("--source-summary evidence.kind must be runtime-observer-log")
     if evidence.get("server_paths_allowed") is not False:
         raise SystemExit("--source-summary must be generated without --allow-server-path")
+    runtime = summary.get("runtime")
+    if not isinstance(runtime, dict):
+        raise SystemExit("--source-summary must include runtime object")
+    if runtime.get("broad_process_event_trace_lines") != 0:
+        raise SystemExit("--source-summary must not include broad ProcessEvent detour trace lines")
     sources = evidence.get("sources")
     if not isinstance(sources, list) or len(sources) != 1:
         raise SystemExit("--source-summary evidence.sources must contain exactly one copied/offline log")

@@ -4060,6 +4060,9 @@ def command_permission_route_gate_current_blocker(
 ) -> str | None:
     if not isinstance(command_permission_route_gate, dict):
         return None
+    current_route_blocker = command_permission_route_gate.get("current_route_blocker")
+    if isinstance(current_route_blocker, str) and current_route_blocker:
+        return current_route_blocker
     current_blocker = command_permission_route_gate.get("current_blocker")
     if isinstance(current_blocker, str) and current_blocker:
         return current_blocker

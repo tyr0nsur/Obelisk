@@ -278,6 +278,31 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("request_missing_required", report["blockers"])
         self.assertIn("prepared_at_utc_not_string", report["blockers"])
 
+    def test_rejects_request_pack_prepared_too_far_before_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            start = datetime.fromisoformat(
+                request["approved_window"]["start_utc"].replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+            request["prepared_at_utc"] = (start - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("prepared_at_utc_too_far_before_approved_window", report["blockers"])
+        self.assertFalse(report["runtime_work_authorized"])
+
     def test_rejects_receipt_approved_before_request_prepared(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -333,6 +358,29 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertIn("operator_approval_receipt_approved_at_or_after_window_start", report["blockers"])
+
+    def test_rejects_receipt_approved_too_far_before_window_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
+            start = datetime.fromisoformat(
+                request["approved_window"]["start_utc"].replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+            receipt_path = write_completed_receipt(
+                output_dir,
+                approved_at_utc=(start - timedelta(minutes=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_approved_too_far_before_window_start", report["blockers"])
 
     def test_rejects_operator_request_markdown_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

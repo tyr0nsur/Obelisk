@@ -8053,6 +8053,61 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertTrue(unlocked_row["manifest_promoted_but_non_counting"])
         self.assertFalse(unlocked_row["counts_toward_complete_sdk_claim"])
 
+    def test_p0_row_reads_canonical_current_route_blocker_from_route_gate_summary(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        original_surface_has_promotion_evidence = module.surface_has_promotion_evidence
+        original_missing_required = module.surface_missing_required_promotion_evidence
+        original_missing_structured = module.surface_missing_structured_promotion_evidence
+        try:
+            module.surface_has_promotion_evidence = lambda surface: True
+            module.surface_missing_required_promotion_evidence = lambda surface: []
+            module.surface_missing_structured_promotion_evidence = (
+                lambda surface, manifest_path=PUBLIC_SDK_SURFACES, public_header_path=PUBLIC_HEADER: []
+            )
+
+            row = module.completion_blocker_outcome_rows(
+                ["obelisk.player_identity.v1"],
+                {
+                    "obelisk.player_identity.v1": {
+                        "id": "obelisk.player_identity.v1",
+                        "status": "promoted",
+                        "evidence": {},
+                    }
+                },
+                set(),
+                "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.\n",
+                {
+                    "schema": "obelisk.command-permission-route-gate-check.v1",
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "current_route_blocker": "identity_public_contract_gate_missing",
+                    "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                    "public_or_runtime_accounting_allowed": False,
+                    "blockers": [],
+                },
+            )[0]
+        finally:
+            module.surface_has_promotion_evidence = original_surface_has_promotion_evidence
+            module.surface_missing_required_promotion_evidence = original_missing_required
+            module.surface_missing_structured_promotion_evidence = original_missing_structured
+
+        self.assertEqual(row["route_gate_current_blocker"], "identity_public_contract_gate_missing")
+        self.assertFalse(row["route_gate_claim_satisfied"])
+        self.assertEqual(row["route_gate_non_counting_blocker"], "identity_public_contract_gate_missing")
+        self.assertIn("route_gate_blocker:identity_public_contract_gate_missing", row["non_counting_reasons"])
+        self.assertFalse(row["counts_toward_complete_sdk_claim"])
+
     def test_mixed_p0_non_counting_reasons_are_visible(self) -> None:
         import importlib.util
 

@@ -30,6 +30,8 @@ RUN_ID_SUFFIX = "-player-principal-lifecycle"
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 MAX_APPROVED_WINDOW_SECONDS = 600
+MAX_REQUEST_PREPARATION_LEAD_SECONDS = 3600
+MAX_OPERATOR_APPROVAL_LEAD_SECONDS = 600
 APPROVAL_TEXT = "current-turn operator-approved runtime window, not standing approval"
 POSTURE_GUARDRAIL_TEXT = (
     "player-principal lifecycle request packs require --final-posture stable; "
@@ -158,10 +160,13 @@ def validate_args(args: argparse.Namespace) -> None:
     end = parse_utc(args.approved_window_end_utc, "--approved-window-end-utc")
     if not start < end:
         raise SystemExit("--approved-window-start-utc must be before --approved-window-end-utc")
-    if start <= datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    if start <= now:
         raise SystemExit("--approved-window-start-utc must be in the future")
-    if end <= datetime.now(timezone.utc):
+    if end <= now:
         raise SystemExit("--approved-window-end-utc must be in the future")
+    if (start - now).total_seconds() > MAX_REQUEST_PREPARATION_LEAD_SECONDS:
+        raise SystemExit("--approved-window-start-utc must be within 1 hour of request preparation")
     if (end - start).total_seconds() > MAX_APPROVED_WINDOW_SECONDS:
         raise SystemExit("--approved-window duration must not exceed 10 minutes")
     if args.restart_expectation not in {"none", "start", "restart"}:

@@ -391,6 +391,21 @@ def route_checks(args: argparse.Namespace, *, current_route_blocker: str | None)
     shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
     shared_header_args = ["--public-header", str(args.public_header)]
     route_blocker_args = ["--current-route-blocker", current_route_blocker] if current_route_blocker else []
+    player_identity_gap_args = [
+        "check_player_identity_public_contract_gap_report.py",
+        "--decisions",
+        str(args.player_identity_decisions),
+        "--surfaces",
+        str(args.public_sdk_surfaces),
+        "--private-candidate-contract",
+        str(args.player_identity_private_candidate_contract),
+        "--public-header",
+        str(args.public_header),
+        "--json",
+    ]
+    approved_runtime = getattr(args, "player_identity_approved_runtime_principal_lifecycle_evidence_manifest", None)
+    if approved_runtime is not None:
+        player_identity_gap_args.extend(["--approved-runtime-evidence", str(approved_runtime)])
     command_response_args = [
         "check_command_chat_response_public_readiness.py",
         *shared_surface_args,
@@ -407,18 +422,7 @@ def route_checks(args: argparse.Namespace, *, current_route_blocker: str | None)
     checks = [
         (
             "player_identity_public_contract_gap",
-            [
-                "check_player_identity_public_contract_gap_report.py",
-                "--decisions",
-                str(args.player_identity_decisions),
-                "--surfaces",
-                str(args.public_sdk_surfaces),
-                "--private-candidate-contract",
-                str(args.player_identity_private_candidate_contract),
-                "--public-header",
-                str(args.public_header),
-                "--json",
-            ],
+            player_identity_gap_args,
         ),
         (
             "permissions_query_failclosed",

@@ -1758,6 +1758,7 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
             "process_event_address": EXPECTED_PROCESS_EVENT_ADDRESS,
             "process_event_hook_installed": True,
             "process_event_hook_patch_size": 18,
+            "broad_process_event_trace_lines": 0,
             "reflection_scanner_disabled": True,
             "plugins_disabled": True,
         }

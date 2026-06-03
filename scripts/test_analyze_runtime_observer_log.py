@@ -101,6 +101,7 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(runtime["process_event_address"], "0x1d34e20")
         self.assertTrue(runtime["process_event_hook_installed"])
         self.assertEqual(runtime["process_event_hook_patch_size"], 18)
+        self.assertEqual(runtime["broad_process_event_trace_lines"], 0)
         self.assertTrue(runtime["reflection_scanner_disabled"])
         self.assertTrue(runtime["plugins_disabled"])
         self.assertIn("chat", modules)
@@ -634,6 +635,35 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_broad_process_event_trace_lines_block_quality_gate(self) -> None:
+        lines = [
+            "[warning] Experimental structure reflection enabled for ShooterGameServer SHA256 "
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+            "[info] ProcessEvent detour hit #1 object=0x111 function=0x222 params=0x333 "
+            "fname_index=6252 fname_number=0",
+            "[info] Reflected structure ProcessEvent #1 function=VerifyPinCode "
+            "fname_index=7636 outer_fname_index=7617 fields=2",
+            "[info] Reflected structure field pinCode offset=0x0 size=4 has_range=true",
+            "[info] Reflected structure field ReturnValue offset=0x4 size=1 has_range=true",
+        ]
+        result = self.run_analyzer(lines)
+        self.assertEqual(result["runtime"]["broad_process_event_trace_lines"], 1)
+        self.assertEqual(result["modules"]["structure"]["blockers"], ["runtime_observer_evidence_only"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            failed = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(failed.returncode, 1)
+        self.assertIn("broad_process_event_trace_lines=1", failed.stderr)
 
     def test_gate_only_module_is_quality_blocker(self) -> None:
         result = self.run_analyzer(

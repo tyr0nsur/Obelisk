@@ -145,6 +145,12 @@ PROCESS_EVENT_HOOK_INSTALLED_RE = re.compile(
     + r"ProcessEvent absolute x64 hook installed successfully\. "
     r"patch_size=(?P<patch_size>\d+) trampoline=(?P<trampoline>0x[0-9a-fA-F]+)"
 )
+PROCESS_EVENT_DETOUR_HIT_RE = re.compile(
+    LOG_PREFIX
+    + r"ProcessEvent detour hit #(?P<sequence>\d+) "
+    r"object=(?P<object>\S+) function=(?P<function>\S+) params=(?P<params>\S+) "
+    r"fname_index=(?P<fname_index>-?\d+) fname_number=(?P<fname_number>-?\d+)"
+)
 REFLECTION_SCANNER_DISABLED_RE = re.compile(
     LOG_PREFIX + r"ReflectionScanner disabled\. Set OBELISK_ENABLE_REFLECTION_SCANNER=1 .*"
 )
@@ -357,6 +363,7 @@ def runtime_record() -> dict[str, Any]:
         "process_event_address": None,
         "process_event_hook_installed": False,
         "process_event_hook_patch_size": None,
+        "broad_process_event_trace_lines": 0,
         "reflection_scanner_disabled": False,
         "plugins_disabled": False,
     }
@@ -510,6 +517,10 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
         if match := PROCESS_EVENT_HOOK_INSTALLED_RE.fullmatch(stripped):
             runtime["process_event_hook_installed"] = True
             runtime["process_event_hook_patch_size"] = int(match.group("patch_size"))
+            continue
+
+        if PROCESS_EVENT_DETOUR_HIT_RE.fullmatch(stripped):
+            runtime["broad_process_event_trace_lines"] += 1
             continue
 
         if REFLECTION_SCANNER_DISABLED_RE.fullmatch(stripped):
@@ -911,6 +922,11 @@ def main() -> int:
 
     if args.fail_on_quality_blockers:
         quality_blockers = []
+        if result["runtime"].get("broad_process_event_trace_lines", 0):
+            quality_blockers.append(
+                "runtime: broad_process_event_trace_lines="
+                f"{result['runtime']['broad_process_event_trace_lines']}"
+            )
         if not result["modules"]:
             quality_blockers.append("no_runtime_observer_evidence")
         for module, payload in result["modules"].items():

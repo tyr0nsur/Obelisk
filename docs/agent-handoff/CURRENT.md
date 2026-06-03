@@ -204,14 +204,12 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
 - Latest round delegated runtime-evidence prep, SDK accounting, reversing/static audit,
-  and runtime ABI. Integrated result: approved runtime principal lifecycle manifest
-  builder now requires window-manifest checks generated with `--post-window-replay`;
-  route/SDK guardrails reject forged runtime-evidence source labels from request packs,
-  preflight/window manifests, operator receipts, sidecars, placeholder evidence, and the
-  placeholder `players-identity-runtime-principal-lifecycle-evidence` schema. Runtime ABI
-  fix: `PlayerPrincipalEventDispatcher` deferred cleanup now retains every failed
-  `DestroyUserData` subscription in a cleanup batch for retry; public ABI unchanged.
-  Reversing audit confirms repo-local/static evidence cannot clear
-  `approved_runtime_evidence_missing`; only an operator-approved runtime window plus
-  copied-log post-window replay can. SDK remains `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`; no runtime/server op. Agents closed.
+  and runtime ABI. Integrated result: request prep is limited to one hour before the
+  approved window, completed receipts to ten minutes before window start, approved runtime
+  manifests reject broad `ProcessEvent detour hit` traces, route checks forward supplied
+  approved runtime evidence into the identity public-contract gap checker, SDK accounting
+  reads canonical `current_route_blocker`, and copied dispatchers retain every failed
+  deferred `DestroyUserData` subscription in a cleanup batch for retry. Reversing audit
+  confirms repo-local/static evidence cannot clear `approved_runtime_evidence_missing`;
+  only an operator-approved runtime window plus copied-log post-window replay can. SDK
+  remains blocked, `stable_claim_allowed=false`; no runtime/server op. Agents closed.

@@ -582,6 +582,63 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["operator_approval_receipt"]["verified"])
         self.assertIn("operator_approval_receipt_approved_at_or_after_window_start", report["blockers"])
 
+    def test_rejects_receipt_approved_too_far_before_window_start(self) -> None:
+        def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            observer_env = Path(fields["observer_env_path"])
+            receipt = Path(fields["operator_approval_receipt_path"])
+            if not request_pack.is_absolute():
+                request_pack = exact_dir / request_pack
+            if not observer_env.is_absolute():
+                observer_env = exact_dir / observer_env
+            if not receipt.is_absolute():
+                receipt = exact_dir / receipt
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            request_payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            window_start = datetime.fromisoformat(
+                fields["approved_window_start_utc"].replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+            request_payload["prepared_at_utc"] = (window_start - timedelta(minutes=12)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            request_pack.write_text(json.dumps(request_payload, sort_keys=True) + "\n", encoding="utf-8")
+            operator_request.write_text(
+                markdown_request(
+                    request_payload,
+                    observer_env.read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            receipt.write_text(
+                json.dumps(
+                    operator_approval_receipt_payload(
+                        request_payload,
+                        request_json_path=request_pack,
+                        request_md_path=operator_request,
+                        env_path=observer_env,
+                        operator_approved=True,
+                        operator_reference="test-current-turn-approval",
+                        approved_at_utc=(window_start - timedelta(minutes=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    ),
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate_receipt,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["operator_approval_receipt"]["verified"])
+        self.assertIn("operator_approval_receipt_approved_too_far_before_window_start", report["blockers"])
+
     def test_rejects_operator_approval_receipt_completion_metadata_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
             receipt_path = Path(fields["operator_approval_receipt_path"])

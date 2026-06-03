@@ -925,20 +925,23 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertLess(body.index("m_PendingDestroyInProgress -= pending.size()"),
                                 body.index("m_DispatchCv.notify_all()"))
 
-    def test_player_principal_deferred_cleanup_retains_each_failed_subscription(self) -> None:
-        text = (CORE_DIR / "PlayerPrincipalEventDispatcher.cpp").read_text(encoding="utf-8")
-        body = extract_function_body(text, r"void PlayerPrincipalEventDispatcher::FinishDispatch\(\)")
-
-        self.assertNotIn(
-            "alreadyCaptured",
-            body,
-            "Player-principal deferred cleanup must retain every failed subscription in a "
-            "cleanup batch so PluginManager retry can quiesce all plugin-owned user data.",
-        )
-        self.assertIn(
-            "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})",
-            body,
-        )
+    def test_deferred_event_dispatchers_retain_each_failed_subscription(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "m_DeferredDestroyFailures" not in text:
+                continue
+            body = extract_function_body(text, r"void \w+EventDispatcher::FinishDispatch\(\)")
+            with self.subTest(source=source.name):
+                self.assertNotIn(
+                    "alreadyCaptured",
+                    body,
+                    "Deferred cleanup must retain every failed subscription in a cleanup "
+                    "batch so PluginManager retry can quiesce all plugin-owned user data.",
+                )
+                self.assertIn(
+                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})",
+                    body,
+                )
 
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")

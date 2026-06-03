@@ -423,6 +423,28 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["route_lock"],
         )
 
+    def test_route_checks_forwards_approved_runtime_evidence_to_identity_gap_report(self) -> None:
+        approved_runtime = Path("approved-runtime-principal-lifecycle.json")
+        args = SimpleNamespace(
+            query_failclosed_artifact=QUERY_CONTRACT,
+            player_identity_decisions=IDENTITY_DECISIONS,
+            public_sdk_surfaces=PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+
+        checks = dict(ROUTE_GATE.route_checks(args, current_route_blocker="identity_public_contract_gate_missing"))
+        argv = checks["player_identity_public_contract_gap"]
+
+        self.assertIn("--approved-runtime-evidence", argv)
+        self.assertEqual(
+            str(approved_runtime),
+            argv[argv.index("--approved-runtime-evidence") + 1],
+        )
+
     def test_approved_runtime_evidence_rejects_stale_child_route_locks(self) -> None:
         original_run_check = ROUTE_GATE.run_check
 

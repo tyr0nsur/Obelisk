@@ -737,6 +737,104 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "deferred destroy callback survived cleanup");
     }
 
+    struct RetryingDeferredDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 1;
+    };
+
+    void BlockingRetryDestroyCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<RetryingDeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FailsThenCountsDestroy(void* userData)
+    {
+        auto* state = static_cast<RetryingDeferredDestroyState*>(userData);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected deferred destroy retry failure");
+        }
+    }
+
+    void TestDeferredOwnerCleanupRetainsEveryFailedDestroy()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        RetryingDeferredDestroyState first;
+        RetryingDeferredDestroyState second;
+        std::atomic<bool> cleanupThrew{false};
+        std::atomic<bool> cleanupFinished{false};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        Require(dispatcher.Register(&owner, {BlockingRetryDestroyCallback, &first, FailsThenCountsDestroy}) != 0,
+                "first retrying deferred destroy registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &second, FailsThenCountsDestroy}) != 0,
+                "second retrying deferred destroy registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "retrying deferred destroy callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(first.Mutex);
+            Require(first.Cv.wait_for(lock, std::chrono::seconds(2), [&first]() { return first.CallbackEntered; }),
+                    "retrying deferred destroy callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (...)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "retrying deferred destroy cleanup did not remove callbacks during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "retrying deferred destroy cleanup finished before dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(first.Mutex);
+            first.ReleaseCallback = true;
+        }
+        first.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "retrying deferred destroy cleanup did not propagate first failure");
+        Require(first.DestroyCalls == 1, "first deferred destroy was not attempted once before retry");
+        Require(second.DestroyCalls == 1, "second deferred destroy was not attempted once before retry");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 2, "retry did not retain both failed deferred destroys");
+        Require(first.DestroyCalls == 2, "retry did not rerun first failed deferred destroy");
+        Require(second.DestroyCalls == 2, "retry did not rerun second failed deferred destroy");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed deferred destroy retry was not idempotent");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -870,6 +968,7 @@ int main()
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
+    TestDeferredOwnerCleanupRetainsEveryFailedDestroy();
     TestOwnerCleanup();
     TestOwnerCleanupPropagatesDestroyUserDataFailure();
     TestOwnerCleanupRetriesFailedDestroyUserData();
