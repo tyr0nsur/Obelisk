@@ -155,8 +155,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness scripts.test_check_command_chat_response_public_readiness scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
   passed with 98 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only on the default route with
-  `lifecycle_anchor_first_evidence_provenance_unbound`.
+  historically passed as planning-only on the default route with the then-current
+  historical blocker `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, P0 `0/4`, and complete SDK
   `0/12`.
@@ -902,7 +902,8 @@ Validation:
   `build_valid=true`, `snapshot_binding_ready=true`, `route_valid=true`, and
   `route_current_blocker=approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  then remained default-planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`.
+  then remained default-planning-only at the historical blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   remains fail-closed with `stable_claim_allowed=false`.
 
@@ -1034,9 +1035,9 @@ tasks across sub-agents:
   `scripts/check_item_return_only_readiness.py` now rejects positive status strings in
   public gameplay metadata that imply public SDK, runtime, ResourceHandle, v1, release,
   or promotion readiness. Scoped non-ready status text remains acceptable.
-- Player-identity offline next action:
+- Player-identity offline next action at this historical checkpoint:
   `scripts/check_player_identity_first_evidence_readiness.py` now emits a structured
-  `planning_provenance.next_action` when the active blocker is
+  `planning_provenance.next_action` when the then-current historical blocker is
   `lifecycle_anchor_first_evidence_provenance_unbound`. The only recommended step is to
   regenerate or select lifecycle/principal planning manifests bound to the current
   first-evidence source, then run the bound identity route wrapper. The expected next
@@ -1230,8 +1231,9 @@ replay/promote-mode gaps while preserving fail-closed SDK accounting:
 - P0 row accounting now treats route-gate satisfaction as fail-closed. A P0 row cannot
   count while the route gate is planning-only, locked, invalid, has blockers, carries any
   current blocker, or lacks promotion/public/runtime readiness. This explicitly covers
-  both the default `lifecycle_anchor_first_evidence_provenance_unbound` blocker and the
-  explicit bound-route `approved_runtime_evidence_missing` blocker.
+  both the then-current historical default
+  `lifecycle_anchor_first_evidence_provenance_unbound` blocker and the explicit
+  bound-route `approved_runtime_evidence_missing` blocker.
 - `scripts/validate_offline_artifact_gate.py` now blocks every
   `obelisk.reflection-snapshot-readiness.v1` report in promote mode, including not-ready
   reports. It also rejects `promotion_ready`, `public_sdk_ready`, and `runtime_ready`
@@ -1576,8 +1578,8 @@ The next supervised P0 identity round closed the deferred aggregate provenance g
   backward-compatible for unbound candidate manifests; stricter source binding is enforced
   by the aggregate readiness checker where the policy is used to advance the P0 route.
 
-Current route posture changes accordingly: the immediate offline P0 next step is to bind
-the lifecycle anchor and principal policy sources to the first-evidence source identity.
+At that historical checkpoint, the immediate offline P0 next step was to bind the
+lifecycle anchor and principal policy sources to the first-evidence source identity.
 Approved copied runtime principal lifecycle evidence remains required after that, and
 public identity review remains after approved runtime evidence.
 
@@ -1945,7 +1947,7 @@ Validation:
 This is accounting-only. It does not authorize runtime/server work, marker/env changes,
 Discord, public identity, public permissions/admin ABI, command response,
 commands/replies, ResourceHandle, release readiness, or stable/complete SDK wording.
-At this checkpoint, default route and SDK accounting remained fail-closed with
+At this historical checkpoint, default route and SDK accounting remained fail-closed with
 `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
 complete-SDK progress `0/12`, and P0 progress `0/4` at this checkpoint.
 
@@ -2044,7 +2046,7 @@ response/replies readiness while the route gate is locked and planning-only.
 This round does not authorize runtime/server work, `/servidor/ark` writes, marker/env
 changes, Discord, GitHub publication, release refs, public identity, permissions/admin
 ABI, command response/replies readiness, ResourceHandle, or stable/complete SDK wording.
-At this checkpoint, default route and SDK accounting remained fail-closed with
+At this historical checkpoint, default route and SDK accounting remained fail-closed with
 `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
 complete-SDK progress `0/12`, and P0 progress `0/4`.
 

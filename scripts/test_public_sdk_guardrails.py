@@ -2939,7 +2939,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Installed SDK/package-shape evidence is package-shape evidence only",
             human,
         )
-        self.assertIn("does not authorize Plugin Hub publication", human)
+        self.assertIn("does not authorize runtime readiness", human)
+        self.assertIn("live-op approval", human)
+        self.assertIn("Plugin Hub readiness/publication", human)
+        self.assertIn("support-tier activation", human)
         self.assertIn("v1 completion", human)
         self.assertIn("stable SDK wording", human)
 
@@ -2950,6 +2953,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         installed_shape = manifest["installed_sdk_package_shape"]
+        installed_shape["non_claim_exports"]["Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED"] = True
+        installed_shape["non_claim_exports"]["Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED"] = True
         installed_shape["non_claim_exports"]["Obelisk_V1_COMPLETION_CLAIM_ALLOWED"] = True
         installed_shape["v1_completion_equivalent_for"] = ["obelisk.player_identity.v1"]
         installed_shape["counts_toward_complete_sdk_claim"] = True
@@ -2965,6 +2970,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertFalse(report["stable_claim_allowed"])
         self.assertIn("installed_sdk_package_shape_guardrail_incomplete", report["blockers"])
+        self.assertIn(
+            "non_claim_exports:Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:non_claim_exports.Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "non_claim_exports:Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:non_claim_exports.Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
         self.assertIn(
             "non_claim_exports:Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
             report["installed_sdk_package_shape_guardrail_drift"],
@@ -5178,7 +5199,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(
             sdk_package_shape["non_claim_exports"],
             {
+                "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED": False,
+                "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED": False,
                 "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED": False,
+                "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED": False,
+                "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED": False,
                 "Obelisk_V1_COMPLETION_CLAIM_ALLOWED": False,
                 "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED": False,
                 "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED": False,
@@ -5272,7 +5297,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             package_config,
         )
         for cmake_false_claim_variable in (
+            "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED",
             "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED",
+            "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED",
+            "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
             "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
             "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
             "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",

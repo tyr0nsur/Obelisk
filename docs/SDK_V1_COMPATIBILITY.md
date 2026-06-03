@@ -113,9 +113,10 @@ not imply private runtime headers, vendored runtime dependencies, release packag
 readiness, public package availability, Plugin Hub package publication, or any blocked
 gameplay module surface.
 The installed CMake package exports explicit non-claim metadata with package-shape status
-and false Plugin Hub publication, v1 completion, public module SDK coverage, and
-production stable SDK claim variables. Consumers must not reinterpret `Obelisk_SDK_FOUND`,
-the package version, or example builds as broader readiness evidence.
+and false runtime-readiness, live-op approval, Plugin Hub readiness/publication,
+support-tier activation, v1 completion, public module SDK coverage, and production stable
+SDK claim variables. Consumers must not reinterpret `Obelisk_SDK_FOUND`, the package
+version, or example builds as broader readiness evidence.
 
 Lifecycle ownership is part of the promoted foundation contract: metadata string
 pointers must remain valid until the plugin shared object is closed; `ObeliskApi*` and

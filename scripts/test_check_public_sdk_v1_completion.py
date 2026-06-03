@@ -415,6 +415,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Release statement outcomes 7/7 ready as bookkeeping only.",
             "Scoped release-statement bookkeeping 7/7 complete.",
             "All seven non-P0 release-statement outcomes are ready.",
+            "All seven non-P0 release-statement outcomes pass scope review.",
+            "Post-v1 and excluded bookkeeping records pass as scoped outcomes.",
         ):
             with self.subTest(statement=statement):
                 self.assertTrue(module.release_statement_forbidden_broad_claims(statement))
@@ -431,7 +433,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 surface["v1_decision_contract"] = {
                     "exclusion_requires": [
                         "the v1 release statement names obelisk.inventory_items_mutation.v1 as post-v1",
-                        "the v1 release statement states that release-statement outcomes are ready as bookkeeping only",
+                        "the v1 release statement states that post-v1 and excluded bookkeeping records pass as scoped outcomes",
                     ],
                 }
                 break
@@ -1307,6 +1309,34 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "sections[1].state",
                 "sections[2].result",
                 "sections[3].support_tier",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_list_split_section_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "sections": [
+                {
+                    "names": ["Stable SDK", "runtime readiness"],
+                    "statuses": ["blocked", "ready"],
+                },
+                {
+                    "aliases": ["public package", "SDK support tier"],
+                    "values": ["release-supported seed"],
+                },
+                {
+                    "names": ["Stable SDK"],
+                    "statuses": ["blocked"],
+                },
+            ],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "sections[0].statuses",
+                "sections[1].values",
             ],
         )
 
@@ -5378,6 +5408,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_installed_sdk_package_shape_must_remain_non_claim_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["installed_sdk_package_shape"]["status"] = "plugin-hub-seed-ready"
+        del manifest["installed_sdk_package_shape"]["non_claim_exports"][
+            "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED"
+        ]
+        manifest["installed_sdk_package_shape"]["non_claim_exports"][
+            "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED"
+        ] = True
+        manifest["installed_sdk_package_shape"]["non_claim_exports"][
+            "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED"
+        ] = True
         manifest["installed_sdk_package_shape"]["not_sufficient_for"] = [
             item
             for item in manifest["installed_sdk_package_shape"]["not_sufficient_for"]
@@ -5406,6 +5445,26 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn(
             "not_sufficient_for:release package readiness or public package availability",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "non_claim_exports:Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "non_claim_exports:Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:non_claim_exports.Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "non_claim_exports:Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:non_claim_exports.Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
             payload["installed_sdk_package_shape_guardrail_drift"],
         )
         self.assertIn(

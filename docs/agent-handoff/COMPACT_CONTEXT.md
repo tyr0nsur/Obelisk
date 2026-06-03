@@ -1967,6 +1967,22 @@ priorities, and do not use history files as the active source of truth.
   route JSON valid/planning-only at `approved_runtime_evidence_missing`, and SDK JSON
   blocked with SDK `0/12`, P0 `0/4`, stable false. No `/servidor/ark` writes, server/runtime
   tools, marker/env edits, Discord, GitHub, tags, or publication.
+- 2026-06-03 package-shape/runtime-intake/research wording follow-up: four scoped workers
+  were delegated by the lead. Integrated changes resolve relative runtime-evidence
+  sidecar paths against the copied-log sibling directory before protected-root/symlink/
+  hash/replay checks; reject relative non-sibling sidecar aliases; extend approved-evidence
+  positive-claim detection for aliases such as `sdkComplete`, `publicIdentityAvailable`,
+  and `runtimeAccepted`; reject plural/list secondary-report split claims such as
+  `names`/`statuses` and `aliases`/`values`; reject release-statement outcome-progress
+  wording using `pass`/`passes`; add package-shape false exports for runtime readiness,
+  live-op approval, Plugin Hub readiness/publication, support-tier activation, v1
+  completion, public module coverage, and production stable SDK claims; and guard the
+  2026-06-02 priority map so retired `lifecycle_anchor_first_evidence_provenance_unbound`
+  references must be historical/stale/then-current. Validation included runtime-evidence
+  intake 121 OK, focused SDK completion 4 OK, research/public SDK guardrails 39 OK, route
+  JSON valid/planning-only at `approved_runtime_evidence_missing`, and SDK JSON blocked
+  with SDK `0/12`, P0 `0/4`, package-shape drift empty, stable false. No `/servidor/ark`
+  writes, server/runtime tools, marker/env edits, Discord, GitHub, tags, or publication.
 
 ## Agent Coordination
 

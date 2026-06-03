@@ -205,14 +205,22 @@ CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE = {
         "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces",
     ),
     "non_claim_exports": {
+        "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED": False,
+        "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED": False,
         "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED": False,
+        "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED": False,
+        "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED": False,
         "Obelisk_V1_COMPLETION_CLAIM_ALLOWED": False,
         "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED": False,
         "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED": False,
     },
 }
 INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS = (
+    "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+    "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED",
     "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED",
+    "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED",
+    "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
     "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",
     "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
     "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
@@ -434,41 +442,70 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "v1_completion_progress_ratio",
 )
 SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS = {
+    "aliases",
     "claim",
     "claim_key",
     "claim_name",
+    "claim_names",
     "claim_scope",
+    "claims",
     "display_name",
+    "display_names",
     "field",
     "field_name",
+    "field_names",
+    "fields",
     "heading",
+    "headings",
     "label",
+    "labels",
     "metric",
     "metric_name",
+    "metric_names",
+    "metrics",
     "name",
+    "names",
     "readiness_key",
+    "readiness_keys",
     "section",
     "section_name",
+    "section_names",
+    "sections",
     "subject",
+    "subjects",
     "summary_name",
+    "summary_names",
     "title",
+    "titles",
 }
 SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS = {
     "allowed",
     "availability",
+    "availabilities",
     "claim_value",
+    "claim_values",
     "declared_support_tier",
+    "declared_support_tiers",
     "enabled",
     "flag",
+    "flags",
     "outcome",
+    "outcomes",
     "publication",
+    "publications",
     "readiness",
     "result",
+    "results",
     "state",
+    "states",
     "status",
+    "statuses",
     "support_tier",
+    "support_tiers",
     "tier",
+    "tiers",
     "value",
+    "values",
 }
 SECONDARY_REPORT_COMPLETION_PROGRESS_VALUE_KEYS = {
     "count",
@@ -1173,10 +1210,10 @@ RELEASE_STATEMENT_OUTCOME_PROGRESS_CLAIM_RE = re.compile(
     r"\b(?:release[-_\s]?statement|scoped[-_\s]?statement|non[-_\s]?p0|"
     r"post[-_\s]?v1|excluded)\b.{0,80}"
     r"\b(?:outcomes?|records?|bookkeeping)\b.{0,80}"
-    r"\b(?:ready|complete|completed|passed|green|satisf(?:y|ies|ied)|"
+    r"\b(?:ready|complete|completed|pass(?:es|ed)?|green|satisf(?:y|ies|ied)|"
     r"unlocked|counts?|counted|progress)\b|"
     r"\b(?:outcomes?|records?|bookkeeping)\b.{0,80}"
-    r"\b(?:ready|complete|completed|passed|green|satisf(?:y|ies|ied)|"
+    r"\b(?:ready|complete|completed|pass(?:es|ed)?|green|satisf(?:y|ies|ied)|"
     r"unlocked|counts?|counted|progress)\b.{0,80}"
     r"\b(?:release[-_\s]?statement|scoped[-_\s]?statement|non[-_\s]?p0|"
     r"post[-_\s]?v1|excluded)\b",
@@ -1914,6 +1951,8 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         return re.sub(r"[_-]+", " ", separated.casefold())
 
     def is_split_claim_descriptor(value: Any) -> bool:
+        if isinstance(value, list):
+            return any(is_split_claim_descriptor(item) for item in value)
         return (
             isinstance(value, str)
             and SECONDARY_REPORT_SPLIT_COMPLETION_DESCRIPTOR_RE.search(
@@ -1923,6 +1962,8 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         )
 
     def is_positive_split_claim_status(value: Any) -> bool:
+        if isinstance(value, list):
+            return any(is_positive_split_claim_status(item) for item in value)
         if is_positive_completion_claim_value(value):
             return True
         if isinstance(value, str):
@@ -2094,6 +2135,8 @@ def is_positive_completion_claim_value(value: Any) -> bool:
         return True
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return value != 0
+    if isinstance(value, list):
+        return any(is_positive_completion_claim_value(item) for item in value)
     if isinstance(value, str):
         stripped = value.strip()
         number_match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)%?", stripped)
@@ -6743,7 +6786,7 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "installed_sdk_package_shape_guardrail_incomplete": [
             "installed_sdk_package_shape must remain package-shape evidence only.",
             f"Drift: {format_human_list(report.get('installed_sdk_package_shape_guardrail_drift'))}.",
-            "Action: do not use installed SDK/package-shape evidence for Plugin Hub publication, v1 completion, or stable SDK wording.",
+            "Action: do not use installed SDK/package-shape evidence for runtime readiness, live-op approval, Plugin Hub readiness/publication, support-tier activation, v1 completion, or stable SDK wording.",
         ],
         "promoted_experimental_surfaces_unresolved": [
             "Experimental copied-data seeds still need an explicit v1 outcome.",
@@ -7090,7 +7133,8 @@ def print_human_report(report: dict[str, Any]) -> None:
     print("The stable v1 SDK claim remains disabled; this is not a v1.0 complete SDK approval.")
     print(
         "Installed SDK/package-shape evidence is package-shape evidence only; it does not "
-        "authorize Plugin Hub publication, v1 completion, or stable SDK wording."
+        "authorize runtime readiness, live-op approval, Plugin Hub readiness/publication, "
+        "support-tier activation, v1 completion, or stable SDK wording."
     )
     outcome_summary = report.get("v1_sdk_blocker_outcome_summary", {})
     if isinstance(outcome_summary, dict):

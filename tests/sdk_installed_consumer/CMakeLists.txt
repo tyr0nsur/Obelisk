@@ -39,18 +39,20 @@ if(NOT Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS STREQUAL "package-shape-eviden
         "Unexpected Obelisk installed SDK package-shape status: "
         "${Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS}")
 endif()
-if(Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED)
-    message(FATAL_ERROR "Installed Obelisk SDK package must not allow Plugin Hub publication claims")
-endif()
-if(Obelisk_V1_COMPLETION_CLAIM_ALLOWED)
-    message(FATAL_ERROR "Installed Obelisk SDK package must not allow v1 completion claims")
-endif()
-if(Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED)
-    message(FATAL_ERROR "Installed Obelisk SDK package must not allow public module SDK coverage claims")
-endif()
-if(Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED)
-    message(FATAL_ERROR "Installed Obelisk SDK package must not allow production stable SDK claims")
-endif()
+foreach(non_claim_var
+    Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED
+    Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED
+    Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED
+    Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED
+    Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED
+    Obelisk_V1_COMPLETION_CLAIM_ALLOWED
+    Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED
+    Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED
+)
+    if(${non_claim_var})
+        message(FATAL_ERROR "Installed Obelisk SDK package enabled forbidden non-claim marker: ${non_claim_var}")
+    endif()
+endforeach()
 if(NOT Obelisk_API_ABI_VERSION EQUAL 1)
     message(FATAL_ERROR "Unexpected Obelisk API ABI version: ${Obelisk_API_ABI_VERSION}")
 endif()

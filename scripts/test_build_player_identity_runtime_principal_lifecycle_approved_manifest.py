@@ -26,6 +26,7 @@ BUILDER = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_approv
 CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
+SERVER_ROOT_WRITE_OPT_IN_ENV = "OBELISK_ALLOW_SERVER_ROOT_WRITES"
 if _OLD_TEST_WORKSPACE_ROOT is None:
     os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
 else:
@@ -68,6 +69,7 @@ def write_sidecar(path: Path, text: str) -> str:
 
 def safe_test_env() -> dict[str, str]:
     env = os.environ.copy()
+    env.pop(SERVER_ROOT_WRITE_OPT_IN_ENV, None)
     env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
     env["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
     return env
@@ -173,6 +175,19 @@ def runtime_log_lines() -> list[str]:
 class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
     def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
         return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=SAFE_OFFLINE_WORKSPACE)
+
+    def test_safe_test_env_drops_server_root_write_override(self) -> None:
+        old_value = os.environ.get(SERVER_ROOT_WRITE_OPT_IN_ENV)
+        os.environ[SERVER_ROOT_WRITE_OPT_IN_ENV] = "1"
+        try:
+            env = safe_test_env()
+        finally:
+            if old_value is None:
+                os.environ.pop(SERVER_ROOT_WRITE_OPT_IN_ENV, None)
+            else:
+                os.environ[SERVER_ROOT_WRITE_OPT_IN_ENV] = old_value
+
+        self.assertNotIn(SERVER_ROOT_WRITE_OPT_IN_ENV, env)
 
     def write_summary(self, temp_dir: Path) -> Path:
         log_path = temp_dir / "live-validation-logs" / RUN_ID / "Obelisk.log"

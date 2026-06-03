@@ -33,10 +33,13 @@ from check_player_identity_runtime_principal_lifecycle_window_manifest import (
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_RECEIPT_SCHEMA as EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA,
     APPROVAL_TEXT as EXPECTED_APPROVAL,
+    ARTIFACT_BINDING_NON_AUTHORIZATION,
+    BRIEF_NON_AUTHORIZATION,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     NON_CLAIMS as EXPECTED_REQUEST_PACK_NON_CLAIMS,
     OBSERVER_ENV_KEYS,
+    REPLAY_NON_AUTHORIZATION,
     REQUIRED_ENV,
     REQUEST_ROLLBACK_DELTA as EXPECTED_REQUEST_ROLLBACK_DELTA,
     SCHEMA as EXPECTED_REQUEST_SCHEMA,
@@ -396,10 +399,13 @@ REQUIRED_NON_CLAIMS = frozenset(
 )
 ALLOWED_POSITIVE_MATCH_NON_CLAIMS = frozenset(
     (
+        ARTIFACT_BINDING_NON_AUTHORIZATION,
+        BRIEF_NON_AUTHORIZATION,
         *EXPECTED_REQUEST_PACK_NON_CLAIMS,
         *EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS,
         *REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS,
         *REQUIRED_NON_CLAIMS,
+        REPLAY_NON_AUTHORIZATION,
     )
 )
 FORBIDDEN_KEY_RE = re.compile(
@@ -417,6 +423,8 @@ POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
     r"(?:public[_ -]?ready|identity[_ -]?ready|permissions?[_ -]?unlocked|"
     r"command[_ -]?route[_ -]?ready|counts?[_ -]?towards?[_ -]?sdk|"
     r"public[_ -]?(?:sdk|player[_ -]?identity|header)|"
+    r"(?:public|runtime|sdk|public[_ -]?sdk|player[_ -]?identity|identity)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|supported|complete|completed|completion|available|active|validated|accepted)|"
     r"(?:(?:request[_ -]?pack|window[_ -]?request|preflight|(?:completed[_ -]?)?receipt|"
     r"operator[_ -]?approval[_ -]?(?:request|receipt)|operator[_ -]?request|"
     r"approval[_ -]?request|window[_ -]?manifest|observer[_ -]?(?:window[_ -]?)?env|"
@@ -693,10 +701,17 @@ def source_path_is_approved_offline_workspace(path_text: Any) -> bool:
     return not status.protected and status.approved_offline_workspace
 
 
-def symlink_component_for_path_text(path_text: Any) -> Path | None:
+def path_from_text(path_text: str, *, base_dir: Path | None = None) -> Path:
+    path = Path(path_text).expanduser()
+    if base_dir is not None and not path.is_absolute():
+        return base_dir / path
+    return path
+
+
+def symlink_component_for_path_text(path_text: Any, *, base_dir: Path | None = None) -> Path | None:
     if not isinstance(path_text, str) or not path_text:
         return None
-    return first_symlink_component(Path(path_text).expanduser())
+    return first_symlink_component(path_from_text(path_text, base_dir=base_dir))
 
 
 def validate_copied_source_file(source: dict[str, Any], label: str, blockers: list[dict[str, Any]]) -> None:
@@ -734,6 +749,7 @@ def validate_operational_window_artifact(
     *,
     run_id: str | None,
     expected_name: str | None = None,
+    base_dir: Path | None = None,
 ) -> None:
     if not isinstance(artifact, dict):
         add(blockers, "operational_window_artifact_missing", label)
@@ -748,7 +764,7 @@ def validate_operational_window_artifact(
     if not isinstance(path_text, str) or not path_text:
         add(blockers, "operational_window_artifact_path_missing", f"{label}.path")
         return
-    symlink_component = symlink_component_for_path_text(path_text)
+    symlink_component = symlink_component_for_path_text(path_text, base_dir=base_dir)
     path_safe_for_hash = True
     if symlink_component is not None:
         add(
@@ -759,7 +775,7 @@ def validate_operational_window_artifact(
         )
         path_safe_for_hash = False
     status = protected_paths.protected_path_status(
-        Path(path_text).expanduser(),
+        path_from_text(path_text, base_dir=base_dir),
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
@@ -769,7 +785,7 @@ def validate_operational_window_artifact(
     elif not status.approved_offline_workspace:
         add(blockers, "operational_window_artifact_path_not_approved_offline_workspace", f"{label}.path")
         path_safe_for_hash = False
-    path = Path(path_text).expanduser()
+    path = path_from_text(path_text, base_dir=base_dir)
     if run_id and run_id not in path.parts:
         add(blockers, "operational_window_artifact_run_id_mismatch", f"{label}.path", run_id=run_id)
     if expected_name is not None and path.name != expected_name:
@@ -794,16 +810,20 @@ def validate_operational_window_artifact(
         )
 
 
-def approved_artifact_status(artifact: Any) -> protected_paths.ProtectedPathStatus | None:
+def approved_artifact_status(
+    artifact: Any,
+    *,
+    base_dir: Path | None = None,
+) -> protected_paths.ProtectedPathStatus | None:
     if not isinstance(artifact, dict):
         return None
     path_text = artifact.get("path")
     if not isinstance(path_text, str) or not path_text:
         return None
-    if symlink_component_for_path_text(path_text) is not None:
+    if symlink_component_for_path_text(path_text, base_dir=base_dir) is not None:
         return None
     status = protected_paths.protected_path_status(
-        Path(path_text).expanduser(),
+        path_from_text(path_text, base_dir=base_dir),
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
@@ -823,9 +843,14 @@ def bound_artifact_from_status(status: protected_paths.ProtectedPathStatus) -> d
         return None
 
 
-def resolved_artifact_path(artifact: Any) -> str | None:
-    status = approved_artifact_status(artifact)
+def resolved_artifact_path(artifact: Any, *, base_dir: Path | None = None) -> str | None:
+    status = approved_artifact_status(artifact, base_dir=base_dir)
     return None if status is None else str(status.resolved)
+
+
+def operational_window_sidecar_dir(window: dict[str, Any]) -> Path | None:
+    copied_status = approved_artifact_status(window.get("copied_log"))
+    return None if copied_status is None else copied_status.resolved.parent
 
 
 def nested_operational_window_artifact(window: dict[str, Any], key: str) -> Any:
@@ -845,7 +870,7 @@ def validate_operational_window_sibling_set(window: dict[str, Any], blockers: li
 
     for key, expected_name in REQUIRED_OPERATIONAL_WINDOW_SIBLING_FILENAMES.items():
         artifact = nested_operational_window_artifact(window, key)
-        artifact_status = approved_artifact_status(artifact)
+        artifact_status = approved_artifact_status(artifact, base_dir=expected_dir)
         if artifact_status is None:
             continue
         expected_path = expected_dir / expected_name
@@ -897,18 +922,26 @@ def artifact_status_for_read(
     artifact: Any,
     label: str,
     blockers: list[dict[str, Any]],
+    *,
+    base_dir: Path | None = None,
 ) -> protected_paths.ProtectedPathStatus | None:
     if not isinstance(artifact, dict):
         add(blockers, "operational_window_artifact_missing", label)
         return None
-    status = approved_artifact_status(artifact)
+    status = approved_artifact_status(artifact, base_dir=base_dir)
     if status is None:
         return None
     return status
 
 
-def load_json_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
-    status = artifact_status_for_read(artifact, label, blockers)
+def load_json_artifact(
+    artifact: Any,
+    label: str,
+    blockers: list[dict[str, Any]],
+    *,
+    base_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    status = artifact_status_for_read(artifact, label, blockers, base_dir=base_dir)
     if status is None:
         return None
     try:
@@ -925,8 +958,14 @@ def load_json_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]
     return payload
 
 
-def load_text_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]) -> str | None:
-    status = artifact_status_for_read(artifact, label, blockers)
+def load_text_artifact(
+    artifact: Any,
+    label: str,
+    blockers: list[dict[str, Any]],
+    *,
+    base_dir: Path | None = None,
+) -> str | None:
+    status = artifact_status_for_read(artifact, label, blockers, base_dir=base_dir)
     if status is None:
         return None
     try:
@@ -981,7 +1020,7 @@ def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[s
     elif (
         isinstance(value, str)
         and contains_unnegated_positive_capability_claim(value)
-        and not (".non_claims[" in trail and value in ALLOWED_POSITIVE_MATCH_NON_CLAIMS)
+        and not value in ALLOWED_POSITIVE_MATCH_NON_CLAIMS
     ):
         add(
             blockers,
@@ -1015,7 +1054,8 @@ def validate_observer_env_binding(
     blockers: list[dict[str, Any]],
 ) -> None:
     label = "$.operational_window.observer_env.path"
-    text = load_text_artifact(window.get("observer_env"), label, blockers)
+    base_dir = operational_window_sidecar_dir(window)
+    text = load_text_artifact(window.get("observer_env"), label, blockers, base_dir=base_dir)
     if text is None:
         return
     env = parse_observer_env(text, label, blockers)
@@ -1059,7 +1099,8 @@ def validate_observer_env_binding(
 
 def validate_request_pack_binding(window: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
     label = "$.operational_window.request_pack.path"
-    payload = load_json_artifact(window.get("request_pack"), label, blockers)
+    base_dir = operational_window_sidecar_dir(window)
+    payload = load_json_artifact(window.get("request_pack"), label, blockers, base_dir=base_dir)
     if payload is None:
         return None
     validate_no_sidecar_overclaims(payload, label, blockers)
@@ -1099,7 +1140,7 @@ def validate_request_pack_binding(window: dict[str, Any], blockers: list[dict[st
         )
     expected_paths = {
         "copied_log_path": resolved_artifact_path(window.get("copied_log")),
-        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+        "window_manifest_path": resolved_artifact_path(window.get("manifest"), base_dir=base_dir),
     }
     copied_log_path = expected_paths["copied_log_path"]
     if copied_log_path is not None:
@@ -1133,24 +1174,29 @@ def validate_request_pack_binding(window: dict[str, Any], blockers: list[dict[st
                 label,
                 sidecar=key,
             )
-        request_status = approved_artifact_status(window.get("request_pack"))
+        request_status = approved_artifact_status(window.get("request_pack"), base_dir=base_dir)
         operator_request_path = (
             str(request_status.resolved.parent / "operator-approval-request.md")
             if request_status is not None
             else None
         )
         expected_sidecars = {
-            "request_pack_path": resolved_artifact_path(window.get("request_pack")),
-            "observer_env_path": resolved_artifact_path(window.get("observer_env")),
+            "request_pack_path": resolved_artifact_path(window.get("request_pack"), base_dir=base_dir),
+            "observer_env_path": resolved_artifact_path(window.get("observer_env"), base_dir=base_dir),
             "operator_approval_request_path": operator_request_path,
-            "operator_approval_receipt_path": resolved_artifact_path(window.get("operator_approval_receipt")),
+            "operator_approval_receipt_path": resolved_artifact_path(
+                window.get("operator_approval_receipt"),
+                base_dir=base_dir,
+            ),
             "preflight_pre_path": resolved_artifact_path(
-                window.get("preflight", {}).get("pre") if isinstance(window.get("preflight"), dict) else None
+                window.get("preflight", {}).get("pre") if isinstance(window.get("preflight"), dict) else None,
+                base_dir=base_dir,
             ),
             "preflight_post_path": resolved_artifact_path(
-                window.get("preflight", {}).get("post") if isinstance(window.get("preflight"), dict) else None
+                window.get("preflight", {}).get("post") if isinstance(window.get("preflight"), dict) else None,
+                base_dir=base_dir,
             ),
-            "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+            "window_manifest_path": resolved_artifact_path(window.get("manifest"), base_dir=base_dir),
             "copied_log_path": resolved_artifact_path(window.get("copied_log")),
         }
         for key, expected in expected_sidecars.items():
@@ -1202,7 +1248,10 @@ def validate_preflight_payload(
         "instance": target.get("instance"),
         "map": target.get("map"),
         "target": target,
-        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+        "window_manifest_path": resolved_artifact_path(
+            window.get("manifest"),
+            base_dir=operational_window_sidecar_dir(window),
+        ),
         "copied_log_path": resolved_artifact_path(window.get("copied_log")),
     }
     copied_log_path = expected_values["copied_log_path"]
@@ -1229,7 +1278,7 @@ def validate_preflight_payload(
     if require_env_file:
         observer_env = window.get("observer_env") if isinstance(window.get("observer_env"), dict) else {}
         expected_env_file = {
-            "path": resolved_artifact_path(observer_env),
+            "path": resolved_artifact_path(observer_env, base_dir=operational_window_sidecar_dir(window)),
             "sha256": observer_env.get("sha256"),
         }
         if env_file != expected_env_file:
@@ -1272,8 +1321,19 @@ def validate_preflight_bindings(window: dict[str, Any], blockers: list[dict[str,
     preflight = window.get("preflight")
     if not isinstance(preflight, dict):
         return
-    pre_payload = load_json_artifact(preflight.get("pre"), "$.operational_window.preflight.pre.path", blockers)
-    post_payload = load_json_artifact(preflight.get("post"), "$.operational_window.preflight.post.path", blockers)
+    base_dir = operational_window_sidecar_dir(window)
+    pre_payload = load_json_artifact(
+        preflight.get("pre"),
+        "$.operational_window.preflight.pre.path",
+        blockers,
+        base_dir=base_dir,
+    )
+    post_payload = load_json_artifact(
+        preflight.get("post"),
+        "$.operational_window.preflight.post.path",
+        blockers,
+        base_dir=base_dir,
+    )
     if pre_payload is not None:
         validate_preflight_payload(
             pre_payload,
@@ -1294,8 +1354,12 @@ def validate_preflight_bindings(window: dict[str, Any], blockers: list[dict[str,
         )
 
 
-def operator_request_sidecar_artifact(window: dict[str, Any]) -> dict[str, Any] | None:
-    request_status = approved_artifact_status(window.get("request_pack"))
+def operator_request_sidecar_artifact(
+    window: dict[str, Any],
+    *,
+    base_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    request_status = approved_artifact_status(window.get("request_pack"), base_dir=base_dir)
     if request_status is None:
         return None
     operator_request_path = request_status.resolved.parent / "operator-approval-request.md"
@@ -1324,7 +1388,7 @@ def load_operator_approval_receipt_payload(
             "operational_window_operator_approval_receipt_verified_not_true",
             "$.operational_window.operator_approval_receipt.verified",
         )
-    status = approved_artifact_status(receipt)
+    status = approved_artifact_status(receipt, base_dir=operational_window_sidecar_dir(window))
     if status is None:
         return None
     try:
@@ -1359,6 +1423,7 @@ def validate_operator_approval_receipt_binding(
     window: dict[str, Any],
     blockers: list[dict[str, Any]],
 ) -> None:
+    base_dir = operational_window_sidecar_dir(window)
     payload = load_operator_approval_receipt_payload(window, blockers)
     if payload is None:
         return
@@ -1488,7 +1553,7 @@ def validate_operator_approval_receipt_binding(
         "target": window.get("target"),
         "approved_window": window.get("approved_window"),
         "copied_log_path": resolved_artifact_path(window.get("copied_log")),
-        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+        "window_manifest_path": resolved_artifact_path(window.get("manifest"), base_dir=base_dir),
     }
     for key, expected in expected_bound_values.items():
         if expected is not None and bound_request.get(key) != expected:
@@ -1541,12 +1606,12 @@ def validate_operator_approval_receipt_binding(
         return
     expected_artifacts = {
         "window_request_json": bound_artifact_from_status(status)
-        if (status := approved_artifact_status(window.get("request_pack"))) is not None
+        if (status := approved_artifact_status(window.get("request_pack"), base_dir=base_dir)) is not None
         else None,
         "observer_window_env": bound_artifact_from_status(status)
-        if (status := approved_artifact_status(window.get("observer_env"))) is not None
+        if (status := approved_artifact_status(window.get("observer_env"), base_dir=base_dir)) is not None
         else None,
-        "operator_approval_request_md": operator_request_sidecar_artifact(window),
+        "operator_approval_request_md": operator_request_sidecar_artifact(window, base_dir=base_dir),
     }
     for key, expected in expected_artifacts.items():
         if expected is not None and bound_artifacts.get(key) != expected:
@@ -1558,9 +1623,9 @@ def validate_operator_approval_receipt_binding(
                 actual=bound_artifacts.get(key),
             )
 
-    request_status = approved_artifact_status(window.get("request_pack"))
-    observer_env_status = approved_artifact_status(window.get("observer_env"))
-    operator_request = operator_request_sidecar_artifact(window)
+    request_status = approved_artifact_status(window.get("request_pack"), base_dir=base_dir)
+    observer_env_status = approved_artifact_status(window.get("observer_env"), base_dir=base_dir)
+    operator_request = operator_request_sidecar_artifact(window, base_dir=base_dir)
     if request_status is not None and observer_env_status is not None and operator_request is not None:
         try:
             expected_digest = request_pack_digest(
@@ -1592,7 +1657,7 @@ def replay_operational_window_manifest(window: dict[str, Any], blockers: list[di
     if not isinstance(path_text, str) or not path_text:
         return
 
-    manifest_path = Path(path_text).expanduser()
+    manifest_path = path_from_text(path_text, base_dir=operational_window_sidecar_dir(window))
     old_window_server_root = window_manifest_checker.SERVER_ROOT
     old_window_roots = window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
     window_manifest_checker.SERVER_ROOT = SERVER_ROOT
@@ -2180,12 +2245,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if window.get("obelisk_commit") != evidence.get("obelisk_commit"):
         add(blockers, "operational_window_obelisk_commit_mismatch", f"{label}.obelisk_commit")
     run_id = window.get("run_id") if isinstance(window.get("run_id"), str) else None
+    sidecar_base_dir = operational_window_sidecar_dir(window)
     validate_operational_window_artifact(
         window.get("manifest"),
         f"{label}.manifest",
         blockers,
         run_id=run_id,
         expected_name="window-manifest.env",
+        base_dir=sidecar_base_dir,
     )
     validate_operational_window_artifact(
         window.get("request_pack"),
@@ -2193,6 +2260,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         blockers,
         run_id=run_id,
         expected_name="window-request.json",
+        base_dir=sidecar_base_dir,
     )
     validate_operational_window_artifact(
         window.get("observer_env"),
@@ -2200,6 +2268,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         blockers,
         run_id=run_id,
         expected_name="observer-window.env",
+        base_dir=sidecar_base_dir,
     )
     validate_operational_window_artifact(
         window.get("operator_approval_receipt"),
@@ -2207,6 +2276,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         blockers,
         run_id=run_id,
         expected_name="operator-approval-receipt.json",
+        base_dir=sidecar_base_dir,
     )
     request_payload = validate_request_pack_binding(window, blockers)
     validate_observer_env_binding(window, request_payload, blockers)
@@ -2229,6 +2299,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             blockers,
             run_id=run_id,
             expected_name="preflight-pre.json",
+            base_dir=sidecar_base_dir,
         )
         validate_operational_window_artifact(
             preflight.get("post"),
@@ -2236,6 +2307,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             blockers,
             run_id=run_id,
             expected_name="preflight-post.json",
+            base_dir=sidecar_base_dir,
         )
         validate_preflight_bindings(window, blockers)
     validate_operational_window_sibling_set(window, blockers)

@@ -755,6 +755,45 @@ This round did not touch `/servidor/ark`, start/stop/restart servers, edit marke
 run runtime observers, ReflectionScanner, ptrace/gcore, broad tracing, Discord, GitHub,
 tags, or publication.
 
+## Runtime Intake, Package Shape, And Historical Route Wording Round
+
+The next supervised four-worker round closed additional offline false-positive routes
+without changing the active blocker.
+
+Integrated findings:
+
+- Approved runtime evidence sidecar paths now resolve relative to the copied-log sibling
+  directory before protected-root checks, symlink checks, hashing, replay, and contract
+  comparisons. Relative non-sibling sidecar aliases fail closed.
+- Approved-evidence positive-claim detection now covers aliases such as `sdkComplete`,
+  `publicIdentityAvailable`, and `runtimeAccepted`.
+- Secondary SDK completion reports now reject plural/list split claims such as
+  `names=["Stable SDK"]` with `statuses=["ready"]` and `aliases=["public package"]` with
+  `values=["release-supported seed"]`.
+- Scoped release-statement outcome-progress wording now rejects `pass` and `passes`, not
+  only `passed`.
+- Installed SDK package-shape metadata now carries eight false non-claim exports covering
+  runtime readiness, live-op approval, Plugin Hub readiness/publication, support-tier
+  activation, v1 completion, public module SDK coverage, and production stable SDK claims.
+  Consumer CMake rejects any of these becoming true.
+- The 2026-06-02 SDK priority map now has a guardrail requiring references to the retired
+  `lifecycle_anchor_first_evidence_provenance_unbound` blocker to be explicitly historical,
+  stale, or then-current.
+
+Validation:
+
+- Runtime evidence intake: 121 tests OK with `OBELISK_ALLOW_SERVER_ROOT_WRITES` unset.
+- Focused SDK completion hardening: 4 tests OK.
+- Research/public SDK guardrails: 39 tests OK.
+- `check_command_permission_route_gate.py --json`: valid planning-only route at
+  `approved_runtime_evidence_missing`.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and no installed package-shape drift.
+
+This round did not create approved runtime evidence and did not authorize server
+operations, `/servidor/ark` writes, marker/env changes, runtime observation,
+ReflectionScanner, ptrace/gcore, broad tracing, Discord, GitHub, tags, or publication.
+
 ## Split-Claim, Runtime Cleanup, And Workspace-Offline Discipline Round
 
 The next delegated round plus lead integration hardened more offline false-positive

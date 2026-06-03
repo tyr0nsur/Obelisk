@@ -53,6 +53,7 @@ OPERATIONAL_WINDOW_FALSE_FLAGS = {
     "approved_runtime_evidence_present": False,
     "approved_runtime_evidence_ready": False,
 }
+SERVER_ROOT_WRITE_OPT_IN_ENV = "OBELISK_ALLOW_SERVER_ROOT_WRITES"
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
@@ -73,6 +74,14 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
 
 
 SHA = EXPECTED_BINARY_SHA256
+
+
+def safe_test_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.pop(SERVER_ROOT_WRITE_OPT_IN_ENV, None)
+    env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+    env["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
+    return env
 
 
 def add_output_artifact_identity(payload: dict) -> dict:
@@ -442,9 +451,7 @@ def analyzer_summary() -> dict:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env={
-            **os.environ,
-            "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
-            "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+            **safe_test_env(),
         },
     )
     return json.loads(result.stdout)
@@ -704,6 +711,19 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
     def tearDown(self) -> None:
         cleanup_live_temp_dirs()
 
+    def test_safe_test_env_drops_server_root_write_override(self) -> None:
+        old_value = os.environ.get(SERVER_ROOT_WRITE_OPT_IN_ENV)
+        os.environ[SERVER_ROOT_WRITE_OPT_IN_ENV] = "1"
+        try:
+            env = safe_test_env()
+        finally:
+            if old_value is None:
+                os.environ.pop(SERVER_ROOT_WRITE_OPT_IN_ENV, None)
+            else:
+                os.environ[SERVER_ROOT_WRITE_OPT_IN_ENV] = old_value
+
+        self.assertNotIn(SERVER_ROOT_WRITE_OPT_IN_ENV, env)
+
     def test_request_pack_digest_uses_prepare_helper(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_digest")
         self.assertIs(checker.request_pack_digest, request_pack_digest)
@@ -723,9 +743,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 [sys.executable, str(SCRIPT), str(path), "--json", *args],
                 check=False,
                 env={
-                    **os.environ,
-                    "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1",
-                    "OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE": str(SAFE_OFFLINE_WORKSPACE),
+                    **safe_test_env(),
                 },
                 text=True,
                 stdout=subprocess.PIPE,
@@ -1226,6 +1244,24 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 lambda sidecar: sidecar.update({"sdkAccountingReady": True}),
                 "operational_window_sidecar_authorization_or_readiness_key_overclaim",
             ),
+            (
+                "preflight_sdk_complete_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"sdkComplete": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_public_identity_available_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"publicIdentityAvailable": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_runtime_accepted_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"runtimeAccepted": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
         )
         for name, artifact_for_payload, mutate, expected in cases:
             with self.subTest(name=name):
@@ -1522,6 +1558,78 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("operational_window_artifact_path_symlink_component", reasons)
         self.assertIn("operational_window_artifact_path_not_copied_or_offline", reasons)
         self.assertNotIn("operational_window_artifact_file_missing", reasons)
+
+    def test_operational_window_artifact_resolves_relative_path_against_copied_log_sibling_dir(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_relative_sidecar")
+        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        with tempfile.TemporaryDirectory() as tmp:
+            offline_root = Path(tmp)
+            copied_log_dir = offline_root / "live-validation-logs" / RUN_ID
+            cwd_dir = offline_root / "cwd"
+            copied_log_dir.mkdir(parents=True)
+            cwd_dir.mkdir()
+            expected_path = copied_log_dir / "window-request.json"
+            cwd_path = cwd_dir / "window-request.json"
+            expected_path.write_text("expected sidecar\n", encoding="utf-8")
+            cwd_path.write_text("wrong cwd sidecar\n", encoding="utf-8")
+            artifact = {
+                "path": "window-request.json",
+                "sha256": hashlib.sha256(expected_path.read_bytes()).hexdigest(),
+            }
+            blockers: list[dict] = []
+            old_cwd = Path.cwd()
+            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
+            os.chdir(cwd_dir)
+            try:
+                checker.validate_operational_window_artifact(
+                    artifact,
+                    "$.operational_window.request_pack",
+                    blockers,
+                    run_id=RUN_ID,
+                    expected_name="window-request.json",
+                    base_dir=copied_log_dir,
+                )
+            finally:
+                os.chdir(old_cwd)
+                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+
+        self.assertEqual([], blockers)
+
+    def test_rejects_relative_sidecar_path_outside_exact_copied_log_sibling_set(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_relative_sidecar_set")
+        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        with tempfile.TemporaryDirectory() as tmp:
+            offline_root = Path(tmp)
+            copied_log_dir = offline_root / "live-validation-logs" / RUN_ID
+            alias_dir = offline_root / "live-validation-logs" / "sidecar-aliases" / RUN_ID
+            copied_log_dir.mkdir(parents=True)
+            alias_dir.mkdir(parents=True)
+            copied_log = copied_log_dir / "Obelisk.log"
+            sidecar = alias_dir / "window-request.json"
+            copied_log.write_text("copied log\n", encoding="utf-8")
+            sidecar.write_text("request sidecar\n", encoding="utf-8")
+            window = {
+                "copied_log": {
+                    "path": str(copied_log),
+                    "path_status": "approved_offline_workspace",
+                    "sha256": hashlib.sha256(copied_log.read_bytes()).hexdigest(),
+                },
+                "request_pack": {
+                    "path": f"../sidecar-aliases/{RUN_ID}/window-request.json",
+                    "sha256": hashlib.sha256(sidecar.read_bytes()).hexdigest(),
+                },
+            }
+            blockers: list[dict] = []
+            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
+            try:
+                checker.validate_operational_window_sibling_set(window, blockers)
+            finally:
+                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+
+        self.assertIn(
+            "operational_window_sidecar_not_exact_copied_log_sibling",
+            {blocker["reason"] for blocker in blockers},
+        )
 
     def test_rejects_expired_request_pack_when_markdown_drift_is_also_present(self) -> None:
         payload = manifest()

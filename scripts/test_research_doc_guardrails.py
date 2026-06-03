@@ -22,6 +22,28 @@ def normalized(text: str) -> str:
 
 
 class ResearchDocGuardrailTests(unittest.TestCase):
+    def test_sdk_priority_map_retired_lifecycle_blocker_is_historical_only(self) -> None:
+        priority_map = (
+            REPO_ROOT / "docs/research/2026-06-02-sdk-complete-priority-map.md"
+        ).read_text(encoding="utf-8")
+        compact_priority_map = normalized(priority_map)
+        retired_blocker = "lifecycle_anchor_first_evidence_provenance_unbound"
+
+        self.assertIn(
+            "Read every later `lifecycle_anchor_first_evidence_provenance_unbound` line "
+            "as historical status only",
+            compact_priority_map,
+        )
+        self.assertIn("The active default blocker is\n`approved_runtime_evidence_missing`", priority_map)
+        self.assertNotIn("Current route posture changes accordingly", priority_map)
+
+        for paragraph in priority_map.split("\n\n"):
+            if retired_blocker not in paragraph:
+                continue
+            compact = normalized(paragraph).lower()
+            with self.subTest(paragraph=normalized(paragraph)[:120]):
+                self.assertRegex(compact, r"\b(?:historical|then-current|stale)\b")
+
     def test_player_identity_post_window_replay_is_mandatory_for_promotion_route_docs(self) -> None:
         checklist = (
             REPO_ROOT

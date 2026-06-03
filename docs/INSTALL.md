@@ -81,7 +81,11 @@ line, not a claim that a stable `v0.1.0` tag exists. The installed package also 
 `struct_size`/capability fields before using appended ABI slots.
 It also exports non-claim package metadata:
 `Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS=package-shape-evidence-only`,
+`Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED=FALSE`,
+`Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED=FALSE`,
 `Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED=FALSE`,
+`Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED=FALSE`,
+`Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED=FALSE`,
 `Obelisk_V1_COMPLETION_CLAIM_ALLOWED=FALSE`,
 `Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED=FALSE`, and
 `Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED=FALSE`.
