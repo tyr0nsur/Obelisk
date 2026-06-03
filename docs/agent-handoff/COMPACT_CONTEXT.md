@@ -19,6 +19,30 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 SDK/reversing boundary hardening round after `625ac05` delegated four
+  scopes: release-statement bookkeeping, public header/ABI aliases, runtime-principal
+  request/evidence sidecars, and ArkServerApi/AseApi/NextGen research boundaries.
+- Integrated changes: SDK completion now rejects same-line mixed release-statement
+  outcome records such as a valid `post-v1` line that embeds `promoted - reviewed
+  elsewhere`; blocked public header symbol scanning covers broader aliases for
+  principal, chat-send/reply, inventory items mutation, tribe, structure census,
+  lifecycle recovery, and operator ingress/storage without changing `ObeliskApi.h`;
+  runtime-principal window manifests treat nested preflight text values `present`,
+  `accepted`, and `available` as positive runtime-evidence/readiness overclaims;
+  research guardrails now cover all AseApi/NextGen reference notes and explicitly ban
+  external-framework authority for porting targets, API ergonomics, wrapper semantics,
+  command parser behavior, timer behavior, return semantics, return override semantics,
+  support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.
+- Validation observed: SDK/window/research/handoff suite 350 OK, bundle/evidence suite
+  119 OK, `py_compile` OK, `git diff --check` OK, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `runtime_ready=false`, `public_sdk_ready=false`, and
+  SDK JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`.
+  Release-statement outcomes still missing for seven non-P0 post-v1/excluded blockers.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 P0/side-lane non-claim hardening round after `7594e36` delegated four
   scopes: bound command/permission route identity sources, player-identity runtime
   request-pack replay sidecars, ResourceHandle/object identity, and

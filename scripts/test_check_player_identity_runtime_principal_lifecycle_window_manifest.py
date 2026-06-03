@@ -1081,6 +1081,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 "runtimeWorkAuthorized": True,
                 "server-operations-authorized": "yes",
                 "public sdk ready": "ready",
+                "approved runtime evidence present": "present",
+                "approvedRuntimeEvidenceReady": "accepted",
             }
             preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
             fields = {
@@ -1112,6 +1114,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("preflight_pre_path_runtime_work_authorized_not_false", reasons)
         self.assertIn("preflight_pre_path_server_operations_authorized_not_false", reasons)
         self.assertIn("preflight_pre_path_public_sdk_ready_not_false", reasons)
+        self.assertIn("preflight_pre_path_approved_runtime_evidence_present_not_false", reasons)
+        self.assertIn("preflight_pre_path_approved_runtime_evidence_ready_not_false", reasons)
         key_paths = {
             detail.get("key_path")
             for detail in blockers
@@ -1120,6 +1124,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("nested_flags.runtimeWorkAuthorized", key_paths)
         self.assertIn("nested_flags.server-operations-authorized", key_paths)
         self.assertIn("nested_flags.public sdk ready", key_paths)
+        self.assertIn("nested_flags.approved runtime evidence present", key_paths)
+        self.assertIn("nested_flags.approvedRuntimeEvidenceReady", key_paths)
 
     def test_rejects_preflight_pre_positive_textual_authorization_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

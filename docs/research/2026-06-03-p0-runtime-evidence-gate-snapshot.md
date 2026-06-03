@@ -774,6 +774,66 @@ Non-claims:
   broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub publication,
   support-tier activation, stable SDK wording, or v1 SDK completion.
 
+## SDK Boundary, Release Statement, And Research Authority Hardening
+
+The next supervised 4-agent round plus lead integration closed more offline bypasses
+without changing the active P0 route blocker or SDK completion state.
+
+Delegated scopes and integrated findings:
+
+- Release-statement bookkeeping: exact non-promoted outcome rows can no longer hide a
+  second same-line outcome record such as `obelisk.inventory_items_mutation.v1: promoted
+  - reviewed elsewhere`. Mixed same-line `promoted`/`excluded`/`post-v1` records now count
+  as duplicate/mixed surface records and fail the exclusion contract.
+- Public header/ABI guardrails: blocked-symbol scanning now covers broader aliases for
+  principal callbacks/ids, chat-send callback/API/handle wording, inventory items
+  mutation, tribe callback capability, structure census callback/handle/snapshot,
+  lifecycle recovery callback/API/handle/event/state, and operator ingress callback/handle
+  names. No `include/obelisk/ObeliskApi.h` change was made.
+- Runtime-principal request/evidence chain: nested preflight strings `present`,
+  `accepted`, and `available` are treated as positive overclaims for runtime evidence or
+  readiness flags, preserving fail-closed handling of request packs, preflight sidecars,
+  receipts, and replay manifests.
+- Reversing research boundary: every AseApi/NextGen reference note is covered by the
+  research-doc guardrail. ArkServerApi/AseApi/NextGenPlugins material remains
+  names/demand only and is explicitly not authority for porting targets, API ergonomics,
+  wrapper semantics, command parser behavior, timer behavior, return semantics, return
+  override semantics, support-tier classification, offsets, layouts, ABI, schemas,
+  constants, or source code.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `runtime_ready=false`, and `public_sdk_ready=false`.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with
+  `status=blocked`, `ready=false`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, and route blockers
+  `["approved_runtime_evidence_missing"]`.
+- Release-statement outcomes remain missing for seven non-P0 post-v1/excluded blockers:
+  gameplay tick callbacks, inventory items mutation, lifecycle ops recovery,
+  ResourceHandle/object identity, operator ingress/storage, player services/economy/
+  mobility, and structure census.
+
+Validation remained offline-only:
+
+- `python3 -m unittest scripts.test_check_public_sdk_v1_completion
+  scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest
+  scripts.test_research_doc_guardrails scripts.test_agent_handoff_guardrails` passed
+  350 tests.
+- `python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle
+  scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed 119 tests.
+- `py_compile` passed for the changed SDK completion and window-manifest checkers.
+- `git diff --check` passed.
+
+Non-claims:
+
+- These changes do not create approved runtime evidence and do not authorize server
+  operations, marker/env changes, runtime observation, ReflectionScanner, ptrace/gcore,
+  broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub publication,
+  support-tier activation, stable SDK wording, public ABI promotion, or v1 SDK completion.
+
 ## Turbo SDK Guardrail Round After Compaction
 
 This follow-up round was delegated directly after compacted conversation recovery. It

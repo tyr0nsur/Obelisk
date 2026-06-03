@@ -20,6 +20,9 @@ Windows/MSVC assumptions into the Linux runtime.
 Useful, but only as a names and demand dictionary for evidence promotion. It is not a
 behavior map, compatibility target, architecture guide, ergonomics guide, implementation
 guide, or evidence source for public Obelisk SDK surfaces.
+AseApi is never authority for porting targets, API ergonomics, wrapper semantics,
+command parser behavior, timer behavior, return semantics, return override semantics,
+support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.
 
 Use AseApi for:
 

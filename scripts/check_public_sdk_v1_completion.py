@@ -1098,17 +1098,17 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
             r"(?:PlayerIdentity|PlayerPrincipal|PlayerLookup|PlayerHandle|PlayerId|PlayerID|"
             r"SteamId|SteamID|EOSId|EOSID|PlatformAccountId|PlatformAccountID|"
             r"PlayerName|TribeId|TribeID|NetworkAddress|"
-            r"PrincipalHandle|PrincipalGeneration|PrincipalScope|ObeliskPrincipal|"
-            r"PlayerSession)"
+            r"Principal|PrincipalId|PrincipalID|PrincipalHandle|PrincipalGeneration|"
+            r"PrincipalScope|ObeliskPrincipal|PlayerSession)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:PLAYER_IDENTITY|PLAYER_PRINCIPAL|PLAYER_LOOKUP|"
             r"PLAYER_ID|STEAM_ID|EOS_ID|PLATFORM_ACCOUNT_ID|PLAYER_NAME|TRIBE_ID|"
-            r"NETWORK_ADDRESS|PRINCIPAL_HANDLE|PRINCIPAL_GENERATION|"
+            r"NETWORK_ADDRESS|PRINCIPAL|PRINCIPAL_ID|PRINCIPAL_HANDLE|PRINCIPAL_GENERATION|"
             r"PRINCIPAL_SCOPE|PLAYER_SESSION)[A-Z0-9_]*$"
         ),
         re.compile(
-            r"(?:^|_)(?:player_identity|player_principal|player_lookup|principal_handle|"
+            r"(?:^|_)(?:player_identity|player_principal|player_lookup|principal|principal_id|principal_handle|"
             r"principal_generation|principal_scope|steam_id|eos_id|platform_account_id|"
             r"player_name|tribe_id|network_address|role_id|player_session)(?:_|$)"
         ),
@@ -1130,35 +1130,44 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     ),
     "obelisk.command_chat_response_path.v1": (
         re.compile(
-            r"(?:Command|Reply|Replies|Response|Respond|SendChat|Broadcast|Notice|Moderation)"
+            r"(?:Command|Reply|Replies|Response|Respond|SendChat|"
+            r"ChatSend(?:Api|API|Callback|Handle|Response|Command|Function|WithOwnerTokenHandle)|"
+            r"Broadcast|Notice|Moderation)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:COMMAND|REPLY|RESPONSE|SEND_CHAT|BROADCAST|"
+            r"CHAT_SEND_(?:API|CALLBACK|HANDLE|RESPONSE|COMMAND|FUNCTION|WITH_OWNER_TOKEN)|"
             r"NOTICE|MODERATION)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:command|reply|replies|response|response_handle|response_kind|"
-            r"send_chat|broadcast|notice|moderation|delivery_scope|delivery_flags)(?:_|$)"
+            r"send_chat|chat_send_api|chat_send_callback|chat_send_handle|chat_send_response|"
+            r"broadcast|notice|moderation|delivery_scope|delivery_flags)(?:_|$)"
         ),
     ),
     "obelisk.commands_replies.v1": (
         re.compile(
             r"(?:Command|Commands|Reply|Replies|CommandRouter|CommandCallback|"
-            r"CommandPayload|CommandRegistration|SendChat|Broadcast|Notice|Moderation)"
+            r"CommandPayload|CommandRegistration|SendChat|"
+            r"ChatSend(?:Api|API|Callback|Handle|Response|Command|Function|WithOwnerTokenHandle)|"
+            r"Broadcast|Notice|Moderation)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:COMMAND|COMMANDS|REPLY|REPLIES|SEND_CHAT|"
+            r"CHAT_SEND_(?:API|CALLBACK|HANDLE|RESPONSE|COMMAND|FUNCTION|WITH_OWNER_TOKEN)|"
             r"BROADCAST|NOTICE|MODERATION)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:command|commands|command_router|command_callback|command_payload|"
-            r"command_registration|reply|replies|send_chat|broadcast|notice|moderation)(?:_|$)"
+            r"command_registration|reply|replies|send_chat|chat_send_api|chat_send_callback|"
+            r"chat_send_handle|chat_send_response|broadcast|notice|moderation)(?:_|$)"
         ),
     ),
     "obelisk.inventory_items_mutation.v1": (
         re.compile(
             r"(?:InventorySdk|ItemsSdk|InventoryLookup|ItemLookup|ItemHandle|GiveItem|"
-            r"RemoveItem|GrantItem|InventoryMutation|ItemMutation|Kit|Kits|Reward|Rewards|"
+            r"RemoveItem|GrantItem|InventoryItemsMutation|ItemsMutation|InventoryMutation|"
+            r"ItemMutation|Kit|Kits|Reward|Rewards|"
             r"Engram|Progression|ResourceHandle|InventoryComp|InventoryID|InventoryId|"
             r"ItemID|ItemId|ItemNetId|ItemNetID|ItemStack|ItemStackID|ItemStackId|"
             r"CraftBlueprint|AdditionalData|AnActor|anActor)"
@@ -1166,13 +1175,13 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:INVENTORY_SDK|ITEMS_SDK|INVENTORY_LOOKUP|"
             r"ITEM_LOOKUP|ITEM_HANDLE|GIVE_ITEM|REMOVE_ITEM|GRANT_ITEM|INVENTORY_MUTATION|"
-            r"ITEM_MUTATION|KIT|KITS|REWARD|REWARDS|ENGRAM|PROGRESSION|"
+            r"INVENTORY_ITEMS_MUTATION|ITEMS_MUTATION|ITEM_MUTATION|KIT|KITS|REWARD|REWARDS|ENGRAM|PROGRESSION|"
             r"RESOURCE_HANDLE|INVENTORY_COMP|INVENTORY_ID|ITEM_ID|ITEM_NET_ID|"
             r"ITEM_STACK|ITEM_STACK_ID|CRAFT_BLUEPRINT|ADDITIONAL_DATA|AN_ACTOR)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:inventory_sdk|items_sdk|inventory_lookup|item_lookup|item_handle|"
-            r"give_item|remove_item|grant_item|inventory_mutation|item_mutation|kits?|"
+            r"give_item|remove_item|grant_item|inventory_items_mutation|items_mutation|inventory_mutation|item_mutation|kits?|"
             r"rewards?|engram|progression|resource_handle|inventory_comp|item_net_id|"
             r"inventory_id|item_id|item_stack|item_stack_id|craft_blueprint|additional_data|an_actor)(?:_|$)"
         ),
@@ -1206,34 +1215,39 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
         re.compile(
             r"(?:PluginWatchdog|CrashRecovery|HotPluginReload|ObeliskHotReload|"
             r"RestartOrchestration|ServerRecovery|OperatorReloadCommand|"
-            r"DetachedWorkerIngress|RestartStateRecovery)"
+            r"DetachedWorkerIngress|RestartStateRecovery|"
+            r"Recovery(?:Api|API|Callback|Handle|Event|State|WithOwnerTokenHandle))"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:PLUGIN_WATCHDOG|CRASH_RECOVERY|HOT_PLUGIN_RELOAD|"
             r"OBELISK_HOT_RELOAD|RESTART_ORCHESTRATION|SERVER_RECOVERY|"
-            r"OPERATOR_RELOAD_COMMAND|DETACHED_WORKER_INGRESS|RESTART_STATE_RECOVERY)[A-Z0-9_]*$"
+            r"OPERATOR_RELOAD_COMMAND|DETACHED_WORKER_INGRESS|RESTART_STATE_RECOVERY|"
+            r"RECOVERY_(?:API|CALLBACK|HANDLE|EVENT|STATE))[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:plugin_watchdog|crash_recovery|hot_plugin_reload|obelisk_hot_reload|"
             r"restart_orchestration|server_recovery|operator_reload_command|"
-            r"detached_worker_ingress|restart_state_recovery)(?:_|$)"
+            r"detached_worker_ingress|restart_state_recovery|recovery_api|recovery_callback|"
+            r"recovery_handle|recovery_event|recovery_state)(?:_|$)"
         ),
     ),
     "obelisk.structure_census.v1": (
         re.compile(
             r"(?:StructureEvents|StructureCensus|StructureAggregate|StructureIdentity|"
             r"StructureLookup|StructureHandle|OwnershipLookup|BuildPlacement|"
-            r"NoCollision|PinOutcome)"
+            r"NoCollision|PinOutcome|Census(?:Api|API|Callback|Handle|Snapshot|WithOwnerTokenHandle))"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:STRUCTURE_EVENTS|STRUCTURE_CENSUS|"
             r"STRUCTURE_AGGREGATE|STRUCTURE_IDENTITY|STRUCTURE_LOOKUP|STRUCTURE_HANDLE|"
-            r"OWNERSHIP_LOOKUP|BUILD_PLACEMENT|NO_COLLISION|PIN_OUTCOME)[A-Z0-9_]*$"
+            r"OWNERSHIP_LOOKUP|BUILD_PLACEMENT|NO_COLLISION|PIN_OUTCOME|"
+            r"CENSUS_(?:API|CALLBACK|HANDLE|SNAPSHOT))[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:structure_events|structure_census|structure_aggregate|"
             r"structure_identity|structure_lookup|structure_handle|ownership_lookup|"
-            r"build_placement|no_collision|pin_outcome)(?:_|$)"
+            r"build_placement|no_collision|pin_outcome|census_api|census_callback|"
+            r"census_handle|census_snapshot)(?:_|$)"
         ),
     ),
     "obelisk.mission_transfer_dino_tribe.v1": (
@@ -1246,13 +1260,13 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:MISSION_SDK|TRANSFER_SDK|DINO_SDK|TRIBE_SDK|"
             r"BUFF_STATUS_SDK|BUFF_SDK|MISSION|TRANSFER|DINO|BUFF_STATUS|DINO_COLORS|"
-            r"DINO_COSMETICS|DINO_CARRY_RULES|TRIBE_MOTD|TRIBE_NOTICE|TRIBE_POLICY|"
+            r"DINO_COSMETICS|DINO_CARRY_RULES|(?<!CHAT_SEND_MODE_)TRIBE|TRIBE_MOTD|TRIBE_NOTICE|TRIBE_POLICY|"
             r"TELEPORT_SPAWN|CROSS_MAP_CORRELATION|OWNERSHIP_LOOKUP|TELEPORT|"
             r"SPAWN)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:mission_sdk|transfer_sdk|dino_sdk|tribe_sdk|buff_status_sdk|"
-            r"buff_sdk|mission|transfer|dino|buff_status|dino_colors|dino_cosmetics|"
+            r"buff_sdk|mission|transfer|dino|tribe|buff_status|dino_colors|dino_cosmetics|"
             r"dino_carry_rules|tribe_motd|tribe_notice|tribe_policy|teleport_spawn|"
             r"cross_map_correlation|ownership_lookup|teleport|spawn)(?:_|$)"
         ),
@@ -1277,19 +1291,20 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     "obelisk.operator_ingress_storage.v1": (
         re.compile(
             r"(?:Rcon|RCON|OperatorReload|OperatorCommand|Webhook|Database|StorageSchema|"
-            r"StorageMigration|SecretManager|ExternalIngress|CrossInstanceStorage|"
+            r"StorageMigration|SecretManager|OperatorIngress|ExternalIngress|IngressCallback|"
+            r"IngressHandle|CrossInstanceStorage|"
             r"QueueDrain|PoisonMessage|Storage)"
         ),
         re.compile(
-            r"^OBELISK_[A-Z0-9_]*(?:RCON|OPERATOR_RELOAD|OPERATOR_COMMAND|WEBHOOK|"
+            r"^OBELISK_[A-Z0-9_]*(?:RCON|OPERATOR_RELOAD|OPERATOR_COMMAND|OPERATOR_INGRESS|WEBHOOK|"
             r"DATABASE|STORAGE_SCHEMA|STORAGE_MIGRATION|SECRET_MANAGER|"
-            r"EXTERNAL_INGRESS|CROSS_INSTANCE_STORAGE|QUEUE_DRAIN|"
+            r"EXTERNAL_INGRESS|INGRESS_CALLBACK|INGRESS_HANDLE|CROSS_INSTANCE_STORAGE|QUEUE_DRAIN|"
             r"POISON_MESSAGE|STORAGE)[A-Z0-9_]*$"
         ),
         re.compile(
-            r"(?:^|_)(?:rcon|operator_reload|operator_command|webhook|database|"
+            r"(?:^|_)(?:rcon|operator_reload|operator_command|operator_ingress|webhook|database|"
             r"storage_schema|storage_migration|secret_manager|external_ingress|"
-            r"cross_instance_storage|queue_drain|poison_message|storage)(?:_|$)"
+            r"ingress_callback|ingress_handle|cross_instance_storage|queue_drain|poison_message|storage)(?:_|$)"
         ),
     ),
     "obelisk.gameplay_tick_callbacks.v1": (
@@ -2767,6 +2782,13 @@ def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> 
     records = release_statement_surface_record_candidates(text, surface_id)
     if len(records) > 1:
         return True
+    embedded_record_pattern = re.compile(
+        rf"(?<![A-Za-z0-9_.-]){re.escape(surface_id)}\s*(?::|\s+-\s+)\s*"
+        rf"(?:promoted|excluded|post-v1)\b",
+        re.IGNORECASE,
+    )
+    if sum(1 for _ in embedded_record_pattern.finditer(text)) > 1:
+        return True
     return False
 
 
@@ -3018,6 +3040,8 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     if recorded_outcome != status:
         return False
     if recorded_outcome not in allowed_outcomes:
+        return False
+    if release_statement_duplicate_or_mixed_records(text, surface_id):
         return False
     record = release_statement_surface_record(text, surface_id, recorded_outcome)
     if record is None:

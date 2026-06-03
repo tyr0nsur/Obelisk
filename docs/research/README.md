@@ -165,6 +165,10 @@ Read the current v1 route through three gates:
 - SDK boundary: public v1 APIs stay copied, redacted, C/POD, owner-token scoped, and
   capability-discovered. ArkApi/AseApi material remains a names/demand reference only,
   not an architecture, ergonomics, behavior, or implementation reference.
+  ArkServerApi/AseApi/NextGenPlugins material is never authority for porting targets,
+  API ergonomics, wrapper semantics, command parser behavior, timer behavior, return
+  semantics, return override semantics, support-tier classification, offsets, layouts,
+  ABI, schemas, constants, or source code.
 
 Historical notes and fixture paths may use labels such as `sdk_buffs`, `sdk_dinos`,
 `sdk.tribes`, or `sdk.transfers`. In this research tree those labels are snapshot or

@@ -983,19 +983,28 @@ class ResearchDocGuardrailTests(unittest.TestCase):
 
     def test_arkapi_aseapi_nextgen_references_remain_names_demand_only(self) -> None:
         readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
-        aseapi_scan = (
-            REPO_ROOT / "docs/research/2026-05-30-aseapi-reference-scan.md"
-        ).read_text(encoding="utf-8")
-        nextgen_inventory = (
-            REPO_ROOT / "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
-        ).read_text(encoding="utf-8")
-        demand_map = (
-            REPO_ROOT / "docs/research/2026-06-01-aseapi-name-demand-map.md"
-        ).read_text(encoding="utf-8")
+        reference_notes = {
+            path.name: path.read_text(encoding="utf-8")
+            for path in sorted((REPO_ROOT / "docs/research").glob("*.md"))
+            if any(
+                token in path.name.lower()
+                for token in ("arkserverapi", "aseapi", "nextgen")
+            )
+        }
+        self.assertEqual(
+            set(reference_notes),
+            {
+                "2026-05-30-aseapi-reference-scan.md",
+                "2026-05-30-nextgenplugins-reference-inventory.md",
+                "2026-06-01-aseapi-name-demand-map.md",
+                "2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md",
+            },
+        )
 
         readme_compact = normalized(readme)
         for phrase in (
             "ArkApi/AseApi material remains a names/demand reference only, not an architecture, ergonomics, behavior, or implementation reference.",
+            "ArkServerApi/AseApi/NextGenPlugins material is never authority for porting targets, API ergonomics, wrapper semantics, command parser behavior, timer behavior, return semantics, return override semantics, support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.",
             "ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change the support tier without a named promotion gate.",
             "Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns.",
             "Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source.",
@@ -1004,7 +1013,17 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             with self.subTest(file="docs/research/README.md", phrase=phrase):
                 self.assertIn(phrase, readme_compact)
 
-        aseapi_compact = normalized(aseapi_scan)
+        authority_boundary = (
+            "never authority for porting targets, API ergonomics, wrapper semantics, "
+            "command parser behavior, timer behavior, return semantics, return override "
+            "semantics, support-tier classification, offsets, layouts, ABI, schemas, "
+            "constants, or source code"
+        )
+        for path, text in reference_notes.items():
+            with self.subTest(file=path, phrase="authority boundary"):
+                self.assertIn(authority_boundary, normalized(text))
+
+        aseapi_compact = normalized(reference_notes["2026-05-30-aseapi-reference-scan.md"])
         for phrase in (
             "Useful, but only as a names and demand dictionary for evidence promotion.",
             "It is not a behavior map, compatibility target, architecture guide, ergonomics guide, implementation guide, or evidence source for public Obelisk SDK surfaces.",
@@ -1016,7 +1035,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             with self.subTest(file="aseapi-reference-scan", phrase=phrase):
                 self.assertIn(phrase, aseapi_compact)
 
-        nextgen_compact = normalized(nextgen_inventory)
+        nextgen_compact = normalized(reference_notes["2026-05-30-nextgenplugins-reference-inventory.md"])
         for phrase in (
             "Use this material only as names and demand evidence.",
             "do not copy Windows ArkApi code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API patterns, constants, schemas, control flow, command parsers, or implementation details into Obelisk.",
@@ -1028,7 +1047,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             with self.subTest(file="nextgenplugins-reference-inventory", phrase=phrase):
                 self.assertIn(phrase, nextgen_compact)
 
-        demand_compact = normalized(demand_map)
+        demand_compact = normalized(reference_notes["2026-06-01-aseapi-name-demand-map.md"])
         for phrase in (
             "Status: dictionary/demand synthesis only; no promotion evidence",
             "No runtime probing, server access, scanner run, debugger, offset derivation, ABI change, source porting, command parser inspection, schema extraction, or implementation copying was performed.",
@@ -1038,6 +1057,21 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(file="aseapi-name-demand-map", phrase=phrase):
                 self.assertIn(phrase, demand_compact)
+
+        demand_chain_compact = normalized(
+            reference_notes["2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md"]
+        )
+        for phrase in (
+            "Status: demand synthesis, not promotion evidence",
+            "The chain explains ordering only.",
+            "ArkApi, AseApi, and local NextGenPlugins material may inform names and demand grouping only.",
+            "Do not use it as architecture or ergonomics guidance, and do not copy or port:",
+            "source code, control flow, command parsers, schemas, constants, return semantics, or plugin behavior;",
+            "direct native-call wrappers, pointer accessors, or Windows/MSVC ABI assumptions;",
+            "This note is also not evidence for ArkApi/AseApi compatibility, public v1 completion",
+        ):
+            with self.subTest(file="v1-sdk-demand-chain-from-aseapi-nextgen", phrase=phrase):
+                self.assertIn(phrase, demand_chain_compact)
 
 
 if __name__ == "__main__":

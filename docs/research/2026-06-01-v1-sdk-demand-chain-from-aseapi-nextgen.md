@@ -95,6 +95,11 @@ only. Do not use it as architecture or ergonomics guidance, and do not copy or p
   FName/GObjects identity, `ResourceHandle`, object lookup, mutation, or return
   override patterns.
 
+These materials are never authority for porting targets, API ergonomics, wrapper
+semantics, command parser behavior, timer behavior, return semantics, return override
+semantics, support-tier classification, offsets, layouts, ABI, schemas, constants, or
+source code.
+
 This note is also not evidence for ArkApi/AseApi compatibility, public v1 completion,
 public identity, public permissions, command replies, send-chat, storage, operator
 ingress, inventory/item SDKs, structure SDKs, economy SDKs, or gameplay mutation.

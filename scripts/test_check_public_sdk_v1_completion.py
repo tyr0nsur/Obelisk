@@ -3177,12 +3177,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "typedef struct ObeliskPlayerIdentity {\n"
                 "    uint32_t abi_version;\n"
                 "    uint64_t principal_handle;\n"
+                "    uint64_t principal_id;\n"
                 "} ObeliskPlayerIdentity;\n"
+                "typedef void (*ObeliskPrincipalCallback)(void* userData);\n"
+                "#define OBELISK_API_CAPABILITY_PRINCIPAL_CALLBACKS 0x10000000u\n"
                 "typedef struct ObeliskOpaque* ObeliskPlayerHandle;\n"
                 "typedef void* ObeliskPermissionHandle;\n"
                 "typedef ObeliskResourceKind ObeliskPlayerKind;\n"
                 "typedef struct ObeliskApi {\n"
                 "    uint64_t (*RegisterPlayerIdentityWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterPrincipalWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskPrincipalCallback callback);\n"
                 "} ObeliskApi;\n",
                 encoding="utf-8",
             )
@@ -3215,8 +3219,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         drift = next(iter(payload["blocked_public_contract_header_symbols"].values()))
         self.assertEqual(drift["surface"], "obelisk.player_identity.v1")
         self.assertIn("ObeliskPlayerIdentity", drift["undeclared_symbols"])
+        self.assertIn("ObeliskPrincipalCallback", drift["undeclared_symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_PRINCIPAL_CALLBACKS", drift["undeclared_symbols"])
         self.assertIn("RegisterPlayerIdentityWithOwnerTokenHandle", drift["undeclared_symbols"])
+        self.assertIn("RegisterPrincipalWithOwnerTokenHandle", drift["undeclared_symbols"])
         self.assertIn("principal_handle", drift["undeclared_symbols"])
+        self.assertIn("principal_id", drift["undeclared_symbols"])
 
     def test_blocked_permissions_contract_detects_public_reason_flags(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3322,8 +3330,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "#pragma once\n"
                 "#include <stdint.h>\n"
                 "typedef struct ObeliskCommandPayload { uint32_t abi_version; } ObeliskCommandPayload;\n"
+                "typedef void (*ObeliskChatSendCallback)(void* userData);\n"
+                "#define OBELISK_API_CAPABILITY_CHAT_SEND_CALLBACKS 0x20000000u\n"
                 "typedef struct ObeliskApi {\n"
                 "    uint64_t (*RegisterCommandWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterChatSendWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskChatSendCallback callback);\n"
                 "} ObeliskApi;\n",
                 encoding="utf-8",
             )
@@ -3355,7 +3366,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         drift = next(iter(payload["blocked_public_contract_header_symbols"].values()))
         self.assertEqual(drift["surface"], "obelisk.commands_replies.v1")
         self.assertIn("ObeliskCommandPayload", drift["undeclared_symbols"])
+        self.assertIn("ObeliskChatSendCallback", drift["undeclared_symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_CHAT_SEND_CALLBACKS", drift["undeclared_symbols"])
         self.assertIn("RegisterCommandWithOwnerTokenHandle", drift["undeclared_symbols"])
+        self.assertIn("RegisterChatSendWithOwnerTokenHandle", drift["undeclared_symbols"])
 
     def test_route_guardrail_contract_detects_forbidden_token_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3457,21 +3471,31 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "#pragma once\n"
                 "#include <stdint.h>\n"
                 "typedef struct ObeliskStructureCensus { uint32_t abi_version; } ObeliskStructureCensus;\n"
+                "typedef void (*ObeliskCensusCallback)(void* userData);\n"
                 "typedef struct ObeliskDinoSdk { uint32_t abi_version; } ObeliskDinoSdk;\n"
+                "#define OBELISK_API_CAPABILITY_TRIBE_CALLBACKS 0x40000000u\n"
                 "typedef struct ObeliskInventoryMutation { uint32_t abi_version; } ObeliskInventoryMutation;\n"
+                "typedef struct ObeliskItemsMutation { uint32_t abi_version; } ObeliskItemsMutation;\n"
                 "typedef struct ObeliskObjectIdentity { uint32_t abi_version; } ObeliskObjectIdentity;\n"
                 "typedef struct ObeliskEconomyApi { uint32_t abi_version; } ObeliskEconomyApi;\n"
                 "typedef struct ObeliskRCONIngress { uint32_t abi_version; } ObeliskRCONIngress;\n"
+                "typedef void (*ObeliskOperatorIngressCallback)(void* userData);\n"
                 "typedef struct ObeliskPluginWatchdog { uint32_t abi_version; } ObeliskPluginWatchdog;\n"
+                "typedef void (*ObeliskRecoveryCallback)(void* userData);\n"
                 "typedef struct ObeliskGameplayTickCallback { uint32_t abi_version; } ObeliskGameplayTickCallback;\n"
                 "typedef struct ObeliskApi {\n"
                 "    uint64_t (*RegisterStructureCensusWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterCensusWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskCensusCallback callback);\n"
                 "    uint64_t (*RegisterMissionWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterTribeWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*GiveItemWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterItemsMutationWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterResourceHandleWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterEconomyWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterOperatorReloadWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterOperatorIngressWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskOperatorIngressCallback callback);\n"
                 "    uint64_t (*RegisterPluginWatchdogWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterRecoveryWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskRecoveryCallback callback);\n"
                 "    uint64_t (*RegisterGameplayTickWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "} ObeliskApi;\n",
                 encoding="utf-8",
@@ -3500,8 +3524,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             for drift in payload["blocked_public_contract_header_symbols"].values()
         }
         self.assertIn("ObeliskStructureCensus", drift_by_surface["obelisk.structure_census.v1"])
+        self.assertIn("ObeliskCensusCallback", drift_by_surface["obelisk.structure_census.v1"])
+        self.assertIn("RegisterCensusWithOwnerTokenHandle", drift_by_surface["obelisk.structure_census.v1"])
         self.assertIn("RegisterMissionWithOwnerTokenHandle", drift_by_surface["obelisk.mission_transfer_dino_tribe.v1"])
+        self.assertIn("OBELISK_API_CAPABILITY_TRIBE_CALLBACKS", drift_by_surface["obelisk.mission_transfer_dino_tribe.v1"])
+        self.assertIn("RegisterTribeWithOwnerTokenHandle", drift_by_surface["obelisk.mission_transfer_dino_tribe.v1"])
         self.assertIn("GiveItemWithOwnerTokenHandle", drift_by_surface["obelisk.inventory_items_mutation.v1"])
+        self.assertIn("ObeliskItemsMutation", drift_by_surface["obelisk.inventory_items_mutation.v1"])
+        self.assertIn("RegisterItemsMutationWithOwnerTokenHandle", drift_by_surface["obelisk.inventory_items_mutation.v1"])
         self.assertIn("ObeliskObjectIdentity", drift_by_surface["obelisk.object_identity_resource_handle.v1"])
         self.assertIn(
             "RegisterResourceHandleWithOwnerTokenHandle",
@@ -3509,7 +3539,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn("RegisterEconomyWithOwnerTokenHandle", drift_by_surface["obelisk.player_services_economy_mobility.v1"])
         self.assertIn("ObeliskRCONIngress", drift_by_surface["obelisk.operator_ingress_storage.v1"])
+        self.assertIn("ObeliskOperatorIngressCallback", drift_by_surface["obelisk.operator_ingress_storage.v1"])
+        self.assertIn("RegisterOperatorIngressWithOwnerTokenHandle", drift_by_surface["obelisk.operator_ingress_storage.v1"])
         self.assertIn("ObeliskPluginWatchdog", drift_by_surface["obelisk.lifecycle_ops_recovery.v1"])
+        self.assertIn("ObeliskRecoveryCallback", drift_by_surface["obelisk.lifecycle_ops_recovery.v1"])
+        self.assertIn("RegisterRecoveryWithOwnerTokenHandle", drift_by_surface["obelisk.lifecycle_ops_recovery.v1"])
         self.assertIn("RegisterGameplayTickWithOwnerTokenHandle", drift_by_surface["obelisk.gameplay_tick_callbacks.v1"])
 
     def test_current_manifest_reports_exact_unresolved_v1_surface_groups(self) -> None:
@@ -3954,6 +3988,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(payload["stable_claim_allowed"])
         self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertIn("v1_completion_required_false", payload["blockers"])
+
+    def test_scoped_release_statement_rejects_same_line_mixed_outcome_record(self) -> None:
+        surface_id = "obelisk.inventory_items_mutation.v1"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
+            statement = "\n".join(
+                (
+                    f"{line}; {surface_id}: promoted - reviewed elsewhere."
+                    if line.startswith(f"{surface_id}: post-v1 -")
+                    else line
+                )
+                for line in SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8").splitlines()
+            )
+            statement_path.write_text(statement + "\n", encoding="utf-8")
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        row = next(row for row in payload["v1_sdk_blocker_outcomes"] if row["surface"] == surface_id)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_duplicate_or_mixed_surface_records",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertEqual(payload["release_statement_duplicate_or_mixed_records"], [surface_id])
+        self.assertEqual(row["manifest_outcome"], "post-v1")
+        self.assertEqual(row["release_statement_outcome"], "post-v1")
+        self.assertFalse(row["release_statement_contract_satisfied"])
+        self.assertFalse(row["counts_toward_complete_sdk_claim"])
+        self.assertFalse(payload["stable_claim_allowed"])
 
     def test_structure_excluded_outcome_is_bookkeeping_only_and_requires_exact_wording(self) -> None:
         surface_id = "obelisk.structure_census.v1"

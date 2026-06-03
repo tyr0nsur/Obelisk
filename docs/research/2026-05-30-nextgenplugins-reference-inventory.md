@@ -12,6 +12,9 @@ ergonomics, behavior, porting guidance, or source material, and do not copy Wind
 code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API
 patterns, constants, schemas, control flow, command parsers, or implementation details
 into Obelisk.
+NextGenPlugins is never authority for porting targets, API ergonomics, wrapper semantics,
+command parser behavior, timer behavior, return semantics, return override semantics,
+support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.
 
 This note intentionally records demand categories and visible plugin-family names only.
 It is not a source-mining checklist: do not use the clone to import signatures, constants,

@@ -199,12 +199,13 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 P0/side-lane non-claim hardening after `7594e36`
-  delegated four scopes: bound route identity sources, runtime request-pack replay
-  sidecars, ResourceHandle/object identity, and Mission/Transfer/Dino/Tribe/Buff
-  accounting. Integrated checkers reject path aliases, nested public/runtime/v1 claims,
-  blocker-clearance wording, release/support-tier/stable-SDK overclaims, and unexpected
-  replay sidecars. Lead validation: bound route 11, lifecycle window 76, ResourceHandle
-  26, mission accounting 34, handoff 14, route JSON planning-only at
-  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, `py_compile`. No runtime/server/Discord/GitHub operation.
+- Latest integration note: 2026-06-03 SDK/reversing boundary hardening after `625ac05`
+  delegated four scopes: release-statement bookkeeping, public header/ABI aliases,
+  runtime-principal request/evidence sidecars, and ArkServerApi/AseApi/NextGen research
+  boundaries. Integrated checkers reject same-line mixed release outcomes, broader
+  blocked header symbol aliases, nested `present/accepted/available` runtime-evidence
+  preflight overclaims, and external-framework authority wording. Lead validation:
+  SDK/window/research/handoff 350 tests OK, bundle/evidence 119 tests OK, route JSON
+  planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`,
+  P0 `0/4`, `stable_claim_allowed=false`, `git diff --check`. No runtime/server/Discord/
+  GitHub operation.

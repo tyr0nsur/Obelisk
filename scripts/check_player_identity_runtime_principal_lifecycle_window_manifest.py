@@ -250,12 +250,15 @@ PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
 PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(
     (
         "1",
+        "accepted",
         "allowed",
         "approved",
         "authorized",
+        "available",
         "complete",
         "completed",
         "enabled",
+        "present",
         "promoted",
         "ready",
         "supported",

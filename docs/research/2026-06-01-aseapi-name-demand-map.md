@@ -27,6 +27,9 @@ AseApi and NextGenPlugins names below are dictionary/demand signals only. They
 must not be used as architecture, behavior, ergonomics, implementation, source,
 offset, vtable, layout, ABI, wrapper, constant, schema, command parser, return
 semantic, or algorithm sources.
+They are never authority for porting targets, API ergonomics, wrapper semantics,
+command parser behavior, timer behavior, return semantics, return override semantics,
+support-tier classification, offsets, layouts, ABI, schemas, constants, or source code.
 
 Every UE4 name must be rederived through Obelisk's Linux reflection path:
 exact `Class.Function` or `Class.Property` resolution, sanitized snapshots,
