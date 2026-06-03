@@ -200,7 +200,12 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             ],
         }
 
-    def write_response_report(self, root: Path) -> Path:
+    def write_response_report(
+        self,
+        root: Path,
+        *,
+        current_route_blocker: str = "approved_runtime_evidence_missing",
+    ) -> Path:
         snapshot_root = root / "base-snapshots"
         candidate_root = root / "candidate-snapshots"
         snapshot_root.mkdir(parents=True, exist_ok=True)
@@ -218,6 +223,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             READINESS.response_path_readiness.DEFAULT_DECISIONS,
             READINESS.response_path_readiness.DEFAULT_PUBLIC_HEADER,
             READINESS.response_path_readiness.DEFAULT_SURFACES,
+            current_route_blocker=current_route_blocker,
         )
         report_path = root / "command-chat-response-public-readiness.json"
         report_path.write_text(json.dumps(response_report), encoding="utf-8")
@@ -294,10 +300,13 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             report["dependency_chain"],
         )
 
-    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+    def test_accepts_identity_contract_route_blocker_without_unlocking(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report_path = self.write_response_report(root)
+            report_path = self.write_response_report(
+                root,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
             report = READINESS.build_report(
                 decisions_path=DECISIONS,
                 surfaces_path=SURFACES,
@@ -309,12 +318,16 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                 current_route_blocker="identity_public_contract_gate_missing",
             )
 
-        self.assertFalse(report["valid"])
-        self.assertFalse(report["accepted_for_planning"])
-        self.assertIn("current_route_blocker_mismatch", report["blockers"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertEqual([], report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_command_router_allowed"])
+        self.assertFalse(report["public_reply_or_send_chat_abi_allowed"])
+        self.assertFalse(report["public_response_path_allowed"])
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
 

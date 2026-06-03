@@ -125,23 +125,25 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_route_ready"])
         self.assertFalse(report["permissions_admin_route_ready"])
 
-    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+    def test_accepts_identity_contract_route_blocker_without_unlocking(self) -> None:
         result = run_checker(
             "--current-route-blocker",
             "identity_public_contract_gate_missing",
-            check=False,
         )
         report = json.loads(result.stdout)
 
-        self.assertEqual(result.returncode, 1)
-        self.assertFalse(report["valid"])
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["valid"])
         self.assertFalse(report["accepted_for_planning"])
-        self.assertIn("current_route_blocker_mismatch", report["blockers"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertEqual([], report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["public_route_ready"])
+        self.assertFalse(report["permissions_admin_route_ready"])
 
     def test_accepts_candidate_query_failclosed_manifest_only_as_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1262,10 +1264,10 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("current_route_blocker_mismatch", report["blockers"])
         self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertNotIn("current_route_blocker_mismatch", report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertFalse(report["route_ready"])
         self.assertFalse(report["public_route_ready"])
         self.assertFalse(report["permissions_admin_route_ready"])

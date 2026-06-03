@@ -1512,13 +1512,20 @@ def player_principal_lifecycle_window_request_diagnosis(
         blockers.append("player_principal_lifecycle_window_env_missing")
     if blockers:
         return {**base, "blockers": blockers}
+    operator_request_path = request_path.parent / "operator-approval-request.md"
+    sidecar_blockers: list[dict[str, Any]] = []
+    player_principal_lifecycle_window_request.validate_request_pack_sidecar_paths(
+        request_json_path=request_path,
+        env_file_path=env_path,
+        operator_request_path=operator_request_path,
+        blockers=sidecar_blockers,
+    )
     try:
         payload = player_principal_lifecycle_window_request.read_json(request_path)
-        env_blockers: list[dict[str, Any]] = []
+        env_blockers: list[dict[str, Any]] = list(sidecar_blockers)
         env = player_principal_lifecycle_window_request.read_env(env_path, env_blockers)
-    except SystemExit as exc:
+    except (OSError, SystemExit) as exc:
         return {**base, "blockers": ["player_principal_lifecycle_window_request_unreadable"], "error": str(exc)}
-    operator_request_path = request_path.parent / "operator-approval-request.md"
     operator_request_markdown = player_principal_lifecycle_window_request.read_text_sidecar(
         operator_request_path,
         "operator_request",

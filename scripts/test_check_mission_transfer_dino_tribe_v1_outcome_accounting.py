@@ -73,6 +73,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         statement: str | None = None,
         split_note: str | None = None,
         tribe_snapshot_root: Path | None = None,
+        buff_snapshot_root: Path | None = None,
         *,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
@@ -100,6 +101,8 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                 args.extend(["--release-statement", str(statement_path)])
             if tribe_snapshot_root is not None:
                 args.extend(["--tribe-snapshot-root", str(tribe_snapshot_root)])
+            if buff_snapshot_root is not None:
+                args.extend(["--buff-snapshot-root", str(buff_snapshot_root)])
             result = subprocess.run(
                 args,
                 cwd=REPO_ROOT,
@@ -142,7 +145,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("lookup_ownership_lifetime", accounting["leaf_family_gaps"]["dino_policy"]["missing_public_gates"])
         self.assertIn("privacy_redaction_contract", accounting["leaf_family_gaps"]["tribe_policy"]["missing_public_gates"])
         self.assertIn("buff_class_object_redaction_contract", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
-        self.assertIn("buff_leaf_readiness_checker", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
+        self.assertNotIn("buff_leaf_readiness_checker", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertNotIn("refreshed_compact_evidence", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
         for leaf_id in REQUIRED_LEAVES:
@@ -247,6 +250,57 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             tribe["non_claims"],
         )
 
+        buff = report["buff_leaf_blocker_accounting"]
+        self.assertEqual(
+            buff["schema"],
+            "obelisk.mission-transfer-dino-tribe-v1-buff-leaf-blocker-accounting.v1",
+        )
+        self.assertEqual(buff["lane"], "buff_status_scalar_boundary_candidate")
+        self.assertEqual(buff["outcome"], "internal_planning_only")
+        self.assertTrue(buff["accepted_for_internal_planning"])
+        self.assertTrue(buff["candidate_only"])
+        self.assertTrue(buff["internal_reusable_evidence_only"])
+        self.assertTrue(buff["not_artifact_gate"])
+        self.assertFalse(buff["v1_accounted"])
+        self.assertFalse(buff["buff_status_sdk_ready"])
+        self.assertFalse(buff["public_abi_ready"])
+        self.assertFalse(buff["public_sdk_ready"])
+        self.assertFalse(buff["public_buff_sdk_ready"])
+        self.assertFalse(buff["runtime_observer_approved"])
+        self.assertFalse(buff["runtime_ready"])
+        self.assertFalse(buff["identity_ready"])
+        self.assertFalse(buff["lookup_ready"])
+        self.assertFalse(buff["mutation_ready"])
+        self.assertFalse(buff["promotion_ready"])
+        self.assertFalse(buff["return_override_ready"])
+        self.assertFalse(buff["resource_handle_ready"])
+        self.assertFalse(buff["v1_completion"])
+        self.assertFalse(buff["copied_payload_policy_ready"])
+        self.assertFalse(buff["lifecycle_semantics_ready"])
+        self.assertEqual(buff["focused_checker"], "scripts/check_buff_status_readiness.py")
+        self.assertEqual(buff["input_target_sets"], ["buff-compact-intake", "buff-breadth-intake"])
+        self.assertEqual(buff["missing_required_evidence"], [])
+        self.assertTrue(buff["scalar_boundary"]["checker_ready"])
+        self.assertTrue(buff["scalar_boundary"]["buff_status_candidate_ready"])
+        self.assertTrue(buff["scalar_boundary"]["copied_bool_boundary_ready"])
+        self.assertTrue(buff["scalar_boundary"]["class_object_redaction_ready"])
+        self.assertTrue(buff["scalar_boundary"]["zero_param_lifecycle_shape_ready"])
+        self.assertEqual(buff["scalar_boundary"]["copied_bool_count"], 6)
+        self.assertIn(
+            "PrimalBuff.BuffOverrideInventoryAccessInput.bInputPressed",
+            buff["scalar_boundary"]["copied_bool_fields"],
+        )
+        self.assertIn(
+            "PrimalBuff.BPPreventAddingOtherBuff.anotherBuffClass",
+            buff["redaction_boundary"]["required_redactions"],
+        )
+        self.assertIn("copied_payload_policy", buff["remaining_public_gates"])
+        self.assertIn("runtime hook wiring", " ".join(buff["redaction_boundary"]["forbidden_promotions"]))
+        self.assertIn(
+            "buff/status leaf accounting does not promote a public Buff SDK, ABI, callback, descriptor, or v1 completion",
+            buff["non_claims"],
+        )
+
         priority = report["leaf_priority"]
         self.assertEqual(priority["schema"], "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1")
         self.assertEqual(priority["recommended_leaf"], "mission")
@@ -257,8 +311,9 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         )
         self.assertEqual(priority["ranked_leaves"][0]["missing_public_gate_count"], 6)
         buff_priority = next(item for item in priority["ranked_leaves"] if item["leaf"] == "buff_status")
-        self.assertIn("Buff-specific consume/readiness checker", " ".join(buff_priority["blocking_risk"]))
-        self.assertIn("Add a Buff-specific consume/readiness checker", buff_priority["next_v1_reuse_step"])
+        self.assertNotIn("missing Buff-specific consume/readiness checker", " ".join(buff_priority["blocking_risk"]))
+        self.assertIn("focused Buff/status readiness checker", " ".join(buff_priority["reusable_evidence"]))
+        self.assertIn("Use the Buff/status checker output", buff_priority["next_v1_reuse_step"])
         self.assertFalse(any(item["public_sdk_ready"] for item in priority["ranked_leaves"]))
         self.assertFalse(any(item["runtime_ready"] for item in priority["ranked_leaves"]))
         self.assertFalse(any(item["promotion_ready"] for item in priority["ranked_leaves"]))
@@ -817,6 +872,32 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertFalse(tribe["public_sdk_ready"])
         self.assertFalse(tribe["runtime_ready"])
         self.assertFalse(tribe["promotion_ready"])
+
+    def test_buff_leaf_accounting_fails_closed_when_status_checker_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_root = Path(tmp) / "missing-snapshots"
+            result = self.run_checker(buff_snapshot_root=missing_root, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertEqual(report["accounting_route"], "candidate_only")
+        self.assertFalse(report["v1_accounted"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["missing_leaf_families"], REQUIRED_LEAVES)
+        self.assertFalse(report["candidate_only_accounting"]["accepted_for_internal_planning"])
+        self.assertIn("buff_status_checker_blocked", report["blockers"])
+        buff = report["buff_leaf_blocker_accounting"]
+        self.assertEqual(buff["outcome"], "blocked_accounting")
+        self.assertFalse(buff["accepted_for_internal_planning"])
+        self.assertFalse(buff["v1_accounted"])
+        self.assertFalse(buff["public_sdk_ready"])
+        self.assertFalse(buff["runtime_ready"])
+        self.assertFalse(buff["promotion_ready"])
+        self.assertFalse(buff["copied_payload_policy_ready"])
+        self.assertFalse(buff["lifecycle_semantics_ready"])
 
     def test_transfer_candidate_leaf_rejects_ready_and_resource_handle_overclaims(self) -> None:
         manifest = load_manifest()

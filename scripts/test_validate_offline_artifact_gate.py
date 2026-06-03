@@ -25,6 +25,7 @@ from test_check_player_identity_runtime_principal_lifecycle_evidence import (
 )
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
     manifest as approved_runtime_principal_lifecycle_evidence_manifest,
+    safe_test_env as approved_runtime_safe_test_env,
 )
 
 
@@ -308,6 +309,8 @@ def command_chat_response_route_readiness(root: Path) -> dict:
                 "scripts/compare_reflection_snapshots.py",
                 "--base-root",
                 str(root),
+                "--candidate-root",
+                str(root / "vanilla-gdb-snapshots"),
                 "--target-set",
                 gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET,
                 "--readiness-report",
@@ -5394,6 +5397,47 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             {blocker["reason"] for blocker in result["blockers"]},
         )
 
+    def test_consume_blocks_incomplete_named_signature_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            target_set = "item-compact-intake"
+            emitted_target = "PrimalItem.AllowEquipItem"
+            expected_targets = gate.known_ufunction_target_set_targets(target_set)
+            self.assertIsNotNone(expected_targets)
+            expected_targets = list(expected_targets)
+            missing_targets = [target for target in expected_targets if target != emitted_target]
+            payload = redacted_signature_manifest(target=emitted_target, target_sets=[target_set])
+            payload["target_set_coverage"] = {
+                "schema": gate.TARGET_SET_COVERAGE_SCHEMA,
+                "status": "incomplete",
+                "complete": False,
+                "declared_target_sets": [
+                    {
+                        "name": target_set,
+                        "source": "manifest",
+                        "expected_targets": expected_targets,
+                        "covered_targets": [emitted_target],
+                        "missing_targets": missing_targets,
+                        "complete": False,
+                    }
+                ],
+                "expected_targets": expected_targets,
+                "emitted_targets": [emitted_target],
+                "missing_targets": missing_targets,
+                "unexpected_targets": [],
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("signature_manifest_target_set_coverage_incomplete", reasons)
+        self.assertIn("signature_manifest_target_set_coverage_status_mismatch", reasons)
+        self.assertIn("signature_manifest_target_set_coverage_not_complete", reasons)
+
     def test_consume_accepts_historical_named_signature_manifest_missing_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -7341,31 +7385,43 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_runtime_principal_lifecycle_evidence_readiness_overclaim", reasons)
 
     def test_accepts_players_identity_runtime_principal_lifecycle_approved_evidence_for_consume_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
-            os.environ,
-            {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
-        ):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "players-identity-runtime-principal-lifecycle-approved-evidence.json"
             write_json(manifest, approved_runtime_principal_lifecycle_evidence_manifest())
 
-            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+            with mock.patch.object(
+                gate.approved_runtime_principal_lifecycle_evidence,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (Path(os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"]),),
+            ), mock.patch.object(
+                gate.approved_runtime_principal_lifecycle_evidence.window_manifest_checker,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (Path(os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"]),),
+            ):
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         self.assertEqual("accepted", result["status"])
         self.assertEqual(result["blockers"], [])
 
     def test_blocks_players_identity_runtime_principal_lifecycle_approved_evidence_in_promote_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
-            os.environ,
-            {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
-        ):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "players-identity-runtime-principal-lifecycle-approved-evidence.json"
             write_json(manifest, approved_runtime_principal_lifecycle_evidence_manifest())
 
-            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+            with mock.patch.object(
+                gate.approved_runtime_principal_lifecycle_evidence,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (Path(os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"]),),
+            ), mock.patch.object(
+                gate.approved_runtime_principal_lifecycle_evidence.window_manifest_checker,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (Path(os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"]),),
+            ):
+                result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
 
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}

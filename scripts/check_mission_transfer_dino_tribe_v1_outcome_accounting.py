@@ -26,6 +26,16 @@ from check_tribe_scalar_boundary_readiness import (
     TARGET_SET as TRIBE_SCALAR_TARGET_SET,
     build_report as build_tribe_scalar_boundary_report,
 )
+from check_buff_status_readiness import (
+    DEFAULT_SNAPSHOT_ROOT as DEFAULT_BUFF_STATUS_SNAPSHOT_ROOT,
+    EXPECTED_COPIED_BOOL_FIELDS as BUFF_EXPECTED_COPIED_BOOL_FIELDS,
+    EXPECTED_REDACTED_FIELDS as BUFF_EXPECTED_REDACTED_FIELDS,
+    EXPECTED_TARGETS as BUFF_EXPECTED_TARGETS,
+    EXPECTED_ZERO_PARAM_TARGETS as BUFF_EXPECTED_ZERO_PARAM_TARGETS,
+    REPORT_SCHEMA as BUFF_STATUS_SCHEMA,
+    TARGET_SETS_USED as BUFF_TARGET_SETS_USED,
+    build_report as build_buff_status_report,
+)
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -37,8 +47,10 @@ SURFACE_ID = "obelisk.mission_transfer_dino_tribe.v1"
 REQUIRED_LEAVES = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
 MISSION_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-mission-leaf-blocker-accounting.v1"
 TRIBE_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-tribe-leaf-blocker-accounting.v1"
+BUFF_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-buff-leaf-blocker-accounting.v1"
 MISSION_REQUIRED_EVIDENCE = ("mission-compact-intake", "mission-copied-bool-policy-slice")
 TRIBE_REQUIRED_EVIDENCE = ("tribe-compact-intake",)
+BUFF_REQUIRED_EVIDENCE = ("buff-compact-intake", "buff-breadth-intake")
 MISSION_COPIED_TARGETS = (
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -73,6 +85,22 @@ TRIBE_PUBLIC_FALSE_KEYS = (
     "resource_handle_ready",
     "v1_completion_ready",
     "promotion_ready",
+)
+BUFF_PUBLIC_FALSE_KEYS = (
+    "public_sdk_ready",
+    "public_buff_sdk_ready",
+    "public_abi_ready",
+    "runtime_ready",
+    "runtime_observer_approved",
+    "identity_ready",
+    "lookup_ready",
+    "mutation_ready",
+    "return_override_ready",
+    "resource_handle_ready",
+    "v1_completion_ready",
+    "promotion_ready",
+    "copied_payload_policy_ready",
+    "lifecycle_semantics_ready",
 )
 MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
     "mission-copied-bool-policy-slice",
@@ -227,7 +255,6 @@ LEAF_MISSING_PUBLIC_GATES = {
         "buff_class_object_redaction_contract",
         "copied_payload_policy",
         "lifecycle_stacking_invalidation_semantics",
-        "buff_leaf_readiness_checker",
         "dispatcher_lifecycle",
         "runtime_observation",
         "resource_handle_policy",
@@ -295,23 +322,25 @@ LEAF_PRIORITY_PROFILES = {
         ),
     },
     "buff_status": {
-        "base_score": 58,
+        "base_score": 62,
         "required_evidence": ("buff-compact-intake", "buff-breadth-intake"),
         "reusable_evidence": (
+            "focused Buff/status readiness checker",
             "compact and breadth layout evidence",
-            "existing internal recognizer coverage",
-            "clear object/class redaction boundary to define",
+            "six canonical copied bool fields",
+            "candidate class/object redaction boundary",
+            "zero-param lifecycle shape accounting",
         ),
         "blocking_risk": (
-            "class/object redaction contract",
             "copied payload policy",
             "lifecycle, stacking, and invalidation semantics",
-            "missing Buff-specific consume/readiness checker",
+            "public ABI and dispatcher lifecycle",
+            "runtime observation and ResourceHandle policy",
         ),
         "next_v1_reuse_step": (
-            "Add a Buff-specific consume/readiness checker before treating Buff as a "
-            "scalar/status lane; keep class/object pointers, lifecycle claims, "
-            "ResourceHandle, mutation, and return override excluded."
+            "Use the Buff/status checker output to plan a copied-bool payload policy; "
+            "keep class/object exposure, lifecycle semantics, ResourceHandle, mutation, "
+            "and return override excluded."
         ),
     },
     "tribe_policy": {
@@ -462,6 +491,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
         help="Sanitized UFunction snapshot root for candidate-only Tribe scalar evidence.",
+    )
+    parser.add_argument(
+        "--buff-snapshot-root",
+        type=Path,
+        default=DEFAULT_BUFF_STATUS_SNAPSHOT_ROOT,
+        help="Sanitized UFunction snapshot root for candidate-only Buff/status evidence.",
     )
     parser.add_argument("--release-statement", type=Path, help="Optional reviewed v1 release statement.")
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
@@ -1353,6 +1388,171 @@ def build_tribe_leaf_blocker_accounting(
     }
 
 
+def validate_buff_status_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.buff_leaf_blocker_accounting.buff_status_checker_report"
+    if report.get("schema") != BUFF_STATUS_SCHEMA:
+        add(blockers, "buff_status_checker_schema_mismatch", f"{label}.schema")
+    target_sets = report.get("target_sets")
+    if not isinstance(target_sets, dict) or target_sets.get("target_sets") != list(BUFF_TARGET_SETS_USED):
+        add(blockers, "buff_status_checker_target_sets_mismatch", f"{label}.target_sets")
+    if report.get("accepted_for_internal_planning") is not True:
+        add(blockers, "buff_status_checker_not_internal_planning_ready", f"{label}.accepted_for_internal_planning")
+    for key in ("offline_only", "fixture_only", "not_artifact_gate"):
+        if report.get(key) is not True:
+            add(blockers, "buff_status_checker_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "buff_status_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in BUFF_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "buff_status_public_or_runtime_claim", f"{label}.{key}", key=key)
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "buff_status_summary_missing", f"{label}.summary")
+        return
+    copied_fields = string_list(summary.get("copied_bool_fields"))
+    missing_copied = sorted(set(BUFF_EXPECTED_COPIED_BOOL_FIELDS) - set(copied_fields))
+    if missing_copied:
+        add(
+            blockers,
+            "buff_status_copied_bool_fields_missing",
+            f"{label}.summary.copied_bool_fields",
+            missing=missing_copied,
+        )
+    redacted_fields = string_list(summary.get("redacted_fields"))
+    missing_redactions = sorted(set(BUFF_EXPECTED_REDACTED_FIELDS) - set(redacted_fields))
+    if missing_redactions:
+        add(
+            blockers,
+            "buff_status_required_redactions_missing",
+            f"{label}.summary.redacted_fields",
+            missing=missing_redactions,
+        )
+    zero_param_targets = [
+        entry.get("target")
+        for entry in summary.get("zero_param_targets", [])
+        if isinstance(entry, dict) and entry.get("ready") is True
+    ]
+    missing_zero_param = sorted(set(BUFF_EXPECTED_ZERO_PARAM_TARGETS) - set(zero_param_targets))
+    if missing_zero_param:
+        add(
+            blockers,
+            "buff_status_zero_param_targets_missing",
+            f"{label}.summary.zero_param_targets",
+            missing=missing_zero_param,
+        )
+
+
+def build_buff_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    buff_report: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("buff_status", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    missing_required_evidence = sorted(set(BUFF_REQUIRED_EVIDENCE) - set(current_evidence))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    buff_gap = (
+        gaps.get("buff_status")
+        if isinstance(gaps, dict) and isinstance(gaps.get("buff_status"), dict)
+        else {}
+    )
+    summary = buff_report.get("summary") if isinstance(buff_report.get("summary"), dict) else {}
+    copied_bool_fields = string_list(summary.get("copied_bool_fields") if isinstance(summary, dict) else None)
+    redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None)
+    zero_param_targets = summary.get("zero_param_targets") if isinstance(summary, dict) else None
+    checker_ready = (
+        buff_report.get("accepted_for_internal_planning") is True
+        and not buff_report.get("blockers")
+        and buff_report.get("copied_payload_policy_ready") is False
+        and buff_report.get("lifecycle_semantics_ready") is False
+    )
+
+    return {
+        "schema": BUFF_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "buff_status",
+        "lane": "buff_status_scalar_boundary_candidate",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": (
+            not missing_required_evidence
+            and leaf.get("status") == "planning"
+            and checker_ready
+        ),
+        "candidate_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "v1_accounted": bool(buff_gap.get("v1_accounted")),
+        "buff_status_sdk_ready": False,
+        "public_abi_ready": False,
+        "public_sdk_ready": False,
+        "public_buff_sdk_ready": False,
+        "runtime_observer_approved": False,
+        "runtime_ready": False,
+        "identity_ready": False,
+        "lookup_ready": False,
+        "mutation_ready": False,
+        "promotion_ready": False,
+        "return_override_ready": False,
+        "resource_handle_ready": False,
+        "v1_completion": False,
+        "copied_payload_policy_ready": False,
+        "lifecycle_semantics_ready": False,
+        "focused_checker": "scripts/check_buff_status_readiness.py",
+        "input_target_sets": list(BUFF_TARGET_SETS_USED),
+        "required_evidence": list(BUFF_REQUIRED_EVIDENCE),
+        "current_evidence": current_evidence,
+        "missing_required_evidence": missing_required_evidence,
+        "scalar_boundary": {
+            "checker_schema": buff_report.get("schema"),
+            "checker_ready": bool(buff_report.get("ready")),
+            "buff_status_candidate_ready": bool(buff_report.get("buff_status_candidate_ready")),
+            "copied_bool_boundary_ready": bool(buff_report.get("copied_bool_boundary_ready")),
+            "class_object_redaction_ready": bool(buff_report.get("class_object_redaction_ready")),
+            "zero_param_lifecycle_shape_ready": bool(buff_report.get("zero_param_lifecycle_shape_ready")),
+            "copied_bool_fields": copied_bool_fields,
+            "copied_bool_count": len(copied_bool_fields),
+            "zero_param_targets": zero_param_targets if isinstance(zero_param_targets, list) else [],
+            "checked_target_count": len(BUFF_EXPECTED_TARGETS),
+        },
+        "redaction_boundary": {
+            "redacted_fields": redacted_fields,
+            "required_redactions": sorted(BUFF_EXPECTED_REDACTED_FIELDS),
+            "forbidden_promotions": [
+                "public Buff/status SDK",
+                "buff identity",
+                "controller, character, damage-causer, or class exposure",
+                "object/class pointer contract",
+                "lookup",
+                "runtime hook wiring",
+                "copied payload policy",
+                "lifecycle, stacking, or invalidation semantics",
+                "aggregate, proximity, or count APIs",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "remaining_public_gates": string_list(buff_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+            else "blocked_accounting"
+        ),
+        "non_claims": [
+            "buff/status leaf accounting is candidate-only internal reusable evidence",
+            "buff/status leaf accounting does not promote a public Buff SDK, ABI, callback, descriptor, or v1 completion",
+            "buff/status leaf accounting does not promote runtime hooks, dispatcher wiring, identity, lookup, object/class exposure, copied payload policy, lifecycle semantics, mutation, return override, or ResourceHandle",
+            "buff/status leaf accounting keeps zero-param lifecycle shape separate from blocked lifecycle, stacking, and invalidation semantics",
+        ],
+    }
+
+
 def validate_public_contracts(
     surface: dict[str, Any],
     leaves: dict[str, dict[str, Any]],
@@ -1554,6 +1754,7 @@ def build_report(
     split_note_path: Path,
     release_statement_path: Path | None = None,
     tribe_snapshot_root: Path = DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
+    buff_snapshot_root: Path = DEFAULT_BUFF_STATUS_SNAPSHOT_ROOT,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     manifest = load_json(manifest_path, "manifest")
@@ -1618,6 +1819,8 @@ def build_report(
 
     tribe_scalar_boundary_report = build_tribe_scalar_boundary_report(tribe_snapshot_root)
     validate_tribe_scalar_boundary_report(tribe_scalar_boundary_report, blockers)
+    buff_status_report = build_buff_status_report(buff_snapshot_root)
+    validate_buff_status_report(buff_status_report, blockers)
 
     excluded_route = manifest_umbrella_excluded or statement_umbrella_excluded
     validate_public_contracts(surface, leaves, blockers, excluded_route=excluded_route)
@@ -1638,6 +1841,11 @@ def build_report(
         leaf_family_accounting,
         tribe_scalar_boundary_report,
     )
+    buff_leaf_blocker_accounting = build_buff_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        buff_status_report,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
@@ -1655,6 +1863,7 @@ def build_report(
         "candidate_only_accounting": leaf_family_accounting,
         "mission_leaf_blocker_accounting": mission_leaf_blocker_accounting,
         "tribe_leaf_blocker_accounting": tribe_leaf_blocker_accounting,
+        "buff_leaf_blocker_accounting": buff_leaf_blocker_accounting,
         "leaf_priority": leaf_priority,
         "missing_leaf_families": leaf_family_accounting["missing_leaf_families"],
         "release_statement": outcome,
@@ -1669,7 +1878,13 @@ def build_report(
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.manifest, args.split_note, args.release_statement, args.tribe_snapshot_root)
+    report = build_report(
+        args.manifest,
+        args.split_note,
+        args.release_statement,
+        args.tribe_snapshot_root,
+        args.buff_snapshot_root,
+    )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif report["ready"]:

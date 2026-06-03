@@ -1405,12 +1405,12 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     current_route_blocker = getattr(args, "current_route_blocker", CURRENT_ROUTE_BLOCKER)
-    if current_route_blocker != CURRENT_ROUTE_BLOCKER:
+    if current_route_blocker not in ALLOWED_ROUTE_BLOCKERS:
         add(
             blockers,
             "current_route_blocker_mismatch",
             "$.current_route_blocker",
-            expected=CURRENT_ROUTE_BLOCKER,
+            expected=list(ALLOWED_ROUTE_BLOCKERS),
             value=current_route_blocker,
         )
     decisions = load_json(args.decisions, "decisions", blockers)
@@ -1429,8 +1429,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "planning_only": True,
         "dependency_chain": REQUIRED_P0_CHAIN,
         "dependency_chain_locked": True,
-        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
-        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": [current_route_blocker],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1446,7 +1446,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "dependency": IDENTITY_SURFACE,
         "non_claim": (
             "valid planning output does not count permissions/admin while player identity remains blocked "
-            f"on {CURRENT_ROUTE_BLOCKER}"
+            f"on {current_route_blocker}"
         ),
         "query_failclosed_artifact_schema": query_artifact_schema,
         "blockers": [blocker["reason"] for blocker in blockers],

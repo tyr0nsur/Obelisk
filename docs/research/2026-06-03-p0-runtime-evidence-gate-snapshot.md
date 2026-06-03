@@ -715,6 +715,62 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Six-Agent SDK Hardening Checkpoint
+
+The next lead-supervised round closed all stale/current standby agents and
+integrated six scoped offline changes without changing the active route blocker.
+
+Integrated findings:
+
+- P0 request preparation now validates that request-pack sidecars are siblings
+  before a window request/env/operator-request set can be reported ready.
+- Downstream P0 checkers for permissions/admin, command chat response, and
+  commands/replies can carry `approved_runtime_evidence_missing` or the next
+  `identity_public_contract_gate_missing` blocker, while keeping public/runtime/
+  v1 readiness false.
+- SDK completion only counts promoted release-statement rows when their detail
+  is reviewed evidence, not package-shape, placeholder, planning, or readiness
+  text.
+- Logger initialization now fails closed if no safe absolute log root can be
+  derived from `OBELISK_LOG_DIR` or `OBELISK_ROOT`.
+- Buff/status has a fixture-only readiness checker and umbrella accounting, but
+  all public SDK, ABI, runtime, identity, lookup, mutation, return override,
+  `ResourceHandle`, and v1 flags remain false.
+- Consume-mode redacted UFunction manifests reject incomplete named target-set
+  coverage when target sets are claimed.
+
+Observed state after integration:
+
+- `check_player_identity_first_evidence_readiness.py --json`: `ready=false`,
+  `status=blocked`, `primary_blocker=approved_runtime_evidence_missing`,
+  `runtime_ready=false`, `public_sdk_ready=false`, `promotion_ready=false`, and
+  `next_step=produce_approved_runtime_principal_lifecycle_evidence`.
+- `check_public_sdk_v1_completion.py --json`: `ready=false`,
+  `status=blocked`, `stable_claim_allowed=false`,
+  `stable_release_contract_claim_allowed=false`, SDK completion remains `0/12`,
+  P0 dependency chain remains `0/4`, and no promoted evidence-less blockers are
+  present.
+
+Validation remained offline-only:
+
+- P0 evidence/request/window/bundle/approved suites: 315 tests OK.
+- Downstream P0 route suites: 155 tests OK.
+- Buff/status, umbrella accounting, and research docs: 80 tests OK.
+- Offline artifact focal target-set/approved-runtime tests: 5 tests OK.
+- Plugin/timer guardrails: 38 and 7 tests OK.
+- Runtime build for logger/process-event/ABI targets: OK.
+- Runtime CTest for `LoggerTests`, `ProcessEventDispatchTests`,
+  `AbiLayoutTests`, and `CAbiLayoutTests`: 4/4 OK.
+- Full SDK completion suite: 245 tests OK in 524.621s.
+
+Non-claims:
+
+- This checkpoint does not create approved runtime evidence, promote identity,
+  complete the SDK, or authorize `/servidor/ark` writes, server starts/stops/
+  restarts, marker/env edits, runtime observation, ReflectionScanner, ptrace/
+  gcore, broad tracing, Discord sends, GitHub publication, tags, releases,
+  Plugin Hub publication, support-tier activation, or stable SDK wording.
+
 ## SDK/P0 Non-Claim Hardening Checkpoint
 
 The next supervised integration round tightened offline false-positive routes

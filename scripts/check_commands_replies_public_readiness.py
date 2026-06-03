@@ -45,6 +45,7 @@ DEPENDENCY_CHAIN = (
 CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
 ALLOWED_ROUTE_BLOCKERS = (
     "approved_runtime_evidence_missing",
+    "identity_public_contract_gate_missing",
 )
 REQUIRED_DEPENDS_ON = list(DEPENDENCY_CHAIN[:-1])
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
@@ -1509,12 +1510,12 @@ def build_report(
     current_route_blocker: str = CURRENT_ROUTE_BLOCKER,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
-    if current_route_blocker != CURRENT_ROUTE_BLOCKER:
+    if current_route_blocker not in ALLOWED_ROUTE_BLOCKERS:
         add(
             blockers,
             "current_route_blocker_mismatch",
             "$.current_route_blocker",
-            expected=CURRENT_ROUTE_BLOCKER,
+            expected=list(ALLOWED_ROUTE_BLOCKERS),
             value=current_route_blocker,
         )
     expected_report_root = response_path_report_root if response_path_report_root is not None else response_path_root
@@ -1546,7 +1547,7 @@ def build_report(
             expected_readiness=response_path_readiness,
             expected_surfaces=surfaces_path,
             expected_public_header=public_header_path,
-            expected_route_blocker=CURRENT_ROUTE_BLOCKER,
+            expected_route_blocker=current_route_blocker,
         )
 
     valid = not blockers
@@ -1558,8 +1559,8 @@ def build_report(
         "surface": SURFACE,
         "dependency_chain": list(DEPENDENCY_CHAIN),
         "dependency_chain_locked": True,
-        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
-        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": [current_route_blocker],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1573,7 +1574,7 @@ def build_report(
         "public_header_allowed": False,
         "non_claim": (
             "valid planning output does not count commands/replies while player identity remains "
-            f"blocked on {CURRENT_ROUTE_BLOCKER}"
+            f"blocked on {current_route_blocker}"
         ),
         "decisions_path": str(decisions_path),
         "surfaces_path": str(surfaces_path),

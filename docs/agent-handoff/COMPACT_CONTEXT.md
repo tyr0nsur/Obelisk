@@ -2014,6 +2014,27 @@ priorities, and do not use history files as the active source of truth.
   `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
   package-shape drift empty, stable false. No `/servidor/ark` writes, server/runtime
   tools, marker/env edits, Discord, GitHub, tags, or publication.
+- 2026-06-03 6-agent SDK hardening checkpoint: all old/current standby agents were closed
+  before lead integration. Integrated changes require player-principal request-pack
+  diagnosis to validate sibling sidecars before clearing request/env/operator-readiness;
+  let downstream permissions/admin, command chat response, and commands/replies checkers
+  carry either `approved_runtime_evidence_missing` or the next
+  `identity_public_contract_gate_missing` blocker without promoting public/runtime/v1
+  flags; require SDK promoted release-statement rows to contain reviewed evidence detail
+  instead of package-shape/readiness placeholders; make Logger fail closed when neither a
+  safe absolute `OBELISK_LOG_DIR` nor root-derived logs directory is available; add
+  fixture-only Buff/status readiness plus umbrella accounting while keeping all Buff
+  public/runtime/ABI/mutation/ResourceHandle/v1 flags false; and make consume-mode
+  redacted UFunction manifests reject incomplete named target-set coverage when target
+  sets are claimed. Validation: P0 evidence/request/window/bundle/approved suites 315 OK,
+  downstream P0 route suites 155 OK, Buff/status plus umbrella and research docs 80 OK,
+  artifact target-set/approved-runtime focal tests 5 OK, plugin/timer guardrails 38/7 OK,
+  runtime build OK, runtime CTest 4/4, full SDK completion suite 245 OK in 524.621s.
+  Route JSON remains blocked at `approved_runtime_evidence_missing`; SDK JSON remains
+  `ready=false`, `status=blocked`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, and no promoted evidence-less blockers. No
+  `/servidor/ark` writes, server access, live runtime tools, marker/env edits, Discord,
+  GitHub, tags, releases, or publication.
 
 ## Agent Coordination
 

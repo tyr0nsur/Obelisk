@@ -1611,9 +1611,18 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
             os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(SAFE_OFFLINE_WORKSPACE)
             try:
-                diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
-                    output_dir / "approved-runtime-principal-lifecycle-evidence.json"
-                )
+                with mock.patch.object(
+                    first_evidence_checker.approved_runtime_principal_lifecycle_evidence,
+                    "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                    (SAFE_OFFLINE_WORKSPACE,),
+                ), mock.patch.object(
+                    first_evidence_checker.approved_runtime_principal_lifecycle_evidence.window_manifest_checker,
+                    "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                    (SAFE_OFFLINE_WORKSPACE,),
+                ):
+                    diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                        output_dir / "approved-runtime-principal-lifecycle-evidence.json"
+                    )
             finally:
                 if old_env is None:
                     os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)

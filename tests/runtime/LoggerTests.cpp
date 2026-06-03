@@ -70,6 +70,13 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestRejectsMissingLogRoot()
+    {
+        ResetEnv();
+
+        ExpectInitThrowsContaining("OBELISK_LOG_DIR or OBELISK_ROOT");
+    }
+
     void TestRejectsRelativeExplicitLogDir()
     {
         ResetEnv();
@@ -154,6 +161,7 @@ int main()
     try
     {
         TestExplicitLogDirCreatesInstanceLogs();
+        TestRejectsMissingLogRoot();
         TestRejectsRelativeExplicitLogDir();
         TestRejectsSymlinkExplicitLogDir();
         TestRejectsSymlinkExplicitLogDirAncestor();

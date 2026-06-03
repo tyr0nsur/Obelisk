@@ -448,7 +448,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
 
-    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+    def test_accepts_identity_contract_route_blocker_without_unlocking(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             readiness_path, decisions_path, public_header_path = self.write_inputs(root)
@@ -461,12 +461,15 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 current_route_blocker="identity_public_contract_gate_missing",
             )
 
-        self.assertFalse(report["valid"])
-        self.assertFalse(report["accepted_for_planning"])
-        self.assertIn("current_route_blocker_mismatch", report["blockers"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertEqual([], report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 

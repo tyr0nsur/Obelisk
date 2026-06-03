@@ -189,6 +189,8 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         send_discord_tests = (REPO_ROOT / "scripts" / "test_send_discord_embed.py").read_text(encoding="utf-8")
 
         self.assertIn("No server target has standing approval", " ".join(current.split()))
+        self.assertIn("no `/servidor/ark` writes", " ".join(current.split()))
+        self.assertIn("write under protected live paths", " ".join(current.split()))
         self.assertIn("no Discord for internal rounds or agent status", " ".join(current.split()))
         self.assertIn("No standing operator approval", compact)
         self.assertIn("No run is approved by this note", mission_plan)

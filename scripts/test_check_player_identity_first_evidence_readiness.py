@@ -1618,6 +1618,52 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(diagnosis["request_pack_ready"])
         self.assertIn("env_line_not_key_value", diagnosis["blockers"])
 
+    def test_window_request_pack_diagnosis_rejects_env_from_other_request_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            request_dir = root / "request"
+            other_dir = root / "other-request"
+            request_dir.mkdir()
+            other_dir.mkdir()
+            request_path = request_dir / "window-request.json"
+            env_path = other_dir / "observer-window.env"
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            end = start + timedelta(minutes=10)
+            run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            request_args = SimpleNamespace(
+                instance="arkserver2",
+                map_name="TheIsland",
+                run_id=run_id,
+                obelisk_commit=current_obelisk_commit(),
+                approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                server_binary_path=prepare_window_request.EXPECTED_SERVER_BINARY_PATH,
+                restart_expectation="restart",
+                final_posture="stable",
+                user_policy="no_regular_users",
+                notice_path="not_applicable",
+                rollback_owner="operator",
+                output_dir=request_dir,
+                json=True,
+            )
+            request_payload = prepare_window_request.request_payload(request_args)
+            env_lines = prepare_window_request.env_lines(request_args)
+            request_path.write_text(json.dumps(request_payload), encoding="utf-8")
+            env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+            (request_dir / "operator-approval-request.md").write_text(
+                prepare_window_request.markdown_request(request_payload, env_lines),
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.player_principal_lifecycle_window_request_diagnosis(request_path, env_path)
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["request_pack_ready"])
+        self.assertIn("env_file_not_sibling_of_request_json", diagnosis["blockers"])
+        self.assertFalse(diagnosis["operator_current_turn_runtime_window_approval_required"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+
     def test_window_request_pack_diagnosis_requires_operator_request_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             request_path = Path(tmp) / "window-request.json"

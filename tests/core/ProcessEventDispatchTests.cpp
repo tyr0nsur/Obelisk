@@ -248,6 +248,8 @@ namespace
 
 int main()
 {
+    const fs::path logRoot = MakeTempRoot();
+    setenv("OBELISK_LOG_DIR", logRoot.string().c_str(), 1);
     Obelisk::Logger::Init();
 
     TestPreCallbackManualOriginalSkipsAutomaticOriginal();
@@ -258,6 +260,8 @@ int main()
     TestPostCallbackRunsAfterOriginal();
 
     Obelisk::Logger::Shutdown();
+    unsetenv("OBELISK_LOG_DIR");
+    fs::remove_all(logRoot);
 
     std::cout << "ProcessEventDispatchTests passed\n";
     return 0;

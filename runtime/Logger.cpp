@@ -116,7 +116,7 @@ namespace Obelisk
                 return path.string();
             }
 
-            return ".";
+            throw std::runtime_error("OBELISK_LOG_DIR or OBELISK_ROOT is required for runtime logging");
         }
 
         std::string GetMapNameFromCmdline()

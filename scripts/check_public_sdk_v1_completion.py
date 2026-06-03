@@ -1224,6 +1224,20 @@ RELEASE_STATEMENT_OUTCOME_PROGRESS_NEGATORS = re.compile(
     r"must\s+not|never|no|not|without)\b",
     re.IGNORECASE,
 )
+PROMOTED_RELEASE_STATEMENT_REVIEWED_EVIDENCE_DETAIL_RE = re.compile(
+    r"\b(?:reviewed|validated|verified|accepted|approved)\b.{0,120}"
+    r"\b(?:abi|sdk|evidence|tests?|coverage|callbacks?|leaf|leaves|units?)\b|"
+    r"\b(?:abi|sdk|evidence|tests?|coverage|callbacks?|leaf|leaves|units?)\b.{0,120}"
+    r"\b(?:reviewed|validated|verified|accepted|approved)\b",
+    re.IGNORECASE,
+)
+PROMOTED_RELEASE_STATEMENT_NON_EVIDENCE_DETAIL_RE = re.compile(
+    r"\b(?:candidate(?:[-_ ]?only)?|consume[-_ ]?only|core[-_ ]?first|"
+    r"evidence[-_ ]?only|foundation|package[-_ ]?shape|placeholder|"
+    r"planning(?:[-_ ]?only)?|plugin[-_ ]?hub|pluginhub|readiness[-_ ]?only|"
+    r"tbd|todo)\b",
+    re.IGNORECASE,
+)
 PLUGIN_HUB_DEFERRED_CONTEXT = re.compile(
     r"\b(?:post[- ]?sdk(?:[- ]?complete)?|after\s+sdk\s+completion)\b",
     re.IGNORECASE,
@@ -3291,6 +3305,30 @@ def release_statement_record_has_contradiction(record: str) -> bool:
     return text_has_affirmative_release_claim(record)
 
 
+def promoted_release_statement_detail(record: str) -> str:
+    match = re.search(
+        rf"\bpromoted\b\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)$",
+        record,
+        re.IGNORECASE,
+    )
+    return (match.group("details") if match else "").strip()
+
+
+def release_statement_satisfies_promoted_outcome(
+    text: str,
+    surface_id: str,
+) -> bool:
+    record = release_statement_surface_record(text, surface_id, "promoted")
+    if record is None or release_statement_record_has_contradiction(record):
+        return False
+    detail = promoted_release_statement_detail(record)
+    if not detail:
+        return False
+    if PROMOTED_RELEASE_STATEMENT_NON_EVIDENCE_DETAIL_RE.search(detail):
+        return False
+    return PROMOTED_RELEASE_STATEMENT_REVIEWED_EVIDENCE_DETAIL_RE.search(detail) is not None
+
+
 def surface_exclusion_claim_terms(surface: dict[str, Any]) -> set[str]:
     terms = set(as_string_list(surface.get("exclusions")))
     terms.update(as_string_list(surface.get("audit_units")))
@@ -3368,7 +3406,7 @@ def release_statement_satisfies_experimental_outcome(text: str, surface_id: str,
     if record is None or release_statement_record_has_contradiction(record):
         return False
     if status == "promoted":
-        return True
+        return release_statement_satisfies_promoted_outcome(text, surface_id)
     required_terms = CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT.get(surface_id, ())
     lowered = record.lower()
     return all(term.lower() in lowered for term in required_terms)
@@ -5112,6 +5150,8 @@ def blocker_outcome_next_action(
             return "keep blocked; promoted status lacks acceptable ABI and SDK-consumer evidence"
         if release_statement_outcome != "promoted":
             return "add one release-statement promoted record after reviewing evidence"
+        if not release_statement_contract_satisfied:
+            return "replace the promoted release-statement record with reviewed evidence details"
         return "promoted accounting complete; this still does not allow the stable SDK claim by itself"
     if (
         surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE
@@ -5182,7 +5222,13 @@ def completion_blocker_outcome_rows(
         release_statement_contract_satisfied = False
         release_statement_outcome_matches_manifest = release_statement_outcome == manifest_outcome
         if status == "promoted":
-            release_statement_contract_satisfied = release_statement_outcome == "promoted"
+            release_statement_contract_satisfied = (
+                release_statement_text is not None
+                and release_statement_satisfies_promoted_outcome(
+                    release_statement_text,
+                    surface_id,
+                )
+            )
         elif status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             allowed_outcomes = required_release_statement_outcomes(surface)
             release_statement_contract_satisfied = (
@@ -6166,7 +6212,10 @@ def build_report(
                 release_statement_missing_blockers.append(surface_id)
             elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
                 release_statement_duplicate_records.append(surface_id)
-            elif not release_statement_names_outcome(release_statement_text, surface_id, status):
+            elif not release_statement_satisfies_promoted_outcome(
+                release_statement_text,
+                surface_id,
+            ):
                 release_statement_missing_blockers.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:

@@ -22,6 +22,7 @@ from check_public_sdk_v1_completion import (
     SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER,
     blocker_guidance,
     command_permission_route_gate_public_or_runtime_claims,
+    completion_blocker_outcome_rows,
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
@@ -8536,6 +8537,60 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], ["obelisk.player_identity.v1"])
         self.assertIsNone(payload["v1_sdk_blocker_outcomes"][0]["release_statement_outcome"])
+
+    def test_promoted_release_statement_row_requires_reviewed_evidence_detail(self) -> None:
+        surface_id = "obelisk.structure_census.v1"
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotionAbi",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion_sdk",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// structure census ABI promotion test\n", encoding="utf-8")
+            sdk_test.write_text("// structure census SDK promotion test\n", encoding="utf-8")
+            surface = {
+                "id": surface_id,
+                "status": "promoted",
+                "support_tier": "release-supported surface",
+                "public_contract": ["ObeliskApi.RegisterStructureCensusCallback"],
+                "evidence": {
+                    "surface_id": surface_id,
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                },
+            }
+            bad_rows = completion_blocker_outcome_rows(
+                [surface_id],
+                {surface_id: surface},
+                set(),
+                f"{surface_id}: promoted - package shape reviewed.\n",
+            )
+            good_rows = completion_blocker_outcome_rows(
+                [surface_id],
+                {surface_id: surface},
+                set(),
+                f"{surface_id}: promoted - reviewed ABI and SDK evidence.\n",
+            )
+
+        bad_row = bad_rows[0]
+        good_row = good_rows[0]
+        self.assertTrue(bad_row["promotion_evidence_satisfied"])
+        self.assertEqual(bad_row["release_statement_outcome"], "promoted")
+        self.assertFalse(bad_row["release_statement_contract_satisfied"])
+        self.assertIn("release_statement_outcome_or_contract_missing", bad_row["non_counting_reasons"])
+        self.assertFalse(bad_row["counts_toward_complete_sdk_claim"])
+        self.assertIn("reviewed evidence details", bad_row["next_action"])
+        self.assertTrue(good_row["release_statement_contract_satisfied"])
+        self.assertEqual(good_row["non_counting_reasons"], [])
+        self.assertTrue(good_row["counts_toward_complete_sdk_claim"])
 
     def test_release_statement_outcome_must_match_manifest_non_promoted_status(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

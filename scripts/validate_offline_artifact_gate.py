@@ -2400,7 +2400,8 @@ def validate_target_set_coverage(
                 "recorded_schema": coverage.get("schema"),
             }
         )
-    if not strict:
+    require_complete_named_coverage = bool(target_sets or source_target_sets)
+    if not strict and not require_complete_named_coverage:
         return blockers
 
     declared = [(target_set, "manifest") for target_set in target_sets] + [
