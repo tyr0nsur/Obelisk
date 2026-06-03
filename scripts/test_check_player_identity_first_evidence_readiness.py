@@ -20,12 +20,15 @@ REPO_ROOT = SCRIPT_DIR.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    SAFE_OFFLINE_WORKSPACE,
+    manifest as approved_runtime_principal_lifecycle_manifest,
+    safe_test_env as approved_runtime_safe_test_env,
+)
+
 import check_player_identity_first_evidence_readiness as checker
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
-from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
-    manifest as approved_runtime_principal_lifecycle_manifest,
-)
 from test_check_player_identity_runtime_principal_lifecycle_evidence import manifest as runtime_principal_lifecycle_manifest
 from test_validate_offline_artifact_gate import players_identity_first_evidence_manifest
 import prepare_player_principal_lifecycle_window_request as prepare_window_request
@@ -73,6 +76,28 @@ def principal_policy_bound_to_lifecycle(lifecycle_manifest: dict | None = None) 
 
 
 class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._old_approved_roots = (
+            checker.approved_runtime_principal_lifecycle_evidence.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        )
+        self._old_window_roots = (
+            checker.approved_runtime_principal_lifecycle_evidence.window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        )
+        checker.approved_runtime_principal_lifecycle_evidence.APPROVED_OFFLINE_WORKSPACE_ROOTS = (
+            SAFE_OFFLINE_WORKSPACE,
+        )
+        checker.approved_runtime_principal_lifecycle_evidence.window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (
+            SAFE_OFFLINE_WORKSPACE,
+        )
+
+    def tearDown(self) -> None:
+        checker.approved_runtime_principal_lifecycle_evidence.APPROVED_OFFLINE_WORKSPACE_ROOTS = (
+            self._old_approved_roots
+        )
+        checker.approved_runtime_principal_lifecycle_evidence.window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (
+            self._old_window_roots
+        )
+
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env.setdefault("OBELISK_COMMIT", "test-obelisk-commit")
@@ -1347,7 +1372,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "bounded_artifact_file_scan",
                     return_value={"ready_to_build_core_evidence_pack": False},
                 ),
-                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
             ):
                 payload = checker.build_report(args)
 
@@ -1531,7 +1556,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "bounded_artifact_file_scan",
                     return_value={"ready_to_build_core_evidence_pack": False},
                 ),
-                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
             ):
                 payload = checker.build_report(args)
 
@@ -2501,7 +2526,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+            with mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
                 diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     approved_manifest
                 )
@@ -2552,7 +2577,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 checker.approved_runtime_principal_lifecycle_evidence,
                 "build_report",
                 side_effect=overclaiming_report,
-            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+            ), mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
                 diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     approved_manifest
                 )
@@ -2598,7 +2623,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 checker.approved_runtime_principal_lifecycle_evidence,
                 "build_report",
                 side_effect=accounting_overclaim_report,
-            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+            ), mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
                 diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     approved_manifest
                 )
@@ -2611,6 +2636,35 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_report_counts_toward_v1_completion_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_counts_toward_complete_sdk_claim_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_or_runtime_accounting_allowed_not_false", diagnosis["blockers"])
+
+    def test_approved_runtime_manifest_diagnosis_rejects_report_not_ready(self) -> None:
+        original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
+
+        def not_ready_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["ready"] = False
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                checker.approved_runtime_principal_lifecycle_evidence,
+                "build_report",
+                side_effect=not_ready_report,
+            ), mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertIn("approved_runtime_report_ready_not_true", diagnosis["blockers"])
 
     def test_approved_runtime_manifest_diagnosis_rejects_legacy_public_contract_gate_alias(self) -> None:
         original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
@@ -2630,7 +2684,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 checker.approved_runtime_principal_lifecycle_evidence,
                 "build_report",
                 side_effect=stale_alias_report,
-            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+            ), mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
                 diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     approved_manifest
                 )

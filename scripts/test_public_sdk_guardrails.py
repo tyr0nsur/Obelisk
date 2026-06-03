@@ -10378,6 +10378,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "stable_claim_allowed=false",
             "approved_runtime_evidence_missing",
             "do\nnot reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin\nHub planning, or side-lane accounting as public SDK readiness or a stable SDK claim",
+            "Package-shape checks also do not authorize runtime readiness, live-op approval, Plugin Hub\nreadiness/publication, support-tier activation, public module coverage, or production\nstable SDK wording",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)

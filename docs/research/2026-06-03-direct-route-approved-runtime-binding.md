@@ -10,13 +10,15 @@ of `--approved-runtime-principal-lifecycle-evidence-manifest`.
 
 ## Facts
 
-- The bound identity wrapper already validates approved runtime principal lifecycle
-  evidence before forwarding it.
+- In unit-test and replay contexts, the bound identity wrapper validates a supplied
+  approved runtime principal lifecycle evidence manifest with the approved-evidence
+  checker before forwarding it. This note records that guardrail, not a current evidence
+  artifact.
 - The direct route gate path still needed the same fail-closed distinction.
 - Unaccepted or arbitrary approved-runtime manifests now keep
   `approved_runtime_evidence_missing`.
-- The direct route can reach `identity_public_contract_gate_missing` only when the source
-  checker reports an accepted approved-runtime diagnosis with:
+- The direct route can reach `identity_public_contract_gate_missing` only in checker output
+  where the source checker reports an accepted approved-runtime diagnosis with:
   - `ready=true`
   - `approved_runtime_evidence_present=true`
   - `runtime_evidence_ready=true`
@@ -27,6 +29,8 @@ of `--approved-runtime-principal-lifecycle-evidence-manifest`.
 ## Non-Claims
 
 - This does not produce approved runtime evidence.
+- This does not record a current approved runtime target or approved runtime evidence
+  artifact.
 - This does not authorize server operations, marker/env changes, runtime capture, or
   Discord.
 - This does not promote public identity, permissions/admin, command response,

@@ -1413,6 +1413,8 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
             blockers.append("approved_runtime_report_mode_not_consume")
         if report.get("ready_scope") != "runtime_evidence_only":
             blockers.append("approved_runtime_report_ready_scope_not_runtime_evidence_only")
+        if report.get("ready") is not True:
+            blockers.append("approved_runtime_report_ready_not_true")
         if report.get("approved_runtime_evidence_present") is not True:
             blockers.append("approved_runtime_report_evidence_present_not_true")
         if report.get("runtime_evidence_ready") is not True:

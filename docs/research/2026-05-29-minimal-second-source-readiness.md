@@ -36,6 +36,11 @@ SetActiveMissionDebugFlags=9622
 
 Snapshot comparison result:
 
+Boundary: the `promotion_gate.ready=true` lines in this note mean named-target-set
+layout readiness only. The same reports keep `promotion_gate.promotion_ready=false`; they
+are not current approved runtime evidence, public SDK promotion, or stable production
+readiness.
+
 ```text
 gate_mode=second_source_promotion
 promotion_gate.ready=true
@@ -192,8 +197,8 @@ boundary from this note is copied scalar evidence for `GameplayPolicyEvent`.
 
 ## Promotion Boundary
 
-This promotes compact UFunction layout evidence for the listed inventory and structure
-targets only. It does not promote:
+This note accepts only compact UFunction layout evidence for the listed inventory and
+structure targets. It does not promote:
 
 - `GObjects` or `FUObjectArray` as a runtime-stable global;
 - `ResourceHandle`, object identity, player identity, item identity, or inventory identity;

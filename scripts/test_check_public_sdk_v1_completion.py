@@ -5484,6 +5484,43 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["installed_sdk_package_shape_guardrail_drift"],
         )
 
+    def test_installed_sdk_package_shape_rejects_nested_split_and_alias_claims(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        manifest["installed_sdk_package_shape"]["accounting"] = {
+            "release": {"packageReady": True},
+        }
+        manifest["installed_sdk_package_shape"]["records"] = [
+            {"claimName": "public package", "status": "published"},
+            {"metricName": "complete SDK claim progress", "ratio": "1/12"},
+        ]
+        manifest["installed_sdk_package_shape"]["claimAliases"] = {
+            "v1CompletionEquivalentFor": ["obelisk.inventory_items_mutation.v1"],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("installed_sdk_package_shape_guardrail_incomplete", payload["blockers"])
+        self.assertIn(
+            "positive_claim:accounting.release.packageReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:records[0].status",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:records[1].ratio",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:claimAliases.v1CompletionEquivalentFor",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+
     def test_installed_sdk_package_shape_canonical_files_are_required(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["installed_sdk_package_shape"]["installed_files"].append(
@@ -11544,6 +11581,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertIn("obelisk.player_identity.v1", payload["minimum_promoted_demand_family_gaps"])
         self.assertIn(
             "obelisk.player_identity.v1",
             payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],

@@ -735,6 +735,51 @@ class ResearchDocGuardrailTests(unittest.TestCase):
                 with self.subTest(file=path, phrase=phrase):
                     self.assertIn(phrase, compact)
 
+    def test_static_reversing_artifacts_do_not_read_as_current_runtime_or_sdk_readiness(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        direct_route = (
+            REPO_ROOT / "docs/research/2026-06-03-direct-route-approved-runtime-binding.md"
+        ).read_text(encoding="utf-8")
+        rc_gate = (
+            REPO_ROOT / "docs/research/2026-05-30-rc-second-source-release-gate-check.md"
+        ).read_text(encoding="utf-8")
+        head_refresh = (
+            REPO_ROOT / "docs/research/2026-05-30-head-rc-second-source-refresh-gap.md"
+        ).read_text(encoding="utf-8")
+        minimal = (
+            REPO_ROOT / "docs/research/2026-05-29-minimal-second-source-readiness.md"
+        ).read_text(encoding="utf-8")
+        capability_map = (
+            REPO_ROOT / "docs/research/2026-05-30-v1-core-capability-map.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("broader production-ready Obelisk core", capability_map)
+        self.assertIn("broader evidence-gated Obelisk core", capability_map)
+
+        self.assertIn("not a current evidence artifact", normalized(direct_route))
+        self.assertIn("does not record a current approved runtime target", normalized(direct_route))
+
+        readme_compact = normalized(readme)
+        self.assertIn("Historical module runtime hit", readme_compact)
+        self.assertIn("not current approved runtime evidence", readme_compact)
+
+        for path, text in (
+            ("2026-05-30-rc-second-source-release-gate-check.md", rc_gate),
+            ("2026-05-30-head-rc-second-source-refresh-gap.md", head_refresh),
+            ("2026-05-29-minimal-second-source-readiness.md", minimal),
+        ):
+            compact = normalized(text)
+            with self.subTest(path=path):
+                self.assertRegex(compact, r"promotion_gate(?:\.| )ready=true")
+                self.assertIn("not current approved runtime evidence", compact)
+                self.assertIn("public SDK promotion", compact)
+                self.assertIn("stable production readiness", compact)
+
+        self.assertIn("historical RC layout-gate output", normalized(rc_gate))
+        self.assertIn("RC UFunction layout-gate output", normalized(head_refresh))
+        self.assertIn("named-target-set layout readiness only", normalized(minimal))
+        self.assertIn("promotion_gate.promotion_ready=false", minimal)
+
     def test_inventory_mission_route_lock_stays_internal_and_non_promoting(self) -> None:
         readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
         next_candidate = (

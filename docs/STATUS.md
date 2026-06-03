@@ -171,6 +171,9 @@ The current executable SDK gate reports `stable_claim_allowed=false` and the can
 P0 route blocker `approved_runtime_evidence_missing`; until the gate output changes, do
 not reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin
 Hub planning, or side-lane accounting as public SDK readiness or a stable SDK claim.
+Package-shape checks also do not authorize runtime readiness, live-op approval, Plugin Hub
+readiness/publication, support-tier activation, public module coverage, or production
+stable SDK wording.
 
 Current completion snapshot for agents and contributors:
 

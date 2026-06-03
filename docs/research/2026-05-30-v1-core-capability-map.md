@@ -2,7 +2,7 @@
 
 ## Objective
 
-Define the post-`v0.1.0-rc.2` direction toward a broader production-ready Obelisk core
+Define the post-`v0.1.0-rc.2` direction toward a broader evidence-gated Obelisk core
 that can later support Obelisk-native Linux plugins for common ArkApi-style modding
 needs without exposing UE4 internals or unsafe memory-derived handles.
 

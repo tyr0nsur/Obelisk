@@ -3724,7 +3724,7 @@ def complete_sdk_minimum_promoted_demand_family_gaps(
     satisfied_by: dict[str, str] = {}
     for blocker_id in sorted(CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES):
         surface = surfaces_by_id.get(blocker_id)
-        if surface and surface.get("status") == "promoted":
+        if surface and surface.get("status") == "promoted" and surface_has_promotion_evidence(surface):
             continue
         equivalent_id = explicit_completion_equivalent_satisfies(
             blocker_id,
@@ -3791,11 +3791,22 @@ def installed_sdk_package_shape_guardrail_drift(manifest: dict[str, Any]) -> lis
             for key, item in value.items():
                 key_path = f"{path}.{key}" if path else str(key)
                 key_name = normalized_completion_claim_key(key)
+                path_suffixes = normalized_claim_path_suffixes(key_path)
                 if (
                     key_name in forbidden_positive_keys
                     or key_name in forbidden_alias_keys
                     or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
-                ) and positive_installed_claim_value(key_name, item):
+                    or any(suffix in forbidden_positive_keys for suffix in path_suffixes)
+                    or any(suffix in forbidden_alias_keys for suffix in path_suffixes)
+                    or any(BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(suffix) for suffix in path_suffixes)
+                ) and (
+                    positive_installed_claim_value(key_name, item)
+                    or any(
+                        positive_installed_claim_value(suffix, item)
+                        for suffix in path_suffixes
+                        if suffix in forbidden_alias_keys
+                    )
+                ):
                     drift.append(f"positive_claim:{key_path}")
                 visit(item, key_path)
         elif isinstance(value, list):
@@ -3803,6 +3814,18 @@ def installed_sdk_package_shape_guardrail_drift(manifest: dict[str, Any]) -> lis
                 visit(item, f"{path}[{index}]")
 
     visit(installed_shape)
+    for claim_path in secondary_report_completion_claims_without_blocker(
+        {
+            "schema": "obelisk.installed-sdk-package-shape.v1",
+            "blockers": [],
+            "installed_sdk_package_shape": installed_shape,
+        }
+    ):
+        if claim_path.startswith("installed_sdk_package_shape."):
+            claim_path = claim_path[len("installed_sdk_package_shape.") :]
+        drift_item = f"positive_claim:{claim_path}"
+        if drift_item not in drift:
+            drift.append(drift_item)
     return drift
 
 

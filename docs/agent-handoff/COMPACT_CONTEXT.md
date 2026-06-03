@@ -1983,6 +1983,21 @@ priorities, and do not use history files as the active source of truth.
   JSON valid/planning-only at `approved_runtime_evidence_missing`, and SDK JSON blocked
   with SDK `0/12`, P0 `0/4`, package-shape drift empty, stable false. No `/servidor/ark`
   writes, server/runtime tools, marker/env edits, Discord, GitHub, tags, or publication.
+- 2026-06-03 SDK/P0 non-claim hardening checkpoint: four lead-delegated workers audited
+  P0 route evidence, SDK completion false positives, static/research boundaries, and
+  runtime/plugin ABI cleanup. Integrated changes require approved-runtime wrapper
+  diagnosis to reject delegated checker reports where `ready` is not true; retarget the
+  first-evidence approved-runtime tests to the approved safe temp workspace environment;
+  require minimum demand-family surfaces to have structured promotion evidence before
+  counting toward complete SDK claims; reject nested path-suffix, alias, and split
+  descriptor/status package-shape completion claims; clarify historical/layout research
+  artifacts as non-current runtime, SDK, production, Plugin Hub, support-tier, and stable
+  evidence; and keep runtime/ABI unchanged after focused audit. Validation: P0
+  first-evidence plus approved-evidence suites 120 OK, focused SDK completion regressions
+  4 OK, research/status guardrails 37 OK, route JSON valid/planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  package-shape drift empty, stable false. No `/servidor/ark` writes, server/runtime
+  tools, marker/env edits, Discord, GitHub, tags, or publication.
 
 ## Agent Coordination
 

@@ -21,6 +21,9 @@ current four-target-set RC evidence record; current checks require
 12 snapshots.
 It does not promote Inventory or Items SDKs, `ResourceHandle`, object identity, lookup,
 mutation, return override, GObjects promotion, or additional gameplay module APIs.
+Any `promotion_gate ready=true` output below is historical RC layout-gate output for the
+named UFunction target sets and then-current ref only. It is not current approved runtime
+evidence, public SDK promotion, or stable production readiness.
 
 ## Inputs
 
@@ -68,6 +71,10 @@ scripts/check_release_readiness.sh \
 
 The smoke check reported:
 
+The following stdout is preserved as historical tool output. In this context,
+`promotion_gate ready=true` means only that the RC second-source layout gate passed for
+the listed target sets.
+
 ```text
 readiness targets=9 comparable=9 blocked=0 second_source_status=compared gate_mode=second_source_promotion
 promotion_gate ready=true blockers=none
@@ -76,7 +83,7 @@ ufunction:sdk_inventory targets=2 comparable=2 blocked=0 second_source=accepted:
 ufunction:sdk_structures targets=6 comparable=6 blocked=0 second_source=accepted:6,rejected:0,inconclusive:0,missing:0
 ```
 
-`scripts/check_release_readiness.sh --require-second-source-readiness` completed:
+Historical release-script stdout included:
 
 ```text
 Core-first release readiness and gameplay/module second-source promotion checks completed.

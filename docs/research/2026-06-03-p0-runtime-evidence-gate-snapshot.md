@@ -715,6 +715,58 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## SDK/P0 Non-Claim Hardening Checkpoint
+
+The next supervised integration round tightened offline false-positive routes
+without changing the current P0 blocker.
+
+Integrated changes:
+
+- The first-evidence approved-runtime wrapper now rejects delegated approved
+  checker reports unless the delegated report has `ready=true`.
+- First-evidence approved-runtime tests reuse the approved safe temp workspace
+  environment so replay guardrails exercise the same offline root contract as the
+  approved evidence checker.
+- SDK completion accounting now requires structured promotion evidence before a
+  minimum demand-family surface can count as promoted for complete SDK claims.
+- Installed package-shape guardrails reject nested path-suffix claims, alias
+  claims, and split descriptor/status/progress claims.
+- Research and status notes now mark historical stdout, layout readiness, and
+  package-shape artifacts as non-current runtime evidence and non-SDK/non-stable
+  release evidence.
+- Runtime/plugin ABI audit found no callback ownership, unload cleanup, or ABI
+  comment/test gap requiring code changes.
+
+Observed unchanged state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, current blocker `approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with
+  `ready=false`, SDK completion `0/12`, P0 dependency chain `0/4`,
+  `stable_claim_allowed=false`, package-shape drift empty, and current route
+  blocker `approved_runtime_evidence_missing`.
+
+Validation remained offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest
+  scripts.test_check_player_identity_first_evidence_readiness
+  scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed, 120 tests.
+- Focused SDK completion regressions for nested/split package claims, invalid
+  promoted dependency-chain accounting, split secondary reports, and package
+  shape non-claim evidence passed, 4 tests.
+- Research/status guardrails passed, 37 tests.
+
+Non-claims:
+
+- This checkpoint does not create approved runtime evidence, clear
+  `approved_runtime_evidence_missing`, promote player identity, unlock
+  permissions/admin, unlock command response surfaces, authorize complete/full/
+  production/stable SDK wording, or authorize server/runtime/Discord/GitHub
+  operations.
+
 ## Runtime-Evidence Test Safety And Public Contract Hardening Round
 
 The next supervised four-worker round addressed offline safety and false-positive SDK

@@ -91,6 +91,9 @@ The published `v0.1.0-rc.2` tag used the same regeneration path for commit `1a7c
 
 The final published `v0.1.0-rc.2` gate added `item-return-only-policy-slice`, so the
 release-scope total is 12 snapshots across the four public RC target sets.
+Any `promotion_gate ready=true` output in this note is RC UFunction layout-gate output
+for the recorded ref and target sets only. It is not current approved runtime evidence,
+public SDK promotion, or stable production readiness.
 
 ```text
 root=/tmp/obelisk-head-rc-ufunction-second-source-root-1a7cd98
