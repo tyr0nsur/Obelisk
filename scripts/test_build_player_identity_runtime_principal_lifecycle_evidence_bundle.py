@@ -130,6 +130,11 @@ def preflight_payload(
         "ready": True,
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
+        "request_pack_counts_as_approved_runtime_evidence": False,
+        "preflight_counts_as_approved_runtime_evidence": False,
+        "completed_receipt_counts_as_approved_runtime_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
         "runtime_ready": False,
         "public_sdk_ready": False,
         "public_abi_ready": False,
@@ -503,6 +508,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["request_pack_ready"])
         self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "copied_log_and_window_manifest_required")
         self.assertEqual(
@@ -564,7 +570,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["request_pack_ready"])
         self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["preflight_counts_as_approved_runtime_evidence"])
+        self.assertFalse(report["completed_receipt_counts_as_approved_runtime_evidence"])
         self.assertFalse(report["server_operations_authorized"])
         self.assertFalse(report["runtime_work_authorized"])
         self.assertFalse(report["promotion_ready"])
@@ -594,7 +603,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             [artifact["present"] for artifact in report["next_required_artifacts"]],
             [True, True, True, True, True, True, True, True, False],
         )
-        self.assertTrue(report["next_required_artifacts"][-1]["satisfies_approved_runtime_evidence"])
+        self.assertFalse(report["next_required_artifacts"][-1]["satisfies_approved_runtime_evidence"])
         self.assertNotIn("request_pack_check_failed", report["blockers"])
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])
@@ -619,12 +628,14 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(preflight.returncode, 0)
         report = json.loads(preflight.stdout)
         self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertTrue(report["approved_runtime_evidence_present"])
         self.assertTrue(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checked"])
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["ready"])
         self.assertEqual(report["inputs"]["approved_runtime_manifest_check"]["exit_code"], 0)
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checker_ready"])
+        self.assertTrue(report["next_required_artifacts"][-1]["satisfies_approved_runtime_evidence"])
 
     def test_preflight_rejects_approved_manifest_copied_from_different_run(self) -> None:
         old_window_start = globals()["WINDOW_START"]
@@ -662,6 +673,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertTrue(report["bundle_inputs_ready"])
         self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
         self.assertIn("approved_runtime_manifest_run_id_mismatch", report["blockers"])
@@ -696,6 +708,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         report = json.loads(preflight.stdout)
         self.assertFalse(report["ready"])
         self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
         self.assertIn("window_manifest_check_failed", report["blockers"])

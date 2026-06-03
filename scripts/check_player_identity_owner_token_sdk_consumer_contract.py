@@ -103,6 +103,23 @@ REQUIRED_NON_CLAIMS = {
     "does not resolve abi.layout, sdk.consumer, lifecycle.owner_cleanup, separation.downstream_surfaces, runtime.lifecycle_evidence, public_sdk, or v1_completion",
     "does not promote permissions/admin, command response, commands/replies, lookup, persistence, mutation, return override, ResourceHandle identity, or send-chat identity",
 }
+FORBIDDEN_STRUCTURED_CLAIM_KEYS = {
+    "acceptedforcontractreview",
+    "promotionready",
+    "publicabiready",
+    "publicabiavailable",
+    "publiccallbackabinow",
+    "publiccapabilitybitsnow",
+    "publicheaderallowed",
+    "publicheadersymbolsnow",
+    "publicsdkready",
+    "publicsdkv1completionclaim",
+    "runtimeenabled",
+    "runtimeready",
+    "stableclaimallowed",
+    "v1completionevidence",
+    "v1completionready",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +143,36 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **details: Any)
     item = {"reason": reason, "label": label}
     item.update(details)
     blockers.append(item)
+
+
+def normalized_key(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def truthy_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "yes", "ready", "allowed", "available", "enabled", "promoted"}
+    if isinstance(value, list):
+        return bool(value)
+    return False
+
+
+def collect_structured_overclaims(value: Any, path: str = "$") -> list[dict[str, Any]]:
+    claims: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            if normalized_key(str(key)) in FORBIDDEN_STRUCTURED_CLAIM_KEYS and truthy_claim_value(item):
+                claims.append({"path": item_path, "key": key, "value": item})
+            claims.extend(collect_structured_overclaims(item, item_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(collect_structured_overclaims(item, f"{path}[{index}]"))
+    return claims
 
 
 def string_set(payload: dict[str, Any], key: str) -> set[str]:
@@ -332,6 +379,25 @@ def validate_manifest(payload: dict[str, Any], preflight_payload: dict[str, Any]
         require_strings(downstream, "must_remain_blocked", REQUIRED_BLOCKED_DOWNSTREAM, blockers)
         require_strings(downstream, "required_checks", REQUIRED_DOWNSTREAM_CHECKS, blockers)
 
+    nested_claims = [
+        claim
+        for claim in collect_structured_overclaims(
+            {
+                "abi_layout": payload.get("abi_layout"),
+                "sdk_consumer": payload.get("sdk_consumer"),
+                "lifecycle_owner_cleanup": payload.get("lifecycle_owner_cleanup"),
+                "downstream_separation": payload.get("downstream_separation"),
+            }
+        )
+    ]
+    if nested_claims:
+        add(
+            blockers,
+            "nested_public_runtime_or_completion_claims",
+            "$",
+            claims=nested_claims,
+        )
+
 
 def build_report(
     payload: dict[str, Any],
@@ -365,6 +431,12 @@ def build_report(
         "lifecycle_owner_cleanup": payload.get("lifecycle_owner_cleanup", {}),
         "downstream_separation": payload.get("downstream_separation", {}),
         "public_abi_preflight_candidate": preflight_report,
+        "public_or_runtime_claims": [
+            claim
+            for detail in blockers
+            if detail.get("reason") == "nested_public_runtime_or_completion_claims"
+            for claim in detail.get("claims", [])
+        ],
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": payload.get("non_claims", []),

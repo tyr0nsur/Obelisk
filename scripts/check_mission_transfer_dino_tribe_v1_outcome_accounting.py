@@ -80,26 +80,47 @@ MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
     "recognition-only",
 ) + MISSION_COPIED_TARGETS + MISSION_RECOGNITION_ONLY_TARGETS + MISSION_COPIED_BOOL_FIELDS + MISSION_REDACTED_RECOGNITION_FIELDS
 MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
+    "abi_ready",
+    "callback_ready",
+    "capability_bit_ready",
+    "capability_ready",
+    "descriptor_ready",
     "dino_sdk_ready",
+    "identity_available",
     "identity_ready",
+    "lookup_available",
     "lookup_ready",
     "mission_sdk_ready",
+    "module_ready",
+    "module_sdk_ready",
+    "mutation_available",
     "mutation_ready",
     "ownership_ready",
     "promotion_ready",
     "public_abi_ready",
     "public_api_ready",
+    "public_callback_ready",
+    "public_capability_ready",
+    "public_descriptor_ready",
     "public_dino_sdk_ready",
     "public_buff_sdk_ready",
+    "public_module_ready",
+    "public_module_sdk_ready",
     "public_mission_sdk_ready",
     "public_sdk_ready",
     "public_transfer_sdk_ready",
     "public_tribe_sdk_ready",
+    "release_readiness",
+    "release_ready",
+    "resource_handle_available",
     "resource_handle_ready",
+    "return_override_available",
     "return_override_ready",
     "runtime_observer_approved",
+    "runtime_observer_ready",
     "runtime_hook_ready",
     "runtime_ready",
+    "v1_accounted",
     "transfer_sdk_ready",
     "tribe_sdk_ready",
     "v1_complete",
@@ -304,12 +325,24 @@ NON_PROMOTIONAL_PATH_MARKERS = (
 )
 FORBIDDEN_CLAIM_PATTERNS = (
     r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+(?:SDK|API)\b",
+    r"\bpublic\s+(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+"
+    r"(?:SDK|API|module|surface|callback|callbacks|descriptor|descriptors|capability|capabilities|"
+    r"capability\s+bit|C\s+ABI|ABI)\b",
+    r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+"
+    r"(?:module|surface|callback|callbacks|descriptor|descriptors|capability|capabilities|"
+    r"capability\s+bit|C\s+ABI|ABI)\b",
+    r"\bpublic\s+(?:SDK|API|ABI|module|surface|callback|descriptor|capability|capability\s+bit|C\s+ABI)\b",
+    r"\b(?:callback|descriptor|capability|capability\s+bit)\s+"
+    r"(?:is\s+)?(?:published|available|ready|enabled)\b",
     r"\bidentity\b",
     r"\blookup\b",
     r"\bmutation\b",
     r"\breturn[- ]override\b",
+    r"\bruntime\s+(?:observer|hook|wiring|dispatch|dispatcher|callback)\b",
     r"\bruntime\s+hook\b",
     r"\bResourceHandle\b",
+    r"\bResource\s+Handle\b",
+    r"\bv1\s+(?:completion|complete|ready|release|promotion|accounted)\b",
     r"\bteleport\s*/\s*spawn\b",
     r"\bteleport[- ]spawn\b",
     r"\bteleport\b",
@@ -899,6 +932,36 @@ def validate_candidate_leaf_evidence(
             )
 
 
+def validate_candidate_leaf_metadata(
+    leaf_id: str,
+    leaf: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    status = leaf.get("status") if isinstance(leaf.get("status"), str) else "missing"
+    if status == "promoted":
+        return
+    label = f"$.leaf_decision_units[{leaf_id}]"
+    ready_reason = "mission_leaf_candidate_ready_overclaim" if leaf_id == "mission" else "leaf_candidate_ready_overclaim"
+    claim_reason = (
+        "mission_leaf_candidate_metadata_forbidden_claim"
+        if leaf_id == "mission"
+        else "leaf_candidate_metadata_forbidden_claim"
+    )
+    for claim in forbidden_claims("\n".join(flattened_strings(leaf))):
+        add(blockers, claim_reason, label, leaf=leaf_id, claim=claim)
+    for claim in candidate_ready_claims("\n".join(flattened_strings(leaf))):
+        add(blockers, ready_reason, label, leaf=leaf_id, claim=claim)
+
+
+def non_counting_allowed_v1_outcome(leaf: dict[str, Any], accounted_by: str | None) -> str | None:
+    if accounted_by == "promoted_leaf_evidence":
+        value = leaf.get("allowed_v1_outcome")
+        return value if isinstance(value, str) else None
+    if accounted_by in {"manifest_leaf_exclusion", "release_statement_leaf_exclusion"}:
+        return "explicitly excluded by name from v1"
+    return "not counted for v1; requires future promoted evidence or explicit leaf exclusion"
+
+
 def build_mission_leaf_blocker_accounting(
     leaves: dict[str, dict[str, Any]],
     leaf_family_accounting: dict[str, Any],
@@ -1196,7 +1259,7 @@ def build_leaf_family_accounting(
             "release_statement_promoted": bool(outcome["leaf_promotions"].get(leaf_id)),
             "current_evidence": string_list(leaf.get("current_evidence")),
             "current_blocker": leaf.get("current_blocker") if isinstance(leaf.get("current_blocker"), str) else None,
-            "allowed_v1_outcome": leaf.get("allowed_v1_outcome") if isinstance(leaf.get("allowed_v1_outcome"), str) else None,
+            "allowed_v1_outcome": non_counting_allowed_v1_outcome(leaf, accounted_by),
             "missing_public_gates": [] if accounted_by == "promoted_leaf_evidence" else missing_public_gates,
         }
 
@@ -1335,7 +1398,9 @@ def build_report(
     leaves = leaf_map(surface, blockers)
     outcome = release_statement_outcome(release_statement)
     for leaf_id in REQUIRED_LEAVES:
-        validate_candidate_leaf_evidence(surface, leaf_id, leaves.get(leaf_id, {}), blockers)
+        leaf = leaves.get(leaf_id, {})
+        validate_candidate_leaf_evidence(surface, leaf_id, leaf, blockers)
+        validate_candidate_leaf_metadata(leaf_id, leaf, blockers)
 
     manifest_umbrella_excluded = surface.get("status") == "excluded" and all(
         leaves.get(leaf_id, {}).get("status") == "excluded" for leaf_id in REQUIRED_LEAVES

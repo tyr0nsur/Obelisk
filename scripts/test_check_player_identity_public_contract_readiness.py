@@ -1123,6 +1123,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
             "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
             "public_callback_abi_now": ["ObeliskPlayerIdentityCallback"],
+            "claims": {
+                "publicHeaderSymbols": ["ObeliskPlayerPrincipalEvent"],
+                "capabilityBits": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+                "callbackAbi": ["ObeliskPlayerIdentityCallback"],
+            },
             "sdk_consumer_contract": {
                 "accepted_for_contract_review": True,
                 "public_sdk_ready": True,
@@ -1138,6 +1143,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         reasons = [blocker["reason"] for blocker in blockers]
         self.assertIn("nested_readiness_flag_not_false", reasons)
         self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
+        self.assertIn("nested_capability_bits_not_empty", reasons)
+        self.assertIn("nested_callback_abi_not_empty", reasons)
+        self.assertFalse(report["accepted_for_candidate_review"])
         self.assertFalse(report["accepted_for_contract_review"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])

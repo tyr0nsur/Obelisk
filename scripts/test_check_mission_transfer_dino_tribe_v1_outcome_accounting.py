@@ -145,6 +145,13 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("buff_leaf_readiness_checker", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertNotIn("refreshed_compact_evidence", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
+        for leaf_id in REQUIRED_LEAVES:
+            self.assertEqual(
+                accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"],
+                "not counted for v1; requires future promoted evidence or explicit leaf exclusion",
+            )
+            self.assertNotIn("C ABI surface", accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"])
+            self.assertNotIn("promoted as", accounting["leaf_family_gaps"][leaf_id]["allowed_v1_outcome"])
 
         mission = report["mission_leaf_blocker_accounting"]
         self.assertEqual(
@@ -768,6 +775,68 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         }
         self.assertIn("ResourceHandle", claims)
         self.assertIn("lookup", claims)
+
+    def test_candidate_leaf_rejects_public_module_alias_true_fields(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["dino_policy"]["evidence"] = {
+            "public_module_sdk_ready": True,
+            "callback_ready": True,
+            "descriptor_ready": True,
+            "capability_ready": True,
+            "resource_handle_available": True,
+            "v1_accounted": True,
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim"
+        }
+        self.assertEqual(
+            fields,
+            {
+                "$.leaf_decision_units[dino_policy].evidence.public_module_sdk_ready",
+                "$.leaf_decision_units[dino_policy].evidence.callback_ready",
+                "$.leaf_decision_units[dino_policy].evidence.descriptor_ready",
+                "$.leaf_decision_units[dino_policy].evidence.capability_ready",
+                "$.leaf_decision_units[dino_policy].evidence.resource_handle_available",
+                "$.leaf_decision_units[dino_policy].evidence.v1_accounted",
+            },
+        )
+
+    def test_candidate_leaf_rejects_metadata_public_runtime_abi_alias_claims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["buff_status"]["allowed_v1_outcome"] = (
+            "Public Buff module SDK is available; Buff C ABI callback capability is published; "
+            "runtime observer wiring is available; Resource Handle identity is usable; v1 completion follows."
+        )
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_metadata_forbidden_claim", report["blockers"])
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_metadata_forbidden_claim"
+        }
+        self.assertIn("Public Buff module", claims)
+        self.assertIn("Buff C ABI", claims)
+        self.assertIn("capability is published", claims)
+        self.assertIn("runtime observer", claims)
+        self.assertIn("Resource Handle", claims)
+        self.assertIn("identity", claims)
+        self.assertIn("v1 completion", claims)
 
     def test_candidate_leaf_rejects_surface_level_per_leaf_overclaims(self) -> None:
         manifest = load_manifest()

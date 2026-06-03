@@ -191,6 +191,11 @@ PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
         "runtime_work_authorized_by_template",
         "generated_template_authorizes_runtime",
         "request_pack_acceptance_authorizes_runtime",
+        "request_pack_counts_as_approved_runtime_evidence",
+        "preflight_counts_as_approved_runtime_evidence",
+        "completed_receipt_counts_as_approved_runtime_evidence",
+        "approved_runtime_evidence_present",
+        "approved_runtime_evidence_ready",
     )
 )
 PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
@@ -203,6 +208,11 @@ PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
         "promotion_ready",
         "public_header_allowed",
         "v1_completion_ready",
+        "request_pack_counts_as_approved_runtime_evidence",
+        "preflight_counts_as_approved_runtime_evidence",
+        "completed_receipt_counts_as_approved_runtime_evidence",
+        "approved_runtime_evidence_present",
+        "approved_runtime_evidence_ready",
     )
 )
 PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(

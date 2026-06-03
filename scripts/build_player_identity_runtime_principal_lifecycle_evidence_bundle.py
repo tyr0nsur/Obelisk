@@ -484,6 +484,7 @@ def next_required_preflight_artifacts(
     preflight_pre: dict[str, Any],
     preflight_post: dict[str, Any],
     approved_bundle: dict[str, Any],
+    approved_bundle_check: dict[str, Any],
 ) -> list[dict[str, Any]]:
     operator_request = dict(request_pack)
     request_path = request_pack.get("path")
@@ -545,7 +546,7 @@ def next_required_preflight_artifacts(
             "approved_runtime_principal_lifecycle_evidence_manifest",
             approved_bundle,
             "approved_runtime_evidence_missing",
-            True,
+            bool(approved_bundle_check.get("ready")),
         ),
     ]
     artifacts: list[dict[str, Any]] = []
@@ -737,7 +738,10 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "request_pack_ready": bool(request_pack_ready),
         "request_pack_is_runtime_evidence": False,
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
+        "approved_runtime_evidence_present": bool(approved_bundle_check["ready"]),
         "approved_runtime_evidence_ready": bool(approved_bundle_check["ready"]),
+        "preflight_counts_as_approved_runtime_evidence": False,
+        "completed_receipt_counts_as_approved_runtime_evidence": False,
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "promotion_ready": False,
@@ -783,6 +787,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             preflight_pre,
             preflight_post,
             approved_bundle,
+            approved_bundle_check,
         ),
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,

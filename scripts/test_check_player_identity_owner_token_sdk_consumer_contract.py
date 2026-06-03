@@ -156,6 +156,29 @@ class PlayerIdentityOwnerTokenSdkConsumerContractTests(unittest.TestCase):
         self.assertIn("public_capability_bits_now_not_empty", preflight_blockers)
         self.assertIn("public_header_identity_or_principal_symbols_detected", preflight_blockers)
 
+    def test_rejects_nested_public_runtime_or_completion_overclaims(self) -> None:
+        payload = self.manifest()
+        payload["sdk_consumer"]["public_abi_available"] = "yes"
+        payload["lifecycle_owner_cleanup"]["stable_claim_allowed"] = True
+        payload["downstream_separation"]["nested"] = {
+            "runtime_ready": True,
+            "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
+        }
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nested_public_runtime_or_completion_claims", report["blockers"])
+        claim_paths = {claim["path"] for claim in report["public_or_runtime_claims"]}
+        self.assertIn("$.sdk_consumer.public_abi_available", claim_paths)
+        self.assertIn("$.lifecycle_owner_cleanup.stable_claim_allowed", claim_paths)
+        self.assertIn("$.downstream_separation.nested.runtime_ready", claim_paths)
+        self.assertIn("$.downstream_separation.nested.public_header_symbols_now", claim_paths)
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1_completion_evidence"])
+
 
 if __name__ == "__main__":
     unittest.main()

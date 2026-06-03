@@ -130,6 +130,37 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
 
+    def test_rejects_public_overclaim_aliases(self) -> None:
+        payload = self.manifest()
+        payload["promotion"] = "ready"
+        payload["v1_completion_ready"] = True
+        payload["public_sdk_v1_completion_claim"] = True
+        payload["claims"] = {
+            "publicHeaderSymbols": ["ObeliskPlayerPrincipalEvent"],
+            "capabilityBits": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+            "callbackAbi": ["ObeliskPlayerIdentityCallback"],
+            "ready": True,
+        }
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_readiness_claim_not_false", report["blockers"])
+        self.assertIn("public_artifact_claim_not_empty", report["blockers"])
+        labels = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] in {"public_readiness_claim_not_false", "public_artifact_claim_not_empty"}
+        }
+        self.assertIn("$.promotion", labels)
+        self.assertIn("$.v1_completion_ready", labels)
+        self.assertIn("$.public_sdk_v1_completion_claim", labels)
+        self.assertIn("$.claims.publicHeaderSymbols", labels)
+        self.assertIn("$.claims.capabilityBits", labels)
+        self.assertIn("$.claims.callbackAbi", labels)
+        self.assertIn("$.claims.ready", labels)
+
     def test_rejects_sdk_consumer_contract_overclaim_or_weakened_rules(self) -> None:
         payload = self.manifest()
         payload["sdk_consumer_contract"] = {

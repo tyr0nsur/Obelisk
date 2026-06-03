@@ -96,6 +96,37 @@ REQUIRED_NON_CLAIMS = {
     "does not resolve abi.public_pod_contract, abi.layout, sdk.consumer, lifecycle.owner_cleanup, or v1_completion",
     "does not promote permissions/admin, command response, commands/replies, lookup, persistence, mutation, return override, or send-chat identity",
 }
+PUBLIC_READINESS_FALSE_KEYS = {
+    "accepted_for_contract_review",
+    "promotion",
+    "promotion_ready",
+    "public_abi_ready",
+    "public_contract_allowed",
+    "public_header_allowed",
+    "public_header_ready",
+    "public_sdk_ready",
+    "public_sdk_v1_completion_claim",
+    "public_sdk_v1_completion_ready",
+    "ready",
+    "runtime_ready",
+    "v1_completion_claim",
+    "v1_completion_evidence",
+    "v1_completion_ready",
+    "v1_ready",
+}
+PUBLIC_EMPTY_LIST_KEYS = {
+    "callback_abi",
+    "callback_symbols",
+    "capability_bits",
+    "header_symbols",
+    "public_callback_abi",
+    "public_callback_abi_now",
+    "public_callbacks",
+    "public_capability_bits",
+    "public_capability_bits_now",
+    "public_header_symbols",
+    "public_header_symbols_now",
+}
 PUBLIC_HEADER_TOKEN_RE = re.compile(
     r"identity|principal|steam_?id|steamid|eos|unique_?net|"
     r"player_?(?:handle|data|id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
@@ -136,6 +167,22 @@ def string_set(payload: dict[str, Any], key: str) -> set[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return set()
     return set(value)
+
+
+def normalize_contract_key(key: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def walk_json(value: Any, path: str = "$") -> list[tuple[str, Any]]:
+    items = [(path, value)]
+    if isinstance(value, dict):
+        for key, item in value.items():
+            items.extend(walk_json(item, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            items.extend(walk_json(item, f"{path}[{index}]"))
+    return items
 
 
 def field_names(layout: dict[str, Any]) -> list[str]:
@@ -335,7 +382,20 @@ def scan_public_header(path: Path, blockers: list[dict[str, Any]]) -> dict[str, 
     return {"path": str(path), "readable": True, "detected_player_identity_tokens": detected}
 
 
+def validate_no_public_overclaim_aliases(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    for path, item in walk_json(payload):
+        key = path.rsplit(".", 1)[-1]
+        if "[" in key:
+            continue
+        normalized_key = normalize_contract_key(key)
+        if normalized_key in PUBLIC_READINESS_FALSE_KEYS and item is not False:
+            add(blockers, "public_readiness_claim_not_false", path, value=item)
+        if normalized_key in PUBLIC_EMPTY_LIST_KEYS and item != []:
+            add(blockers, "public_artifact_claim_not_empty", path, value=item)
+
+
 def validate_manifest(payload: dict[str, Any], private_payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    validate_no_public_overclaim_aliases(payload, blockers)
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema", value=payload.get("schema"))
     if payload.get("surface") != SURFACE:

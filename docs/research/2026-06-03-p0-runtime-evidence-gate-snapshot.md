@@ -361,3 +361,34 @@ valid/planning-only, release-statement scope check, SDK JSON blocked by design,
 py_compile, and `git diff --check`. The stable state remains
 `current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
 P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Runtime Preflight, ABI Candidate, And Dependency Certificate Hardening
+
+The next supervised 4-agent round closed additional offline replay and P0
+dependency-accounting gaps without running a server or changing the blocker:
+
+- Runtime request/preflight sidecars now explicitly keep request-pack,
+  preflight, completed-receipt, and approved-runtime-evidence counters false.
+  Window-manifest replay requires those false counters, and evidence-bundle
+  preflight reports approved runtime evidence present only after the
+  approved-evidence checker accepts it.
+- Player identity public ABI preflight, public-contract gap/readiness, and the
+  owner-token SDK consumer contract reject nested or alias public header,
+  capability, callback ABI, public SDK, runtime, promotion, and v1 claims while
+  staying candidate-only.
+- SDK completion now requires hash-bound promoted dependency certificates for
+  `obelisk.permissions_admin.v1` before `obelisk.command_chat_response_path.v1`
+  can consume it, and for `obelisk.command_chat_response_path.v1` before
+  `obelisk.commands_replies.v1` can consume it. Certificates must match active
+  promoted surface-record SHA-256 values; loose inline downstream evidence does
+  not substitute.
+- Mission/Transfer/Dino/Tribe/Buff side-lane accounting rejects module,
+  callback, descriptor, capability, C ABI, `ResourceHandle`, and v1-accounted
+  aliases while remaining candidate-only and non-counting.
+
+Validated offline: full SDK completion suite 221, identity ABI/contract/
+owner-token suite 96, runtime/preflight suite 204, side-lane accounting 25,
+preflight shell, route JSON valid/planning-only, SDK JSON blocked by design,
+py_compile, and `git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.

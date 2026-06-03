@@ -69,6 +69,12 @@ MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES = {
 PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = (
     "obelisk.player-identity-promotion-certificate.v1"
 )
+PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_SCHEMA = (
+    "obelisk.permissions-admin-promotion-certificate.v1"
+)
+COMMAND_RESPONSE_PROMOTION_CERTIFICATE_SCHEMA = (
+    "obelisk.command-chat-response-path-promotion-certificate.v1"
+)
 PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -3958,6 +3964,10 @@ def surface_record_sha256_for_certificate(surface: dict[str, Any]) -> str:
 
 
 def active_player_identity_surface_record_sha256(manifest_path: Path) -> str | None:
+    return active_promoted_surface_record_sha256(manifest_path, "obelisk.player_identity.v1")
+
+
+def active_promoted_surface_record_sha256(manifest_path: Path, surface_id: str) -> str | None:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -3968,7 +3978,7 @@ def active_player_identity_surface_record_sha256(manifest_path: Path) -> str | N
     for surface in surfaces:
         if (
             isinstance(surface, dict)
-            and surface.get("id") == "obelisk.player_identity.v1"
+            and surface.get("id") == surface_id
             and surface.get("status") == "promoted"
         ):
             return surface_record_sha256_for_certificate(surface)
@@ -4005,7 +4015,9 @@ def player_identity_promotion_certificate_missing(
         missing.append("player_identity_promotion_certificate:evidence_missing")
     else:
         active_surface_hash = active_player_identity_surface_record_sha256(manifest_path)
-        if active_surface_hash is not None:
+        if active_surface_hash is None:
+            missing.append("player_identity_promotion_certificate:surface_record_missing_or_unpromoted")
+        else:
             certificate_surface_hash = identity_evidence.get("reviewed_surface_record_sha256")
             if (
                 not isinstance(certificate_surface_hash, str)
@@ -4020,6 +4032,107 @@ def player_identity_promotion_certificate_missing(
         for reason in dependency_missing:
             missing.append(f"player_identity_{reason}")
     return missing
+
+
+def promoted_dependency_certificate_missing(
+    evidence: dict[str, Any],
+    *,
+    certificate_key: str,
+    schema: str,
+    surface_id: str,
+    v1_dependency_chain_position: int,
+    required_by_surface: str,
+    required_by_v1_dependency_chain_position: int,
+    dependency_reason_prefix: str,
+    dependency_validator: Any,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
+    missing: list[str] = []
+    certificate, certificate_errors = load_hash_bound_json_artifact_binding(
+        evidence.get(certificate_key),
+        certificate_key,
+    )
+    if certificate_errors:
+        return certificate_errors
+
+    assert certificate is not None
+    if not (
+        certificate.get("schema") == schema
+        and certificate.get("surface_id") == surface_id
+        and certificate.get("promotion_status") == "promoted"
+        and certificate.get("v1_dependency_chain") == list(CANONICAL_V1_DEPENDENCY_SEQUENCE)
+        and certificate.get("v1_dependency_chain_position") == v1_dependency_chain_position
+        and certificate.get("required_by_surface") == required_by_surface
+        and certificate.get("required_by_v1_dependency_chain_position")
+        == required_by_v1_dependency_chain_position
+    ):
+        missing.append(f"{certificate_key}:fields_invalid")
+
+    dependency_evidence = certificate.get("evidence")
+    if not isinstance(dependency_evidence, dict):
+        missing.append(f"{certificate_key}:evidence_missing")
+        return missing
+
+    active_surface_hash = active_promoted_surface_record_sha256(manifest_path, surface_id)
+    if active_surface_hash is None:
+        missing.append(f"{certificate_key}:surface_record_missing_or_unpromoted")
+    else:
+        certificate_surface_hash = dependency_evidence.get("reviewed_surface_record_sha256")
+        if (
+            not isinstance(certificate_surface_hash, str)
+            or certificate_surface_hash.lower() != active_surface_hash
+        ):
+            missing.append(f"{certificate_key}:surface_record_sha256_mismatch")
+
+    dependency_missing = dependency_validator(
+        dependency_evidence,
+        manifest_path,
+        public_header_path,
+    )
+    for reason in dependency_missing:
+        missing.append(f"{dependency_reason_prefix}_{reason}")
+    return missing
+
+
+def permissions_admin_promotion_certificate_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
+    return promoted_dependency_certificate_missing(
+        evidence,
+        certificate_key="permissions_admin_promotion_certificate",
+        schema=PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_SCHEMA,
+        surface_id="obelisk.permissions_admin.v1",
+        v1_dependency_chain_position=2,
+        required_by_surface="obelisk.command_chat_response_path.v1",
+        required_by_v1_dependency_chain_position=3,
+        dependency_reason_prefix="permissions_admin",
+        dependency_validator=permissions_admin_structured_promotion_evidence_missing,
+        manifest_path=manifest_path,
+        public_header_path=public_header_path,
+    )
+
+
+def command_response_promotion_certificate_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
+    return promoted_dependency_certificate_missing(
+        evidence,
+        certificate_key="command_response_promotion_certificate",
+        schema=COMMAND_RESPONSE_PROMOTION_CERTIFICATE_SCHEMA,
+        surface_id="obelisk.command_chat_response_path.v1",
+        v1_dependency_chain_position=3,
+        required_by_surface="obelisk.commands_replies.v1",
+        required_by_v1_dependency_chain_position=4,
+        dependency_reason_prefix="command_response",
+        dependency_validator=command_response_structured_promotion_evidence_missing,
+        manifest_path=manifest_path,
+        public_header_path=public_header_path,
+    )
 
 
 def permissions_admin_structured_promotion_evidence_missing(
@@ -4107,21 +4220,29 @@ def command_response_structured_promotion_evidence_missing(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
-    permissions_admin_evidence = evidence.get("permissions_admin_promotion_evidence")
-    if not isinstance(permissions_admin_evidence, dict):
-        permissions_admin_evidence = {
-            "player_identity_promotion_certificate": evidence.get("player_identity_promotion_certificate"),
-            "query_failclosed_report": evidence.get("permissions_admin_query_failclosed_report"),
-            "public_readiness_report": evidence.get("permissions_admin_public_readiness_report"),
-            "executed_test_report": evidence.get("permissions_admin_executed_test_report"),
-        }
-    dependency_missing = permissions_admin_structured_promotion_evidence_missing(
-        permissions_admin_evidence,
+    dependency_missing = permissions_admin_promotion_certificate_missing(
+        evidence,
         manifest_path,
         public_header_path,
     )
-    for reason in dependency_missing:
-        missing.append(f"permissions_admin_{reason}")
+    missing.extend(dependency_missing)
+    if not isinstance(evidence.get("permissions_admin_promotion_certificate"), dict):
+        permissions_admin_evidence = evidence.get("permissions_admin_promotion_evidence")
+        if not isinstance(permissions_admin_evidence, dict):
+            permissions_admin_evidence = {
+                "player_identity_promotion_certificate": evidence.get("player_identity_promotion_certificate"),
+                "query_failclosed_report": evidence.get("permissions_admin_query_failclosed_report"),
+                "public_readiness_report": evidence.get("permissions_admin_public_readiness_report"),
+                "executed_test_report": evidence.get("permissions_admin_executed_test_report"),
+            }
+        legacy_dependency_missing = permissions_admin_structured_promotion_evidence_missing(
+            permissions_admin_evidence,
+            manifest_path,
+            public_header_path,
+        )
+        for reason in legacy_dependency_missing:
+            missing.append(f"permissions_admin_{reason}")
+        dependency_missing = [*dependency_missing, *legacy_dependency_missing]
 
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -4176,19 +4297,27 @@ def commands_replies_structured_promotion_evidence_missing(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
-    command_response_evidence = evidence.get("command_response_promotion_evidence")
-    if not isinstance(command_response_evidence, dict):
-        command_response_evidence = {
-            "public_readiness_report": evidence.get("command_response_public_readiness_report"),
-            "executed_test_report": evidence.get("command_response_executed_test_report"),
-        }
-    dependency_missing = command_response_structured_promotion_evidence_missing(
-        command_response_evidence,
+    dependency_missing = command_response_promotion_certificate_missing(
+        evidence,
         manifest_path,
         public_header_path,
     )
-    for reason in dependency_missing:
-        missing.append(f"command_response_{reason}")
+    missing.extend(dependency_missing)
+    if not isinstance(evidence.get("command_response_promotion_certificate"), dict):
+        command_response_evidence = evidence.get("command_response_promotion_evidence")
+        if not isinstance(command_response_evidence, dict):
+            command_response_evidence = {
+                "public_readiness_report": evidence.get("command_response_public_readiness_report"),
+                "executed_test_report": evidence.get("command_response_executed_test_report"),
+            }
+        legacy_dependency_missing = command_response_structured_promotion_evidence_missing(
+            command_response_evidence,
+            manifest_path,
+            public_header_path,
+        )
+        for reason in legacy_dependency_missing:
+            missing.append(f"command_response_{reason}")
+        dependency_missing = [*dependency_missing, *legacy_dependency_missing]
 
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:

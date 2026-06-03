@@ -1492,6 +1492,23 @@ priorities, and do not use history files as the active source of truth.
   by design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
   no runtime/server operation.
+- 2026-06-03 supervised 4-agent runtime-preflight/ABI/downstream/side-lane hardening
+  round: runtime request/preflight outputs now explicitly keep request-pack, preflight, and
+  completed-receipt approved-runtime counters false; window-manifest replay requires those
+  false counters; evidence-bundle preflight reports approved runtime evidence present only
+  when the approved-evidence checker accepts it. Public ABI preflight/gap/readiness and
+  owner-token SDK consumer checks reject nested or alias public header/capability/callback/
+  public SDK/runtime/promotion/v1 claims while remaining candidate-only. SDK completion now
+  requires hash-bound promoted dependency certificates for permissions/admin before command
+  response and command response before commands/replies, with active surface-record SHA
+  checks; loose inline downstream evidence no longer substitutes. Mission/Transfer/Dino/
+  Tribe/Buff accounting rejects module/callback/descriptor/capability/C ABI/ResourceHandle/
+  v1-accounted aliases while staying candidate-only. Validations passed: full SDK
+  completion 221, identity ABI/contract/owner-token 96, runtime/preflight 204, side-lane
+  accounting 25, preflight shell, route JSON valid/planning-only, SDK JSON blocked by
+  design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
+  no runtime/server operation.
 
 ## Agent Coordination
 

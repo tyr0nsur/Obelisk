@@ -822,10 +822,17 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             "public_header_allowed": True,
             "public_contract_allowed": True,
             "public_abi_ready": True,
+            "v1_completion_ready": True,
             "v1_completion_evidence": True,
+            "public_sdk_v1_completion_claim": True,
             "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
             "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
             "public_callback_abi_now": ["ObeliskPlayerIdentityCallback"],
+            "claims": {
+                "publicHeaderSymbols": ["ObeliskPlayerPrincipalEvent"],
+                "capabilityBits": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+                "callbackAbi": ["ObeliskPlayerIdentityCallback"],
+            },
             "sdk_consumer_contract": {
                 "accepted_for_contract_review": True,
                 "public_sdk_ready": True,
@@ -849,6 +856,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         reasons = [blocker["reason"] for blocker in blockers]
         self.assertIn("nested_readiness_flag_not_false", reasons)
         self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
+        self.assertIn("nested_capability_bits_not_empty", reasons)
+        self.assertIn("nested_callback_abi_not_empty", reasons)
+        self.assertFalse(report["accepted_for_candidate_review"])
         self.assertFalse(report["accepted_for_contract_review"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
@@ -860,6 +870,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertEqual(report["public_header_symbols_now"], [])
         self.assertEqual(report["public_capability_bits_now"], [])
         self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertEqual(report["claims"]["publicHeaderSymbols"], [])
+        self.assertEqual(report["claims"]["capabilityBits"], [])
+        self.assertEqual(report["claims"]["callbackAbi"], [])
         self.assertFalse(report["sdk_consumer_contract"]["accepted_for_contract_review"])
         self.assertFalse(report["sdk_consumer_contract"]["public_sdk_ready"])
         self.assertEqual(report["sdk_consumer_contract"]["public_header_symbols_now"], [])

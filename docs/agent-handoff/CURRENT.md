@@ -408,3 +408,21 @@ This file is an active routing table only. Durable evidence belongs in
   suite 219, py_compile, release-statement scope check, route JSON valid/planning-only, SDK
   JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
   `git diff --check`. No runtime/server operation. Agents closed.
+- Latest round delegated P0 runtime request/preflight hardening, player identity public
+  ABI preflight guardrails, downstream P0 structured-evidence accounting, and
+  Mission/Transfer/Dino/Tribe/Buff side-lane accounting. Integrated result: preflight and
+  window-manifest sidecars now explicitly keep request-pack/preflight/completed-receipt
+  approved-runtime counters false, and evidence-bundle preflight marks approved runtime
+  evidence present only after the approved-evidence checker accepts it. Public ABI
+  preflight, gap, readiness, and owner-token SDK consumer contracts now reject nested or
+  alias public header/capability/callback/public SDK/runtime/promotion/v1 claims while
+  staying candidate-only. SDK completion now requires hash-bound promoted dependency
+  certificates for permissions/admin before command response and command response before
+  commands/replies; loose inline downstream evidence no longer substitutes for active
+  promoted dependency surfaces. Side-lane accounting now rejects module/callback/descriptor/
+  capability/C ABI/ResourceHandle/v1-accounted aliases while preserving candidate-only
+  Mission/Transfer/Dino/Tribe/Buff status. Validation passed: full SDK completion suite 221,
+  identity ABI/contract/owner-token suite 96, runtime/preflight suite 204, side-lane
+  accounting 25, preflight shell, py_compile, route JSON valid/planning-only, SDK JSON
+  blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
+  `git diff --check`. No runtime/server operation. Agents closed.

@@ -542,6 +542,75 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "sha256": sha256_file(REPO_ROOT / relative),
         }
 
+    def write_dependency_promotion_certificate(
+        self,
+        path: Path,
+        *,
+        schema: str,
+        surface_id: str,
+        position: int,
+        required_by_surface: str,
+        required_by_position: int,
+        evidence: dict[str, object],
+        **overrides: object,
+    ) -> dict[str, str]:
+        payload: dict[str, object] = {
+            "schema": schema,
+            "surface_id": surface_id,
+            "promotion_status": "promoted",
+            "v1_dependency_chain": [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+            "v1_dependency_chain_position": position,
+            "required_by_surface": required_by_surface,
+            "required_by_v1_dependency_chain_position": required_by_position,
+            "evidence": evidence,
+        }
+        payload.update(overrides)
+        path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        relative = str(path.relative_to(REPO_ROOT))
+        return {
+            "path": relative,
+            "sha256": sha256_file(REPO_ROOT / relative),
+        }
+
+    def write_permissions_admin_promotion_certificate(
+        self,
+        path: Path,
+        permissions_artifacts: dict[str, object],
+        **overrides: object,
+    ) -> dict[str, str]:
+        return self.write_dependency_promotion_certificate(
+            path,
+            schema="obelisk.permissions-admin-promotion-certificate.v1",
+            surface_id="obelisk.permissions_admin.v1",
+            position=2,
+            required_by_surface="obelisk.command_chat_response_path.v1",
+            required_by_position=3,
+            evidence=permissions_artifacts,
+            **overrides,
+        )
+
+    def write_command_response_promotion_certificate(
+        self,
+        path: Path,
+        command_response_artifacts: dict[str, object],
+        **overrides: object,
+    ) -> dict[str, str]:
+        return self.write_dependency_promotion_certificate(
+            path,
+            schema="obelisk.command-chat-response-path-promotion-certificate.v1",
+            surface_id="obelisk.command_chat_response_path.v1",
+            position=3,
+            required_by_surface="obelisk.commands_replies.v1",
+            required_by_position=4,
+            evidence=command_response_artifacts,
+            **overrides,
+        )
+
     def write_permissions_admin_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
         query_report = root / "permissions_admin_query_failclosed_report.json"
         readiness_report = root / "permissions_admin_public_readiness_report.json"
@@ -8368,6 +8437,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [
+                "permissions_admin_promotion_certificate:missing",
                 "permissions_admin_player_identity_promotion_certificate:missing",
                 "permissions_admin_query_failclosed_report:missing",
                 "permissions_admin_public_readiness_report:missing",
@@ -8806,6 +8876,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [
+                "command_response_promotion_certificate:missing",
+                "command_response_permissions_admin_promotion_certificate:missing",
                 "command_response_permissions_admin_player_identity_promotion_certificate:missing",
                 "command_response_permissions_admin_query_failclosed_report:missing",
                 "command_response_permissions_admin_public_readiness_report:missing",
@@ -9184,6 +9256,89 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             stale_missing,
         )
 
+    def test_command_response_dependency_certificate_must_match_active_permissions_surface(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandResponseDependencyCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            permissions_evidence = self.write_permissions_admin_structured_promotion_artifacts(root)
+            certificate = self.write_permissions_admin_promotion_certificate(
+                root / "permissions_admin_promotion_certificate.json",
+                permissions_evidence,
+            )
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.permissions_admin.v1":
+                    surface["status"] = "promoted"
+                    surface["evidence"] = {"different_reviewed_dependency": True}
+                    break
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.permissions_admin_structured_promotion_evidence_missing
+            try:
+                module.permissions_admin_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.permissions_admin_promotion_certificate_missing(
+                    {"permissions_admin_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.permissions_admin_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn("permissions_admin_promotion_certificate:surface_record_sha256_mismatch", missing)
+
+    def test_commands_replies_dependency_certificate_must_match_active_response_surface(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesDependencyCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            command_response_evidence: dict[str, object] = {
+                "public_readiness_report": "tests/core/unused_command_response_readiness.json",
+                "executed_test_report": "tests/core/unused_command_response_tests.json",
+            }
+            certificate = self.write_command_response_promotion_certificate(
+                root / "command_response_promotion_certificate.json",
+                command_response_evidence,
+            )
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.command_chat_response_path.v1":
+                    surface["status"] = "promoted"
+                    surface["evidence"] = {"different_reviewed_dependency": True}
+                    break
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.command_response_promotion_certificate_missing(
+                    {"command_response_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn("command_response_promotion_certificate:surface_record_sha256_mismatch", missing)
+
     def test_permissions_admin_structured_promotion_requires_identity_promotion_certificate(self) -> None:
         with tempfile.TemporaryDirectory(
             dir=REPO_ROOT / "tests" / "core",
@@ -9298,6 +9453,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             valid_missing,
             [
+                "player_identity_promotion_certificate:surface_record_missing_or_unpromoted",
                 "player_identity_public_contract_readiness_report:promotion_blockers_remaining",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_candidate_only",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_promotion_ready_false",
@@ -9618,6 +9774,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [
+                "command_response_promotion_certificate:missing",
+                "command_response_permissions_admin_promotion_certificate:missing",
                 "command_response_permissions_admin_player_identity_promotion_certificate:missing",
                 "command_response_permissions_admin_query_failclosed_report:missing",
                 "command_response_permissions_admin_public_readiness_report:missing",
@@ -9719,6 +9877,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [
+                "permissions_admin_promotion_certificate:missing",
                 "permissions_admin_player_identity_promotion_certificate:missing",
                 "permissions_admin_query_failclosed_report:missing",
                 "permissions_admin_public_readiness_report:missing",
@@ -10025,9 +10184,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
             response_executed = str(response_executed_path.relative_to(REPO_ROOT))
             original_dependency = module.permissions_admin_structured_promotion_evidence_missing
+            original_certificate_dependency = module.permissions_admin_promotion_certificate_missing
             original_current_head = module.current_repo_head
             try:
                 module.permissions_admin_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.permissions_admin_promotion_certificate_missing = lambda *_args, **_kwargs: []
                 module.current_repo_head = lambda: "0" * 40
                 missing = module.command_response_structured_promotion_evidence_missing(
                     {
@@ -10037,6 +10198,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
             finally:
                 module.permissions_admin_structured_promotion_evidence_missing = original_dependency
+                module.permissions_admin_promotion_certificate_missing = original_certificate_dependency
                 module.current_repo_head = original_current_head
 
         self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
@@ -10089,8 +10251,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 command="python3 -m unittest command_response_promotion",
             )
             original_dependency = module.permissions_admin_structured_promotion_evidence_missing
+            original_certificate_dependency = module.permissions_admin_promotion_certificate_missing
             try:
                 module.permissions_admin_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.permissions_admin_promotion_certificate_missing = lambda *_args, **_kwargs: []
                 missing = module.command_response_structured_promotion_evidence_missing(
                     {
                         "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
@@ -10099,6 +10263,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
             finally:
                 module.permissions_admin_structured_promotion_evidence_missing = original_dependency
+                module.permissions_admin_promotion_certificate_missing = original_certificate_dependency
 
         self.assertIn("public_readiness_report:public_or_runtime_claim_without_blocker", missing)
         self.assertIn("public_readiness_report:completion_claim_without_blocker", missing)
@@ -10314,9 +10479,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
             replies_executed = str(replies_executed_path.relative_to(REPO_ROOT))
             original_dependency = module.command_response_structured_promotion_evidence_missing
+            original_certificate_dependency = module.command_response_promotion_certificate_missing
             original_current_head = module.current_repo_head
             try:
                 module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.command_response_promotion_certificate_missing = lambda *_args, **_kwargs: []
                 module.current_repo_head = lambda: "0" * 40
                 missing = module.commands_replies_structured_promotion_evidence_missing(
                     {
@@ -10326,6 +10493,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
             finally:
                 module.command_response_structured_promotion_evidence_missing = original_dependency
+                module.command_response_promotion_certificate_missing = original_certificate_dependency
                 module.current_repo_head = original_current_head
 
         self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
@@ -10382,8 +10550,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 argv=["cmake", "--build", "commands_replies_sdk_consumer"],
             )
             original_dependency = module.command_response_structured_promotion_evidence_missing
+            original_certificate_dependency = module.command_response_promotion_certificate_missing
             try:
                 module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                module.command_response_promotion_certificate_missing = lambda *_args, **_kwargs: []
                 missing = module.commands_replies_structured_promotion_evidence_missing(
                     {
                         "public_readiness_report": str(replies_report.relative_to(REPO_ROOT)),
@@ -10392,6 +10562,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
             finally:
                 module.command_response_structured_promotion_evidence_missing = original_dependency
+                module.command_response_promotion_certificate_missing = original_certificate_dependency
 
         self.assertIn("public_readiness_report:public_or_runtime_claim_without_blocker", missing)
         self.assertIn("public_readiness_report:completion_claim_without_blocker", missing)

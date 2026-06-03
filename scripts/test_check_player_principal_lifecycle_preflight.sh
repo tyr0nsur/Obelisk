@@ -116,6 +116,11 @@ payload = json.loads(open(path, encoding="utf-8").read())
 required_false_flags = (
     "server_operations_authorized",
     "runtime_work_authorized",
+    "request_pack_counts_as_approved_runtime_evidence",
+    "preflight_counts_as_approved_runtime_evidence",
+    "completed_receipt_counts_as_approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
     "runtime_ready",
     "public_sdk_ready",
     "public_abi_ready",
@@ -198,6 +203,11 @@ payload = json.loads(open(path, encoding="utf-8").read())
 required_false_flags = (
     "server_operations_authorized",
     "runtime_work_authorized",
+    "request_pack_counts_as_approved_runtime_evidence",
+    "preflight_counts_as_approved_runtime_evidence",
+    "completed_receipt_counts_as_approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
     "runtime_ready",
     "public_sdk_ready",
     "public_abi_ready",

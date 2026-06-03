@@ -24,7 +24,7 @@ promotion gates.
 
 ## Leaf Decisions
 
-| Leaf | Current evidence/checker status | Current blocker | Allowed v1 outcome | Explicit non-claims |
+| Leaf | Current evidence/checker status | Current blocker | Candidate-only non-counting outcome | Explicit non-claims |
 | --- | --- | --- | --- | --- |
 | `mission` | `mission-compact-intake` has accepted internal layout evidence. `scripts/check_mission_copied_bool_readiness.py --json` reports `ready=true`, consume accepted, promote blocked, `accepted_for_internal_planning=true`, `public_sdk_ready=false`, and `runtime_ready=false` for the copied-bool policy slice. | Runtime observer, dispatcher lifecycle, public ABI/API, identity, arrays, mutation, return override, and live-ops validation remain unresolved. | Keep a consume-only internal copied-bool planning slice for exact Mission metadata; preserve recognition-only redaction for object/container fields. | No public Mission SDK, no mission identity, no player/controller/character identity, no item-array payload, no runtime hook approval, no mutation, no return override, no `ResourceHandle`, no v1 completion. |
 | `transfer` | `transfer-baccept-only-policy-slice` has a focused readiness checker. `scripts/check_transfer_baccept_readiness.py --json` reports `ready=true`, consume accepted, promote blocked, `accepted_for_internal_planning=true`, and explicit false flags for public SDK/ABI/runtime/identity/ownership/payload contracts. | Transfer payload ownership, downloaded-character and dino payload contracts, player identity, cross-map state, ownership, mutation, return override, runtime wiring, and public ABI remain unresolved. | Keep only the `bAccept` copied-bool slice as candidate internal planning evidence. | No public Transfer SDK, no transfer payload decoding, no downloaded-character contract, no dino payload contract, no player identity, no cross-map state contract, no ownership, no runtime hook wiring, no mutation, no return override, no `ResourceHandle`, no v1 completion. |
@@ -41,6 +41,9 @@ redaction, lifecycle, runtime, ABI, and public documentation gates are satisfied
 
 For v1, the allowed outcome is documentation and consume-only/internal planning
 evidence. Public SDK promotion remains blocked for all five leaves.
+These side-lane outcomes are non-counting: a leaf becomes v1-accounted only by
+explicit release exclusion or by a future promoted-evidence gate that is outside
+this candidate-only note.
 
 ## Mission Leaf Accounting Boundary
 

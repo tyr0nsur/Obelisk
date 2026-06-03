@@ -342,17 +342,32 @@ REQUIRED_SEPARATION_FORBIDDEN = {
 
 READINESS_FALSE_KEYS = {
     "accepted_for_contract_review",
+    "promotion",
     "promotion_ready",
     "public_sdk_ready",
     "runtime_ready",
     "public_header_allowed",
+    "public_header_ready",
     "public_contract_allowed",
     "public_abi_ready",
+    "public_sdk_v1_completion_claim",
+    "public_sdk_v1_completion_ready",
+    "v1_completion_claim",
     "v1_completion_evidence",
+    "v1_completion_ready",
+    "v1_ready",
 }
 EMPTY_PUBLIC_LIST_KEYS = {
+    "callback_abi",
+    "callback_symbols",
+    "capability_bits",
+    "header_symbols",
+    "public_callback_abi",
     "public_header_symbols_now",
+    "public_header_symbols",
+    "public_capability_bits",
     "public_capability_bits_now",
+    "public_callbacks",
     "public_callback_abi_now",
 }
 NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
@@ -2057,12 +2072,16 @@ def validate_public_abi_preflight_candidate(
             path=str(path),
             preflight_blockers=report["blockers"],
         )
-    return sanitize_non_promotional_report(
+    sanitize_blocker_count = len(blockers)
+    report = sanitize_non_promotional_report(
         report,
         blockers,
         input_label="public_abi_preflight_candidate",
         path="$.public_abi_promotion_preflight",
     )
+    if len(blockers) != sanitize_blocker_count:
+        report["accepted_for_candidate_review"] = False
+    return report
 
 
 def validate_owner_token_sdk_consumer_contract(
