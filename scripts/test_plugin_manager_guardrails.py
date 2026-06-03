@@ -53,6 +53,17 @@ OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
     "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
 }
 
+LEGACY_VOID_OWNER_TOKEN_REGISTRATION_WRAPPERS = {
+    "RegisterPreProcessEventWithOwnerToken": "PluginRegisterPreProcessEventWithOwnerTokenHandle(ownerToken, callback)",
+    "RegisterPostProcessEventWithOwnerToken": "PluginRegisterPostProcessEventWithOwnerTokenHandle(ownerToken, callback)",
+    "RegisterPreProcessEventForNameIndexWithOwnerToken": (
+        "PluginRegisterPreProcessEventForNameIndexWithOwnerTokenHandle(ownerToken, nameIndex, callback)"
+    ),
+    "RegisterPostProcessEventForNameIndexWithOwnerToken": (
+        "PluginRegisterPostProcessEventForNameIndexWithOwnerTokenHandle(ownerToken, nameIndex, callback)"
+    ),
+}
+
 BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS = {
     "inventory-action observer": (
         "InventoryAction",
@@ -158,6 +169,26 @@ def obelisk_api_field_names(header: str) -> list[str]:
         plain_field = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]+\])?$", declaration)
         if plain_field:
             fields.append(plain_field.group(1))
+    return fields
+
+
+def obelisk_api_function_field_names(header: str) -> list[str]:
+    match = re.search(
+        r"typedef\s+struct\s+ObeliskApi\s*\{(?P<body>.*?)\}\s*ObeliskApi\s*;",
+        strip_c_comments(header),
+        re.DOTALL,
+    )
+    if match is None:
+        raise AssertionError("typedef struct ObeliskApi block not found")
+
+    fields: list[str] = []
+    for declaration in match.group("body").split(";"):
+        declaration = " ".join(declaration.split())
+        if not declaration:
+            continue
+        function_pointer = re.search(r"\(\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", declaration)
+        if function_pointer:
+            fields.append(function_pointer.group(1))
     return fields
 
 
@@ -502,6 +533,35 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         for api_field, cleanup_token in OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS.items():
             with self.subTest(api_field=api_field):
                 self.assertIn(cleanup_token, cleanup_body)
+
+    def test_public_owner_token_registration_apis_are_handle_based_or_legacy_wrappers(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        owner_token_register_fields = {
+            field
+            for field in obelisk_api_function_field_names(api_header)
+            if field.startswith("Register") and "WithOwnerToken" in field
+        }
+        expected_fields = set(OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS) | set(
+            LEGACY_VOID_OWNER_TOKEN_REGISTRATION_WRAPPERS
+        )
+        self.assertEqual(
+            sorted(owner_token_register_fields - expected_fields),
+            [],
+            "New public owner-token registration APIs must be handle-returning and covered "
+            "by PluginManager owner cleanup, or explicitly documented as legacy wrappers.",
+        )
+        self.assertEqual(sorted(expected_fields - owner_token_register_fields), [])
+
+        for api_field, wrapper_call in LEGACY_VOID_OWNER_TOKEN_REGISTRATION_WRAPPERS.items():
+            with self.subTest(api_field=api_field):
+                body = extract_function_body(
+                    plugin_manager_text,
+                    rf"void Plugin{api_field}\(.*?\)",
+                )
+                self.assertIn(wrapper_call, body)
+                self.assertNotIn("EventManager::Get().Register", body)
 
     def test_inventory_gameplay_policy_kinds_are_wired_to_expected_dispatcher_family(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")

@@ -252,6 +252,10 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "public_response_path_ready",
     "runtime_ready",
     "send_chat_ready",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "public_or_runtime_accounting_allowed",
     "public_header_allowed",
     "public_header_ready",
     "public_readiness_ready",
@@ -388,13 +392,23 @@ RUNTIME_EVIDENCE_READY_SCOPE = "runtime_evidence_only"
 PUBLIC_CONTRACT_REVIEW_READY_SCOPE = "contract_review_input_only"
 BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
 PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
+    "approved_bundle",
     BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    "live_ops_sidecar",
+    "live_validation_sidecar",
+    "operator_approval_receipt",
     "operator_approval_receipt_only",
+    "operator_receipt",
     "operator_receipt_only",
+    "placeholder_provenance",
+    "preflight",
     "preflight_only",
+    "request_pack",
     "request_pack_only",
+    "runtime_window",
     "live_ops_sidecar_only",
     "live_validation_sidecar_only",
+    "window_manifest",
     "window_manifest_only",
 }
 PROMOTION_EVIDENCE_SCOPE_KEYS = {
@@ -518,6 +532,8 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "live_ops_sidecar",
     "live-ops-sidecar",
     "package_shape",
+    "placeholder",
+    "placeholder_provenance",
     "planning",
     "plugin_hub",
     "pluginhub",
@@ -535,6 +551,8 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "operator-receipt",
     "window_manifest",
     "window-manifest",
+    "runtime_window",
+    "runtime-window",
     "static_candidate",
     "static_target",
     "return_only",
@@ -567,7 +585,7 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "terms",
 }
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
-    r"(?:candidate|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
+    r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
@@ -1196,7 +1214,17 @@ def run_command_permission_route_gate(
         blockers.append("command_permission_route_gate_invalid")
     if payload.get("accepted_for_planning") is not True or payload.get("planning_only") is not True:
         blockers.append("command_permission_route_gate_not_planning_only")
-    for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
+    for key in (
+        "promotion_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "runtime_ready",
+        "public_header_allowed",
+        "counts_toward_public_sdk",
+        "counts_toward_runtime",
+        "counts_toward_v1_completion",
+        "public_or_runtime_accounting_allowed",
+    ):
         if payload.get(key) is not False:
             blockers.append(f"command_permission_route_gate_{key}_not_false")
     critical_path_phase = payload.get("critical_path_phase") if isinstance(payload.get("critical_path_phase"), dict) else {}
@@ -1254,6 +1282,10 @@ def run_command_permission_route_gate(
             "public_abi_ready": payload.get("public_abi_ready"),
             "runtime_ready": payload.get("runtime_ready"),
             "public_header_allowed": payload.get("public_header_allowed"),
+            "counts_toward_public_sdk": payload.get("counts_toward_public_sdk"),
+            "counts_toward_runtime": payload.get("counts_toward_runtime"),
+            "counts_toward_v1_completion": payload.get("counts_toward_v1_completion"),
+            "public_or_runtime_accounting_allowed": payload.get("public_or_runtime_accounting_allowed"),
             "current_blocker": current_blocker,
             "source_checker_primary_blocker": source_checker_primary_blocker,
             "source_checker_next_blocker": source_checker_next_blocker,

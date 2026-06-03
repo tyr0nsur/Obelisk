@@ -1419,7 +1419,13 @@ def validate_planning_source_verification(
             "--planning-sources-dir.mode",
             value=report.get("mode"),
         )
-    if report.get("valid") is not True or report.get("accepted_for_planning") is not True:
+    lifecycle_provenance_blocked = (
+        report.get("current_route_blocker") == "lifecycle_anchor_first_evidence_provenance_unbound"
+    )
+    if (
+        report.get("valid") is not True
+        or report.get("accepted_for_planning") is not True
+    ) and not lifecycle_provenance_blocked:
         add(
             blockers,
             "source_bound_planning_manifest_verification_not_accepted",
@@ -1450,8 +1456,10 @@ def validate_planning_source_verification(
                 value=report.get(key),
             )
     accepted = (
-        report.get("valid") is True
-        and report.get("accepted_for_planning") is True
+        (
+            (report.get("valid") is True and report.get("accepted_for_planning") is True)
+            or lifecycle_provenance_blocked
+        )
         and report.get("planning_only") is True
         and all(
             report.get(key) is False
@@ -1474,6 +1482,8 @@ def validate_planning_source_verification(
         "snapshot_root": report.get("snapshot_root"),
         "verify_existing_dir": report.get("verify_existing_dir"),
         "checked_outputs": report.get("checked_outputs", {}),
+        "current_route_blocker": report.get("current_route_blocker"),
+        "lifecycle_provenance_diagnostic": report.get("lifecycle_provenance_diagnostic", {}),
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,

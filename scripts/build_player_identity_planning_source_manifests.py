@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -523,6 +524,152 @@ def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:
     return [str(blocker.get("reason")) for blocker in blockers]
 
 
+def source_artifact_id_rows(source_artifact_ids: Any) -> list[dict[str, str]]:
+    if not isinstance(source_artifact_ids, list):
+        return []
+    rows: list[dict[str, str]] = []
+    for entry in source_artifact_ids:
+        if not isinstance(entry, str) or ":" not in entry:
+            continue
+        field, _, value = entry.partition(":")
+        rows.append({"field": field, "value": value, "entry": entry})
+    return rows
+
+
+def lifecycle_provenance_diagnostic(lifecycle: dict[str, Any]) -> dict[str, Any]:
+    artifact_identity = lifecycle.get("artifact_identity") if isinstance(lifecycle.get("artifact_identity"), dict) else {}
+    source_rows = source_artifact_id_rows(artifact_identity.get("source_artifact_ids"))
+    missing_source_ids: list[dict[str, Any]] = []
+    obelisk_commit = artifact_identity.get("obelisk_commit")
+    if obelisk_commit in lifecycle_checker.PLACEHOLDER_OBELISK_COMMITS:
+        missing_source_ids.append(
+            {
+                "field": "$.artifact_identity.obelisk_commit",
+                "observed": obelisk_commit,
+                "required": "non-placeholder reviewed Obelisk commit/source binding for accepted lifecycle anchors",
+            }
+        )
+    for row in source_rows:
+        placeholders = lifecycle_checker.PLACEHOLDER_SOURCE_ARTIFACT_IDS.get(row["field"])
+        if placeholders is not None and row["value"] in placeholders:
+            missing_source_ids.append(
+                {
+                    "field": "$.artifact_identity.source_artifact_ids",
+                    "source_id_field": row["field"],
+                    "observed": row["entry"],
+                    "required": (
+                        "non-placeholder source artifact id bound to the durable lifecycle-anchor "
+                        "second-source/static report"
+                    ),
+                }
+            )
+
+    missing_report_hashes: list[dict[str, Any]] = []
+    accepted_anchor_targets: list[str] = []
+    anchors = lifecycle.get("candidate_anchors") if isinstance(lifecycle.get("candidate_anchors"), list) else []
+    for index, anchor in enumerate(anchors):
+        if not isinstance(anchor, dict) or anchor.get("accepted") is not True:
+            continue
+        target = anchor.get("target")
+        if isinstance(target, str):
+            accepted_anchor_targets.append(target)
+        corroboration = anchor.get("corroboration") if isinstance(anchor.get("corroboration"), dict) else {}
+        status = corroboration.get("status")
+        if status == "second_source_accepted":
+            report_sha = corroboration.get("second_source_report_sha256")
+            if not isinstance(report_sha, str) or lifecycle_checker.SHA256_RE.fullmatch(report_sha) is None:
+                missing_report_hashes.append(
+                    {
+                        "target": target,
+                        "field": f"$.candidate_anchors[{index}].corroboration.second_source_report_sha256",
+                        "observed": report_sha,
+                        "required": "64-hex SHA256 of a reviewed durable second-source lifecycle-anchor report",
+                    }
+                )
+        elif status == "static_accepted":
+            report_sha = corroboration.get("static_report_sha256")
+            if not isinstance(report_sha, str) or lifecycle_checker.SHA256_RE.fullmatch(report_sha) is None:
+                missing_report_hashes.append(
+                    {
+                        "target": target,
+                        "field": f"$.candidate_anchors[{index}].corroboration.static_report_sha256",
+                        "observed": report_sha,
+                        "required": "64-hex SHA256 of a reviewed durable static lifecycle-anchor report",
+                    }
+                )
+
+    return {
+        "current_route_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+        "accepted_anchor_targets": accepted_anchor_targets,
+        "observed_source_artifact_ids": [row["entry"] for row in source_rows],
+        "missing_durable_source_ids": missing_source_ids,
+        "missing_durable_report_hashes": missing_report_hashes,
+        "required_evidence_boundary": (
+            "sanitized snapshot layout is planning-only; accepted lifecycle anchors need "
+            "non-placeholder source ids and reviewed durable report hashes before route/SDK "
+            "accounting can move past the provenance blocker"
+        ),
+    }
+
+
+def lifecycle_generation_failure_report(
+    *,
+    snapshot_root: Path,
+    output_dir: Path | None,
+    verify_existing_dir: Path | None,
+    lifecycle: dict[str, Any],
+    lifecycle_blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    reasons = validation_reasons(lifecycle_blockers)
+    accepted_targets = [
+        str(anchor.get("target"))
+        for anchor in lifecycle.get("candidate_anchors", [])
+        if isinstance(anchor, dict) and anchor.get("accepted") is True and isinstance(anchor.get("target"), str)
+    ]
+    return {
+        "schema": REPORT_SCHEMA,
+        "mode": "verify_existing" if verify_existing_dir is not None else "build",
+        "valid": False,
+        "accepted_for_planning": False,
+        "planning_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "runtime_ready": False,
+        "v1_completion_ready": False,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "snapshot_root": str(snapshot_root),
+        "output_dir": str(output_dir) if output_dir is not None else None,
+        "verify_existing_dir": str(verify_existing_dir) if verify_existing_dir is not None else None,
+        "current_route_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+        "blockers": ["generated_lifecycle_anchor_candidates_invalid", *sorted(set(reasons))],
+        "lifecycle_anchor_candidate_blockers": lifecycle_blockers,
+        "lifecycle_anchor_candidate_blocker_reasons": reasons,
+        "lifecycle_provenance_diagnostic": lifecycle_provenance_diagnostic(lifecycle),
+        "accepted_lifecycle_targets": accepted_targets,
+        "required_next_artifacts": [
+            {
+                "artifact": "lifecycle_anchor_candidates",
+                "schema": lifecycle_checker.SCHEMA,
+                "required": (
+                    "accepted anchors must carry non-placeholder artifact_identity, non-generic "
+                    "source_artifact_ids, and accepted second-source/static report hashes"
+                ),
+            },
+            {
+                "artifact": "source_bound_second_source_or_static_report",
+                "required": (
+                    "create or select a durable repo-local reviewed report for "
+                    "ShooterGameMode.HandleNewPlayer and ShooterGameMode.OnLogout before "
+                    "regenerating planning manifests"
+                ),
+            },
+        ],
+        "non_claims": NON_CLAIMS,
+    }
+
+
 def output_record(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return {"path": str(path), "sha256": sha256_file(path), "schema": payload.get("schema")}
 
@@ -578,7 +725,12 @@ def build_report(
     }
 
 
-def build_into_dir(*, snapshot_root: Path, output_dir: Path) -> dict[str, Any]:
+def build_into_dir(
+    *,
+    snapshot_root: Path,
+    output_dir: Path,
+    verify_existing_dir: Path | None = None,
+) -> dict[str, Any]:
     output_dir = binder.prepare_output_dir(output_dir)
 
     first_evidence = build_redacted_ufunction_signatures.build_players_identity_first_evidence(
@@ -595,9 +747,12 @@ def build_into_dir(*, snapshot_root: Path, output_dir: Path) -> dict[str, Any]:
     lifecycle = build_lifecycle_manifest(first_evidence, snapshot_root)
     lifecycle_blockers = lifecycle_checker.validate_manifest(lifecycle, promote=False)
     if lifecycle_blockers:
-        raise SystemExit(
-            "generated lifecycle-anchor candidates failed validation: "
-            + json.dumps(validation_reasons(lifecycle_blockers), sort_keys=True)
+        return lifecycle_generation_failure_report(
+            snapshot_root=snapshot_root,
+            output_dir=output_dir,
+            verify_existing_dir=verify_existing_dir,
+            lifecycle=lifecycle,
+            lifecycle_blockers=lifecycle_blockers,
         )
     lifecycle_snapshot_root_binding = binder.validate_lifecycle_anchor_snapshot_root(
         lifecycle=lifecycle,
@@ -652,7 +807,13 @@ def build_into_dir(*, snapshot_root: Path, output_dir: Path) -> dict[str, Any]:
 def verify_existing_dir(*, snapshot_root: Path, existing_dir: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="obelisk-player-identity-planning-verify-") as temp_dir:
         generated_dir = Path(temp_dir) / "generated"
-        generated_report = build_into_dir(snapshot_root=snapshot_root, output_dir=generated_dir)
+        generated_report = build_into_dir(
+            snapshot_root=snapshot_root,
+            output_dir=generated_dir,
+            verify_existing_dir=existing_dir,
+        )
+        if generated_report.get("valid") is not True:
+            return generated_report
 
         blockers: list[dict[str, Any]] = []
         checked_outputs: dict[str, dict[str, Any]] = {}
@@ -753,6 +914,20 @@ def main() -> int:
         report = build_into_dir(snapshot_root=snapshot_root, output_dir=args.output_dir)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
+    if not report["valid"] and "lifecycle_anchor_candidate_blocker_reasons" in report:
+        diagnostic = report.get("lifecycle_provenance_diagnostic", {})
+        print(
+            "generated lifecycle-anchor candidates failed validation"
+            + ": "
+            + json.dumps(
+                {
+                    "blockers": report["lifecycle_anchor_candidate_blocker_reasons"],
+                    "diagnostic": diagnostic,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
     return 0 if report["valid"] else 1
 
 

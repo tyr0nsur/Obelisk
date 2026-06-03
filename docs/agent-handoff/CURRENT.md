@@ -30,7 +30,7 @@ This file is an active routing table only. Durable evidence belongs in
   Rebind accepted lifecycle anchors with reviewed non-generic provenance before expecting
   `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the only
   allowed later route blocker is `identity_public_contract_gate_missing`, still locked and
-  planning-only.
+  planning-only. The builder now emits a fail-closed JSON diagnostic for this blocker.
 
 ## Hard Overrides
 - GitHub work may be delegated only for an evidenced, stable milestone. No tag or
@@ -209,11 +209,12 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest round delegated identity intake, SDK accounting, runtime lifecycle, and reversing.
-  Integrated result: accepted lifecycle anchors reject placeholder artifact identity and
-  missing report hashes; route gate treats
-  `lifecycle_anchor_first_evidence_provenance_unbound` as the valid upstream planning-only
-  lock and skips downstream P0 child composition until rebound; SDK completion remains
-  fail-closed at SDK `0/12`, P0 `0/4`, public/runtime false,
-  `stable_claim_allowed=false`. Runtime ABI tests added copied-dispatcher token guard
-  coverage. Agents closed; no runtime/server op.
+- Latest round delegated identity, SDK accounting, runtime ABI, and reversing. Integrated
+  result: builder/first-evidence/public-contract diagnostics now name the exact lifecycle
+  provenance gaps (`mixed_or_unknown`, `capture_id:core`, `evidence_pack_id:core-evidence-pack`,
+  missing report hashes for `HandleNewPlayer`/`OnLogout`). Route/SDK guardrails force
+  parent `counts_toward_*` false, reject bare request/preflight/window/operator/placeholder
+  promotion scopes, and keep SDK `0/12`, P0 `0/4`, public/runtime false. Runtime ABI
+  guardrails require new public owner-token registration APIs to be handle-based or legacy
+  wrappers. No sufficient durable artifact exists yet; next artifact is a repo-local
+  reviewed lifecycle-anchor second-source/static report. Agents closed; no runtime/server op.

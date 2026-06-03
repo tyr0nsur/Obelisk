@@ -932,13 +932,20 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
-            )
+        )
 
         report = json.loads(result.stdout)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("source_bound_planning_manifest_verification_not_accepted", report["blockers"])
+        self.assertEqual(result.returncode, 0)
         source_verification = report["source_bound_planning_manifest_verification"]
-        self.assertFalse(source_verification["accepted_for_contract_review"])
+        self.assertTrue(source_verification["accepted_for_contract_review"])
+        self.assertEqual(
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            source_verification["current_route_blocker"],
+        )
+        self.assertIn(
+            "accepted_anchor_second_source_report_hash_missing",
+            source_verification["blockers"],
+        )
         self.assertFalse(source_verification["promotion_ready"])
         self.assertFalse(source_verification["public_sdk_ready"])
         self.assertFalse(source_verification["runtime_ready"])

@@ -449,6 +449,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "public_abi_ready": False,
             "runtime_ready": False,
             "public_header_allowed": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "public_or_runtime_accounting_allowed": False,
             "critical_path_phase": {
                 "current_blocker": "approved_runtime_evidence_missing",
                 "source_checker_primary_blocker": "approved_runtime_evidence_missing",
@@ -916,6 +920,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'public_abi_ready': False,\n"
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
+                "    'counts_toward_public_sdk': False,\n"
+                "    'counts_toward_runtime': False,\n"
+                "    'counts_toward_v1_completion': False,\n"
+                "    'public_or_runtime_accounting_allowed': False,\n"
                 "    'critical_path_phase': {\n"
                 "        'current_blocker': 'approved_runtime_evidence_missing',\n"
                 "        'source_checker_primary_blocker': 'approved_runtime_evidence_missing',\n"
@@ -1182,6 +1190,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("structure_build_policy_offline_intake_blockers_not_empty", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
+        self.assertFalse(route_gate["counts_toward_public_sdk"])
+        self.assertFalse(route_gate["counts_toward_runtime"])
+        self.assertFalse(route_gate["counts_toward_v1_completion"])
+        self.assertFalse(route_gate["public_or_runtime_accounting_allowed"])
         self.assertEqual(
             route_gate["source_checker_primary_blocker"],
             "lifecycle_anchor_first_evidence_provenance_unbound",
@@ -1984,6 +1996,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'public_abi_ready': False,\n"
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
+                "    'counts_toward_public_sdk': False,\n"
+                "    'counts_toward_runtime': False,\n"
+                "    'counts_toward_v1_completion': False,\n"
+                "    'public_or_runtime_accounting_allowed': False,\n"
                 "    'checks': [{\n"
                 "        'name': 'command_chat_response_public_readiness',\n"
                 "        'public_or_runtime_claims': ['reply_api_allowed'],\n"
@@ -2043,6 +2059,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'public_abi_ready': False,\n"
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
+                "    'counts_toward_public_sdk': False,\n"
+                "    'counts_toward_runtime': False,\n"
+                "    'counts_toward_v1_completion': False,\n"
+                "    'public_or_runtime_accounting_allowed': False,\n"
                 "    'blockers': []\n"
                 "} ))\n",
                 encoding="utf-8",
@@ -2130,6 +2150,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 public_abi_ready=True,
                 runtime_ready=True,
                 public_header_allowed=True,
+                counts_toward_public_sdk=True,
+                counts_toward_runtime=True,
+                counts_toward_v1_completion=True,
+                public_or_runtime_accounting_allowed=True,
                 critical_path_phase={
                     "current_blocker": None,
                     "source_checker_primary_blocker": None,
@@ -2169,6 +2193,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "command_permission_route_gate_public_abi_ready_not_false",
             "command_permission_route_gate_runtime_ready_not_false",
             "command_permission_route_gate_public_header_allowed_not_false",
+            "command_permission_route_gate_counts_toward_public_sdk_not_false",
+            "command_permission_route_gate_counts_toward_runtime_not_false",
+            "command_permission_route_gate_counts_toward_v1_completion_not_false",
+            "command_permission_route_gate_public_or_runtime_accounting_allowed_not_false",
             "command_permission_route_gate_lock_unexpected",
             "command_permission_route_gate_default_blocker_mismatch",
             "command_permission_route_gate_default_source_blocker_mismatch",
@@ -2190,6 +2218,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "command_permission_route_gate_not_planning_only",
             payload["command_permission_route_gate"]["completion_gate_blockers"],
         )
+
+    def test_completion_gate_rejects_route_gate_accounting_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                counts_toward_public_sdk=True,
+                counts_toward_runtime=True,
+                counts_toward_v1_completion=True,
+                public_or_runtime_accounting_allowed=True,
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "command_permission_route_gate_counts_toward_public_sdk_not_false",
+            "command_permission_route_gate_counts_toward_runtime_not_false",
+            "command_permission_route_gate_counts_toward_v1_completion_not_false",
+            "command_permission_route_gate_public_or_runtime_accounting_allowed_not_false",
+            "command_permission_route_gate_public_or_runtime_claims",
+        ):
+            self.assertIn(blocker, payload["blockers"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["command_permission_route_gate"]["completion_gate_accepted"])
 
     def test_completion_gate_rejects_route_gate_wrong_default_blocked_until(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2279,6 +2338,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'public_abi_ready': False,\n"
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
+                "    'counts_toward_public_sdk': False,\n"
+                "    'counts_toward_runtime': False,\n"
+                "    'counts_toward_v1_completion': False,\n"
+                "    'public_or_runtime_accounting_allowed': False,\n"
                 "    'critical_path_phase': {\n"
                 "        'current_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
                 "        'source_checker_primary_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound'\n"
@@ -2344,6 +2407,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "production_support_ready": True,
                 "stable_sdk_allowed": "ready",
                 "public_api_allowed": "allowed",
+                "counts_toward_public_sdk": True,
+                "countsTowardRuntime": True,
+                "counts_toward_v1_completion": True,
+                "public_or_runtime_accounting_allowed": True,
                 "checks": [
                     {
                         "name": "commands_replies_public_readiness",
@@ -2447,6 +2514,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("production_support_ready", claims)
         self.assertIn("stable_sdk_allowed", claims)
         self.assertIn("public_api_allowed", claims)
+        self.assertIn("counts_toward_public_sdk", claims)
+        self.assertIn("countsTowardRuntime", claims)
+        self.assertIn("counts_toward_v1_completion", claims)
+        self.assertIn("public_or_runtime_accounting_allowed", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2463,6 +2534,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'public_abi_ready': False,\n"
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
+                "    'counts_toward_public_sdk': False,\n"
+                "    'counts_toward_runtime': False,\n"
+                "    'counts_toward_v1_completion': False,\n"
+                "    'public_or_runtime_accounting_allowed': False,\n"
                 "    'checks': [{\n"
                 "        'name': 'commands_replies_public_readiness',\n"
                 "        'public_command_router_allowed': True,\n"
@@ -5816,7 +5891,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "request_pack",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "operator_approval_receipt_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "operator_approval_receipt",
             },
             {
                 **base_evidence,
@@ -5824,7 +5907,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "operator_receipt",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "preflight_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "preflight",
             },
             {
                 **base_evidence,
@@ -5832,11 +5923,27 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "window_manifest",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "live_validation_sidecar_only",
             },
             {
                 **base_evidence,
+                "ready_scope": "live_validation_sidecar",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "live_ops_sidecar_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "live_ops_sidecar",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "placeholder_provenance",
             },
             {
                 **base_evidence,
@@ -5885,8 +5992,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "schemas": ["obelisk.placeholder-provenance.v1"],
+            },
+            {
+                **base_evidence,
                 "abi_tests": ["tests/core/player_identity_approved_bundle.cpp"],
                 "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_approved_bundle.c"],
+            },
+            {
+                **base_evidence,
+                "abi_tests": ["tests/core/player_identity_placeholder_provenance.cpp"],
+                "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_placeholder_provenance.c"],
             },
         )
         for evidence in cases:

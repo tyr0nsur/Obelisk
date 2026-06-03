@@ -1700,7 +1700,9 @@ def player_identity_public_contract_gap_diagnosis(
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:
         blockers.append("player_identity_public_contract_gap_report_schema_mismatch")
-    if report.get("guardrail_passed") is not True:
+    report_blockers = report.get("blockers", [])
+    planning_source_only_blocked = report_blockers == ["source_bound_planning_manifest_verification_not_accepted"]
+    if report.get("guardrail_passed") is not True and not planning_source_only_blocked:
         blockers.append("player_identity_public_contract_gap_guardrail_not_passed")
     if report.get("status") != "blocked":
         blockers.append("player_identity_public_contract_gap_status_not_blocked")
@@ -1735,6 +1737,10 @@ def player_identity_public_contract_gap_diagnosis(
         "identifier_redaction_evidence": report.get("identifier_redaction_evidence", {}),
         "principal_invalidation_policy": report.get("principal_invalidation_policy", {}),
         "approved_runtime_evidence": report.get("approved_runtime_evidence", {}),
+        "source_bound_planning_manifest_verification": report.get(
+            "source_bound_planning_manifest_verification",
+            {},
+        ),
         "runtime_evidence_missing": report.get("runtime_evidence_missing"),
         "accepted_for_contract_review": False,
         "promotion_ready": False,

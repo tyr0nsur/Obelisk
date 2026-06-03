@@ -32,9 +32,82 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
     def assert_lifecycle_provenance_guardrail_blocks_generation(
         self,
         result: subprocess.CompletedProcess[str],
+        *,
+        expected_mode: str,
     ) -> None:
         self.assertEqual(1, result.returncode)
-        self.assertEqual("", result.stdout)
+        payload = json.loads(result.stdout)
+        diagnostic = payload["lifecycle_provenance_diagnostic"]
+
+        self.assertEqual("obelisk.player-identity-planning-source-manifests-build-report.v1", payload["schema"])
+        self.assertEqual(expected_mode, payload["mode"])
+        self.assertFalse(payload["valid"])
+        self.assertFalse(payload["accepted_for_planning"])
+        self.assertTrue(payload["planning_only"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["server_operations_authorized"])
+        self.assertFalse(payload["runtime_work_authorized"])
+        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", payload["current_route_blocker"])
+        self.assertEqual(
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            diagnostic["current_route_blocker"],
+        )
+        self.assertIn("generated_lifecycle_anchor_candidates_invalid", payload["blockers"])
+        self.assertIn(
+            "accepted_anchor_artifact_identity_obelisk_commit_placeholder",
+            payload["lifecycle_anchor_candidate_blocker_reasons"],
+        )
+        self.assertIn(
+            "accepted_anchor_artifact_identity_source_id_placeholder",
+            payload["lifecycle_anchor_candidate_blocker_reasons"],
+        )
+        self.assertIn(
+            "accepted_anchor_second_source_report_hash_missing",
+            payload["lifecycle_anchor_candidate_blocker_reasons"],
+        )
+        self.assertIn("ShooterGameMode.HandleNewPlayer", payload["accepted_lifecycle_targets"])
+        self.assertIn("ShooterGameMode.OnLogout", payload["accepted_lifecycle_targets"])
+        self.assertEqual(
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+            diagnostic["accepted_anchor_targets"],
+        )
+        self.assertEqual(
+            [
+                "$.candidate_anchors[0].corroboration.second_source_report_sha256",
+                "$.candidate_anchors[1].corroboration.second_source_report_sha256",
+            ],
+            [entry["field"] for entry in diagnostic["missing_durable_report_hashes"]],
+        )
+        self.assertIn(
+            {
+                "field": "$.artifact_identity.source_artifact_ids",
+                "source_id_field": "capture_id",
+                "observed": "capture_id:core",
+                "required": (
+                    "non-placeholder source artifact id bound to the durable lifecycle-anchor "
+                    "second-source/static report"
+                ),
+            },
+            diagnostic["missing_durable_source_ids"],
+        )
+        self.assertIn(
+            {
+                "field": "$.artifact_identity.source_artifact_ids",
+                "source_id_field": "evidence_pack_id",
+                "observed": "evidence_pack_id:core-evidence-pack",
+                "required": (
+                    "non-placeholder source artifact id bound to the durable lifecycle-anchor "
+                    "second-source/static report"
+                ),
+            },
+            diagnostic["missing_durable_source_ids"],
+        )
+        self.assertIn("mixed_or_unknown", json.dumps(diagnostic["missing_durable_source_ids"], sort_keys=True))
+        required_artifacts = {artifact["artifact"] for artifact in payload["required_next_artifacts"]}
+        self.assertIn("lifecycle_anchor_candidates", required_artifacts)
+        self.assertIn("source_bound_second_source_or_static_report", required_artifacts)
         self.assertIn("generated lifecycle-anchor candidates failed validation", result.stderr)
         self.assertIn("accepted_anchor_artifact_identity_obelisk_commit_placeholder", result.stderr)
         self.assertIn("accepted_anchor_artifact_identity_source_id_placeholder", result.stderr)
@@ -45,7 +118,7 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
             output_dir = Path(temp_dir) / "planning"
             result = self.run_tool(["--output-dir", str(output_dir), "--json"], check=False)
 
-        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result, expected_mode="build")
 
     def test_verify_existing_dir_fails_closed_on_committed_placeholder_lifecycle_provenance(self) -> None:
         result = self.run_tool(
@@ -57,7 +130,7 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
             check=False,
         )
 
-        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result, expected_mode="verify_existing")
 
     def test_verify_existing_dir_stops_before_stale_check_when_generated_lifecycle_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -78,7 +151,7 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
 
             result = self.run_tool(["--verify-existing-dir", str(existing), "--json"], check=False)
 
-        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result, expected_mode="verify_existing")
 
     def test_rejects_protected_output_dir_before_writing(self) -> None:
         result = self.run_tool(

@@ -1193,6 +1193,14 @@ priorities, and do not use history files as the active source of truth.
   is rebound. SDK completion remains blocked with SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`, public/runtime false. PluginManager guardrails gained
   copied-dispatcher public-ABI token coverage. No runtime/server operation was performed.
+- 2026-06-03 supervised 4-agent diagnostic/accounting round: builder, first-evidence, and
+  public-contract gap diagnostics now expose the exact lifecycle provenance blocker fields
+  instead of only stderr failure. Route/SDK guardrails now emit/enforce parent accounting
+  false and reject bare request/preflight/window/operator/placeholder promotion scopes.
+  Runtime ABI guardrails require new public owner-token registration APIs to be
+  handle-based or documented legacy wrappers. Reversing audit found no sufficient durable
+  lifecycle report; next artifact is a repo-local reviewed second-source/static report for
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`. No runtime/server op.
 
 ## Agent Coordination
 

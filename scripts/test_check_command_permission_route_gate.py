@@ -252,6 +252,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+        self.assertFalse(report["counts_toward_runtime"])
+        self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["public_or_runtime_accounting_allowed"])
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
         self.assertTrue(report["route_lock_invariant_valid"])
@@ -556,6 +560,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+        self.assertFalse(report["counts_toward_runtime"])
+        self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["public_or_runtime_accounting_allowed"])
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
         self.assertTrue(report["route_lock_invariant_valid"])
@@ -1239,6 +1247,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "production_support_ready": True,
                 "stable_sdk_allowed": "ready",
                 "public_api_allowed": "allowed",
+                "counts_toward_public_sdk": True,
+                "countsTowardRuntime": True,
+                "counts_toward_v1_completion": True,
+                "public_or_runtime_accounting_allowed": True,
             }
         )
 
@@ -1263,6 +1275,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("production_support_ready", claims)
         self.assertIn("stable_sdk_allowed", claims)
         self.assertIn("public_api_allowed", claims)
+        self.assertIn("counts_toward_public_sdk", claims)
+        self.assertIn("countsTowardRuntime", claims)
+        self.assertIn("counts_toward_v1_completion", claims)
+        self.assertIn("public_or_runtime_accounting_allowed", claims)
 
     def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
