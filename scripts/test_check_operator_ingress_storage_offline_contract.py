@@ -214,6 +214,10 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "Plugin Hub ready",
             "pluginHubReady",
             "public ABI",
+            "public header",
+            "public header allowed",
+            "public capability",
+            "publicCapabilitiesReady",
             "v1 completion",
             "v1_completion_required",
         ]
@@ -261,6 +265,10 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "pluginHubReady",
             "runtimeServices",
             "public_c_abi",
+            "public_header",
+            "publicHeaderAllowed",
+            "public_capability",
+            "publicCapabilitiesReady",
             "runtime_storage_service",
             "operator_ingress_authorizes_command_response",
         ]
@@ -277,13 +285,20 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
 
     def test_canonical_false_keys_are_only_exempt_at_contract_paths(self) -> None:
         contract = self.load_valid_contract()
+        contract["lanes"][0]["public_header_allowed"] = False
         contract["lanes"][0]["public_sdk_ready"] = False
         contract["lanes"][0]["runtime_services"] = False
         contract["lanes"][0]["promotion"] = {"public_sdk": False, "runtime": False}
 
         errors = checker.validate_contract(contract)
 
-        for key in ("public_sdk_ready", "runtime_services", "public_sdk", "runtime"):
+        for key in (
+            "public_header_allowed",
+            "public_sdk_ready",
+            "runtime_services",
+            "public_sdk",
+            "runtime",
+        ):
             self.assertTrue(
                 any(key in error and "prohibited claim" in error for error in errors),
                 errors,

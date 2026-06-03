@@ -142,6 +142,7 @@ CLAIM_KEY_EXEMPTIONS = frozenset(
         "operator_shortcut_barrier",
         *SHORTCUT_BARRIER_TRUE_FLAGS,
         *SHORTCUT_BARRIER_FALSE_FLAGS,
+        "public_header_allowed",
         "public_sdk",
         "public_sdk_ready",
         "public_abi_ready",
@@ -163,6 +164,8 @@ PROHIBITED_CLAIM_RE = re.compile(
     r"\brelease[-_ ]?(?:ready|readiness|supported|support)\b|"
     r"\bready[-_ ]?for[-_ ]?release\b|"
     r"\bpublic[-_ ]?sdk(?:[-_ ]?(?:ready|readiness|supported|support|surface|claim))?\b|"
+    r"\bpublic[-_ ]?header(?:[-_ ]?(?:ready|readiness|supported|support|surface|claim|allowed))?\b|"
+    r"\bpublic[-_ ]?capabilit(?:y|ies)(?:[-_ ]?(?:ready|readiness|supported|support|surface|claim))?\b|"
     r"\b(?:complete|full|production|stable)[-_ ]?sdk\b|"
     r"\bv1(?:\.0)?[-_ ]?(?:ready|complete|stable|support(?:ed)?)\b|"
     r"\bexternal[-_ ]?(?:ingress|services?|storage|operator[-_ ]?(?:ingress|services?))\b|"
@@ -253,6 +256,8 @@ def _is_claim_key_exempt(path: str, key: str) -> bool:
         return path == f"$.operator_shortcut_barrier.{key}"
     if key in {"public_abi_ready", "public_sdk_ready", "runtime_ready", "runtime_services"}:
         return path == f"$.{key}"
+    if key == "public_header_allowed":
+        return path == "$.public_header_allowed"
     if key == "public_sdk":
         return path == "$.promotion.public_sdk"
     if key == "runtime":

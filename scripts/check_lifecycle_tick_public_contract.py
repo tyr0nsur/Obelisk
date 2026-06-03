@@ -24,6 +24,7 @@ DEFAULT_HEADER = ROOT / "include" / "obelisk" / "ObeliskApi.h"
 LIFECYCLE_SURFACE = "obelisk.lifecycle_ops_recovery.v1"
 TICK_SURFACE = "obelisk.gameplay_tick_callbacks.v1"
 FOUNDATION_SURFACE = "obelisk.lifecycle_config_logging.v1"
+DESCRIPTORS_SURFACE = "obelisk.descriptors.v1"
 TIMERS_SURFACE = "obelisk.process_local_timers.v1"
 
 FALSE_TOP_LEVEL_KEYS = (
@@ -123,6 +124,13 @@ TICK_HEADER_TOKENS = {
     "RegisterServerTickWithOwnerTokenHandle",
     "RegisterModuleTickWithOwnerTokenHandle",
 }
+SUPPORT_TIER_FORBIDDEN_READINESS = (
+    ("public SDK readiness", re.compile(r"\bpublic\s+sdk\b", re.IGNORECASE)),
+    ("SDK readiness", re.compile(r"\bsdk\s+(?:ready|readiness|complete|completion|stable)\b", re.IGNORECASE)),
+    ("runtime readiness", re.compile(r"\bruntime\s+(?:ready|readiness|validated|supported|available|enabled)\b", re.IGNORECASE)),
+    ("v1 readiness", re.compile(r"\bv1(?:\.0)?\s+(?:ready|readiness|complete|completion|stable|supported|available|enabled)\b", re.IGNORECASE)),
+    ("stable SDK readiness", re.compile(r"\bstable\s+sdk\b", re.IGNORECASE)),
+)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -233,6 +241,7 @@ def validate_surfaces(manifest: dict[str, Any]) -> list[str]:
         for surface in raw_surfaces
         if isinstance(surface, dict) and isinstance(surface.get("id"), str)
     }
+    errors.extend(validate_support_tiers(surfaces))
 
     for surface_id in (LIFECYCLE_SURFACE, TICK_SURFACE):
         surface = surfaces.get(surface_id)
@@ -288,6 +297,30 @@ def validate_surfaces(manifest: dict[str, Any]) -> list[str]:
         if missing:
             errors.append(f"surfaces: timer exclusions missing {sorted(missing)}")
 
+    return errors
+
+
+def validate_support_tiers(surfaces: dict[str, dict[str, Any]]) -> list[str]:
+    errors: list[str] = []
+    for surface_id in (
+        FOUNDATION_SURFACE,
+        DESCRIPTORS_SURFACE,
+        TIMERS_SURFACE,
+        LIFECYCLE_SURFACE,
+        TICK_SURFACE,
+    ):
+        surface = surfaces.get(surface_id)
+        if not isinstance(surface, dict):
+            continue
+        support_tier = surface.get("support_tier")
+        if not isinstance(support_tier, str):
+            continue
+        for claim, pattern in SUPPORT_TIER_FORBIDDEN_READINESS:
+            if pattern.search(support_tier):
+                errors.append(
+                    f"surfaces: {surface_id} support_tier must not imply {claim}: {support_tier!r}"
+                )
+                break
     return errors
 
 

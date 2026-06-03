@@ -1777,6 +1777,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "no_live_progress",
                 "release_statement_bookkeeping",
                 "promoted_demand_gaps",
+                "active_side_lane_review",
                 "runtime_required_blockers",
                 "next_v1_work",
             },
@@ -1818,6 +1819,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Excluded/post-v1 outcomes do not satisfy",
             sections["promoted_demand_gaps"]["non_claim"],
         )
+        expected_active_side_lanes = [
+            "obelisk.lifecycle_ops_recovery.v1",
+            "obelisk.player_services_economy_mobility.v1",
+            "obelisk.operator_ingress_storage.v1",
+            "obelisk.gameplay_tick_callbacks.v1",
+        ]
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"]["active_side_lane_review_blockers"],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"][
+                "active_side_lane_review_manifest_post_v1_or_excluded"
+            ],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"][
+                "active_side_lane_review_release_statement_post_v1_or_excluded"
+            ],
+            [],
+        )
+        self.assertEqual(
+            progress["active_side_lane_review_promoted_for_claim_count"],
+            0,
+        )
+        self.assertEqual(
+            progress["active_side_lane_review_remaining_for_claim_count"],
+            4,
+        )
+        self.assertEqual(
+            progress["active_side_lane_review_remaining_for_claim"],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            sections["active_side_lane_review"]["promoted_for_claim_count"],
+            0,
+        )
+        self.assertEqual(
+            sections["active_side_lane_review"]["remaining_for_claim"],
+            expected_active_side_lanes,
+        )
+        self.assertFalse(sections["active_side_lane_review"]["stable_claim_allowed"])
+        self.assertIn("non-claim accounting", sections["active_side_lane_review"]["non_claim"])
         self.assertEqual(
             sections["runtime_required_blockers"]["manifest_outcome_missing"],
             payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing"],
@@ -3769,6 +3814,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
                 "manifest_post_v1_or_excluded_outcomes"
             ],
+        )
+        expected_active_side_lanes = [
+            "obelisk.lifecycle_ops_recovery.v1",
+            "obelisk.player_services_economy_mobility.v1",
+            "obelisk.operator_ingress_storage.v1",
+            "obelisk.gameplay_tick_callbacks.v1",
+        ]
+        self.assertEqual(
+            payload["v1_sdk_progress"]["active_side_lane_review_blockers"],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"][
+                "active_side_lane_review_manifest_post_v1_or_excluded"
+            ],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"][
+                "active_side_lane_review_release_statement_post_v1_or_excluded"
+            ],
+            expected_active_side_lanes,
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"]["active_side_lane_review_promoted_for_claim_count"],
+            0,
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"]["active_side_lane_review_remaining_for_claim_count"],
+            4,
+        )
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["active_side_lane_review"][
+                "release_statement_post_v1_or_excluded"
+            ],
+            expected_active_side_lanes,
+        )
+        self.assertIn(
+            "do not promote",
+            payload["v1_sdk_progress"]["active_side_lane_review_non_claim"],
         )
         self.assertEqual(
             payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][

@@ -225,6 +225,36 @@ No server/runtime operation, protected live-path write, marker/env change,
 ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish,
 tag, or push occurred.
 
+## Side-Lane SDK Blocker Guardrail Snapshot
+
+The next supervised round after `b5df8fb` hardened four non-P0 SDK blockers without
+changing complete-SDK progress or the active P0 route:
+
+- Lifecycle/tick public-contract checking rejects broad readiness wording in
+  `support_tier` for lifecycle/config/logging, descriptors, process-local timers,
+  lifecycle ops recovery, and gameplay tick callbacks. This keeps promoted foundation
+  surfaces from implying watchdog, reload, runtime recovery, server tick, UE gameplay
+  tick, module tick, per-frame hook, or gameplay timer readiness.
+- Operator ingress/storage offline checking rejects public header and public capability
+  claims outside the canonical top-level false contract flags.
+- Player services/economy/mobility contract checking rejects affirmative availability
+  wording inside `non_claims`, preserving the umbrella as pre-ABI/post-v1/non-promoted.
+- SDK completion now exposes an `active_side_lane_review` accounting section for
+  lifecycle ops recovery, player services/economy/mobility, operator ingress/storage, and
+  gameplay tick callbacks. The section is explicit non-claim accounting: these four
+  blockers remain `0/4` promoted and `4/4` remaining for the complete SDK claim.
+
+Lead validation observed lifecycle/tick 8 OK, operator ingress/storage 11 OK, player
+services/economy/mobility 10 OK, SDK completion 227 OK, side-lane checker JSONs
+OK/candidate-only/non-promoted, route JSON valid/planning-only with
+`current_route_blocker=approved_runtime_evidence_missing`, SDK JSON blocked with complete
+SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile` OK, and
+`git diff --check` OK.
+
+No server/runtime operation, protected live-path write, marker/env change,
+ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish,
+tag, or push occurred.
+
 ## Route Bookkeeping And Alias Hardening Snapshot
 
 The next supervised round after `a178b0b` closed additional offline accounting and

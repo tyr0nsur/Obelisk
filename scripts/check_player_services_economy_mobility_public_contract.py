@@ -100,6 +100,20 @@ NEGATIVE_CONTEXT_TERMS = re.compile(
     r"\b(?:before|block(?:ed|s|er)?|does not add|forbidden|must be|no|not|without|until|requires?)\b",
     re.IGNORECASE,
 )
+NON_CLAIM_CONTEXT_TERMS = re.compile(
+    r"\b(?:before|block(?:ed|s|er)?|candidate[-_ ]?only|does not|excluded|forbidden|must be|"
+    r"no|not|planning[-_ ]?only|pre[-_ ]?abi|without|until|requires?)\b",
+    re.IGNORECASE,
+)
+NON_CLAIM_NEGATING_CONTEXT_TERMS = re.compile(
+    r"\b(?:before|block(?:ed|s|er)?|does not|excluded|forbidden|must be|"
+    r"no|not|without|until|requires?)\b",
+    re.IGNORECASE,
+)
+NON_CLAIM_AFFIRMATIVE_RE = re.compile(
+    r"\b(?:available|enabled|exposed|implemented|released|shipped)\b",
+    re.IGNORECASE,
+)
 PROMOTION_OVERCLAIM_RE = re.compile(
     r"\b(?:promoted|promotion[-_ ]?ready|public[-_ ]?(?:sdk|abi|contract)[-_ ]?ready|"
     r"runtime[-_ ]?(?:ready|services?|wiring)|public[-_ ]?headers?|public[-_ ]?abi)\b",
@@ -143,6 +157,14 @@ def _allowed_blocked_term_path(path: str) -> bool:
 
 def _negative_context(value: str) -> bool:
     return bool(NEGATIVE_CONTEXT_TERMS.search(value))
+
+
+def _non_claim_context(value: str) -> bool:
+    return bool(NON_CLAIM_CONTEXT_TERMS.search(value))
+
+
+def _non_claim_negating_context(value: str) -> bool:
+    return bool(NON_CLAIM_NEGATING_CONTEXT_TERMS.search(value))
 
 
 def load_contract(path: pathlib.Path) -> dict[str, Any]:
@@ -305,6 +327,15 @@ def _validate_non_claims(contract: dict[str, Any], errors: list[str]) -> None:
     if not isinstance(non_claims, list) or not all(isinstance(item, str) for item in non_claims):
         errors.append("non_claims must be a list of strings")
         return
+    for index, non_claim in enumerate(non_claims):
+        if not _non_claim_context(non_claim):
+            errors.append(f"non_claims[{index}] must use explicit non-claim or blocking wording")
+        affirmative_match = NON_CLAIM_AFFIRMATIVE_RE.search(non_claim)
+        if affirmative_match and not _non_claim_negating_context(non_claim):
+            errors.append(
+                f"non_claims[{index}] contains affirmative availability term "
+                f"{affirmative_match.group(0)!r}"
+            )
     actual = set(non_claims)
     for missing in sorted(REQUIRED_NON_CLAIMS - actual):
         errors.append(f"non_claims missing {missing}")

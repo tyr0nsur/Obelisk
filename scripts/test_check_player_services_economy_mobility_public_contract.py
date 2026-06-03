@@ -168,6 +168,15 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
             errors,
         )
 
+    def test_non_claims_reject_affirmative_availability_wording(self) -> None:
+        contract = self.load_valid_contract()
+        contract["non_claims"].append("umbrella planning lane available")
+
+        errors = checker.validate_contract(contract)
+
+        self.assertIn("non_claims[4] must use explicit non-claim or blocking wording", errors)
+        self.assertIn("non_claims[4] contains affirmative availability term 'available'", errors)
+
     def test_json_output_reports_errors(self) -> None:
         contract = self.load_valid_contract()
         contract["runtime_services"] = True

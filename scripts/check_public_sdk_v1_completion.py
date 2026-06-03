@@ -151,6 +151,12 @@ CANONICAL_V1_DEPENDENCY_SEQUENCE = (
 )
 CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN = CANONICAL_V1_DEPENDENCY_SEQUENCE
 P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES = {"excluded", "post-v1"}
+CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS = {
+    "obelisk.lifecycle_ops_recovery.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+}
 CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.gameplay_policy_event.v1",
     "obelisk.chat_message.v1",
@@ -5041,11 +5047,46 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         if row.get("is_p0_dependency_chain") is True
         and row.get("release_statement_scoped_non_complete_bookkeeping") is True
     ]
+    non_p0_manifest_post_v1_or_excluded_outcomes = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is not True
+        and row.get("manifest_outcome") in {"post-v1", "excluded"}
+    ]
     non_p0_release_statement_post_v1_or_excluded_outcomes = [
         row["surface"]
         for row in rows
         if row.get("is_p0_dependency_chain") is not True
         and row.get("release_statement_scoped_non_complete_bookkeeping") is True
+    ]
+    active_side_lane_review_blockers = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS
+    ]
+    active_side_lane_review_manifest_post_v1_or_excluded = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS
+        and row.get("manifest_outcome") in {"post-v1", "excluded"}
+    ]
+    active_side_lane_review_release_statement_post_v1_or_excluded = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS
+        and row.get("release_statement_scoped_non_complete_bookkeeping") is True
+    ]
+    active_side_lane_review_promoted_for_claim = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS
+        and row.get("counts_toward_complete_sdk_claim") is True
+    ]
+    active_side_lane_review_remaining_for_claim = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_ACTIVE_SIDE_LANE_REVIEW_BLOCKERS
+        and row.get("unresolved_for_complete_sdk_claim") is True
     ]
     return {
         "total": len(rows),
@@ -5072,8 +5113,24 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         "p0_release_statement_scoped_non_complete_outcome_count": (
             len(p0_release_statement_scoped_non_complete_outcomes)
         ),
+        "non_p0_manifest_post_v1_or_excluded_outcome_count": (
+            len(non_p0_manifest_post_v1_or_excluded_outcomes)
+        ),
         "non_p0_release_statement_post_v1_or_excluded_outcome_count": (
             len(non_p0_release_statement_post_v1_or_excluded_outcomes)
+        ),
+        "active_side_lane_review_blocker_count": len(active_side_lane_review_blockers),
+        "active_side_lane_review_promoted_for_claim_count": len(
+            active_side_lane_review_promoted_for_claim
+        ),
+        "active_side_lane_review_remaining_for_claim_count": len(
+            active_side_lane_review_remaining_for_claim
+        ),
+        "active_side_lane_review_manifest_post_v1_or_excluded_count": len(
+            active_side_lane_review_manifest_post_v1_or_excluded
+        ),
+        "active_side_lane_review_release_statement_post_v1_or_excluded_count": len(
+            active_side_lane_review_release_statement_post_v1_or_excluded
         ),
         "route_gate_non_counting_surface_count": len(route_gate_non_counting_surfaces),
         "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
@@ -5093,8 +5150,25 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         "p0_release_statement_scoped_non_complete_outcomes": (
             p0_release_statement_scoped_non_complete_outcomes
         ),
+        "non_p0_manifest_post_v1_or_excluded_outcomes": (
+            non_p0_manifest_post_v1_or_excluded_outcomes
+        ),
         "non_p0_release_statement_post_v1_or_excluded_outcomes": (
             non_p0_release_statement_post_v1_or_excluded_outcomes
+        ),
+        "active_side_lane_review_blockers": active_side_lane_review_blockers,
+        "active_side_lane_review_manifest_post_v1_or_excluded": (
+            active_side_lane_review_manifest_post_v1_or_excluded
+        ),
+        "active_side_lane_review_release_statement_post_v1_or_excluded": (
+            active_side_lane_review_release_statement_post_v1_or_excluded
+        ),
+        "active_side_lane_review_promoted_for_claim": active_side_lane_review_promoted_for_claim,
+        "active_side_lane_review_remaining_for_claim": active_side_lane_review_remaining_for_claim,
+        "active_side_lane_review_non_claim": (
+            "Active side-lane review bookkeeping is non-claim accounting; post-v1/excluded "
+            "or release-statement records do not promote lifecycle ops, player services, "
+            "operator ingress/storage, or gameplay tick callbacks into the complete SDK."
         ),
         "route_gate_non_counting_surfaces": route_gate_non_counting_surfaces,
         "route_gate_non_counting_blockers": route_gate_non_counting_blockers,
@@ -5257,6 +5331,17 @@ def categorized_v1_report_sections(
                 "non_p0_release_statement_post_v1_or_excluded_outcome_count",
                 0,
             ),
+            "active_side_lane_review_manifest_post_v1_or_excluded": blocker_outcome_summary.get(
+                "active_side_lane_review_manifest_post_v1_or_excluded",
+                [],
+            ),
+            "active_side_lane_review_release_statement_post_v1_or_excluded": blocker_outcome_summary.get(
+                "active_side_lane_review_release_statement_post_v1_or_excluded",
+                [],
+            ),
+            "active_side_lane_review_non_claim": blocker_outcome_summary.get(
+                "active_side_lane_review_non_claim",
+            ),
             "missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
             "missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
             "missing_experimental_outcomes": sorted(
@@ -5284,6 +5369,35 @@ def categorized_v1_report_sections(
                 "Excluded/post-v1 outcomes do not satisfy promoted-demand requirements; "
                 "demand families need promoted surfaces or explicit promoted equivalents."
             ),
+        },
+        "active_side_lane_review": {
+            "blockers": blocker_outcome_summary.get("active_side_lane_review_blockers", []),
+            "promoted_for_claim": blocker_outcome_summary.get(
+                "active_side_lane_review_promoted_for_claim",
+                [],
+            ),
+            "promoted_for_claim_count": blocker_outcome_summary.get(
+                "active_side_lane_review_promoted_for_claim_count",
+                0,
+            ),
+            "remaining_for_claim": blocker_outcome_summary.get(
+                "active_side_lane_review_remaining_for_claim",
+                [],
+            ),
+            "remaining_for_claim_count": blocker_outcome_summary.get(
+                "active_side_lane_review_remaining_for_claim_count",
+                0,
+            ),
+            "manifest_post_v1_or_excluded": blocker_outcome_summary.get(
+                "active_side_lane_review_manifest_post_v1_or_excluded",
+                [],
+            ),
+            "release_statement_post_v1_or_excluded": blocker_outcome_summary.get(
+                "active_side_lane_review_release_statement_post_v1_or_excluded",
+                [],
+            ),
+            "stable_claim_allowed": stable_claim_allowed,
+            "non_claim": blocker_outcome_summary.get("active_side_lane_review_non_claim"),
         },
         "runtime_required_blockers": {
             "blocker_codes": sorted(set(runtime_blocker_codes)),
@@ -6171,6 +6285,45 @@ def build_report(
             ],
             "non_p0_release_statement_post_v1_or_excluded_outcome_count": blocker_outcome_summary[
                 "non_p0_release_statement_post_v1_or_excluded_outcome_count"
+            ],
+            "non_p0_manifest_post_v1_or_excluded_outcomes": blocker_outcome_summary[
+                "non_p0_manifest_post_v1_or_excluded_outcomes"
+            ],
+            "non_p0_manifest_post_v1_or_excluded_outcome_count": blocker_outcome_summary[
+                "non_p0_manifest_post_v1_or_excluded_outcome_count"
+            ],
+            "active_side_lane_review_blockers": blocker_outcome_summary[
+                "active_side_lane_review_blockers"
+            ],
+            "active_side_lane_review_blocker_count": blocker_outcome_summary[
+                "active_side_lane_review_blocker_count"
+            ],
+            "active_side_lane_review_promoted_for_claim": blocker_outcome_summary[
+                "active_side_lane_review_promoted_for_claim"
+            ],
+            "active_side_lane_review_promoted_for_claim_count": blocker_outcome_summary[
+                "active_side_lane_review_promoted_for_claim_count"
+            ],
+            "active_side_lane_review_remaining_for_claim": blocker_outcome_summary[
+                "active_side_lane_review_remaining_for_claim"
+            ],
+            "active_side_lane_review_remaining_for_claim_count": blocker_outcome_summary[
+                "active_side_lane_review_remaining_for_claim_count"
+            ],
+            "active_side_lane_review_manifest_post_v1_or_excluded": blocker_outcome_summary[
+                "active_side_lane_review_manifest_post_v1_or_excluded"
+            ],
+            "active_side_lane_review_manifest_post_v1_or_excluded_count": blocker_outcome_summary[
+                "active_side_lane_review_manifest_post_v1_or_excluded_count"
+            ],
+            "active_side_lane_review_release_statement_post_v1_or_excluded": blocker_outcome_summary[
+                "active_side_lane_review_release_statement_post_v1_or_excluded"
+            ],
+            "active_side_lane_review_release_statement_post_v1_or_excluded_count": blocker_outcome_summary[
+                "active_side_lane_review_release_statement_post_v1_or_excluded_count"
+            ],
+            "active_side_lane_review_non_claim": blocker_outcome_summary[
+                "active_side_lane_review_non_claim"
             ],
             "route_gate_non_counting_surfaces": blocker_outcome_summary[
                 "route_gate_non_counting_surfaces"

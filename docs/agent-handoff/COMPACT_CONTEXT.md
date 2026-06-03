@@ -19,6 +19,29 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 side-lane SDK blocker guardrail round after `b5df8fb` delegated four
+  scopes: lifecycle ops recovery/gameplay tick support-tier claims, operator
+  ingress/storage public header/capability claims, player services/economy/mobility
+  affirmative `non_claims`, and SDK completion active side-lane accounting.
+- Integrated changes: lifecycle/tick contract checking rejects broad readiness wording
+  in support tiers for lifecycle/config/logging, descriptors, process-local timers,
+  lifecycle ops recovery, and gameplay tick callbacks; operator ingress/storage rejects
+  public header and public capability claims outside canonical false contract paths;
+  player services/economy/mobility rejects affirmative availability wording in
+  `non_claims`; SDK completion exposes active side-lane review bookkeeping for
+  `obelisk.lifecycle_ops_recovery.v1`, `obelisk.player_services_economy_mobility.v1`,
+  `obelisk.operator_ingress_storage.v1`, and `obelisk.gameplay_tick_callbacks.v1`,
+  keeping them at `0/4` promoted and non-claim.
+- Validation observed: lifecycle/tick 8 OK, operator ingress/storage 11 OK, player
+  services/economy/mobility 10 OK, SDK completion suite 227 OK, side-lane checker JSONs
+  OK/candidate-only/non-promoted, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`, SDK JSON blocked by design
+  with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile` OK, and
+  `git diff --check` OK.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 turbo SDK route/bookkeeping hardening round after `a178b0b` delegated four
   scopes: release-statement exact outcome bookkeeping, runtime window/preflight alias
   authorization, downstream command response/replies moderation-broadcast aliases, and

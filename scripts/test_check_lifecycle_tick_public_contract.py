@@ -153,6 +153,30 @@ class LifecycleTickPublicContractTests(unittest.TestCase):
         self.assertTrue(any("lifecycle foundation exclusions missing" in error for error in errors), errors)
         self.assertTrue(any("timer exclusions missing" in error for error in errors), errors)
 
+    def test_surface_support_tiers_cannot_claim_broad_readiness(self) -> None:
+        manifest = self.load_surfaces()
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        surfaces["obelisk.lifecycle_config_logging.v1"]["support_tier"] = "v1 complete foundation"
+        surfaces["obelisk.descriptors.v1"]["support_tier"] = "public SDK ready descriptors"
+        surfaces["obelisk.process_local_timers.v1"]["support_tier"] = "runtime ready timers"
+        surfaces["obelisk.lifecycle_ops_recovery.v1"]["support_tier"] = "stable SDK recovery"
+        surfaces["obelisk.gameplay_tick_callbacks.v1"]["support_tier"] = "v1.0 stable tick callbacks"
+
+        errors = checker.validate_surfaces(manifest)
+
+        for surface_id in (
+            "obelisk.lifecycle_config_logging.v1",
+            "obelisk.descriptors.v1",
+            "obelisk.process_local_timers.v1",
+            "obelisk.lifecycle_ops_recovery.v1",
+            "obelisk.gameplay_tick_callbacks.v1",
+        ):
+            with self.subTest(surface_id=surface_id):
+                self.assertTrue(
+                    any(f"surfaces: {surface_id} support_tier must not imply" in error for error in errors),
+                    errors,
+                )
+
     def test_header_rejects_blocked_public_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             header = Path(tmp) / "ObeliskApi.h"

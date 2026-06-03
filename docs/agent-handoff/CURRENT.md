@@ -199,19 +199,14 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 turbo SDK route/bookkeeping hardening round after
-  `a178b0b` delegated four scopes: release-statement exact outcome bookkeeping to
-  Chandrasekhar, runtime window/preflight alias authorization to Lorentz, downstream
-  command response/replies moderation-broadcast aliases to Hubble, and inventory copied
-  signal non-claim containers to Averroes. Integrated changes require non-promoted
-  release-statement outcome records to match the manifest status exactly; normalize
-  nested preflight positive authorization/readiness flag aliases such as
-  `runtimeWorkAuthorized`; reject broadcast/notices/moderation public ABI/API/header and
-  positive readiness aliases in command response/replies; and reject positive inventory
-  SDK/ResourceHandle readiness wording hidden inside negative guardrail containers while
-  still allowing bare excluded-term lists. Lead validation: SDK completion suite 227,
-  runtime window manifest 74, command response/replies 85, inventory copied signals 29,
-  inventory JSON ready only as category/copied signal with `public_sdk_ready=false`,
-  route JSON valid/planning-only with `approved_runtime_evidence_missing`, SDK JSON
-  blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile`, and
-  `git diff --check`. No runtime/server/Discord/GitHub operation.
+- Latest integration note: 2026-06-03 side-lane SDK blocker guardrail round after
+  `b5df8fb` delegated four scopes: lifecycle/tick support-tier readiness claims,
+  operator ingress/storage public header/capability claims, player services/economy/
+  mobility affirmative `non_claims`, and SDK completion active side-lane accounting.
+  Integrated checkers preserve lifecycle ops recovery, gameplay tick callbacks, operator
+  ingress/storage, and player services/economy/mobility as non-promoted/post-v1 blockers.
+  Lead validation: lifecycle/tick 8, operator ingress/storage 11, player services 10,
+  SDK completion 227, side-lane JSONs ok/candidate-only, route JSON planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, `py_compile`, and `git diff --check`. No
+  runtime/server/Discord/GitHub operation.
