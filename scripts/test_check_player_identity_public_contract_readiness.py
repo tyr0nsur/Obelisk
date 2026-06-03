@@ -1277,6 +1277,51 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             ["approved_runtime_evidence_public_header_allowed_not_false"],
         )
 
+    def test_approved_runtime_report_rejects_recursive_public_contract_overclaim(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+            report["claims"] = {
+                "public_contract_ready": True,
+                "summary": "public player identity ready",
+                "downstream": "identity unlocks permissions now",
+            }
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=overclaiming_report,
+            ):
+                runtime_report = checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertFalse(runtime_report["accepted_for_contract_review"])
+        self.assertIn(
+            "approved_runtime_evidence_report_public_readiness_overclaim",
+            [blocker["reason"] for blocker in blockers],
+        )
+
+        report = checker.build_report(
+            self.decisions(),
+            runtime_report,
+            {"accepted_for_contract_review": False},
+            {},
+            {"readable": True, "detected_player_identity_tokens": []},
+            blockers,
+            "consume",
+        )
+
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
+        self.assertNotIn("runtime.lifecycle_evidence", report["resolved_inputs"])
+
     def test_approved_runtime_report_accumulates_route_and_public_overclaims(self) -> None:
         original_build_report = checker.approved_evidence.build_report
 

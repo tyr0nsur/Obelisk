@@ -281,7 +281,7 @@ def request_pack_check_state(
     }
     if not request_pack["exists"] or not observer_env["exists"]:
         return state
-    if not unprotected_existing_file_state(request_pack) or not unprotected_existing_file_state(observer_env):
+    if not offline_readable_file_state(request_pack) or not offline_readable_file_state(observer_env):
         return state
     command = [
         sys.executable,
@@ -292,7 +292,7 @@ def request_pack_check_state(
         str(observer_env["path"]),
         "--post-window-replay",
     ]
-    if unprotected_existing_file_state(operator_approval_receipt):
+    if offline_readable_file_state(operator_approval_receipt):
         command.extend(["--operator-approval-receipt", str(operator_approval_receipt["path"])])
     state["checked"] = True
     exit_code, payload, stderr = run_json_check(command)
@@ -383,7 +383,7 @@ def approved_runtime_manifest_check_state(
     }
     if not approved_bundle["exists"]:
         return state
-    if not unprotected_existing_file_state(approved_bundle):
+    if not offline_readable_file_state(approved_bundle):
         return state
     state["checked"] = True
     exit_code, payload, stderr = run_json_check(

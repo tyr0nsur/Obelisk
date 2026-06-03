@@ -601,6 +601,41 @@ EMPTY_PUBLIC_LIST_KEYS = {
     "public_capability_bits_now",
     "public_callback_abi_now",
 }
+ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
+    "approved_runtime_evidence_present",
+    "runtime_evidence_ready",
+}
+NEGATIVE_CONTEXT_RE = re.compile(
+    r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|forbid(?:den|s)?|"
+    r"redact(?:ed|ion)?|excludes?|without|until|missing|blocked|blocker|unavailable|"
+    r"must[_ -]?not[_ -]?expose|no_)\b",
+    re.IGNORECASE,
+)
+APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
+    r"(?:"
+    r"public|sdk|abi|capability|callback|header|identity|principal|permission|admin|"
+    r"command|chat|reply|lookup|storage|persist|mutation|return[_ -]?override|resource[_ -]?handle|v1"
+    r").*(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available)"
+    r"|(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available).*"
+    r"(?:public|sdk|abi|identity|principal|permission|admin|command|chat|reply|lookup|storage|persist|mutation|"
+    r"return[_ -]?override|resource[_ -]?handle|v1)",
+    re.IGNORECASE,
+)
+APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
+    "public_identity_ready": re.compile(r"public\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_sdk_ready": re.compile(r"public\s+sdk\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_abi_ready": re.compile(r"public\s+abi\s+(?:is\s+)?ready", re.IGNORECASE),
+    "v1_completion_ready": re.compile(r"v1\s+(?:sdk\s+)?completion\s+(?:is\s+)?ready", re.IGNORECASE),
+    "capability_available": re.compile(r"(?:identity\s+)?capability\s+(?:bit\s+)?(?:is\s+)?available", re.IGNORECASE),
+    "downstream_unlocked": re.compile(
+        r"(?:identity|principal).*unlock(?:s|ed)?\s+(?:permission|admin|command|chat|reply|lookup|storage)",
+        re.IGNORECASE,
+    ),
+    "lookup_allowed": re.compile(r"(?:player\s+)?lookup\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "mutation_allowed": re.compile(r"mutation\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "return_override_allowed": re.compile(r"return[_ -]?override\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "resource_handle_supported": re.compile(r"resource[_ -]?handle\s+(?:is\s+)?supported", re.IGNORECASE),
+}
 NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
     ".private_pod_layout_candidate.accepted_for_contract_review",
     ".identifier_redaction_evidence.accepted_for_contract_review",
@@ -706,6 +741,65 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(blocker)
 
 
+def has_negative_context(value: str, match_start: int) -> bool:
+    normalized = value.replace("_", " ")
+    clause_start = max(
+        normalized.rfind(";", 0, match_start),
+        normalized.rfind(".", 0, match_start),
+    )
+    clause_end_candidates = [
+        index
+        for index in (
+            normalized.find(";", match_start),
+            normalized.find(".", match_start),
+        )
+        if index != -1
+    ]
+    clause_end = min(clause_end_candidates) if clause_end_candidates else len(normalized)
+    prefix = normalized[clause_start + 1 : match_start]
+    suffix = normalized[match_start:clause_end]
+    if re.search(r"(?:^|\b)non[-_ ]*$", prefix, re.IGNORECASE):
+        return True
+    if NEGATIVE_CONTEXT_RE.search(prefix):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:forbidden|unavailable|blocked|redacted)\b|\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
+            suffix,
+            re.IGNORECASE,
+        )
+    )
+
+
+def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dict[str, Any]]:
+    overclaims: list[dict[str, Any]] = []
+    if isinstance(report, dict):
+        for key, item in report.items():
+            item_path = f"{path}.{key}"
+            normalized_key = str(key).replace("-", "_").replace(" ", "_")
+            if key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+                overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
+            if (
+                normalized_key not in ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS
+                and normalized_key not in READINESS_FALSE_KEYS
+                and item not in (False, None, [], {})
+                and APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(normalized_key)
+            ):
+                overclaims.append({"path": item_path, "term": "readiness_or_authorization_key", "value": item})
+            overclaims.extend(approved_runtime_report_overclaims(item, item_path))
+    elif isinstance(report, list):
+        for index, item in enumerate(report):
+            overclaims.extend(approved_runtime_report_overclaims(item, f"{path}[{index}]"))
+    elif isinstance(report, str):
+        for term, pattern in APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS.items():
+            for match in pattern.finditer(report):
+                if has_negative_context(report, match.start()):
+                    continue
+                overclaims.append({"path": path, "term": term, "value": report})
+                break
+    return overclaims
+
+
 def load_json(path: Path, label: str) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -759,6 +853,7 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
 
     validation = approved_evidence.validate_manifest(payload, check_mode="consume")
     report = approved_evidence.build_report(payload, validation, check_mode="consume")
+    accepted = not validation.blockers
     if validation.blockers:
         add(
             blockers,
@@ -767,6 +862,15 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
             reasons=[blocker["reason"] for blocker in validation.blockers],
         )
     else:
+        overclaims = approved_runtime_report_overclaims(report)
+        if overclaims:
+            add(
+                blockers,
+                "approved_runtime_evidence_report_public_readiness_overclaim",
+                "$.approved_runtime_evidence",
+                overclaims=overclaims,
+            )
+            accepted = False
         if report.get("next_blocker") != "identity_public_contract_gate_missing":
             add(
                 blockers,
@@ -774,18 +878,21 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                 "$.approved_runtime_evidence.next_blocker",
                 value=report.get("next_blocker"),
             )
+            accepted = False
         if report.get("approved_runtime_evidence_present") is not True:
             add(
                 blockers,
                 "approved_runtime_evidence_presence_missing",
                 "$.approved_runtime_evidence.approved_runtime_evidence_present",
             )
+            accepted = False
         if report.get("runtime_evidence_ready") is not True:
             add(
                 blockers,
                 "approved_runtime_evidence_runtime_ready_missing",
                 "$.approved_runtime_evidence.runtime_evidence_ready",
             )
+            accepted = False
         resolved_inputs = report.get("resolved_inputs")
         if resolved_inputs is not None:
             if not isinstance(resolved_inputs, list) or not all(
@@ -797,6 +904,7 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                     "$.approved_runtime_evidence.resolved_inputs",
                     value=resolved_inputs,
                 )
+                accepted = False
             else:
                 forbidden_inputs = sorted(
                     item
@@ -810,6 +918,7 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                         "$.approved_runtime_evidence.resolved_inputs",
                         forbidden=forbidden_inputs,
                     )
+                    accepted = False
                 unexpected_inputs = sorted(set(resolved_inputs) - {REQUIRED_RESOLVED_INPUT})
                 if unexpected_inputs:
                     add(
@@ -818,9 +927,22 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                         "$.approved_runtime_evidence.resolved_inputs",
                         unexpected=unexpected_inputs,
                     )
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+                    accepted = False
+    for key in (
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "public_header_allowed",
+        "public_contract_allowed",
+        "public_abi_ready",
+        "v1_completion_ready",
+        "v1_completion_evidence",
+        "public_sdk_v1_completion_claim",
+    ):
         if key in report and report.get(key) is not False:
             add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
+            accepted = False
+    report["accepted_for_contract_review"] = accepted
     return report
 
 
@@ -2353,7 +2475,8 @@ def build_report(
     public_abi_preflight_report = public_abi_preflight_report or {}
     owner_token_sdk_consumer_report = owner_token_sdk_consumer_report or {}
     runtime_evidence_accepted = (
-        runtime_report.get("approved_runtime_evidence_present") is True
+        runtime_report.get("accepted_for_contract_review") is True
+        and runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
         and runtime_report.get("promotion_ready") is False
         and runtime_report.get("public_sdk_ready") is False
@@ -2442,6 +2565,7 @@ def build_report(
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "approved_runtime_evidence": {
+            "accepted_for_contract_review": runtime_report.get("accepted_for_contract_review") is True,
             "approved_runtime_evidence_present": runtime_report.get("approved_runtime_evidence_present") is True,
             "runtime_evidence_ready": runtime_report.get("runtime_evidence_ready") is True,
             "promotion_ready": False,

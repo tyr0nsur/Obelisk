@@ -1608,6 +1608,40 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(state["ready"])
         self.assertEqual([], blockers)
 
+    def test_request_pack_check_does_not_read_unapproved_sidecars(self) -> None:
+        blockers: list[dict] = []
+
+        with mock.patch.object(
+            bundle_builder,
+            "run_json_check",
+            side_effect=AssertionError("unapproved request-pack sidecars must not be checked"),
+        ):
+            state = bundle_builder.request_pack_check_state(
+                {
+                    "exists": True,
+                    "path": Path("/tmp/unapproved-window-request.json"),
+                    "approved_offline_workspace": False,
+                    "protected": False,
+                },
+                {
+                    "exists": True,
+                    "path": Path("/tmp/unapproved-observer-window.env"),
+                    "approved_offline_workspace": False,
+                    "protected": False,
+                },
+                {
+                    "exists": True,
+                    "path": Path("/tmp/unapproved-operator-approval-receipt.json"),
+                    "approved_offline_workspace": False,
+                    "protected": False,
+                },
+                blockers,
+            )
+
+        self.assertFalse(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertEqual([], blockers)
+
     def test_approved_manifest_check_does_not_read_protected_manifest(self) -> None:
         blockers: list[dict] = []
         with mock.patch.object(
@@ -1621,6 +1655,27 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "path": Path("/servidor/ark/obelisk/approved-runtime-principal-lifecycle-evidence.json"),
                     "approved_offline_workspace": False,
                     "protected": True,
+                },
+                blockers,
+            )
+
+        self.assertFalse(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertEqual([], blockers)
+
+    def test_approved_manifest_check_does_not_read_unapproved_manifest(self) -> None:
+        blockers: list[dict] = []
+        with mock.patch.object(
+            bundle_builder,
+            "run_json_check",
+            side_effect=AssertionError("unapproved approved-runtime manifest must not be checked"),
+        ):
+            state = bundle_builder.approved_runtime_manifest_check_state(
+                {
+                    "exists": True,
+                    "path": Path("/tmp/approved-runtime-principal-lifecycle-evidence.json"),
+                    "approved_offline_workspace": False,
+                    "protected": False,
                 },
                 blockers,
             )

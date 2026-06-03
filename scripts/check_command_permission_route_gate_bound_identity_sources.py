@@ -146,6 +146,50 @@ def safe_optional_input_path(path: Path | None, label: str) -> Path | None:
     return resolved
 
 
+def check_approved_runtime_evidence_manifest(path: Path, temp_root: Path) -> tuple[bool, dict[str, Any] | None, int, str, str | None]:
+    argv = [
+        sys.executable,
+        str(SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"),
+        str(path),
+        "--json",
+    ]
+    env = os.environ.copy()
+    env.update({"TMPDIR": str(temp_root), "TEMP": str(temp_root), "TMP": str(temp_root)})
+    result = subprocess.run(
+        argv,
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    parse_error = None
+    report = None
+    try:
+        loaded = json.loads(result.stdout)
+        if isinstance(loaded, dict):
+            report = loaded
+        else:
+            parse_error = "stdout_json_not_object"
+    except json.JSONDecodeError as exc:
+        parse_error = f"stdout_json_decode_error: {exc}"
+    accepted = (
+        result.returncode == 0
+        and parse_error is None
+        and isinstance(report, dict)
+        and report.get("ready") is True
+        and report.get("approved_runtime_evidence_present") is True
+        and report.get("runtime_evidence_ready") is True
+        and report.get("next_blocker") == "identity_public_contract_gate_missing"
+        and report.get("promotion_ready") is False
+        and report.get("public_sdk_ready") is False
+        and report.get("public_abi_ready") is False
+        and report.get("runtime_ready") is False
+        and report.get("v1_completion_ready") is False
+    )
+    return accepted, report, result.returncode, result.stderr.strip(), parse_error
+
+
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     binder.atomic_write_json(path, payload)
 
@@ -216,6 +260,7 @@ def run_route_gate(
     lifecycle_output: Path,
     principal_output: Path,
     temp_root: Path,
+    approved_runtime: Path | None,
 ) -> tuple[int, dict[str, Any] | None, str, str | None]:
     query_failclosed_artifact = safe_optional_input_path(args.query_failclosed_artifact, "query-failclosed-artifact")
     player_identity_decisions = safe_optional_input_path(args.player_identity_decisions, "player-identity-decisions")
@@ -258,10 +303,6 @@ def run_route_gate(
         argv.extend(["--command-response-root", str(command_response_root)])
     if command_response_readiness is not None:
         argv.extend(["--command-response-readiness", str(command_response_readiness)])
-    approved_runtime = safe_optional_input_path(
-        getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
-        "approved-runtime-principal-lifecycle-evidence-manifest",
-    )
     if approved_runtime is not None:
         argv.extend(["--approved-runtime-principal-lifecycle-evidence-manifest", str(approved_runtime)])
     env = os.environ.copy()
@@ -303,20 +344,38 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
         "approved-runtime-principal-lifecycle-evidence-manifest",
     )
-    expected_blocker = (
-        "identity_public_contract_gate_missing"
-        if approved_runtime is not None
-        else "approved_runtime_evidence_missing"
-    )
-    expected_blocked_until = (
-        ["reviewed_identity_public_contract"]
-        if approved_runtime is not None
-        else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
-    )
     with tempfile.TemporaryDirectory(prefix="obelisk-bound-player-identity-route-") as temp_dir:
         temp_root = Path(temp_dir)
         reject_symlink_component(temp_root, "temp-root")
         reject_protected_output_path(temp_root, "temp-root")
+        approved_runtime_evidence_check = None
+        approved_runtime_accepted = False
+        if approved_runtime is not None:
+            (
+                approved_runtime_accepted,
+                approved_runtime_report,
+                approved_runtime_returncode,
+                approved_runtime_stderr,
+                approved_runtime_parse_error,
+            ) = check_approved_runtime_evidence_manifest(approved_runtime, temp_root)
+            approved_runtime_evidence_check = {
+                "accepted": approved_runtime_accepted,
+                "returncode": approved_runtime_returncode,
+                "stderr": approved_runtime_stderr,
+                "parse_error": approved_runtime_parse_error,
+                "report": approved_runtime_report,
+            }
+        accepted_approved_runtime = approved_runtime if approved_runtime_accepted else None
+        expected_blocker = (
+            "identity_public_contract_gate_missing"
+            if accepted_approved_runtime is not None
+            else "approved_runtime_evidence_missing"
+        )
+        expected_blocked_until = (
+            ["reviewed_identity_public_contract"]
+            if accepted_approved_runtime is not None
+            else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
+        )
         (
             binding_report,
             lifecycle_output,
@@ -333,9 +392,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             lifecycle_output=lifecycle_output,
             principal_output=principal_output,
             temp_root=temp_root,
+            approved_runtime=accepted_approved_runtime,
         )
 
     blockers: list[str] = []
+    if approved_runtime is not None and not approved_runtime_accepted:
+        blockers.append("approved_runtime_evidence_not_accepted")
     if binding_report.get("ready") is not True:
         blockers.append("identity_planning_binding_not_ready")
     if route_returncode != 0:
@@ -437,6 +499,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 str(approved_runtime) if approved_runtime is not None else None
             ),
         },
+        "approved_runtime_evidence_check": approved_runtime_evidence_check,
         "critical_path_phase": critical_path_phase,
         "route_lock": route_lock,
         "binding_report": binding_report,

@@ -653,6 +653,20 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "target_sets",
     "terms",
 }
+STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS = {
+    "evidence_kind",
+    "evidence_kinds",
+    "source_kind",
+    "source_kinds",
+    "source_target_sets",
+    "target_set",
+    "target_sets",
+}
+STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS = re.compile(
+    r"(?:approved[-_ ]?runtime[-_ ]?principal[-_ ]?lifecycle[-_ ]?evidence|"
+    r"identity[-_ ]?public[-_ ]?contract(?:[-_ ]?gate[-_ ]?missing)?)",
+    re.IGNORECASE,
+)
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
@@ -660,6 +674,7 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"players?[-_ ]?identity[-_ ]?lifecycle[-_ ]?anchor[-_ ]?candidates?|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"lifecycle[-_ ]?anchor[-_ ]?candidates?|"
+    r"request[-_ ]?packs?|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
     r"operator[-_ ]?(?:approval[-_ ]?)?receipts?|window[-_ ]?manifests?|"
     r"(?:(?:post[-_ ]?window[-_ ]?)?runtime[-_ ]?replay(?:[-_ ]?fixtures?)?|"
@@ -2767,12 +2782,20 @@ def evidence_has_non_promotional_schema_marker(
     *,
     parent_key: str | None = None,
 ) -> bool:
-    normalized_key = parent_key.lower().replace("-", "_") if isinstance(parent_key, str) else None
+    normalized_key = None
+    if isinstance(parent_key, str):
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", parent_key)
+        normalized_key = re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
     if normalized_key in STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS:
         try:
             text = json.dumps(value, sort_keys=True)
         except TypeError:
             text = str(value)
+        if (
+            normalized_key in STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS
+            and STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS.search(text)
+        ):
+            return True
         if STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS.search(text):
             return True
     if isinstance(value, dict):

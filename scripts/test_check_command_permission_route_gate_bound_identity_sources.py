@@ -145,8 +145,10 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         *,
         approved_runtime_path: Path | None = None,
         canonical_paths: bool = True,
+        approved_runtime_check: tuple[bool, dict | None, int, str, str | None] | None = None,
     ) -> dict:
         original = CHECKER.run_route_gate
+        original_approved_check = CHECKER.check_approved_runtime_evidence_manifest
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
@@ -171,6 +173,10 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                     return 0, route_report, "", None
 
                 CHECKER.run_route_gate = fake_run_route_gate
+                if approved_runtime_check is not None:
+                    CHECKER.check_approved_runtime_evidence_manifest = (
+                        lambda *_args, **_kwargs: approved_runtime_check
+                    )
                 return CHECKER.build_report(
                     self.build_args(
                         lifecycle_path,
@@ -180,6 +186,7 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                 )
         finally:
             CHECKER.run_route_gate = original
+            CHECKER.check_approved_runtime_evidence_manifest = original_approved_check
 
     def test_transient_bound_route_advances_only_to_runtime_evidence_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -269,13 +276,55 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertIn("route_gate_lock_blocked_until_unexpected", report["blockers"])
         self.assertEqual("identity_public_contract_gate_missing", report["critical_path_phase"]["current_blocker"])
 
-    def test_bound_route_allows_contract_blocker_with_explicit_runtime_evidence(self) -> None:
+    def test_bound_route_rejects_contract_blocker_with_unaccepted_runtime_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
             write_json(approved_runtime, {"schema": "test.approved-runtime"})
             report = self.run_with_fake_route_report(
                 self.base_route_report(blocker="identity_public_contract_gate_missing"),
                 approved_runtime_path=approved_runtime,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
+        self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
+        self.assertIn("route_gate_bound_identity_blocker_unexpected", report["blockers"])
+        self.assertIn("route_gate_bound_identity_primary_blocker_unexpected", report["blockers"])
+        self.assertIn("route_gate_lock_blocked_until_unexpected", report["blockers"])
+        self.assertFalse(report["approved_runtime_evidence_check"]["accepted"])
+
+    def test_bound_route_allows_contract_blocker_with_accepted_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
+            write_json(approved_runtime, {"schema": "test.approved-runtime"})
+            report = self.run_with_fake_route_report(
+                self.base_route_report(blocker="identity_public_contract_gate_missing"),
+                approved_runtime_path=approved_runtime,
+                approved_runtime_check=(
+                    True,
+                    {
+                        "ready": True,
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "v1_completion_ready": False,
+                    },
+                    0,
+                    "",
+                    None,
+                ),
             )
 
         self.assertTrue(report["valid"])
@@ -291,6 +340,7 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertEqual([], report["blockers"])
         self.assertEqual("identity_public_contract_gate_missing", report["critical_path_phase"]["current_blocker"])
         self.assertEqual(["reviewed_identity_public_contract"], report["route_lock"]["blocked_until"])
+        self.assertTrue(report["approved_runtime_evidence_check"]["accepted"])
 
     def test_rejects_stale_lifecycle_anchor_snapshot_hash_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

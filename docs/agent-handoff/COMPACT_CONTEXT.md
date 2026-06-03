@@ -1402,6 +1402,25 @@ priorities, and do not use history files as the active source of truth.
   completion suite 213, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent bound-evidence/source-marker hardening round: bound
+  identity route now validates supplied approved-runtime principal lifecycle evidence
+  with the approved-evidence checker before forwarding it or expecting
+  `identity_public_contract_gate_missing`; arbitrary files keep
+  `approved_runtime_evidence_missing` and add `approved_runtime_evidence_not_accepted`.
+  Evidence-bundle preflight requires approved-offline readable sidecars before invoking
+  request-pack, operator-receipt, or approved-runtime manifest checkers. Player identity
+  public-contract readiness records `accepted_for_contract_review` and rejects nested
+  public/header/capability/SDK/ABI/v1/downstream overclaims in approved-runtime reports
+  before resolving `runtime.lifecycle_evidence`. SDK completion accounting normalizes
+  camelCase source-marker keys (`sourceKind`, `sourceTargetSets`, `evidenceKinds`) and
+  rejects request-pack/preflight/live-ops-sidecar/approved-runtime/identity-contract
+  markers as promotion evidence. The P0 snapshot note now labels its original commit as a
+  historical checkpoint baseline. Validations passed: bound identity route 9,
+  evidence-bundle 48, player identity readiness/gap 82, route gate 46, full SDK
+  completion suite 214, route JSON valid/planning-only, SDK JSON blocked by design,
+  py_compile, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

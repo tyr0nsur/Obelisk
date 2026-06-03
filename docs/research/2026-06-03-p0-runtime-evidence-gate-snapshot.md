@@ -8,7 +8,8 @@ claim.
 
 ## Baseline
 
-- Obelisk commit: `279b16c Integrate tribe scalar accounting evidence`
+- Original checkpoint commit: `279b16c Integrate tribe scalar accounting evidence`
+- Hygiene-audit starting baseline: `b46906d`
 - Date: 2026-06-03
 - Runtime/server operation: none
 - Publication operation: none
@@ -210,6 +211,40 @@ completion suite 211, py_compile, route JSON valid/planning-only, SDK JSON
 blocked by design, and `git diff --check`. The stable
 state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
 progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Bound Evidence Source Hardening
+
+The next supervised 4-agent round closed additional source-boundary gaps without
+running a server or changing the route blocker:
+
+- The bound identity route wrapper now validates any supplied
+  `--approved-runtime-principal-lifecycle-evidence-manifest` with the approved
+  runtime evidence checker before forwarding it to the route gate. An arbitrary
+  file path no longer moves the expected blocker to
+  `identity_public_contract_gate_missing`; rejected input stays at
+  `approved_runtime_evidence_missing` and records
+  `approved_runtime_evidence_not_accepted`.
+- Evidence-bundle preflight now requires approved-offline readable sidecars
+  before invoking request-pack, operator-receipt, or approved-runtime manifest
+  checkers, so unapproved existing files are not read or treated as checked.
+- Player identity public-contract readiness now records
+  `accepted_for_contract_review` for approved runtime evidence and rejects
+  nested public/header/capability/SDK/ABI/v1/downstream overclaims in the
+  approved-runtime report before resolving `runtime.lifecycle_evidence`.
+- SDK completion accounting normalizes camelCase source-marker keys such as
+  `sourceKind`, `sourceTargetSets`, and `evidenceKinds`, and rejects
+  `request_pack`, `preflight`, `live_ops_sidecar`,
+  `approved_runtime_principal_lifecycle_evidence`, and
+  `identity_public_contract_gate_missing` as promotion evidence markers.
+- Research hygiene clarified that this note's original checkpoint commit is
+  historical and that later hardening rounds have newer local checkpoints.
+
+Validated offline: bound identity route 9, evidence-bundle 48, player identity
+public-contract readiness/gap 82, route gate 46, full SDK completion suite 214,
+route JSON valid/planning-only, SDK JSON blocked by design, py_compile, and
+`git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.
 
 ## Request Pack And Replay Binding Hardening
 

@@ -7011,6 +7011,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     surface["evidence"][key] = value
                     self.assertFalse(surface_has_promotion_evidence(surface))
 
+    def test_promotion_evidence_rejects_camel_case_non_promotional_source_markers(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+            base_surface = {
+                "id": "obelisk.structure_census.v1",
+                "status": "promoted",
+                "public_contract": ["ObeliskApi.RegisterStructureCensusCallback"],
+                "evidence": {
+                    "surface_id": "obelisk.structure_census.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                },
+            }
+            self.assertTrue(surface_has_promotion_evidence(base_surface))
+
+            cases = (
+                ("sourceKind", "request_pack"),
+                ("sourceKind", "approved_runtime_principal_lifecycle_evidence"),
+                ("evidenceKind", "identity_public_contract_gate_missing"),
+                ("sourceTargetSets", ["preflight"]),
+                ("evidenceKinds", ["live_ops_sidecar"]),
+            )
+            for key, value in cases:
+                with self.subTest(marker_key=key):
+                    surface = json.loads(json.dumps(base_surface))
+                    surface["evidence"][key] = value
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+
     def test_promoted_completion_blocker_rejects_core_test_as_sdk_consumer_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()
         for surface in manifest["surfaces"]:

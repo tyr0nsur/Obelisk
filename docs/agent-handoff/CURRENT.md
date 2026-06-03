@@ -312,3 +312,23 @@ This file is an active routing table only. Durable evidence belongs in
   valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`, py_compile, full SDK completion suite 213, and
   `git diff --check`. No runtime/server operation. Agents closed.
+- Latest round delegated evidence-bundle preflight hardening, player identity public
+  contract readiness audit, offline research hygiene, and SDK completion accounting.
+  Lead locally hardened the bound identity route wrapper so an
+  `--approved-runtime-principal-lifecycle-evidence-manifest` must pass the approved
+  runtime evidence checker before it is forwarded or allowed to change the expected
+  blocker to `identity_public_contract_gate_missing`; arbitrary files now keep
+  `approved_runtime_evidence_missing` and add `approved_runtime_evidence_not_accepted`.
+  Evidence-bundle preflight now requires approved-offline readable sidecars before
+  invoking request-pack/operator-receipt/approved-runtime checkers. Public-contract
+  readiness now tracks `accepted_for_contract_review` and rejects nested public/header/
+  capability/SDK/ABI/v1/downstream overclaims in approved-runtime reports before
+  resolving `runtime.lifecycle_evidence`. SDK completion now normalizes camelCase source
+  marker keys such as `sourceKind`, `sourceTargetSets`, and `evidenceKinds`, and rejects
+  request-pack/preflight/live-ops-sidecar/approved-runtime/identity-contract markers as
+  promotion evidence. Research hygiene clarified the P0 snapshot commit baseline.
+  Validation passed: bound identity route 9, evidence-bundle 48, player identity
+  readiness/gap 82, route gate 46, full SDK completion suite 214, route JSON
+  valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, py_compile, and `git diff --check`. No runtime/server
+  operation. Agents closed.
