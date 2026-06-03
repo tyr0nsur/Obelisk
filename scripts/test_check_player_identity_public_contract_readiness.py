@@ -39,7 +39,10 @@ OWNER_TOKEN_SDK_CONSUMER_CONTRACT = (
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import manifest as approved_manifest
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    manifest as approved_manifest,
+    safe_test_env as approved_runtime_safe_test_env,
+)
 from test_check_player_identity_identifier_redaction_evidence import evidence as redaction_manifest
 import check_player_identity_public_contract_readiness as checker
 
@@ -90,7 +93,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     *args,
                 ],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env=approved_runtime_safe_test_env(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -104,6 +107,18 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
     def public_abi_preflight_candidate(self) -> dict:
         return json.loads(PUBLIC_ABI_PREFLIGHT_CANDIDATE.read_text(encoding="utf-8"))
+
+    def accepted_runtime_contract_review_report(self) -> dict:
+        return {
+            "ready": True,
+            "next_blocker": "identity_public_contract_gate_missing",
+            "approved_runtime_evidence_present": True,
+            "runtime_evidence_ready": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+        }
 
     def test_accepts_runtime_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest())
@@ -522,7 +537,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env=approved_runtime_safe_test_env(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -569,7 +584,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env=approved_runtime_safe_test_env(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -821,7 +836,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env=approved_runtime_safe_test_env(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -1265,21 +1280,31 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["sdk_consumer"]["public_header_symbols_now"], [])
 
     def test_approved_runtime_report_must_route_to_identity_public_contract_gate(self) -> None:
-        original_build_report = checker.approved_evidence.build_report
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
 
-        def wrong_next_blocker(payload, validation, *, check_mode: str):
-            report = original_build_report(payload, validation, check_mode=check_mode)
-            report["next_blocker"] = "runtime_ready"
-            return report
+        def wrong_next_blocker(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "ready": True,
+                "next_blocker": "runtime_ready",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+            }
 
         with tempfile.TemporaryDirectory() as tmp:
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=wrong_next_blocker,
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=wrong_next_blocker),
             ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1288,11 +1313,49 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             ["approved_runtime_evidence_next_blocker_mismatch"],
         )
 
-    def test_approved_runtime_report_must_not_overclaim_public_readiness(self) -> None:
-        original_build_report = checker.approved_evidence.build_report
+    def test_approved_runtime_report_must_be_ready(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
 
-        def overclaiming_report(payload, validation, *, check_mode: str):
-            report = original_build_report(payload, validation, check_mode=check_mode)
+        def not_ready_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "ready": False,
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=not_ready_report),
+            ):
+                report = checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertIn(
+            "approved_runtime_evidence_report_ready_not_true",
+            [blocker["reason"] for blocker in blockers],
+        )
+        self.assertFalse(report["accepted_for_contract_review"])
+
+    def test_approved_runtime_report_must_not_overclaim_public_readiness(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def overclaiming_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            report = self.accepted_runtime_contract_review_report()
             report["public_sdk_ready"] = True
             return report
 
@@ -1300,10 +1363,10 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=overclaiming_report,
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report),
             ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1313,10 +1376,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
 
     def test_approved_runtime_report_rejects_nested_alias_overclaims(self) -> None:
-        original_build_report = checker.approved_evidence.build_report
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
 
-        def overclaiming_report(payload, validation, *, check_mode: str):
-            report = original_build_report(payload, validation, check_mode=check_mode)
+        def overclaiming_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            report = self.accepted_runtime_contract_review_report()
             report["nestedClaims"] = {
                 "publicSdkReady": True,
                 "publicPrincipalReady": True,
@@ -1334,10 +1400,10 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=overclaiming_report,
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report),
             ):
                 report = checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1361,10 +1427,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(report["accepted_for_contract_review"])
 
     def test_approved_runtime_report_must_not_overclaim_public_header_allowed(self) -> None:
-        original_build_report = checker.approved_evidence.build_report
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
 
-        def overclaiming_report(payload, validation, *, check_mode: str):
-            report = original_build_report(payload, validation, check_mode=check_mode)
+        def overclaiming_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            report = self.accepted_runtime_contract_review_report()
             report["public_header_allowed"] = True
             return report
 
@@ -1372,10 +1441,10 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=overclaiming_report,
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report),
             ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1406,7 +1475,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
             with (
-                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
                 mock.patch.object(checker.approved_evidence, "validate_manifest", return_value=mock.Mock(blockers=[])),
                 mock.patch.object(
                     checker.approved_evidence,
@@ -1448,10 +1517,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertNotIn("runtime.lifecycle_evidence", report["resolved_inputs"])
 
     def test_approved_runtime_report_accumulates_route_and_public_overclaims(self) -> None:
-        original_build_report = checker.approved_evidence.build_report
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
 
-        def mismatched_and_overclaiming_report(payload, validation, *, check_mode: str):
-            report = original_build_report(payload, validation, check_mode=check_mode)
+        def mismatched_and_overclaiming_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            report = self.accepted_runtime_contract_review_report()
             report["next_blocker"] = "runtime_ready"
             report["promotion_ready"] = True
             report["runtime_ready"] = True
@@ -1462,10 +1534,14 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
-                checker.approved_evidence,
-                "build_report",
-                side_effect=mismatched_and_overclaiming_report,
+            with (
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
+                mock.patch.object(checker.approved_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(
+                    checker.approved_evidence,
+                    "build_report",
+                    side_effect=mismatched_and_overclaiming_report,
+                ),
             ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
@@ -1509,7 +1585,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
             with (
-                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.dict(os.environ, approved_runtime_safe_test_env()),
                 mock.patch.object(
                     checker.approved_evidence,
                     "validate_manifest",
@@ -1560,7 +1636,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                env=approved_runtime_safe_test_env(),
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

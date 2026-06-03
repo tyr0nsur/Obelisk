@@ -17,12 +17,44 @@ namespace Obelisk
 
     namespace
     {
+        void ValidateExistingPathComponentsNoSymlinks(const std::filesystem::path& path, const char* label)
+        {
+            std::filesystem::path current;
+            for (const auto& component : path)
+            {
+                if (component == path.root_name())
+                {
+                    current = component;
+                    continue;
+                }
+                if (component == path.root_directory())
+                {
+                    current = current.empty() ? component : current / component;
+                    continue;
+                }
+
+                current = current.empty() ? component : current / component;
+                std::error_code ec;
+                const std::filesystem::file_status status = std::filesystem::symlink_status(current, ec);
+                if (status.type() == std::filesystem::file_type::not_found)
+                    return;
+                if (ec)
+                    throw std::runtime_error(std::string(label) + " path component is not accessible: " + ec.message());
+                if (std::filesystem::is_symlink(status))
+                    throw std::runtime_error(std::string(label) + " path component must not be a symlink");
+                if (current != path && !std::filesystem::is_directory(status))
+                    throw std::runtime_error(std::string(label) + " path component must be a directory");
+            }
+        }
+
         void ValidateOrCreateLogDirectory(const std::filesystem::path& path, const char* label)
         {
             if (path.empty())
                 throw std::runtime_error(std::string(label) + " is empty");
             if (!path.is_absolute())
                 throw std::runtime_error(std::string(label) + " must be absolute");
+
+            ValidateExistingPathComponentsNoSymlinks(path, label);
 
             std::error_code ec;
             const std::filesystem::file_status symlinkStatus = std::filesystem::symlink_status(path, ec);
@@ -41,6 +73,8 @@ namespace Obelisk
                 if (!std::filesystem::is_directory(symlinkStatus))
                     throw std::runtime_error(std::string(label) + " must be a directory");
             }
+
+            ValidateExistingPathComponentsNoSymlinks(path, label);
 
             const std::filesystem::file_status finalStatus = std::filesystem::symlink_status(path, ec);
             if (ec)
@@ -67,6 +101,7 @@ namespace Obelisk
                 std::filesystem::path rootPath(root);
                 if (!rootPath.is_absolute())
                     throw std::runtime_error("OBELISK_ROOT must be absolute before deriving log directory");
+                ValidateExistingPathComponentsNoSymlinks(rootPath, "OBELISK_ROOT");
                 std::error_code ec;
                 const std::filesystem::file_status rootStatus = std::filesystem::symlink_status(rootPath, ec);
                 if (ec)

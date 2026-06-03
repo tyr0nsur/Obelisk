@@ -1201,6 +1201,44 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_delegated_text_claims_without_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "delegated_route_gate_report": {
+                "schema": "obelisk.delegated-route-gate-report.v1",
+                "blockers": [],
+                "summary": "SDK v1 stable claim allowed.",
+                "notes": [
+                    "Complete SDK claim progress is 2/12.",
+                    "7/7 scoped release-statement outcomes recorded; stable SDK remains blocked.",
+                ],
+            },
+            "command": "python3 scripts/check_public_sdk_v1_completion.py --json",
+            "argv": ["python3", "scripts/check_public_sdk_v1_completion.py", "--json"],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "delegated_route_gate_report.notes[0]:positive_completion_text",
+                "delegated_route_gate_report.summary:positive_completion_text",
+            ],
+        )
+
+    def test_secondary_report_scanner_allows_delegated_text_claim_when_report_has_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["parent_blocked"],
+            "delegated_route_gate_report": {
+                "schema": "obelisk.delegated-route-gate-report.v1",
+                "blockers": ["approved_runtime_evidence_missing"],
+                "summary": "SDK v1 stable claim allowed.",
+            },
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
     def test_secondary_report_scanner_rejects_release_statement_bookkeeping_progress_aliases(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",

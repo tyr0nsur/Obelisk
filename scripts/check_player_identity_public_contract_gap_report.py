@@ -2185,6 +2185,14 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
             value=report.get("next_blocker"),
         )
         accepted = False
+    if report.get("ready") is not True:
+        add(
+            blockers,
+            "approved_runtime_evidence_report_ready_not_true",
+            "--approved-runtime-evidence.ready",
+            value=report.get("ready"),
+        )
+        accepted = False
     if report.get("approved_runtime_evidence_present") is not True:
         add(
             blockers,

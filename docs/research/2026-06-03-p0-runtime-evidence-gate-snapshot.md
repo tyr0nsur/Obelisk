@@ -767,6 +767,61 @@ Non-claims:
   production/stable SDK wording, or authorize server/runtime/Discord/GitHub
   operations.
 
+## Public-Contract, Operational-Window, SDK-Prose, Side-Lane, And Log-Path Hardening
+
+The next supervised integration round closed additional offline false positives
+and one runtime path-safety gap without changing route or SDK readiness.
+
+Integrated changes:
+
+- Public-contract readiness and gap-report intake now require delegated approved
+  runtime evidence reports to state `ready=true` before accepting
+  `runtime.lifecycle_evidence` as a contract-review input.
+- Approved runtime evidence validation now requires all nested operational-window
+  false flags to remain false, including `public_abi_ready`,
+  `stable_claim_allowed`, `*_counts_as_approved_runtime_evidence`, and
+  `approved_runtime_evidence_*` aliases.
+- SDK completion secondary-report scanning rejects delegated prose claims such as
+  `SDK v1 stable claim allowed` or positive complete-SDK progress when the nested
+  report has no local blocker, while preserving command/provenance metadata.
+- Mission/Transfer/Dino/Tribe promoted leaf evidence intake rejects symlinked or
+  protected/resolved-server evidence paths before reading a future promoted leaf
+  report.
+- Runtime logging rejects symlinked ancestor components for explicit
+  `OBELISK_LOG_DIR` and `OBELISK_ROOT`-derived log directories before creating
+  log paths.
+
+Observed unchanged state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, current blocker `approved_runtime_evidence_missing`,
+  and false public/runtime/v1 accounting.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK
+  completion `0/12`, P0 dependency chain `0/4`, package-shape drift empty, and
+  `stable_claim_allowed=false`.
+- `check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`:
+  `ready=true`, `accounting_route=candidate_only`, and false promotion/public
+  SDK/runtime readiness.
+
+Validation remained offline-only:
+
+- Approved runtime evidence plus bundle suites passed, 136 tests.
+- Player identity public-contract readiness and gap-report suites passed, 93
+  tests.
+- Mission/Transfer/Dino/Tribe outcome accounting passed, 35 tests.
+- Full SDK completion suite passed, 244 tests; focused delegated prose scanner
+  tests passed, 4 tests.
+- Runtime build passed; focused runtime CTest passed, 5/5; runtime Python
+  guardrails passed, 51 tests.
+- Handoff/research/public SDK guardrails passed, 249 tests.
+
+Non-claims:
+
+- This checkpoint does not create approved runtime evidence, authorize a runtime
+  window, clear `approved_runtime_evidence_missing`, promote public identity,
+  unlock permissions/admin or command surfaces, authorize complete/full/
+  production/stable SDK wording, or authorize Discord/GitHub publication.
+
 ## Runtime-Evidence Test Safety And Public Contract Hardening Round
 
 The next supervised four-worker round addressed offline safety and false-positive SDK

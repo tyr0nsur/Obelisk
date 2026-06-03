@@ -91,6 +91,20 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestRejectsSymlinkExplicitLogDirAncestor()
+    {
+        ResetEnv();
+        const fs::path root = MakeTempRoot("obelisk_logger_symlink_log_dir_ancestor");
+        const fs::path external = root / "external-parent";
+        fs::create_directories(external);
+        fs::create_symlink(external, root / "log-parent-link");
+        setenv("OBELISK_LOG_DIR", (root / "log-parent-link" / "logs").string().c_str(), 1);
+
+        ExpectInitThrowsContaining("symlink");
+        Require(!fs::exists(external / "logs"), "logger created logs through a symlinked log parent");
+        fs::remove_all(root);
+    }
+
     void TestRejectsSymlinkInstanceLogDir()
     {
         ResetEnv();
@@ -103,6 +117,21 @@ namespace
         setenv("OBELISK_INSTANCE_ID", "arkserver", 1);
 
         ExpectInitThrowsContaining("symlink");
+        fs::remove_all(root);
+    }
+
+    void TestRejectsRootDerivedSymlinkAncestor()
+    {
+        ResetEnv();
+        const fs::path root = MakeTempRoot("obelisk_logger_root_symlink_ancestor");
+        const fs::path external = root / "external-parent";
+        fs::create_directories(external);
+        fs::create_symlink(external, root / "root-parent-link");
+        setenv("OBELISK_ROOT", (root / "root-parent-link" / "obelisk").string().c_str(), 1);
+
+        ExpectInitThrowsContaining("symlink");
+        Require(!fs::exists(external / "obelisk" / "logs"),
+                "logger created root-derived logs through a symlinked root parent");
         fs::remove_all(root);
     }
 
@@ -127,7 +156,9 @@ int main()
         TestExplicitLogDirCreatesInstanceLogs();
         TestRejectsRelativeExplicitLogDir();
         TestRejectsSymlinkExplicitLogDir();
+        TestRejectsSymlinkExplicitLogDirAncestor();
         TestRejectsSymlinkInstanceLogDir();
+        TestRejectsRootDerivedSymlinkAncestor();
         TestRejectsRootDerivedSymlinkLogDir();
         ResetEnv();
         std::cout << "LoggerTests passed\n";

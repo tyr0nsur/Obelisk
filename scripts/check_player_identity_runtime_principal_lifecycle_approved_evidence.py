@@ -175,6 +175,21 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "non_claims",
     )
 )
+REQUIRED_OPERATIONAL_WINDOW_FALSE_FLAGS = (
+    "promotion_ready",
+    "public_header_allowed",
+    "public_abi_ready",
+    "public_sdk_ready",
+    "v1_completion_ready",
+    "runtime_ready",
+    "stable_claim_allowed",
+    "request_pack_counts_as_approved_runtime_evidence",
+    "preflight_counts_as_approved_runtime_evidence",
+    "window_manifest_counts_as_approved_runtime_evidence",
+    "completed_receipt_counts_as_approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+)
 ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS = frozenset(("path", "path_status", "sha256"))
 ALLOWED_OPERATIONAL_WINDOW_ARTIFACT_KEYS = frozenset(("path", "sha256", "verified"))
 ALLOWED_OPERATIONAL_WINDOW_PREFLIGHT_KEYS = frozenset(("pre", "post"))
@@ -2120,7 +2135,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         add(blockers, "operational_window_schema_mismatch", f"{label}.schema")
     if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
         add(blockers, "operational_window_not_ready", label)
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+    for key in REQUIRED_OPERATIONAL_WINDOW_FALSE_FLAGS:
         if window.get(key) is not False:
             add(blockers, f"operational_window_{key}_not_false", f"{label}.{key}")
     if window.get("approval") != EXPECTED_APPROVAL:

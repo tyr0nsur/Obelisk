@@ -2017,6 +2017,32 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
     def path_is_non_claim_container(path: str) -> bool:
         return any(part in {"non_claim", "non_claims"} for part in normalized_claim_path_parts(path))
 
+    def text_claim_path_is_machine_metadata(path: str) -> bool:
+        path_parts = normalized_claim_path_parts(path)
+        return (
+            normalized_claim_path_tail(path) in SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS
+            or any(
+                part
+                in {
+                    "argv",
+                    "checker",
+                    "command",
+                    "commands",
+                    "cwd",
+                    "digest",
+                    "hash",
+                    "output_name",
+                    "path",
+                    "paths",
+                    "producer",
+                    "script",
+                    "schema",
+                    "sha256",
+                }
+                for part in path_parts
+            )
+        )
+
     def has_positive_completion_claim_text(value: str) -> bool:
         for raw_clause in BROAD_CLAIM_TEXT_CLAUSE_SPLIT_RE.split(claim_search_text(value)):
             clause = re.sub(r"\s+", " ", raw_clause).strip()
@@ -2094,7 +2120,10 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 visit(item, f"{path}[{index}]", blocked_report_context)
         elif (
             isinstance(value, str)
-            and path_is_non_claim_container(path)
+            and (
+                path_is_non_claim_container(path)
+                or not text_claim_path_is_machine_metadata(path)
+            )
             and has_positive_completion_claim_text(value)
             and not blocked_report_context
         ):

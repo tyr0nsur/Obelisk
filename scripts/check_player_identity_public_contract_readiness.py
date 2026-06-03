@@ -1140,6 +1140,14 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                 value=report.get("next_blocker"),
             )
             accepted = False
+        if report.get("ready") is not True:
+            add(
+                blockers,
+                "approved_runtime_evidence_report_ready_not_true",
+                "$.approved_runtime_evidence.ready",
+                value=report.get("ready"),
+            )
+            accepted = False
         if report.get("approved_runtime_evidence_present") is not True:
             add(
                 blockers,

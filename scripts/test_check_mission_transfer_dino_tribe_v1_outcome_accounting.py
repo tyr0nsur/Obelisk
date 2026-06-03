@@ -529,6 +529,42 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_leaf_evidence_path_not_repo_relative", payload["blockers"])
 
+    def test_future_per_leaf_promoted_route_rejects_symlinked_evidence_report(self) -> None:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
+            evidence_root = Path(temp_dir)
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["public_contract"] = [f"Copied {leaf['id']} policy event"]
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [write_promoted_leaf_report(evidence_root, leaf["id"], "abi_tests")],
+                    "sdk_consumer_tests": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "sdk_consumer_tests")
+                    ],
+                    "second_source_evidence": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "second_source_evidence")
+                    ],
+                }
+            mission_entry = gameplay["leaf_decision_units"][0]["evidence"]["abi_tests"][0]
+            symlink_path = REPO_ROOT / mission_entry["path"]
+            real_path = symlink_path.with_name("mission-abi_tests-real-report.json")
+            symlink_path.rename(real_path)
+            symlink_path.symlink_to(real_path)
+
+            result = self.run_checker(manifest=manifest, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_leaf_evidence_path_rejected", payload["blockers"])
+
     def test_future_per_leaf_promoted_route_rejects_non_leaf_specific_or_planning_schema_reports(self) -> None:
         evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
         evidence_parent.mkdir(parents=True, exist_ok=True)

@@ -26,6 +26,7 @@ from check_tribe_scalar_boundary_readiness import (
     TARGET_SET as TRIBE_SCALAR_TARGET_SET,
     build_report as build_tribe_scalar_boundary_report,
 )
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -806,7 +807,21 @@ def validate_promoted_leaf_gate_report(
         return
     path = resolve_evidence_path(raw_path, manifest_dir)
     try:
-        content = path.read_bytes()
+        reject_symlink_component(path, f"{label}.path")
+        safe_path = reject_protected_input_path(path, f"{label}.path")
+    except SystemExit as exc:
+        add(
+            blockers,
+            "promoted_leaf_evidence_path_rejected",
+            f"{label}.path",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=str(path),
+            detail=str(exc),
+        )
+        return
+    try:
+        content = safe_path.read_bytes()
     except OSError as exc:
         add(
             blockers,

@@ -810,6 +810,23 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
 
+    def test_rejects_operational_window_allowed_false_flag_overclaims(self) -> None:
+        for key in OPERATIONAL_WINDOW_FALSE_FLAGS:
+            with self.subTest(key=key):
+                payload = manifest()
+                payload["operational_window"][key] = True
+                payload = add_output_artifact_identity(payload)
+
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"operational_window_{key}_not_false", report["blockers"])
+                self.assertFalse(report["approved_runtime_evidence_present"])
+                self.assertFalse(report["runtime_evidence_ready"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
+
     def test_rejects_runtime_summary_commit_that_is_not_current_head(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_current_head")
         payload = manifest()

@@ -1998,6 +1998,22 @@ priorities, and do not use history files as the active source of truth.
   `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
   package-shape drift empty, stable false. No `/servidor/ark` writes, server/runtime
   tools, marker/env edits, Discord, GitHub, tags, or publication.
+- 2026-06-03 production-hardening follow-up: four lead-delegated workers audited P0
+  runtime-evidence preparation, SDK completion accounting, side-lane offline intake, and
+  runtime/ABI path safety while the lead hardened public-contract intake. Integrated
+  changes require public-contract/gap report delegated approved-runtime reports to have
+  `ready=true`; reject nested operational-window approved-evidence overclaims such as
+  `public_abi_ready`, stable-claim, and counts-as-evidence flags; reject delegated
+  secondary-report prose such as `SDK v1 stable claim allowed` when no local blocker is
+  present; reject symlinked/protected Mission/Transfer/Dino/Tribe promoted leaf evidence
+  paths; and reject symlink ancestors in explicit/root-derived runtime log directories.
+  Validation: approved-evidence plus bundle 136 OK, public-contract readiness/gap 93 OK,
+  mission/transfer/dino/tribe accounting 35 OK, SDK completion full 244 OK, SDK focused
+  scanner 4 OK, runtime build OK, runtime CTest 5/5, runtime guardrails 51 OK,
+  handoff/research/public SDK guardrails 249 OK, route JSON valid/planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  package-shape drift empty, stable false. No `/servidor/ark` writes, server/runtime
+  tools, marker/env edits, Discord, GitHub, tags, or publication.
 
 ## Agent Coordination
 

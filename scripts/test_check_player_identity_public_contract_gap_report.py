@@ -495,6 +495,51 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_resolved_inputs_unexpected", reasons)
         self.assertFalse(runtime_report["accepted_for_contract_review"])
 
+    def test_approved_runtime_evidence_rejects_report_not_ready(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def not_ready_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "schema": checker.approved_runtime_evidence.REPORT_SCHEMA,
+                "mode": "consume",
+                "ready": False,
+                "ready_scope": "runtime_evidence_only",
+                "remaining_blockers": [],
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "observed_runtime_cases": checker.REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES,
+                "consumer_cases": checker.REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+                "consumer_boundary_assertions": checker.REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+                "resolved_inputs": ["runtime.lifecycle_evidence"],
+            }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            runtime_path = Path(tempdir) / "approved-runtime-evidence.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(checker.approved_runtime_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_runtime_evidence, "build_report", side_effect=not_ready_report),
+            ):
+                runtime_report = checker.validate_approved_runtime_evidence(runtime_path, blockers)
+
+        self.assertIn(
+            "approved_runtime_evidence_report_ready_not_true",
+            [blocker["reason"] for blocker in blockers],
+        )
+        self.assertFalse(runtime_report["accepted_for_contract_review"])
+        self.assertIsNone(runtime_report["resolved_input"])
+        self.assertEqual(runtime_report["resolved_inputs"], [])
+
     def test_approved_runtime_evidence_rejects_weak_lifecycle_report_linkage(self) -> None:
         def accepted_validation(_payload, *, check_mode: str):
             self.assertEqual(check_mode, "consume")
