@@ -108,6 +108,7 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "public_header_allowed",
     "public_header_ready",
     "public_readiness_ready",
+    "public_route_ready",
     "public_bridge_abi_allowed",
     "public_command_router_allowed",
     "public_response_abi_allowed",
@@ -123,11 +124,14 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "send_chat_allowed",
     "send_chat_api_allowed",
     "permissions_admin_ready",
+    "permissions_admin_route_ready",
     "permissions_ready",
     "permission_ready",
     "command_router_allowed",
     "runtime_delivery_allowed",
     "runtime_readiness_allowed",
+    "route_ready",
+    "route_readiness_ready",
     "public_response_path_allowed",
     "v1_completion_evidence",
     "v1_completion_ready",
@@ -202,6 +206,7 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
     r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"
     r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim|"
+    r"public[_ -]?route|route[_ -]?readiness|route|"
     r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
     r")\b(?:\s+(?:is|are))?\s+"
     r"\b(?:authorized|granted|public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
@@ -392,10 +397,8 @@ def route_checks(
     args: argparse.Namespace,
     *,
     current_route_blocker: str | None,
-    approved_runtime_evidence_accepted: bool | None = None,
+    approved_runtime_evidence_accepted: bool = False,
 ) -> list[tuple[str, list[str]]]:
-    if approved_runtime_evidence_accepted is None:
-        approved_runtime_evidence_accepted = current_route_blocker == "identity_public_contract_gate_missing"
     shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
     shared_header_args = ["--public-header", str(args.public_header)]
     route_blocker_args = ["--current-route-blocker", current_route_blocker] if current_route_blocker else []
@@ -605,6 +608,13 @@ def collect_public_or_runtime_claims(
             return any(contains_forbidden_claim_source(child) for child in item.values())
         return False
 
+    def text_claim_path_is_command_metadata(claim_path: str) -> bool:
+        return any(
+            normalized_key(part.split("[", 1)[0]) in {"argv"}
+            for part in claim_path.split(".")
+            if part
+        )
+
     if isinstance(value, dict):
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
@@ -637,7 +647,11 @@ def collect_public_or_runtime_claims(
                 )
             )
     elif isinstance(value, str):
-        if include_text_claims and contains_positive_public_or_runtime_text_claim(value):
+        if (
+            include_text_claims
+            and not text_claim_path_is_command_metadata(path)
+            and contains_positive_public_or_runtime_text_claim(value)
+        ):
             claims.append(f"{path}:positive_text_claim")
     return sorted(set(claims))
 

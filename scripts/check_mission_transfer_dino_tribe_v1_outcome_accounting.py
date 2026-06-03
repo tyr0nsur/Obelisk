@@ -320,9 +320,9 @@ FORBIDDEN_CLAIM_PATTERNS = (
 FORBIDDEN_CLAIM_RE = re.compile("|".join(f"(?:{pattern})" for pattern in FORBIDDEN_CLAIM_PATTERNS), re.IGNORECASE)
 CANDIDATE_READY_CLAIM_PATTERNS = (
     r"\b(?:public\s+SDK|public\s+ABI|runtime|runtime\s+observer|runtime\s+hook|"
-    r"v1|v1\s+SDK|promotion|release)\s+(?:ready|readiness|complete|completion)\b",
+    r"v1|v1\s+SDK|promotion|release)\s+(?:is\s+)?(?:ready|readiness|complete|completion)\b",
     r"\b(?:ready|complete)\s+for\s+v1\b",
-    r"\bv1(?:\.0)?\s+(?:stable|complete|completion|ready)\b",
+    r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b",
 )
 CANDIDATE_READY_CLAIM_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
@@ -538,6 +538,7 @@ def release_statement_outcome(text: str) -> dict[str, Any]:
             "leaf_exclusions": {},
             "leaf_promotions": {},
             "forbidden_claims": [],
+            "ready_claims": [],
         }
     surface_line = next((line for line in text.splitlines() if SURFACE_ID in line), "")
     leaf_exclusions = {}
@@ -556,6 +557,7 @@ def release_statement_outcome(text: str) -> dict[str, Any]:
         "leaf_exclusions": leaf_exclusions,
         "leaf_promotions": leaf_promotions,
         "forbidden_claims": sorted(set(forbidden_claims(text))),
+        "ready_claims": sorted(set(candidate_ready_claims(text))),
     }
 
 
@@ -1127,12 +1129,22 @@ def validate_public_contracts(
         add(blockers, "excluded_surface_public_contract_not_empty", "$.surface.public_contract")
     for claim in forbidden_claims("\n".join(surface_contract)):
         add(blockers, "public_contract_forbidden_claim", "$.surface.public_contract", claim=claim)
+    for claim in candidate_ready_claims("\n".join(surface_contract)):
+        add(blockers, "public_contract_ready_overclaim", "$.surface.public_contract", claim=claim)
     for leaf_id, leaf in leaves.items():
         contract = public_contract(leaf)
         if excluded_route and contract:
             add(blockers, "excluded_leaf_public_contract_not_empty", f"$.leaf_decision_units[{leaf_id}].public_contract", leaf=leaf_id)
         for claim in forbidden_claims("\n".join(contract)):
             add(blockers, "leaf_public_contract_forbidden_claim", f"$.leaf_decision_units[{leaf_id}].public_contract", leaf=leaf_id, claim=claim)
+        for claim in candidate_ready_claims("\n".join(contract)):
+            add(
+                blockers,
+                "leaf_public_contract_ready_overclaim",
+                f"$.leaf_decision_units[{leaf_id}].public_contract",
+                leaf=leaf_id,
+                claim=claim,
+            )
 
 
 def leaf_accounted_by(route: str, leaf_id: str, leaf: dict[str, Any], outcome: dict[str, Any]) -> str | None:
@@ -1339,6 +1351,13 @@ def build_report(
             "release_statement_forbidden_claims",
             "$.release_statement",
             claims=outcome["forbidden_claims"],
+        )
+    if outcome["ready_claims"]:
+        add(
+            blockers,
+            "release_statement_ready_overclaims",
+            "$.release_statement",
+            claims=outcome["ready_claims"],
         )
     if outcome["present"] and not statement_umbrella_excluded and not all_promoted:
         missing = [leaf_id for leaf_id in REQUIRED_LEAVES if not outcome["leaf_exclusions"].get(leaf_id)]

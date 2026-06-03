@@ -508,7 +508,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
         )
 
-        checks = dict(ROUTE_GATE.route_checks(args, current_route_blocker="identity_public_contract_gate_missing"))
+        checks = dict(
+            ROUTE_GATE.route_checks(
+                args,
+                current_route_blocker="identity_public_contract_gate_missing",
+                approved_runtime_evidence_accepted=True,
+            )
+        )
         argv = checks["player_identity_public_contract_gap"]
 
         self.assertIn("--approved-runtime-evidence", argv)
@@ -516,6 +522,29 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             str(approved_runtime),
             argv[argv.index("--approved-runtime-evidence") + 1],
         )
+
+    def test_route_checks_do_not_forward_runtime_manifest_without_accepted_diagnosis(self) -> None:
+        approved_runtime = Path("approved-runtime-looking.json")
+        args = SimpleNamespace(
+            query_failclosed_artifact=QUERY_CONTRACT,
+            player_identity_decisions=IDENTITY_DECISIONS,
+            public_sdk_surfaces=PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+
+        checks = dict(
+            ROUTE_GATE.route_checks(
+                args,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
+        )
+        argv = checks["player_identity_public_contract_gap"]
+
+        self.assertNotIn("--approved-runtime-evidence", argv)
 
     def test_approved_runtime_evidence_rejects_identity_contract_child_route_locks(self) -> None:
         original_run_check = ROUTE_GATE.run_check
@@ -1397,6 +1426,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
                 self.assertEqual(["claim:positive_text_claim"], claims)
 
+    def test_collect_public_or_runtime_claims_rejects_route_ready_text_variants(self) -> None:
+        for text in ("route ready", "route is ready", "route readiness enabled", "public route is ready"):
+            with self.subTest(text=text):
+                claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
+                self.assertEqual(["claim:positive_text_claim"], claims)
+
     def test_collect_public_or_runtime_claims_rejects_public_sdk_v1_text_and_keys(self) -> None:
         claims = ROUTE_GATE.collect_public_or_runtime_claims(
             {
@@ -1418,6 +1453,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "v1_completion_ready": True,
                 "publicSdkReady": True,
                 "publicHeaderReady": "ready",
+                "routeReady": True,
+                "route_readiness_ready": True,
+                "publicRouteReady": True,
+                "permissionsAdminRouteReady": True,
                 "complete_sdk_ready": True,
                 "full_api_supported": True,
                 "production_support_ready": True,
@@ -1446,6 +1485,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("v1_completion_ready", claims)
         self.assertIn("publicSdkReady", claims)
         self.assertIn("publicHeaderReady", claims)
+        self.assertIn("routeReady", claims)
+        self.assertIn("route_readiness_ready", claims)
+        self.assertIn("publicRouteReady", claims)
+        self.assertIn("permissionsAdminRouteReady", claims)
         self.assertIn("complete_sdk_ready", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)
@@ -1955,6 +1998,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "publicAbiReady": True,
                     "runtimeReady": True,
                     "serverOperationsAuthorized": True,
+                    "routeReady": True,
+                    "route_readiness_ready": True,
+                    "publicRouteReady": True,
+                    "permissionsAdminRouteReady": True,
                     "runtime_work_authorized": True,
                     "runtimeApprovalGranted": True,
                     "operator_approval_granted": True,
@@ -1970,6 +2017,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "permissions_admin_ready": True,
                     "notes": [
                         "public ABI is ready",
+                        "route readiness is ready",
+                        "public route is ready",
                         "send-chat ABI is public and ready",
                         "command routing is public and ready",
                         "permissions/admin is public and ready",
@@ -2013,6 +2062,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.publicAbiReady", result["public_or_runtime_claims"])
         self.assertIn("nested.runtimeReady", result["public_or_runtime_claims"])
         self.assertIn("nested.serverOperationsAuthorized", result["public_or_runtime_claims"])
+        self.assertIn("nested.routeReady", result["public_or_runtime_claims"])
+        self.assertIn("nested.route_readiness_ready", result["public_or_runtime_claims"])
+        self.assertIn("nested.publicRouteReady", result["public_or_runtime_claims"])
+        self.assertIn("nested.permissionsAdminRouteReady", result["public_or_runtime_claims"])
         self.assertIn("nested.runtime_work_authorized", result["public_or_runtime_claims"])
         self.assertIn("nested.runtimeApprovalGranted", result["public_or_runtime_claims"])
         self.assertIn("nested.operator_approval_granted", result["public_or_runtime_claims"])

@@ -307,6 +307,25 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("runtime hook", claims)
         self.assertIn("cross-map correlation", claims)
 
+    def test_release_statement_rejects_generic_sdk_runtime_v1_readiness_overclaims(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission excluded; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded; buff_status excluded. "
+            "Public SDK is ready. Runtime ready. v1 is complete.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_ready_overclaims", report["blockers"])
+        claims = report["release_statement"]["ready_claims"]
+        self.assertIn("Public SDK is ready", claims)
+        self.assertIn("Runtime ready", claims)
+        self.assertIn("v1 is complete", claims)
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_release_statement_rejects_negated_exclusion_as_affirmative_claim(self) -> None:
         statement = (
             f"{SURFACE_ID}: excluded - mission is not excluded; transfer excluded; "
@@ -343,6 +362,32 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("excluded_leaf_public_contract_not_empty", report["blockers"])
         self.assertIn("public_contract_forbidden_claim", report["blockers"])
         self.assertIn("leaf_public_contract_forbidden_claim", report["blockers"])
+
+    def test_manifest_public_contract_rejects_generic_ready_overclaims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        gameplay["public_contract"] = ["public SDK is ready"]
+        gameplay["leaf_decision_units"][0]["public_contract"] = ["runtime ready", "v1 is complete"]
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_contract_ready_overclaim", report["blockers"])
+        self.assertIn("leaf_public_contract_ready_overclaim", report["blockers"])
+        surface_claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "public_contract_ready_overclaim"
+        }
+        leaf_claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_public_contract_ready_overclaim"
+        }
+        self.assertIn("public SDK is ready", surface_claims)
+        self.assertIn("runtime ready", leaf_claims)
+        self.assertIn("v1 is complete", leaf_claims)
 
     def test_future_per_leaf_promoted_route_requires_real_evidence(self) -> None:
         evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"

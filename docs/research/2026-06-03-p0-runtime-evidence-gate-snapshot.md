@@ -332,3 +332,32 @@ smoke 6, route JSON valid/planning-only, SDK JSON blocked by design,
 py_compile, full SDK completion suite 213, and `git diff --check`. The stable
 state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
 progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Route Readiness And Release Wording Hardening
+
+The next supervised 4-agent round closed offline claim/evidence gaps without
+changing the P0 route blocker:
+
+- The route gate only forwards an approved-runtime evidence manifest after an
+  explicit accepted diagnosis; generated `argv` metadata is excluded from text
+  claim scans while structured route-ready/public-runtime aliases still block.
+- Permissions/admin readiness now emits explicit false route-readiness fields
+  and rejects `route_ready`, `public_route_ready`, and related aliases as
+  overclaims.
+- SDK completion revalidates the nested command response readiness report
+  schema and child source-artifact SHA-256 bindings before commands/replies
+  structured evidence can count.
+- Release-statement guardrails now reject broad `release-grade` and
+  `production-grade` SDK/API/support claims while allowing negated boundary
+  wording.
+- Mission/Transfer/Dino/Tribe side-lane accounting rejects generic ready,
+  public-runtime, and v1 completion overclaims in release statements and
+  public-contract fields while remaining candidate-only.
+
+Validated offline: route gate 50, permissions/admin readiness 59, command
+response/replies readiness 79, public SDK guardrails 193, mission/transfer/
+dino/tribe accounting 23, full SDK completion suite 219, route JSON
+valid/planning-only, release-statement scope check, SDK JSON blocked by design,
+py_compile, and `git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.

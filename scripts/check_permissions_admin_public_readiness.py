@@ -389,16 +389,20 @@ FALSE_ONLY_KEYS = frozenset(
         "public_header_allowed",
         "public_header_ready",
         "public_permission_cache_allowed",
+        "public_route_ready",
         "public_reply_abi_ready",
         "public_response_abi_allowed",
         "public_response_path_ready",
         "public_reply_or_send_chat_abi_allowed",
         "public_response_path_allowed",
         "public_sdk_ready",
+        "route_ready",
+        "route_readiness_ready",
         "release_readiness_ready",
         "stable_claim_allowed",
         "stable_sdk_claim_allowed",
         "stable_sdk_ready",
+        "permissions_admin_route_ready",
         "replies_send_chat_allowed",
         "reply_send_chat_router_claims_allowed",
         "runtime_delivery_allowed",
@@ -459,6 +463,7 @@ POSITIVE_CLAIM_RE = re.compile(
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
     r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
+    r"public\s+route|route|route\s+readiness|route[_ -]?ready|"
     r"release\s+readiness|stable\s+sdk|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"permissions?/admin|reply\s+endpoint|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request|endpoint))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
@@ -472,6 +477,7 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
     r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
+    r"public\s+route|route|route\s+readiness|route[_ -]?ready|"
     r"release\s+readiness|stable\s+sdk|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"permissions?/admin|reply\s+endpoint|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request|endpoint))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
@@ -1275,6 +1281,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
         "public_or_runtime_accounting_allowed": False,
+        "route_ready": False,
+        "public_route_ready": False,
+        "permissions_admin_route_ready": False,
         "promotion_ready": False,
         "public_header_allowed": False,
         "public_abi_ready": False,

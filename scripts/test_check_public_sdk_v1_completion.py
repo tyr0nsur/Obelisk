@@ -60,6 +60,60 @@ def source_artifact_hashes(**paths: Path) -> dict[str, str]:
     return {key: sha256_file(path) for key, path in paths.items()}
 
 
+def write_source_bound_command_response_report(
+    root: Path,
+    *,
+    surfaces_path: Path = PUBLIC_SDK_SURFACES,
+    public_header_path: Path = PUBLIC_HEADER,
+) -> tuple[Path, Path]:
+    readiness = root / "command-chat-response-route-planning-readiness.json"
+    readiness.write_text(
+        json.dumps(
+            {
+                "source_root": str(root),
+                "producer": {
+                    "script": "scripts/compare_reflection_snapshots.py",
+                    "output_name": "command-chat-response-route-planning-readiness.json",
+                    "argv": [
+                        "scripts/compare_reflection_snapshots.py",
+                        "--target-set",
+                        "command-chat-response-route-planning",
+                        "--readiness-report",
+                        str(readiness),
+                        "--json",
+                    ],
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    response_report_root = root / "command-chat-response-public-readiness"
+    response_report_root.mkdir(exist_ok=True)
+    response_report = response_report_root / "command-chat-response-public-readiness.json"
+    response_report.write_text(
+        json.dumps(
+            {
+                "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                "readiness_root": str(root),
+                "readiness_path": str(readiness),
+                "decisions_path": str(REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"),
+                "surfaces_path": str(surfaces_path),
+                "public_header_path": str(public_header_path),
+                "source_artifact_hashes": source_artifact_hashes(
+                    readiness_path=readiness,
+                    decisions_path=REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json",
+                    surfaces_path=surfaces_path,
+                    public_header_path=public_header_path,
+                ),
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return response_report_root, response_report
+
+
 def current_repo_head() -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -732,6 +786,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "release_candidate_ready",
             "release_package_ready",
             "release_ready",
+            "route_ready",
+            "route_readiness_ready",
+            "public_route_ready",
             "runtime_v1_ready",
             "stable_sdk_allowed",
             "stable_v1_sdk",
@@ -785,6 +842,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "schema": "obelisk.secondary-report.v1",
             "blockers": [],
             "public_sdk": {"ready": True},
+            "public_route": {"ready": True},
+            "route": {"ready": True},
             "runtime": {"ready": "yes"},
             "stable_claim": {"allowed": True},
             "v1_completion": {"progress_ratio": "1/12"},
@@ -795,7 +854,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             secondary_report_completion_claims_without_blocker(payload),
             [
                 "p0_dependency_chain.promoted_for_claim_count",
+                "public_route.ready",
                 "public_sdk.ready",
+                "route.ready",
                 "runtime.ready",
                 "stable_claim.allowed",
                 "v1_completion.progress_ratio",
@@ -857,6 +918,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "schema": "obelisk.command-permission-route-gate-check.v1",
             "blockers": [],
             "public_sdk": {"ready": True},
+            "public_route": {"ready": True},
+            "route": {"ready": True},
             "runtime": {"ready": "ready"},
             "counts_toward": {
                 "public_sdk": True,
@@ -872,7 +935,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "counts_toward.public_sdk",
                 "counts_toward.runtime",
                 "counts_toward.v1_completion",
+                "public_route.ready",
                 "public_sdk.ready",
+                "route.ready",
                 "runtime.ready",
                 "stable_claim.allowed",
             ],
@@ -2288,6 +2353,24 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertFalse(payload["stable_claim_allowed"])
 
+    def test_route_gate_claim_scanner_ignores_argv_path_metadata(self) -> None:
+        report = {
+            "checks": [
+                {
+                    "argv": [
+                        "check_commands_replies_public_readiness.py",
+                        "--response-path-report",
+                        "/tmp/command-chat-response-public-readiness/command-chat-response-public-readiness.json",
+                        "--response-path-report-root",
+                        "/tmp/command-chat-response-public-readiness",
+                    ],
+                    "public_or_runtime_claims": [],
+                }
+            ]
+        }
+
+        self.assertEqual(command_permission_route_gate_public_or_runtime_claims(report), [])
+
     def test_completion_gate_rejects_route_gate_schema_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = Path(temp_dir) / "fake_route_gate.py"
@@ -2657,6 +2740,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "countsTowardRuntime": True,
                 "counts_toward_v1_completion": True,
                 "public_or_runtime_accounting_allowed": True,
+                "routeReady": True,
+                "route_readiness_ready": True,
+                "publicRouteReady": True,
+                "permissionsAdminRouteReady": True,
                 "checks": [
                     {
                         "name": "commands_replies_public_readiness",
@@ -2674,6 +2761,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "reply_send_chat_router_claims_allowed": True,
                         "public_abi_allowed": "ready",
                         "permissions_admin_ready": True,
+                        "permissions_admin_route_ready": True,
+                        "public_route_ready": True,
+                        "route_ready": True,
+                        "route_readiness_ready": True,
                         "permissions_ready": True,
                         "permission_ready": True,
                         "operator_approval_granted": True,
@@ -2689,6 +2780,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "reply_allowed": 1,
                         "send_chat_allowed": "true",
                         "notes": [
+                            "route readiness is ready",
+                            "public route is ready",
                             "send-chat ABI is public and ready",
                             "command routing is public and ready",
                             "permissions/admin is public and ready",
@@ -2734,6 +2827,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].reply_send_chat_router_claims_allowed", claims)
         self.assertIn("checks[0].public_abi_allowed", claims)
         self.assertIn("checks[0].permissions_admin_ready", claims)
+        self.assertIn("checks[0].permissions_admin_route_ready", claims)
+        self.assertIn("checks[0].public_route_ready", claims)
+        self.assertIn("checks[0].route_ready", claims)
+        self.assertIn("checks[0].route_readiness_ready", claims)
         self.assertIn("checks[0].permissions_ready", claims)
         self.assertIn("checks[0].permission_ready", claims)
         self.assertIn("checks[0].operator_approval_granted", claims)
@@ -2765,10 +2862,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[14]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[15]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[16]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[17]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[17]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[18]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[19].non_claims[0]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[19].non_claims[1]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[19]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[20]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[21].non_claims[0]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[21].non_claims[1]:positive_text_claim", claims)
         self.assertIn("complete_sdk_ready", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)
@@ -2780,6 +2879,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("countsTowardRuntime", claims)
         self.assertIn("counts_toward_v1_completion", claims)
         self.assertIn("public_or_runtime_accounting_allowed", claims)
+        self.assertIn("routeReady", claims)
+        self.assertIn("route_readiness_ready", claims)
+        self.assertIn("publicRouteReady", claims)
+        self.assertIn("permissionsAdminRouteReady", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -8880,12 +8983,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             root = Path(core_dir)
             manifest_path = root / "custom-public-sdk-surfaces.json"
             header_path = root / "CustomObeliskApi.h"
-            response_path_report_root = root / "command-chat-response-public-readiness"
-            response_path_report_root.mkdir()
-            response_path_report = response_path_report_root / "command-chat-response-public-readiness.json"
             manifest_path.write_text(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
             header_path.write_text("#pragma once\n#define OBELISK_CUSTOM_HEADER 1\n", encoding="utf-8")
-            response_path_report.write_text("{}", encoding="utf-8")
+            response_path_report_root, response_path_report = write_source_bound_command_response_report(
+                root,
+                surfaces_path=manifest_path,
+                public_header_path=header_path,
+            )
             stale_report = {
                 "decisions_path": str(
                     REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
@@ -9008,10 +9112,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             prefix="CommandsRepliesSourceHashes",
         ) as core_dir:
             root = Path(core_dir)
-            response_report_root = root / "command-chat-response-public-readiness"
-            response_report_root.mkdir()
-            response_report = response_report_root / "command-chat-response-public-readiness.json"
-            response_report.write_text("{}", encoding="utf-8")
+            response_report_root, response_report = write_source_bound_command_response_report(root)
             report = {
                 "decisions_path": str(REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"),
                 "surfaces_path": str(PUBLIC_SDK_SURFACES),
@@ -9038,6 +9139,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(current_missing, [])
         self.assertIn(
             "public_readiness_report:response_path_report_path:source_artifact_sha256_mismatch",
+            stale_missing,
+        )
+
+    def test_commands_replies_source_artifacts_revalidate_nested_response_report_hashes(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesNestedResponseHashes",
+        ) as core_dir:
+            root = Path(core_dir)
+            response_report_root, response_report = write_source_bound_command_response_report(root)
+            response_payload = json.loads(response_report.read_text(encoding="utf-8"))
+            response_payload["source_artifact_hashes"]["readiness_path"] = "0" * 64
+            response_report.write_text(json.dumps(response_payload, sort_keys=True), encoding="utf-8")
+            report = {
+                "decisions_path": str(REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"),
+                "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                "public_header_path": str(PUBLIC_HEADER),
+                "response_path_report_path": str(response_report),
+                "response_path_report_root": str(response_report_root),
+                "source_artifact_hashes": source_artifact_hashes(
+                    decisions_path=REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json",
+                    surfaces_path=PUBLIC_SDK_SURFACES,
+                    public_header_path=PUBLIC_HEADER,
+                    response_path_report_path=response_report,
+                ),
+            }
+
+            stale_missing = module.commands_replies_public_readiness_source_artifacts_missing(
+                report,
+                "public_readiness_report",
+            )
+
+        self.assertIn(
+            "public_readiness_report:response_path_report:readiness_path:source_artifact_sha256_mismatch",
             stale_missing,
         )
 

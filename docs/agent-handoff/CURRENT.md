@@ -391,3 +391,20 @@ This file is an active routing table only. Durable evidence belongs in
   valid/planning-only at `approved_runtime_evidence_missing`, mission/transfer/dino/tribe/
   buff accounting JSON valid/candidate-only, SDK JSON blocked by design with SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`, and no runtime/server operation. Agents closed.
+- Latest round delegated P0 route acceptance, permissions/admin route-readiness,
+  downstream command response/replies evidence binding, and UE4 side-lane accounting.
+  Integrated result: the route gate now forwards approved-runtime evidence only after an
+  explicit accepted diagnosis and ignores generated `argv` metadata while still rejecting
+  route/public/runtime overclaim aliases. Permissions/admin readiness now emits explicit
+  false `route_ready`, `public_route_ready`, and `permissions_admin_route_ready` fields and
+  rejects route-ready aliases. SDK completion revalidates nested command response report
+  schema plus source-artifact SHA-256 bindings before commands/replies structured evidence
+  can count, rejects route-ready aliases in secondary reports, and blocks broad
+  `release-grade`/`production-grade` SDK/API/support release wording. Mission/Transfer/
+  Dino/Tribe side-lane accounting rejects generic ready/public-runtime/v1 overclaims in
+  release statements and public-contract fields while preserving candidate-only status.
+  Validation passed: route gate 50, permissions/admin 59, command response/replies 79,
+  public SDK guardrails 193, mission/transfer/dino/tribe accounting 23, full SDK completion
+  suite 219, py_compile, release-statement scope check, route JSON valid/planning-only, SDK
+  JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
+  `git diff --check`. No runtime/server operation. Agents closed.

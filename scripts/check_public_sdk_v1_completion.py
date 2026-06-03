@@ -269,6 +269,7 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "public_header_allowed",
     "public_header_ready",
     "public_readiness_ready",
+    "public_route_ready",
     "public_bridge_abi_allowed",
     "public_command_router_allowed",
     "public_response_abi_allowed",
@@ -284,11 +285,14 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "send_chat_allowed",
     "send_chat_api_allowed",
     "permissions_admin_ready",
+    "permissions_admin_route_ready",
     "permissions_ready",
     "permission_ready",
     "command_router_allowed",
     "runtime_delivery_allowed",
     "runtime_readiness_allowed",
+    "route_ready",
+    "route_readiness_ready",
     "public_response_path_allowed",
     "v1_completion_evidence",
     "v1_completion_ready",
@@ -357,6 +361,8 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "release_candidate_readiness_ready",
     "release_ready",
     "release_readiness_ready",
+    "route_ready",
+    "route_readiness_ready",
     "runtime_v1_ready",
     "v1_completion_ready",
     "stable_claim_allowed",
@@ -375,7 +381,8 @@ BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
     r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
-    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:public_)?route(?:_readiness)?_(?:ready|allowed|supported|enabled|public)"
     r")$"
 )
 ROUTE_GATE_OVERRIDE_TEST_ENV = "OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS"
@@ -407,6 +414,7 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
     r"send[-\s]?chat\s+abi|reply\s+endpoint|command\s+routing|permissions/admin|replies\s+api|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|runtime\s+work|"
+    r"public\s+route|route\s+readiness|route|"
     r"server\s+operations?|operator\s+approval|runtime\s+approval|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
@@ -419,6 +427,7 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
     r".{0,80}\b(?:"
     r"reply\s+api|reply\s+abi|reply\s+endpoint|send[-\s]?chat\s+api|command\s+router|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|runtime\s+work|"
+    r"public\s+route|route\s+readiness|route|"
     r"server\s+operations?|operator\s+approval|runtime\s+approval|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
@@ -558,6 +567,7 @@ REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     ),
 }
 PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS = {
+    "argv",
     "blockers",
     "candidate",
     "missing",
@@ -783,13 +793,19 @@ UTC_TIMESTAMP_RE = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})"
 )
 AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
-    r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
+    r"\b(?:complete|full|production|production[- ]?grade|release[- ]?grade|stable)\s+"
+    r"(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
     r"\b(?:sdk|api|surface|capability|support)\s+"
     r"(?:is|are|remains?|stays?)\s+"
-    r"(?:complete|full|production|stable|available|ready|supported|included|shipped|"
+    r"(?:complete|full|production|production[- ]?grade|release[- ]?grade|stable|available|ready|supported|included|shipped|"
     r"public|promoted)\b",
     r"\b[a-z0-9_ /+-]{2,80}\s+(?:is|are)\s+"
     r"(?:available|ready|supported|included|shipped|public|promoted)\s+in\s+v1\b",
+    r"\b(?:this|statement|release)\s+"
+    r"(?:declares?|approves?|allows?|authorizes?|ships?)\b.{0,80}"
+    r"\b(?:production[- ]?grade|release[- ]?grade)\b.{0,80}\b(?:sdk|api|support)\b",
+    r"\b(?:sdk|api|support)\b.{0,80}\b(?:production[- ]?grade|release[- ]?grade)\b.{0,80}"
+    r"\b(?:available|included|ready|released|shipped|supported|public|promoted|ships?)\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:this|statement|release)\s+"
@@ -813,6 +829,16 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:[a-z0-9_/+-]+\s+){1,5}(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
+    r"\b(?:this|statement|release)\s+"
+    r"(?:is|declares?|approves?|allows?|authorizes?|ships?)\b.{0,80}"
+    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|"
+    r"production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
+    r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+"
+    r"(?:is|are|remains?|stays?)\s+"
+    r"(?:release[- ]?grade)\b",
+    r"\b(?:public\s+)?(?:sdk|api|support)\b.{0,80}"
+    r"\b(?:release[- ]?grade|production[- ]?grade)\b.{0,80}"
+    r"\b(?:allowed|available|included|ready|released|shipped|supported|public|promoted|ships?)\b",
     r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)[- ]+"
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
@@ -1524,6 +1550,13 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
             if part
         )
 
+    def text_claim_path_is_command_metadata(path: str) -> bool:
+        return any(
+            normalized_key(part.split("[", 1)[0]) in {"argv"}
+            for part in path.split(".")
+            if part
+        )
+
     def claim_key_matches_path(key_name: str, path: str) -> bool:
         if (
             key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
@@ -1559,6 +1592,7 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         elif (
             isinstance(value, str)
             and not text_claim_path_is_negative_context(path)
+            and not text_claim_path_is_command_metadata(path)
             and positive_text_claim(value)
         ):
             claims.append(f"{path}:positive_text_claim")
@@ -3476,6 +3510,24 @@ def commands_replies_public_readiness_source_artifacts_missing(
         )
         if response_path_report_path != expected_response_path_report:
             missing.append(f"{reason_prefix}:response_path_report_path_mismatch")
+    if response_path_report_path is not None:
+        try:
+            response_path_report = json.loads(response_path_report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            missing.append(f"{reason_prefix}:response_path_report_path:json_unreadable")
+        else:
+            if not isinstance(response_path_report, dict):
+                missing.append(f"{reason_prefix}:response_path_report_path:json_not_object")
+            elif response_path_report.get("schema") != "obelisk.command-chat-response-public-readiness-check.v1":
+                missing.append(f"{reason_prefix}:response_path_report:schema_mismatch")
+            else:
+                for item in command_response_public_readiness_source_artifacts_missing(
+                    response_path_report,
+                    f"{reason_prefix}:response_path_report",
+                    manifest_path,
+                    public_header_path,
+                ):
+                    missing.append(item)
     return missing
 
 

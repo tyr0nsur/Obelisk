@@ -1476,6 +1476,22 @@ priorities, and do not use history files as the active source of truth.
   accounting JSON valid/candidate-only, SDK JSON blocked by design. Route/SDK remain fail-closed
   at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
   no runtime/server operation.
+- 2026-06-03 supervised 4-agent route/readiness/evidence/accounting hardening round:
+  route checks now fail closed unless approved runtime evidence carries an explicit
+  accepted diagnosis, and generated `argv` path metadata no longer creates false positive
+  route/public-runtime claims. Permissions/admin public readiness exposes explicit false
+  route-readiness fields and rejects route-ready aliases. SDK completion verifies nested
+  command response readiness report schema plus child source-artifact SHA-256 bindings before
+  commands/replies structured evidence can count, rejects route-ready aliases in secondary
+  reports, and blocks broad `release-grade`/`production-grade` SDK/API/support wording.
+  Mission/Transfer/Dino/Tribe side-lane accounting rejects generic ready/public-runtime/v1
+  overclaims in release statements and public-contract fields while staying candidate-only.
+  Validations passed: route gate 50, permissions/admin 59, command response/replies 79,
+  public SDK guardrails 193, mission/transfer/dino/tribe accounting 23, full SDK completion
+  suite 219, route JSON valid/planning-only, release-statement scope check, SDK JSON blocked
+  by design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
+  no runtime/server operation.
 
 ## Agent Coordination
 

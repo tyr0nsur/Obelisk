@@ -121,6 +121,9 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["counts_toward_runtime"])
         self.assertFalse(report["counts_toward_v1_completion"])
         self.assertFalse(report["public_or_runtime_accounting_allowed"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["public_route_ready"])
+        self.assertFalse(report["permissions_admin_route_ready"])
 
     def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
         result = run_checker(
@@ -488,6 +491,9 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             decisions["alias_claims"] = {
                 "publicReplyAbiReady": True,
                 "public-response-path-ready": True,
+                "routeReady": True,
+                "public-route-ready": True,
+                "permissionsAdminRouteReady": True,
                 "send chat ready": True,
                 "publicAbiReady": True,
                 "runtimeReady": True,
@@ -500,6 +506,8 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             }
             decisions["positive_claims"] = [
                 "public ABI is ready",
+                "route readiness is ready",
+                "permissions/admin route is ready",
                 "permissions/admin is public and ready",
                 "reply endpoint is live",
                 "command response path is live",
