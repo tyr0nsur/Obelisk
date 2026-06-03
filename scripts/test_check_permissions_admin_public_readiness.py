@@ -515,6 +515,52 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_post_identity_misleading_alias_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "identityContractReviewed": True,
+                    "principalReady": True,
+                    "permissionsQueryReady": True,
+                    "permissionsUnlocked": True,
+                    "permissionHeaderAllowed": True,
+                    "adminAuthorityReady": True,
+                    "acceptedRuntimeEvidenceReady": True,
+                },
+                "notes": [
+                    "identity contract reviewed",
+                    "principal ready",
+                    "permissions query ready",
+                    "permissions unlocked",
+                    "permission header allowed",
+                    "admin authority ready",
+                    "accepted runtime evidence ready",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.identityContractReviewed"),
+                ("public_surface_overclaim", "$.secondary_report.principalReady"),
+                ("public_surface_overclaim", "$.secondary_report.permissionsQueryReady"),
+                ("public_surface_overclaim", "$.secondary_report.permissionsUnlocked"),
+                ("public_surface_overclaim", "$.secondary_report.permissionHeaderAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.adminAuthorityReady"),
+                ("public_surface_overclaim", "$.secondary_report.acceptedRuntimeEvidenceReady"),
+                ("positive_public_surface_claim", "$.notes[0]"),
+                ("positive_public_surface_claim", "$.notes[1]"),
+                ("positive_public_surface_claim", "$.notes[2]"),
+                ("positive_public_surface_claim", "$.notes[3]"),
+                ("positive_public_surface_claim", "$.notes[4]"),
+                ("positive_public_surface_claim", "$.notes[5]"),
+                ("positive_public_surface_claim", "$.notes[6]"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims(
@@ -1102,6 +1148,79 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
+    def test_identity_contract_route_blocker_and_runtime_evidence_stay_locked_without_certificate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["support_tier"] = "release-supported copied principal"
+                    surface["capabilities"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+                    surface["public_contract"] = [
+                        "ObeliskPlayerPrincipalEvent",
+                        "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+                        "UnregisterPlayerPrincipalEventWithOwnerToken",
+                    ]
+                    surface["public_fields"] = [
+                        "abi_version",
+                        "struct_size",
+                        "principal_handle",
+                        "principal_generation",
+                        "principal_scope_flags",
+                    ]
+                    surface["abi_contract"] = [
+                        "capability_gated",
+                        "append_only_abi",
+                        "owner_token_handle_registration",
+                        "owner_scoped_unregister",
+                        "plugin_owner_cleanup",
+                        "no_ue_internals_in_public_abi",
+                    ]
+                    surface["lifecycle_contract"] = [
+                        "plugin-owner cleanup",
+                        "owner-token cleanup on init failure",
+                        "owner-token cleanup on plugin unload",
+                        "owner-scoped unregister cleanup",
+                    ]
+                    surface["evidence"]["accepted_runtime_evidence"] = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                        "result": "approved runtime principal lifecycle evidence",
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    surface["evidence"].pop("player_identity_promotion_certificate", None)
+                    surface["evidence"]["sdk_consumer_tests"] = ["tests/sdk_consumer/player_identity_plugin.cpp"]
+                    surface["v1_decision_contract"]["current_decision"] = "promoted_public_contract"
+                    surface["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"] = False
+                    surface["blockers"] = [
+                        blocker
+                        for blocker in surface["blockers"]
+                        if blocker != "No approved runtime principal lifecycle evidence."
+                    ]
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker(
+                "--surfaces",
+                str(surfaces_path),
+                "--current-route-blocker",
+                "identity_public_contract_gate_missing",
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("current_route_blocker_mismatch", report["blockers"])
+        self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["route_ready"])
+        self.assertFalse(report["public_route_ready"])
+        self.assertFalse(report["permissions_admin_route_ready"])
+        self.assertFalse(report["accepted_for_planning"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])

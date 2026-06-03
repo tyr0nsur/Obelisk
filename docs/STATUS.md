@@ -172,6 +172,21 @@ P0 route blocker `approved_runtime_evidence_missing`; until the gate output chan
 not reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin
 Hub planning, or side-lane accounting as public SDK readiness or a stable SDK claim.
 
+Current completion snapshot for agents and contributors:
+
+- P0 dependency chain: `0/4` promoted. Required order remains
+  `obelisk.player_identity.v1`, `obelisk.permissions_admin.v1`,
+  `obelisk.command_chat_response_path.v1`, and `obelisk.commands_replies.v1`.
+- Complete SDK demand families: `0/12` promoted for the complete SDK claim.
+- Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes recorded. This can
+  reduce wording/accounting blockers only; it does not increase P0 or complete-SDK
+  promotion counts.
+- Current executable route blocker: `approved_runtime_evidence_missing`. Accepted runtime
+  evidence may advance only to the locked planning blocker
+  `identity_public_contract_gate_missing`; it still does not unlock public identity,
+  permissions/admin, command response, command replies, runtime readiness, public ABI, or
+  a stable SDK claim.
+
 ## Current Game Interaction Boundary
 
 The first stable line should prove the Linux runtime, hook, plugin ABI, install layout, and

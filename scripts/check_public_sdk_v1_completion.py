@@ -1435,6 +1435,15 @@ def parse_args() -> argparse.Namespace:
             "allowing a complete v1 SDK claim while manifest blockers remain unresolved."
         ),
     )
+    parser.add_argument(
+        "--allow-scoped-release-statement-extra-records",
+        action="store_true",
+        help=(
+            "Allow explicitly requested extra surface outcome rows during scoped "
+            "release-statement validation. Without this, scope validation permits only "
+            "non-P0 v1 completion blockers that are already post-v1 or excluded in the manifest."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -2762,6 +2771,42 @@ def release_statement_surface_record_candidates(
                 )
             ) and (found_status != "promoted" or has_reviewed_details)
             records.append((found_status, line.strip(), canonical_reviewed_record))
+    return records
+
+
+def release_statement_all_surface_records(text: str | None) -> list[dict[str, str]]:
+    if text is None:
+        return []
+    pattern = re.compile(
+        rf"^\s*(?P<surface>obelisk\.[A-Za-z0-9_.-]+\.v1)\s*"
+        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+-\s+)\s*"
+        rf"(?P<status>promoted|excluded|post-v1)"
+        rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
+        re.IGNORECASE,
+    )
+    records: list[dict[str, str]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        match = pattern.fullmatch(line)
+        if not match:
+            continue
+        status = match.group("status").lower()
+        has_reviewed_details = bool((match.group("details") or "").strip())
+        canonical_reviewed_record = bool(
+            re.fullmatch(
+                RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
+                match.group("delimiter"),
+            )
+        ) and (status != "promoted" or has_reviewed_details)
+        if not canonical_reviewed_record:
+            continue
+        records.append(
+            {
+                "surface": match.group("surface"),
+                "outcome": status,
+                "line": line.strip(),
+                "line_number": str(line_number),
+            }
+        )
     return records
 
 
@@ -6065,6 +6110,23 @@ def build_report(
         public_header_path,
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
+    release_statement_surface_records_all = release_statement_all_surface_records(
+        release_statement_text
+    )
+    scoped_release_statement_allowed_surface_records = [
+        row["surface"]
+        for row in blocker_outcome_rows
+        if row.get("is_p0_dependency_chain") is not True
+        and row.get("manifest_outcome") in {"post-v1", "excluded"}
+    ]
+    scoped_release_statement_allowed_surface_record_set = set(
+        scoped_release_statement_allowed_surface_records
+    )
+    scoped_release_statement_unexpected_surface_records = [
+        record
+        for record in release_statement_surface_records_all
+        if record["surface"] not in scoped_release_statement_allowed_surface_record_set
+    ]
     p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]
     manifest_promoted_but_non_counting = blocker_outcome_summary[
         "manifest_promoted_but_non_counting"
@@ -6270,6 +6332,13 @@ def build_report(
         "release_statement_missing_experimental_outcomes": sorted(set(release_statement_missing_experimental_outcomes)),
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
         "release_statement_forbidden_broad_claims": release_statement_forbidden_claims,
+        "release_statement_surface_records": release_statement_surface_records_all,
+        "scoped_release_statement_allowed_surface_records": (
+            scoped_release_statement_allowed_surface_records
+        ),
+        "scoped_release_statement_unexpected_surface_records": (
+            scoped_release_statement_unexpected_surface_records
+        ),
         "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
         "v1_sdk_blocker_outcomes": blocker_outcome_rows,
         "v1_sdk_blocker_outcome_summary": blocker_outcome_summary,
@@ -6439,7 +6508,11 @@ def build_report(
     }
 
 
-def add_scoped_release_statement_result(report: dict[str, Any]) -> dict[str, Any]:
+def add_scoped_release_statement_result(
+    report: dict[str, Any],
+    *,
+    allow_extra_records: bool = False,
+) -> dict[str, Any]:
     blocking_report_blockers = [
         blocker
         for blocker in report.get("blockers", [])
@@ -6447,6 +6520,9 @@ def add_scoped_release_statement_result(report: dict[str, Any]) -> dict[str, Any
     ]
     if report.get("release_statement") is None:
         blocking_report_blockers.append("scoped_release_statement_path_required")
+    unexpected_records = report.get("scoped_release_statement_unexpected_surface_records")
+    if unexpected_records and not allow_extra_records:
+        blocking_report_blockers.append("scoped_release_statement_unexpected_surface_records")
     scoped_ready = not blocking_report_blockers
     report["scoped_release_statement"] = {
         "ready": scoped_ready,
@@ -6455,6 +6531,12 @@ def add_scoped_release_statement_result(report: dict[str, Any]) -> dict[str, Any
         "allowed_remaining_blockers": sorted(
             set(report.get("blockers", [])) & SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS
         ),
+        "allowed_surface_records": report.get(
+            "scoped_release_statement_allowed_surface_records",
+            [],
+        ),
+        "unexpected_surface_records": unexpected_records or [],
+        "extra_records_explicitly_allowed": allow_extra_records,
         "non_claim": (
             "A scoped release statement records reviewed exclusions/post-v1 outcomes only; "
             "it does not authorize v1.0 stable, complete SDK, full SDK, or production SDK wording."
@@ -6623,6 +6705,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         ],
         "release_statement_missing_public_sdk_surfaces_reference": [
             "The release statement does not reference docs/public_sdk_surfaces.json.",
+        ],
+        "scoped_release_statement_unexpected_surface_records": [
+            "The scoped release statement contains surface rows outside the default scoped builder set.",
+            f"Rows: {format_human_list([record.get('line') for record in report.get('scoped_release_statement_unexpected_surface_records', [])], limit=4)}.",
+            "Action: remove P0, promoted, experimental, and non-blocker rows, or rerun scope validation with --allow-scoped-release-statement-extra-records when the extra rows are intentional.",
         ],
         "blocked_public_contract_header_symbols_detected": [
             "The public header contains symbols that look like blocked public contract surface drift.",
@@ -6902,7 +6989,10 @@ def main() -> int:
         args.structure_build_policy_offline_intake,
     )
     if args.validate_release_statement_scope:
-        report = add_scoped_release_statement_result(report)
+        report = add_scoped_release_statement_result(
+            report,
+            allow_extra_records=args.allow_scoped_release_statement_extra_records,
+        )
         if args.json:
             print(json.dumps(report, indent=2, sort_keys=True))
         else:

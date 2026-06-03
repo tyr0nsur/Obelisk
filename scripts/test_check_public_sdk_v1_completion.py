@@ -304,29 +304,70 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.assertEqual(build_result.returncode, 0, build_result.stderr)
             statement = statement_path.read_text(encoding="utf-8")
             self.assertIn("bookkeeping only", statement)
+            self.assertIn("docs/SDK_V1_COMPATIBILITY.md", statement)
+            self.assertIn("docs/public_sdk_surfaces.json", statement)
             self.assertIn("obelisk.inventory_items_mutation.v1: post-v1 - no Inventory SDK", statement)
             self.assertIn("obelisk.structure_census.v1: excluded - no StructureEvents SDK", statement)
+            for surface_id in (
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.gameplay_policy_event.v1",
+                "obelisk.chat_message.v1",
+                "obelisk.chat.local_routing.v1",
+                "obelisk.inventory_item_copied_signals.v1",
+                "obelisk.lifecycle_config_logging.v1",
+                "obelisk.descriptors.v1",
+                "obelisk.process_local_timers.v1",
+            ):
+                with self.subTest(surface_id=surface_id):
+                    self.assertNotIn(f"{surface_id}:", statement)
             self.assertNotIn("obelisk.arkapi_compatibility.v1:", statement)
 
             result = self.run_checker(
                 "--release-statement",
                 str(statement_path),
+                "--validate-release-statement-scope",
                 "--json",
                 check=False,
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0)
         self.assertFalse(payload["ready"])
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
         self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
         self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertNotIn("release_statement_missing_sdk_compatibility_reference", payload["blockers"])
+        self.assertNotIn("release_statement_missing_public_sdk_surfaces_reference", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(payload["scoped_release_statement"]["unexpected_surface_records"], [])
+        self.assertEqual(
+            payload["scoped_release_statement"]["allowed_surface_records"],
+            [
+                "obelisk.inventory_items_mutation.v1",
+                "obelisk.object_identity_resource_handle.v1",
+                "obelisk.structure_census.v1",
+                "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.player_services_economy_mobility.v1",
+                "obelisk.operator_ingress_storage.v1",
+                "obelisk.gameplay_tick_callbacks.v1",
+            ],
+        )
         self.assertEqual(
             payload["v1_sdk_progress"]["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
             7,
         )
+        self.assertEqual(
+            payload["v1_sdk_progress"]["p0_release_statement_scoped_non_complete_outcome_count"],
+            0,
+        )
         self.assertEqual(payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_ratio"], "0/12")
         self.assertEqual(payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_ratio"], "0/4")
         self.assertIn("v1_required_dependency_chain_unpromoted", payload["blockers"])
 
     def route_gate_override_env(self) -> dict[str, str]:
@@ -4506,6 +4547,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--structure-build-policy-offline-intake",
                 str(build_policy_checker),
                 "--validate-release-statement-scope",
+                "--allow-scoped-release-statement-extra-records",
                 "--json",
             )
 
@@ -4599,6 +4641,94 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
         self.assertIn("v1_completion_required_false", payload["blockers"])
 
+    def test_scoped_release_statement_scope_rejects_unexpected_surface_records_by_default(self) -> None:
+        extra_records = {
+            "obelisk.player_identity.v1": (
+                "obelisk.player_identity.v1: excluded - no player identity API is included in v1"
+            ),
+            "obelisk.lifecycle_config_logging.v1": (
+                "obelisk.lifecycle_config_logging.v1: excluded - no lifecycle/config/logging "
+                "release-statement bookkeeping is included in v1"
+            ),
+            "obelisk.chat_message.v1": (
+                "obelisk.chat_message.v1: excluded - no ChatMessageEvent is included in v1"
+            ),
+            "obelisk.arkapi_compatibility.v1": (
+                "obelisk.arkapi_compatibility.v1: excluded - no ArkApi compatibility layer is included in v1"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "\n".join(extra_records.values())
+                + "\n",
+                encoding="utf-8",
+            )
+
+            blocked_result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+            allowed_result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--allow-scoped-release-statement-extra-records",
+                "--json",
+                check=False,
+            )
+
+        blocked_payload = json.loads(blocked_result.stdout)
+        self.assertEqual(blocked_result.returncode, 1)
+        self.assertFalse(blocked_payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "scoped_release_statement_unexpected_surface_records",
+            blocked_payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertEqual(
+            [
+                record["surface"]
+                for record in blocked_payload["scoped_release_statement"][
+                    "unexpected_surface_records"
+                ]
+            ],
+            list(extra_records),
+        )
+        self.assertEqual(blocked_payload["release_statement_forbidden_broad_claims"], [])
+        self.assertEqual(blocked_payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(
+            blocked_payload["v1_sdk_progress"][
+                "non_p0_release_statement_post_v1_or_excluded_outcome_count"
+            ],
+            7,
+        )
+        self.assertEqual(
+            blocked_payload["v1_sdk_progress"][
+                "p0_release_statement_scoped_non_complete_outcome_count"
+            ],
+            0,
+        )
+        self.assertEqual(
+            blocked_payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_ratio"],
+            "0/12",
+        )
+        self.assertEqual(
+            blocked_payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_ratio"],
+            "0/4",
+        )
+        self.assertFalse(blocked_payload["stable_claim_allowed"])
+
+        allowed_payload = json.loads(allowed_result.stdout)
+        self.assertEqual(allowed_result.returncode, 0)
+        self.assertTrue(allowed_payload["scoped_release_statement"]["ready"])
+        self.assertTrue(
+            allowed_payload["scoped_release_statement"]["extra_records_explicitly_allowed"]
+        )
+
     def test_complete_claim_rejects_all_excluded_blockers_as_scoped_only(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4625,6 +4755,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--structure-build-policy-offline-intake",
                 str(build_policy_checker),
                 "--validate-release-statement-scope",
+                "--allow-scoped-release-statement-extra-records",
                 "--json",
                 check=False,
             )

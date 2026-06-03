@@ -715,6 +715,79 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Post-Identity Lock And Scoped Release Statement Hardening
+
+Another supervised four-agent round plus lead integration hardened downstream
+offline gates without changing the active route blocker or SDK completion count.
+
+Delegated scopes and integrated findings:
+
+- Permissions/admin: accepted runtime evidence and
+  `identity_public_contract_gate_missing` remain insufficient to unlock
+  permissions/admin. The checker and query fail-closed contract now reject
+  misleading aliases such as `identityContractReviewed`, `principalReady`,
+  `permissionsQueryReady`, `permissionsUnlocked`, `permissionHeaderAllowed`,
+  `adminAuthorityReady`, and `acceptedRuntimeEvidenceReady` unless the promoted
+  identity public contract plus matching certificate exists.
+- Command response/replies: downstream gates now reject additional false-ready
+  aliases including `commandRouteReady`, `replyPathReady`, `commandsUnlocked`,
+  `responseHeaderAllowed`, and `acceptedRuntimeEvidenceReady`. Existing send-chat,
+  moderation, and broadcast readiness aliases remain fail-closed.
+- Scoped v1 release statement: the draft builder records only the seven non-P0
+  manifest post-v1/excluded completion blockers and cites
+  `docs/SDK_V1_COMPATIBILITY.md` plus `docs/public_sdk_surfaces.json`. Scoped
+  validation now records all surface rows and rejects unexpected P0, promoted,
+  experimental, or non-blocker rows by default; extra rows require the explicit
+  `--allow-scoped-release-statement-extra-records` opt-in.
+- Offline research hygiene: stale player-identity core/reflection inventory
+  command recipes are recovery-only, not the current P0 next action. The accepted
+  planning anchors remain `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout`; `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer` are admin targets, not lifecycle
+  anchors.
+- Contributor status: `docs/STATUS.md` now has a current completion snapshot:
+  P0 `0/4`, complete SDK `0/12`, scoped release-statement bookkeeping `0/7`,
+  `approved_runtime_evidence_missing`, and `stable_claim_allowed=false`.
+
+Observed unchanged route and SDK state:
+
+- Route JSON remains `valid=true`, `planning_only=true`,
+  `current_route_blocker=approved_runtime_evidence_missing`,
+  `remaining_route_blockers=["approved_runtime_evidence_missing"]`, and all
+  public/runtime/v1 accounting flags false.
+- SDK JSON without a release statement remains blocked by design with
+  `ready=false`, complete SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`,
+  and missing release-statement outcomes for the seven non-P0 scoped rows.
+- SDK JSON with a generated scoped release statement reports
+  `scoped_release_statement.ready=true`, clears the seven missing statement
+  outcomes, keeps P0 scoped outcomes at `0`, and still keeps `ready=false`,
+  complete SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+Validation remained offline-only:
+
+- `test_check_permissions_admin_public_readiness.py`: 64 tests OK.
+- `test_check_permissions_admin_query_failclosed_contract.py`: 44 tests OK.
+- `test_check_command_chat_response_public_readiness.py`: 40 tests OK.
+- `test_check_commands_replies_public_readiness.py`: 45 tests OK.
+- `test_check_public_sdk_v1_completion.py`: 232 tests OK.
+- `python3 -m unittest scripts.test_research_doc_guardrails scripts.test_agent_handoff_guardrails`:
+  48 tests OK.
+- `check_command_permission_route_gate.py --json`: route still planning-only at
+  `approved_runtime_evidence_missing`.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK `0/12`,
+  P0 `0/4`, and `stable_claim_allowed=false`.
+- Generated scoped release-statement validation:
+  `scoped_release_statement.ready=true`, statement outcomes `7/7`, complete SDK
+  `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+- `py_compile` and `git diff --check`: OK.
+
+Non-claims:
+
+- This round did not create approved runtime evidence, promote identity, unlock
+  permissions/admin, expose command response/replies ABI, authorize server
+  operations, change markers/env, run runtime observation, send Discord, publish
+  GitHub state, or permit complete/full/production/stable SDK wording.
+
 ## SDK Side-Lane, Descriptor, And Runtime-Evidence Alias Hardening
 
 The next delegated integration round closed more offline overclaim paths without changing

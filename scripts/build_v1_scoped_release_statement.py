@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from check_public_sdk_v1_completion import (
+    CANONICAL_EXPERIMENTAL_SURFACE_IDS,
+    CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN,
     DEFAULT_MANIFEST,
     as_string_list,
     required_release_statement_text,
@@ -56,11 +58,16 @@ def build_statement(manifest: dict[str, Any]) -> str:
     by_id = surfaces_by_id(manifest)
     lines = [
         "# Scoped non-complete v1 release-statement draft.",
+        "# Reviewed against docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json.",
         "# These rows are bookkeeping only and do not authorize stable/full/production SDK wording.",
     ]
     for surface_id in post_v1_or_excluded:
         if surface_id not in completion_blockers:
             continue
+        if surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN:
+            raise ValueError(f"scoped builder cannot emit P0 dependency-chain surface: {surface_id}")
+        if surface_id in CANONICAL_EXPERIMENTAL_SURFACE_IDS:
+            raise ValueError(f"scoped builder cannot emit promoted-experimental surface: {surface_id}")
         surface = by_id.get(surface_id)
         if not surface:
             raise ValueError(f"post_v1_or_excluded surface missing from manifest.surfaces: {surface_id}")

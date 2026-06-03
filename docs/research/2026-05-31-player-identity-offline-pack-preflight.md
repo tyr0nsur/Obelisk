@@ -274,8 +274,9 @@ make runtime evidence present, and does not change `promotion_ready=false`,
 
 Closing `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer` removed the admin-surface fixture gap. It does
-not unblock permissions, command routing, operator ingress/storage, Inventory SDK, runtime
-identity, approved runtime evidence, or any public v1 SDK claim.
+not make them lifecycle anchors and does not unblock permissions, command routing,
+operator ingress/storage, Inventory SDK, runtime identity, approved runtime evidence, or
+any public v1 SDK claim.
 
 ## Completed Admin Snapshot Route
 
@@ -354,6 +355,15 @@ pack must be tied back to the complete core evidence-pack manifest before
 `players-identity-lifecycle-intake` planning is accepted.
 Likewise, orientation-only static admin thunks are not enough to rebuild the reflection
 inventory pack or replace the completed admin focal snapshots.
+
+## Recovery-Only Staged Input Recipe
+
+The command recipe below is historical recovery guidance only. Do not use it as the
+current P0 next action and do not run it for the current binary unless the binary hash
+changes or a reviewed artifact contradicts the source-bound planning manifests. The
+current route already has accepted planning anchors
+`ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`; the active blocker is
+approved copied runtime principal lifecycle evidence.
 
 If a complete non-protected core evidence pack is available, a safe inventory-build route
 is:

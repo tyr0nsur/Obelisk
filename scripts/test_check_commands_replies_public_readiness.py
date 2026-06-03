@@ -490,6 +490,11 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         READINESS.collect_overclaims(
             {
                 "secondary_report": {
+                    "acceptedRuntimeEvidenceReady": True,
+                    "broadcastReady": True,
+                    "commandRouteReady": True,
+                    "commandsUnlocked": True,
+                    "moderationReady": True,
                     "permissionsAdminRouteReady": True,
                     "publicBridgeAbiAllowed": True,
                     "publicHeaderReady": True,
@@ -497,6 +502,8 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                     "publicResponseAbiAllowed": True,
                     "publicResponsePathReady": True,
                     "publicSdk": True,
+                    "replyPathReady": True,
+                    "responseHeaderAllowed": True,
                     "runtimeApproval": True,
                     "runtimeApprovalGranted": True,
                     "runtimeWorkAuthorized": True,
@@ -509,6 +516,11 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
         self.assertEqual(
             [
+                ("public_surface_overclaim", "$.secondary_report.acceptedRuntimeEvidenceReady"),
+                ("public_surface_overclaim", "$.secondary_report.broadcastReady"),
+                ("public_surface_overclaim", "$.secondary_report.commandRouteReady"),
+                ("public_surface_overclaim", "$.secondary_report.commandsUnlocked"),
+                ("public_surface_overclaim", "$.secondary_report.moderationReady"),
                 ("public_surface_overclaim", "$.secondary_report.permissionsAdminRouteReady"),
                 ("public_surface_overclaim", "$.secondary_report.publicBridgeAbiAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.publicHeaderReady"),
@@ -516,6 +528,8 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                 ("public_surface_overclaim", "$.secondary_report.publicResponseAbiAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.publicResponsePathReady"),
                 ("public_surface_overclaim", "$.secondary_report.publicSdk"),
+                ("public_surface_overclaim", "$.secondary_report.replyPathReady"),
+                ("public_surface_overclaim", "$.secondary_report.responseHeaderAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.runtimeApproval"),
                 ("public_surface_overclaim", "$.secondary_report.runtimeApprovalGranted"),
                 ("public_surface_overclaim", "$.secondary_report.runtimeWorkAuthorized"),

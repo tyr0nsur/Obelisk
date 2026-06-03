@@ -559,12 +559,19 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         READINESS.collect_surface_overclaims(
             {
                 "secondary_report": {
+                    "acceptedRuntimeEvidenceReady": True,
+                    "broadcastReady": True,
+                    "commandRouteReady": True,
                     "commandRouterAllowed": True,
+                    "commandsUnlocked": True,
+                    "moderationReady": True,
                     "operatorApprovalGranted": True,
                     "publicAbiAllowed": True,
                     "publicBridgeAbiAllowed": True,
                     "publicCommandRouterAllowed": True,
                     "publicResponseAbiAllowed": True,
+                    "replyPathReady": True,
+                    "responseHeaderAllowed": True,
                     "replySendChatRouterClaimsAllowed": True,
                     "runtimeWorkAuthorized": True,
                     "serverOperationsAuthorized": True,
@@ -576,12 +583,19 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
 
         self.assertEqual(
             [
+                ("public_surface_overclaim", "$.secondary_report.acceptedRuntimeEvidenceReady"),
+                ("public_surface_overclaim", "$.secondary_report.broadcastReady"),
+                ("public_surface_overclaim", "$.secondary_report.commandRouteReady"),
                 ("public_surface_overclaim", "$.secondary_report.commandRouterAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.commandsUnlocked"),
+                ("public_surface_overclaim", "$.secondary_report.moderationReady"),
                 ("public_surface_overclaim", "$.secondary_report.operatorApprovalGranted"),
                 ("public_surface_overclaim", "$.secondary_report.publicAbiAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.publicBridgeAbiAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.publicCommandRouterAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.publicResponseAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.replyPathReady"),
+                ("public_surface_overclaim", "$.secondary_report.responseHeaderAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.replySendChatRouterClaimsAllowed"),
                 ("public_surface_overclaim", "$.secondary_report.runtimeWorkAuthorized"),
                 ("public_surface_overclaim", "$.secondary_report.serverOperationsAuthorized"),

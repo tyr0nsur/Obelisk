@@ -199,17 +199,18 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 P0 runtime-evidence preparation hardening after
-  `7581cd9` delegated four scopes: request-pack/preflight/window sidecars, player
-  identity public-contract aliases, bound approved-runtime route evidence, and stale
-  offline reversing notes. Integrated changes keep request/preflight/window/receipt
-  artifacts explicitly non-evidence, require approved-runtime diagnoses to bind the exact
-  CLI manifest path plus false/empty public/runtime fields, reject identity contract
-  aliases such as `contractReviewed`/`publicIdentityReady`, add a scoped release-statement
-  draft builder for seven non-P0 post-v1/excluded blockers, and mark old core/admin/
-  second-source commands recovery-only. Validation: route gate 53 OK, bound route 11 OK,
-  identity public contract 101 OK, preflight shell OK, request/window 147 OK, approved
-  evidence 136 OK, public SDK/completion guardrails 427 OK, route JSON planning-only at
-  `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, `py_compile` and `git diff --check` OK. No
-  runtime/server/Discord/GitHub operation.
+- Latest integration note: 2026-06-03 delegated four scopes for post-identity lock and
+  SDK bookkeeping hardening. Integrated changes keep permissions/admin locked after
+  accepted runtime evidence or `identity_public_contract_gate_missing` until promoted
+  identity contract plus certificate; command response/replies reject route/reply/header/
+  accepted-runtime aliases; scoped v1 release-statement validation now accepts only the
+  seven non-P0 post-v1/excluded rows by default and rejects P0/promoted/experimental/
+  non-blocker rows unless explicitly allowed; stale player-identity pack recipes are
+  marked recovery-only and admin targets stay non-lifecycle anchors. Status docs now
+  expose SDK `0/12`, P0 `0/4`, scoped release-statement bookkeeping `0/7`, and
+  `stable_claim_allowed=false`. Validation: permissions/admin 64 OK, permissions query
+  44 OK, command response 40 OK, command replies 45 OK, public SDK completion 232 OK,
+  research+handoff 48 OK, route JSON planning-only at `approved_runtime_evidence_missing`,
+  SDK JSON blocked with SDK `0/12`, P0 `0/4`, and generated scoped statement
+  `ready=true` as non-complete bookkeeping only. `py_compile` and `git diff --check` OK.
+  No runtime/server/Discord/GitHub operation.

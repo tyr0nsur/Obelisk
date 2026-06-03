@@ -274,6 +274,18 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
             self.assertIn("runtime serial reuse/wraparound semantics", text)
         self.assertIn("rejected object samples plus runtime serial reuse/wraparound semantics", status)
 
+    def test_status_matrix_keeps_current_v1_completion_snapshot(self) -> None:
+        status = normalized((REPO_ROOT / "docs" / "STATUS.md").read_text(encoding="utf-8"))
+
+        self.assertIn("Current completion snapshot for agents and contributors", status)
+        self.assertIn("P0 dependency chain: `0/4` promoted", status)
+        self.assertIn("Complete SDK demand families: `0/12` promoted", status)
+        self.assertIn("Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes", status)
+        self.assertIn("approved_runtime_evidence_missing", status)
+        self.assertIn("identity_public_contract_gate_missing", status)
+        self.assertIn("does not unlock public identity, permissions/admin, command response, command replies", status)
+        self.assertIn("stable SDK claim", status)
+
     def test_player_identity_focal_plans_require_exact_targets(self) -> None:
         current = normalized(CURRENT.read_text(encoding="utf-8"))
         compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))

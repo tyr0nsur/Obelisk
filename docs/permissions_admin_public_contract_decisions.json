@@ -64,6 +64,8 @@
         "player identity planning evidence alone cannot enable permissions/admin",
         "runtime principal evidence alone is not public identity promotion",
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
+        "identity_public_contract_gate_missing is an identity route blocker only and cannot unlock permissions/admin before a promoted identity public contract and certificate",
+        "accepted runtime evidence ready aliases such as acceptedRuntimeEvidenceReady, identityContractReviewed, principalReady, permissionsQueryReady, permissionsUnlocked, permissionHeaderAllowed, and adminAuthorityReady cannot unlock permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
         "permissions/admin structured promotion evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in the ordered P0 dependency chain, bound by reviewed evidence artifact hash",

@@ -131,17 +131,61 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             REPO_ROOT / "docs/research/2026-05-31-player-identity-offline-pack-preflight.md"
         ).read_text(encoding="utf-8")
         section = offline_pack.split("## Safe Next Step", 1)[1]
+        current_step = section.split("## Recovery-Only Staged Input Recipe", 1)[0]
+        recovery_recipe = section.split("## Recovery-Only Staged Input Recipe", 1)[1].split(
+            "## Boundary", 1
+        )[0]
         compact = normalized(section)
+        current_step_compact = normalized(current_step)
+        recovery_compact = normalized(recovery_recipe)
 
         self.assertIn("consume-only for the current route", compact)
         self.assertIn("approved copied runtime principal lifecycle evidence", compact)
         self.assertIn("reviewed public identity contract gate", compact)
         self.assertIn("principal privacy/invalidation policy", compact)
         self.assertIn("or lifecycle layout alone", compact)
+        self.assertIn("ShooterGameMode.HandleNewPlayer", current_step_compact)
+        self.assertIn("ShooterGameMode.OnLogout", current_step_compact)
+        self.assertIn("Recovery-Only Staged Input Recipe", section)
+        self.assertIn("historical recovery guidance only", recovery_compact)
+        self.assertIn("binary hash changes", recovery_compact)
+        self.assertIn("contradicts the source-bound planning manifests", recovery_compact)
+        self.assertIn("approved copied runtime principal lifecycle evidence", recovery_compact)
+        self.assertNotIn("build_core_dump_evidence_pack.py", current_step)
+        self.assertNotIn("build_reflection_inventory_pack.py", current_step)
         self.assertNotIn(
             "The next useful action is to finish the principal privacy and invalidation policy",
             section,
         )
+
+    def test_player_identity_admin_targets_are_not_lifecycle_anchors(self) -> None:
+        notes = {
+            "offline_pack": REPO_ROOT
+            / "docs/research/2026-05-31-player-identity-offline-pack-preflight.md",
+            "targetset_gap": REPO_ROOT / "docs/research/2026-05-31-player-identity-targetset-gap.md",
+            "readme": REPO_ROOT / "docs/research/README.md",
+        }
+
+        for name, path in notes.items():
+            compact = normalized(path.read_text(encoding="utf-8"))
+            with self.subTest(note=name):
+                self.assertIn("ShooterPlayerController.ServerListPlayers", compact)
+                self.assertIn("ShooterPlayerController.ServerKickPlayer", compact)
+                self.assertIn("ShooterGameMode.HandleNewPlayer", compact)
+                self.assertIn("ShooterGameMode.OnLogout", compact)
+
+        offline_pack = normalized(notes["offline_pack"].read_text(encoding="utf-8"))
+        self.assertIn("does not make them lifecycle anchors", offline_pack)
+
+        targetset_gap = normalized(notes["targetset_gap"].read_text(encoding="utf-8"))
+        self.assertIn("Admin/session pressure only", targetset_gap)
+        self.assertIn("Admin/authority pressure only", targetset_gap)
+        self.assertIn("not identity lifecycle proof", targetset_gap)
+
+        readme_route = notes["readme"].read_text(encoding="utf-8").split(
+            "| Players identity lifecycle |", 1
+        )[1].split("\n", 1)[0]
+        self.assertIn("admin targets, not lifecycle anchors", normalized(readme_route))
 
     def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
         documented_flags = self._documented_identity_bundle_flags(

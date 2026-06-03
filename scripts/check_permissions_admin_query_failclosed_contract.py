@@ -370,6 +370,8 @@ READY_OVERCLAIM_KEYS = frozenset(
         "api_production_grade",
         "api_production_ready",
         "api_stable",
+        "accepted_runtime_evidence_ready",
+        "admin_authority_ready",
         "command_router_allowed",
         "complete_api",
         "complete_sdk",
@@ -380,8 +382,13 @@ READY_OVERCLAIM_KEYS = frozenset(
         "full_api",
         "full_sdk",
         "full_support",
+        "identity_contract_reviewed",
         "operator_approval_granted",
+        "permission_header_allowed",
         "permissions_admin_ready",
+        "permissions_query_ready",
+        "permissions_unlocked",
+        "principal_ready",
         "production_grade_api",
         "production_grade_sdk",
         "production_grade_support",
@@ -464,6 +471,13 @@ READY_OVERCLAIM_STRINGS = {
     "public api is ready": "public_api_ready",
     "public sdk ready": "public_sdk_ready",
     "permissions/admin is public and ready": "permissions_admin_ready",
+    "identity contract reviewed": "identity_contract_reviewed",
+    "principal ready": "principal_ready",
+    "permissions query ready": "permissions_query_ready",
+    "permissions unlocked": "permissions_unlocked",
+    "permission header allowed": "permission_header_allowed",
+    "admin authority ready": "admin_authority_ready",
+    "accepted runtime evidence ready": "accepted_runtime_evidence_ready",
     "reply endpoint is live": "public_reply_abi_ready",
     "runtime ready": "runtime_ready",
     "promotion ready": "promotion_ready",
@@ -478,7 +492,9 @@ OVERCLAIM_NEGATIVE_PREFIXES = (
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"\b(?:"
+    r"accepted[_ -]?runtime[_ -]?evidence|admin[_ -]?authority|identity[_ -]?(?:public[_ -]?)?contract|"
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
+    r"permission[_ -]?headers?|permissions?[_ -]?quer(?:y|ies)|permissions?|principal|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
     r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"

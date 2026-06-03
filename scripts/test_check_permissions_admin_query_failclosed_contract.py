@@ -1160,6 +1160,49 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         ):
             self.assertIn(blocker, report["blockers"])
 
+    def test_rejects_post_identity_misleading_readiness_aliases(self) -> None:
+        payload = manifest()
+        payload["nested_claim"] = {
+            "identityContractReviewed": True,
+            "principalReady": True,
+            "permissionsQueryReady": True,
+            "permissionsUnlocked": True,
+            "permissionHeaderAllowed": True,
+            "adminAuthorityReady": True,
+            "acceptedRuntimeEvidenceReady": True,
+        }
+        payload["claim_texts"] = [
+            "identity contract reviewed",
+            "principal ready",
+            "permissions query ready",
+            "permissions unlocked",
+            "permission header allowed",
+            "admin authority ready",
+            "accepted runtime evidence ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "identity_contract_reviewed_overclaim",
+            "principal_ready_overclaim",
+            "permissions_query_ready_overclaim",
+            "permissions_unlocked_overclaim",
+            "permission_header_allowed_overclaim",
+            "admin_authority_ready_overclaim",
+            "accepted_runtime_evidence_ready_overclaim",
+            "identity_contract_reviewed_string_overclaim",
+            "principal_ready_string_overclaim",
+            "permissions_query_ready_string_overclaim",
+            "permissions_unlocked_string_overclaim",
+            "permission_header_allowed_string_overclaim",
+            "admin_authority_ready_string_overclaim",
+            "accepted_runtime_evidence_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
     def test_rejects_broad_public_runtime_or_sdk_completion_claims(self) -> None:
         payload = manifest()
         payload["nested_claim"] = {

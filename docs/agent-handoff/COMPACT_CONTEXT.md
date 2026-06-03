@@ -1859,6 +1859,27 @@ priorities, and do not use history files as the active source of truth.
   and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 post-identity lock/scoped-statement hardening round: permissions/admin now
+  rejects accepted-runtime and identity-contract aliases such as `identityContractReviewed`,
+  `principalReady`, `permissionsQueryReady`, `permissionsUnlocked`,
+  `permissionHeaderAllowed`, `adminAuthorityReady`, and `acceptedRuntimeEvidenceReady`
+  unless the promoted identity public contract plus matching certificate exists. Command
+  response/replies reject route/reply/header/accepted-runtime aliases such as
+  `commandRouteReady`, `replyPathReady`, `commandsUnlocked`, and
+  `responseHeaderAllowed`. Scoped v1 release-statement validation accepts only the seven
+  non-P0 post-v1/excluded rows by default and rejects P0/promoted/experimental/non-blocker
+  rows unless `--allow-scoped-release-statement-extra-records` is explicitly passed.
+  Player-identity staged core/reflection inventory recipes are recovery-only; accepted
+  lifecycle anchors remain `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout`, while `ServerListPlayers`/`ServerKickPlayer` are admin
+  targets, not lifecycle anchors. Contributor status now records P0 `0/4`, complete SDK
+  `0/12`, scoped statement bookkeeping `0/7`, `approved_runtime_evidence_missing`, and
+  `stable_claim_allowed=false`. Validation: permissions/admin 64 OK, permissions query
+  44 OK, command response 40 OK, command replies 45 OK, public SDK completion 232 OK,
+  research+handoff 48 OK, route JSON planning-only at `approved_runtime_evidence_missing`,
+  SDK JSON blocked with SDK `0/12`, P0 `0/4`, generated scoped statement `ready=true` as
+  non-complete bookkeeping only, `py_compile` OK, and `git diff --check` OK. No
+  runtime/server/Discord/GitHub operation.
 
 ## Agent Coordination
 

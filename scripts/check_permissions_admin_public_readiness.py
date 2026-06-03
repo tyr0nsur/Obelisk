@@ -150,6 +150,8 @@ REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
         "player identity planning evidence alone cannot enable permissions/admin",
         "runtime principal evidence alone is not public identity promotion",
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
+        "identity_public_contract_gate_missing is an identity route blocker only and cannot unlock permissions/admin before a promoted identity public contract and certificate",
+        "accepted runtime evidence ready aliases such as acceptedRuntimeEvidenceReady, identityContractReviewed, principalReady, permissionsQueryReady, permissionsUnlocked, permissionHeaderAllowed, and adminAuthorityReady cannot unlock permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
         "permissions/admin structured promotion evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in the ordered P0 dependency chain, bound by reviewed evidence artifact hash",
@@ -379,11 +381,18 @@ FALSE_ONLY_KEYS = frozenset(
         "counts_toward_v1_completion",
         "full_sdk_claim_allowed",
         "full_sdk_ready",
+        "accepted_runtime_evidence_ready",
+        "admin_authority_ready",
+        "identity_contract_reviewed",
         "operator_approval_granted",
+        "permission_header_allowed",
         "permission_ready",
         "permission_cache_abi_allowed",
         "permissions_admin_ready",
+        "permissions_query_ready",
         "permissions_ready",
+        "permissions_unlocked",
+        "principal_ready",
         "promotion_ready",
         "production_sdk_claim_allowed",
         "production_sdk_ready",
@@ -485,20 +494,23 @@ NEGATED_CLAIM_SUFFIX_RE = re.compile(
 )
 POSITIVE_CLAIM_RE = re.compile(
     r"\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|identity\s+(?:public\s+)?contract|"
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
     r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
+    r"permission\s+headers?|permissions?\s+quer(?:y|ies)|permissions?|principal|"
     r"public\s+route|route|route\s+readiness|route[_ -]?ready|"
     r"release\s+readiness|stable\s+sdk|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"permissions?/admin|reply\s+endpoint|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request|endpoint))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
     r"runtime(?:[_ -]?delivery)?"
-    r")\b.{0,100}\b(allowed|available|delivered|enabled|established|live|promoted|public|ready|supported)\b",
+    r")\b.{0,100}\b(allowed|available|delivered|enabled|established|live|promoted|public|ready|reviewed|supported|unlocked)\b",
     re.IGNORECASE,
 )
 POSITIVE_CLAIM_REVERSED_RE = re.compile(
-    r"\b(allowed|available|delivered|enabled|established|live|promoted|public|ready|supported)\b"
+    r"\b(allowed|available|delivered|enabled|established|live|promoted|public|ready|reviewed|supported|unlocked)\b"
     r".{0,100}\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|identity\s+(?:public\s+)?contract|"
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
     r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
