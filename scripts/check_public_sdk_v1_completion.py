@@ -652,6 +652,12 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",
+    r"\b(?:installed\s+|public\s+|release\s+)?(?:sdk\s+)?package\s+"
+    r"(?:is|are|becomes?|became)?\s*"
+    r"\b(?:allowed|available|published|ready|released|shipped|public)\b",
+    r"\b(?:installed\s+|public\s+|release\s+)?(?:sdk\s+)?package\s+"
+    r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
+    r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",
     r"\bv1(?:\.0)?\s+(?:sdk|api|support)\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",

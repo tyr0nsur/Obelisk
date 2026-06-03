@@ -606,6 +606,48 @@ def validate_target_detail_path(
         )
     if not observed.is_file():
         add(blockers, "target_detail_path_not_regular_file", f"{label}.path", target=target, value=str(observed))
+        return
+    validate_target_snapshot_content(observed, target=target, label=label, blockers=blockers)
+
+
+def validate_target_snapshot_content(
+    path: Path,
+    *,
+    target: str,
+    label: str,
+    blockers: list[dict[str, Any]],
+) -> None:
+    payload = safe_load_json(path, "readiness_target_snapshot", blockers)
+    if payload is None:
+        return
+    if payload.get("status") == "fixture-placeholder":
+        add(blockers, "target_snapshot_placeholder", f"{label}.path", target=target, path=str(path))
+    if payload.get("schema") != "obelisk.ufunction-chain.snapshot.v1":
+        add(
+            blockers,
+            "target_snapshot_schema_mismatch",
+            f"{label}.schema",
+            target=target,
+            value=payload.get("schema"),
+        )
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        add(blockers, "target_snapshot_evidence_missing", f"{label}.evidence", target=target)
+    else:
+        for key in ("artifact_sha256", "capture_id", "evidence_pack_id", "source", "status"):
+            if not isinstance(evidence.get(key), str) or not evidence.get(key):
+                add(blockers, "target_snapshot_evidence_field_missing", f"{label}.evidence.{key}", target=target)
+    snapshots = payload.get("targets")
+    if not isinstance(snapshots, list) or len(snapshots) != 1 or not isinstance(snapshots[0], dict):
+        add(blockers, "target_snapshot_targets_invalid", f"{label}.targets", target=target)
+        return
+    snapshot = snapshots[0]
+    target_payload = snapshot.get("target")
+    if not isinstance(target_payload, dict) or target_payload.get("name") != target.rsplit(".", 1)[1]:
+        add(blockers, "target_snapshot_target_mismatch", f"{label}.targets[0].target", target=target)
+    property_chain = snapshot.get("property_chain")
+    if not isinstance(property_chain, dict) or not isinstance(property_chain.get("properties"), list):
+        add(blockers, "target_snapshot_property_chain_missing", f"{label}.targets[0].property_chain", target=target)
 
 
 def validate_readiness_provenance(

@@ -208,13 +208,13 @@ This file is an active routing table only. Durable evidence belongs in
   `blocked_until=[reviewed_identity_public_contract]` for
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
-  `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
-  `identity_public_contract_gate_missing` non-counting.
-- Latest supervised round delegated P0 runtime-evidence freshness, permissions/admin
-  overclaim scanning, runtime ABI/lifecycle tests, and read-only reversing triage.
-  Integrated approved-evidence `obelisk_commit` must match current `HEAD`, permissions
-  artifact broad public/runtime/SDK claim rejection, repo-local provenance-bound default
-  command-response planning fixture, and init-failure in-flight copied-dispatcher close
-  ordering coverage. Agents closed; route/SDK remain fail-closed at
+  `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
+- Latest supervised round delegated identity public-contract aggregation, SDK release
+  wording, runtime ABI/lifecycle cleanup, and read-only reversing triage. Integrated:
+  candidate ABI preflight no longer appears as a top-level identity `resolved_input`;
+  release statements reject direct SDK/package ready/published/GA wording; command-response
+  repo-local route snapshots must be provenance-bearing, non-placeholder UFunction-chain
+  snapshots; Mission copied-bool owner cleanup propagates/retries `DestroyUserData`
+  failures. Agents closed; route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, public/runtime false,
   `stable_claim_allowed=false`. No runtime/server op.

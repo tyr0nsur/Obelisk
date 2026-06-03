@@ -104,7 +104,9 @@ namespace Obelisk::Core
             return true;
         }
 
-        void DestroySubscriptionUserData(const MissionCopiedBoolEventSubscription& subscription)
+        void DestroySubscriptionUserData(
+            const MissionCopiedBoolEventSubscription& subscription,
+            bool propagateFailure = false)
         {
             if (!subscription.DestroyUserData)
                 return;
@@ -119,12 +121,38 @@ namespace Obelisk::Core
             {
                 if (Obelisk::Logger::IsInitialized())
                     OBELISK_ERROR("Mission copied-bool event subscription cleanup threw: {}", e.what());
+                if (propagateFailure)
+                    throw;
             }
             catch (...)
             {
                 if (Obelisk::Logger::IsInitialized())
                     OBELISK_ERROR("Mission copied-bool event subscription cleanup threw an unknown exception.");
+                if (propagateFailure)
+                    throw;
             }
+        }
+
+        std::vector<MissionCopiedBoolEventSubscription> DestroySubscriptionsForOwnerCleanup(
+            const std::vector<MissionCopiedBoolEventSubscription>& subscriptions,
+            std::exception_ptr& firstFailure)
+        {
+            std::vector<MissionCopiedBoolEventSubscription> failed;
+            for (const MissionCopiedBoolEventSubscription& subscription : subscriptions)
+            {
+                try
+                {
+                    DestroySubscriptionUserData(subscription, true);
+                }
+                catch (...)
+                {
+                    if (!firstFailure)
+                        firstFailure = std::current_exception();
+                    failed.push_back(subscription);
+                }
+            }
+
+            return failed;
         }
 
         bool IsInsideAnyGameplayCallback()
@@ -343,11 +371,16 @@ namespace Obelisk::Core
             return 0;
 
         std::vector<MissionCopiedBoolEventSubscription> removed;
+        std::exception_ptr deferredFailure;
+        std::vector<MissionCopiedBoolEventSubscription> deferredFailures;
+        size_t retainedCount = 0;
         size_t before = 0;
         size_t after = 0;
         try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
+            removed = TakeFailedOwnerDestroySubscriptions(owner);
+            retainedCount = removed.size();
             before = m_Registrations.size();
             const size_t matchingCount = static_cast<size_t>(
                 std::count_if(m_Registrations.begin(),
@@ -355,7 +388,7 @@ namespace Obelisk::Core
                               [owner](const Registration& item) {
                                   return item.Owner == owner;
                               }));
-            if (matchingCount == 0)
+            if (matchingCount == 0 && retainedCount == 0)
             {
                 if (!IsInsideAnyGameplayCallback() &&
                     !IsInsideDispatcherCleanup() &&
@@ -365,7 +398,7 @@ namespace Obelisk::Core
                 }
                 return 0;
             }
-            removed.reserve(matchingCount);
+            removed.reserve(retainedCount + matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
@@ -380,8 +413,24 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            std::vector<MissionCopiedBoolEventSubscription> currentRemoved(
+                removed.begin() + static_cast<std::ptrdiff_t>(retainedCount),
+                removed.end());
+            const bool queuedForDeferredDestroy = m_DispatchDepth > 0 && !currentRemoved.empty();
+            if (QueueOrDestroyRemovedSubscriptions(currentRemoved, lock, cleanupBatchId))
+            {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                deferredFailures = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
+            }
+            if (queuedForDeferredDestroy)
+                removed.erase(removed.begin() + static_cast<std::ptrdiff_t>(retainedCount), removed.end());
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -399,26 +448,91 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Mission copied-bool event owner cleanup failed with an unknown exception.");
             throw;
         }
-        for (const MissionCopiedBoolEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
-        return before - after;
+        std::exception_ptr cleanupFailure;
+        std::vector<MissionCopiedBoolEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
+        if (deferredFailure)
+        {
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+            failed.insert(failed.end(), deferredFailures.begin(), deferredFailures.end());
+        }
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
+        return retainedCount + (before - after);
     }
 
     bool MissionCopiedBoolEventDispatcher::QueueOrDestroyRemovedSubscriptions(
         std::vector<MissionCopiedBoolEventSubscription>& removed,
-        std::unique_lock<std::mutex>&)
+        std::unique_lock<std::mutex>&,
+        uint64_t cleanupBatchId)
     {
         if (removed.empty())
             return false;
 
         if (m_DispatchDepth > 0)
         {
-            m_PendingDestroy.insert(m_PendingDestroy.end(), removed.begin(), removed.end());
+            for (const MissionCopiedBoolEventSubscription& subscription : removed)
+                m_PendingDestroy.push_back({subscription, cleanupBatchId});
             removed.clear();
             return !IsInsideAnyGameplayCallback();
         }
 
         return false;
+    }
+
+    std::vector<MissionCopiedBoolEventSubscription> MissionCopiedBoolEventDispatcher::TakeFailedOwnerDestroySubscriptions(void* owner)
+    {
+        std::vector<MissionCopiedBoolEventSubscription> subscriptions;
+        auto keepEnd = std::remove_if(
+            m_FailedOwnerDestroy.begin(),
+            m_FailedOwnerDestroy.end(),
+            [owner, &subscriptions](const FailedOwnerDestroy& item) {
+                if (item.Owner != owner)
+                    return false;
+                subscriptions.push_back(item.Subscription);
+                return true;
+            });
+        m_FailedOwnerDestroy.erase(keepEnd, m_FailedOwnerDestroy.end());
+        return subscriptions;
+    }
+
+    void MissionCopiedBoolEventDispatcher::RetainFailedOwnerDestroySubscriptions(
+        void* owner,
+        const std::vector<MissionCopiedBoolEventSubscription>& subscriptions)
+    {
+        if (!owner || subscriptions.empty())
+            return;
+
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FailedOwnerDestroy.reserve(m_FailedOwnerDestroy.size() + subscriptions.size());
+        for (const MissionCopiedBoolEventSubscription& subscription : subscriptions)
+            m_FailedOwnerDestroy.push_back({owner, subscription});
+    }
+
+    std::vector<MissionCopiedBoolEventSubscription> MissionCopiedBoolEventDispatcher::TakeDeferredDestroyFailures(
+        uint64_t cleanupBatchId,
+        std::exception_ptr& firstFailure)
+    {
+        std::vector<MissionCopiedBoolEventSubscription> failedSubscriptions;
+        if (cleanupBatchId == 0)
+            return failedSubscriptions;
+
+        auto keepEnd = std::remove_if(
+            m_DeferredDestroyFailures.begin(),
+            m_DeferredDestroyFailures.end(),
+            [cleanupBatchId, &firstFailure, &failedSubscriptions](const DeferredDestroyFailure& failure) {
+                if (failure.CleanupBatchId != cleanupBatchId)
+                    return false;
+                if (!firstFailure)
+                    firstFailure = failure.Failure;
+                failedSubscriptions.push_back(failure.Subscription);
+                return true;
+            });
+        m_DeferredDestroyFailures.erase(keepEnd, m_DeferredDestroyFailures.end());
+
+        return failedSubscriptions;
     }
 
     bool MissionCopiedBoolEventDispatcher::IsDispatchCleanupComplete() const
@@ -428,7 +542,8 @@ namespace Obelisk::Core
 
     void MissionCopiedBoolEventDispatcher::FinishDispatch()
     {
-        std::vector<MissionCopiedBoolEventSubscription> pending;
+        std::vector<PendingDestroy> pending;
+        std::vector<DeferredDestroyFailure> failures;
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             if (m_DispatchDepth == 0)
@@ -442,11 +557,45 @@ namespace Obelisk::Core
             m_PendingDestroyInProgress += pending.size();
         }
 
-        for (const MissionCopiedBoolEventSubscription& subscription : pending)
-            DestroySubscriptionUserData(subscription);
+        for (const PendingDestroy& item : pending)
+        {
+            try
+            {
+                DestroySubscriptionUserData(item.Subscription, item.CleanupBatchId != 0);
+            }
+            catch (...)
+            {
+                if (item.CleanupBatchId == 0)
+                    continue;
+                try
+                {
+                    const bool alreadyCaptured = std::any_of(
+                        failures.begin(),
+                        failures.end(),
+                        [&item](const DeferredDestroyFailure& failure) {
+                            return failure.CleanupBatchId == item.CleanupBatchId;
+                        });
+                    if (!alreadyCaptured)
+                        failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()});
+                }
+                catch (...)
+                {
+                }
+            }
+        }
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingDestroyInProgress -= pending.size();
+            try
+            {
+                m_DeferredDestroyFailures.insert(
+                    m_DeferredDestroyFailures.end(),
+                    failures.begin(),
+                    failures.end());
+            }
+            catch (...)
+            {
+            }
         }
         m_DispatchCv.notify_all();
     }

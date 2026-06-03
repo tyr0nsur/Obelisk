@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <condition_variable>
+#include <exception>
 #include <mutex>
 #include <span>
 #include <vector>
@@ -71,13 +72,40 @@ namespace Obelisk::Core
             MissionCopiedBoolEventSubscription Subscription;
         };
 
+        struct PendingDestroy
+        {
+            MissionCopiedBoolEventSubscription Subscription;
+            uint64_t CleanupBatchId = 0;
+        };
+
+        struct DeferredDestroyFailure
+        {
+            uint64_t CleanupBatchId = 0;
+            MissionCopiedBoolEventSubscription Subscription;
+            std::exception_ptr Failure;
+        };
+
+        struct FailedOwnerDestroy
+        {
+            void* Owner = nullptr;
+            MissionCopiedBoolEventSubscription Subscription;
+        };
+
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId, uint64_t generation) const;
         bool QueueOrDestroyRemovedSubscriptions(
             std::vector<MissionCopiedBoolEventSubscription>& removed,
-            std::unique_lock<std::mutex>& lock);
+            std::unique_lock<std::mutex>& lock,
+            uint64_t cleanupBatchId = 0);
         bool IsDispatchCleanupComplete() const;
+        std::vector<MissionCopiedBoolEventSubscription> TakeFailedOwnerDestroySubscriptions(void* owner);
+        void RetainFailedOwnerDestroySubscriptions(
+            void* owner,
+            const std::vector<MissionCopiedBoolEventSubscription>& subscriptions);
+        std::vector<MissionCopiedBoolEventSubscription> TakeDeferredDestroyFailures(
+            uint64_t cleanupBatchId,
+            std::exception_ptr& firstFailure);
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -85,9 +113,12 @@ namespace Obelisk::Core
         size_t m_DispatchDepth = 0;
         uint64_t m_NextRegistrationId = 1;
         uint64_t m_NextGeneration = 1;
+        uint64_t m_NextCleanupBatchId = 1;
         std::vector<Registration> m_Registrations;
         std::atomic<size_t> m_SubscriptionCount{0};
-        std::vector<MissionCopiedBoolEventSubscription> m_PendingDestroy;
+        std::vector<PendingDestroy> m_PendingDestroy;
+        std::vector<DeferredDestroyFailure> m_DeferredDestroyFailures;
+        std::vector<FailedOwnerDestroy> m_FailedOwnerDestroy;
         size_t m_PendingDestroyInProgress = 0;
     };
 }

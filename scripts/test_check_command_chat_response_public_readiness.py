@@ -33,6 +33,29 @@ TARGETS = [
 ]
 
 
+def target_snapshot_payload(target: str) -> dict:
+    return {
+        "schema": "obelisk.ufunction-chain.snapshot.v1",
+        "evidence": {
+            "artifact_sha256": "a" * 64,
+            "capture_id": "unit-test-command-response",
+            "evidence_pack_id": "unit-test-command-response-pack",
+            "source": "unit-test",
+            "status": "candidate-only",
+        },
+        "targets": [
+            {
+                "target": {"name": target.rsplit(".", 1)[1]},
+                "property_chain": {
+                    "properties": [
+                        {"name": "UnitTestProperty", "status": "candidate-only"},
+                    ]
+                },
+            }
+        ],
+    }
+
+
 class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
     def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -346,7 +369,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         snapshot_root.mkdir(parents=True, exist_ok=True)
         for target in TARGETS:
             (snapshot_root / f"{target.rsplit(':', 1)[1]}.snapshot.json").write_text(
-                json.dumps({"schema": "obelisk.ufunction-chain.snapshot.v1", "target": target}),
+                json.dumps(target_snapshot_payload(target.rsplit(":", 1)[1])),
                 encoding="utf-8",
             )
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
@@ -512,6 +535,38 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertFalse(report["valid"])
         self.assertIn("readiness_source_root_mismatch", report["blockers"])
+
+    def test_rejects_placeholder_target_snapshot_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            first_snapshot = root / "base-snapshots" / "ShooterPlayerController.ClientChatMessage.snapshot.json"
+            first_snapshot.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.ufunction-chain.snapshot.v1",
+                        "status": "fixture-placeholder",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("target_snapshot_placeholder", report["blockers"])
+        self.assertIn("target_snapshot_evidence_missing", report["blockers"])
+        self.assertIn("target_snapshot_targets_invalid", report["blockers"])
 
     def test_rejects_readiness_not_bound_to_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

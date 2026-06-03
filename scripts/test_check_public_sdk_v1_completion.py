@@ -4800,6 +4800,45 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, forbidden_claims)
 
+    def test_release_statement_rejects_installed_sdk_package_readiness_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "The installed SDK package is ready for public use.\n"
+            "The SDK package is available for plugin authors.\n"
+            "The public SDK package is published.\n"
+            "The release package reaches GA today.\n"
+            "The installed SDK package is package-shape evidence only, not release package readiness.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["installed_sdk_package_shape_guardrail_drift"], [])
+        self.assertFalse(payload["stable_claim_allowed"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "The installed SDK package is ready for public use.",
+            "The SDK package is available for plugin authors.",
+            "The public SDK package is published.",
+            "The release package reaches GA today.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+        self.assertNotIn("package-shape evidence only", forbidden_claims)
+
     def test_release_statement_rejects_without_prefixed_affirmative_claims(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (

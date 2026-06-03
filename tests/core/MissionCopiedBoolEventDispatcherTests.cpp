@@ -678,6 +678,114 @@ namespace
         Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 3,
                 "owner cleanup after exception removed wrong callback count");
     }
+
+    struct DestroyFailureState
+    {
+        int Calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+        throw std::runtime_error("expected mission copied-bool destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+    }
+
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {CaptureCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy mission registration failed");
+        Require(dispatcher.Register(&owner, {CaptureCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy mission registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing mission DestroyUserData");
+        Require(state.Calls == 2, "owner cleanup did not attempt all mission DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup failure left mission callbacks registered");
+    }
+
+    struct RetryDestroyFailureState
+    {
+        int FailingCalls = 0;
+        int CountingCalls = 0;
+        bool FailNext = true;
+    };
+
+    void FailsOnceDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->FailingCalls;
+        if (state->FailNext)
+        {
+            state->FailNext = false;
+            throw std::runtime_error("expected one-shot mission destroy failure");
+        }
+    }
+
+    void CountRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->CountingCalls;
+    }
+
+    void TestOwnerCleanupRetriesFailedDestroyUserData()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        Require(dispatcher.Register(&owner, {CaptureCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "failing retry mission registration failed");
+        Require(dispatcher.Register(&owner, {CaptureCallback, &state, CountRetryDestroyUserData}) != 0,
+                "counting retry mission registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid one-shot mission DestroyUserData failure");
+        Require(state.FailingCalls == 1, "first cleanup did not call failing mission destroy once");
+        Require(state.CountingCalls == 1, "first cleanup did not attempt successful mission destroy");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "failed mission cleanup left callbacks dispatchable");
+        Require(dispatcher.Dispatch(MakeEvent(bools)) == 0,
+                "failed mission cleanup left callback reachable from dispatch");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1, "retry cleanup did not report pending failed mission destroy");
+        Require(state.FailingCalls == 2, "retry cleanup did not retry failed mission DestroyUserData");
+        Require(state.CountingCalls == 1, "retry cleanup repeated successful mission DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed mission cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left mission callbacks dispatchable");
+    }
 }
 
 int main()
@@ -698,6 +806,8 @@ int main()
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestCallbackExceptionDoesNotStopDispatch();
+        TestOwnerCleanupPropagatesDestroyUserDataFailure();
+        TestOwnerCleanupRetriesFailedDestroyUserData();
     }
     catch (const std::exception& e)
     {

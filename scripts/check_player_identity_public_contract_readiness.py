@@ -2128,8 +2128,6 @@ def build_report(
             resolved_inputs.append(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
         if principal_policy_report.get("accepted_for_policy_review") is True:
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
-        if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
-            resolved_inputs.append(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
     runtime_input_resolved = REQUIRED_RESOLVED_INPUT in resolved_inputs
     return {
         "schema": REPORT_SCHEMA,

@@ -118,9 +118,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "runtime.lifecycle_evidence",
                 "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
-                "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
         )
+        self.assertNotIn(checker.REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT, report["resolved_inputs"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
@@ -178,6 +178,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(abi_preflight["public_header_allowed"])
         self.assertFalse(abi_preflight["public_abi_ready"])
         self.assertFalse(abi_preflight["v1_completion_evidence"])
+        self.assertIn("abi.public_pod_contract", abi_preflight["does_not_resolve"])
+        self.assertIn("sdk.consumer", abi_preflight["does_not_resolve"])
+        self.assertIn("lifecycle.owner_cleanup", abi_preflight["does_not_resolve"])
         self.assertEqual(abi_preflight["public_header_symbols_now"], [])
         self.assertEqual(abi_preflight["public_capability_bits_now"], [])
         self.assertEqual(abi_preflight["public_callback_abi_now"], [])
@@ -232,9 +235,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "privacy.identifier_redaction",
                 "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
-                "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
         )
+        self.assertNotIn(checker.REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT, report["resolved_inputs"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])

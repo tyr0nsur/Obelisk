@@ -407,6 +407,30 @@ def command_chat_response_route_manifest(*, binary_sha256: str = BINARY_SHA) -> 
     }
 
 
+def command_chat_response_route_snapshot_payload(filename: str) -> dict:
+    target_name = filename.removesuffix(".snapshot.json").rsplit(".", 1)[1]
+    return {
+        "schema": SNAPSHOT_SCHEMA,
+        "evidence": {
+            "artifact_sha256": "d" * 64,
+            "capture_id": "unit-test-command-response",
+            "evidence_pack_id": "unit-test-command-response-pack",
+            "source": "unit-test",
+            "status": "candidate-only",
+        },
+        "targets": [
+            {
+                "target": {"name": target_name},
+                "property_chain": {
+                    "properties": [
+                        {"name": "UnitTestProperty", "status": "candidate-only"},
+                    ]
+                },
+            }
+        ],
+    }
+
+
 def write_command_chat_response_route_fixture(
     workspace: Path,
     *,
@@ -416,7 +440,7 @@ def write_command_chat_response_route_fixture(
     root = workspace / "command-chat-response-route-planning-distinct-second-source-20260601"
     for snapshot_root in ("base-snapshots", "vanilla-gdb-snapshots"):
         for filename in gate.COMMAND_CHAT_RESPONSE_ROUTE_SNAPSHOT_FILENAMES.values():
-            write_json(root / snapshot_root / filename, {"schema": SNAPSHOT_SCHEMA})
+            write_json(root / snapshot_root / filename, command_chat_response_route_snapshot_payload(filename))
     write_json(
         root / gate.command_chat_response_public_readiness.DEFAULT_READINESS_NAME,
         readiness_payload if readiness_payload is not None else command_chat_response_route_readiness(root),
