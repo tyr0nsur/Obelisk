@@ -127,6 +127,24 @@
       "outer": "ShooterPlayerController"
     },
     {
+      "file": "ShooterPlayerController.ClientServerChatDirectMessage.snapshot.json",
+      "module": "command_chat_response_route_planning",
+      "name": "ClientServerChatDirectMessage",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ClientServerChatMessage.snapshot.json",
+      "module": "command_chat_response_route_planning",
+      "name": "ClientServerChatMessage",
+      "outer": "ShooterPlayerController"
+    },
+    {
+      "file": "ShooterPlayerController.ClientChatMessage.snapshot.json",
+      "module": "command_chat_response_route_planning",
+      "name": "ClientChatMessage",
+      "outer": "ShooterPlayerController"
+    },
+    {
       "file": "ShooterPlayerController.ServerListPlayers.snapshot.json",
       "module": "sdk_players",
       "name": "ServerListPlayers",

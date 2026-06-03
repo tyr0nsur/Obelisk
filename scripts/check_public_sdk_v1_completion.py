@@ -3292,6 +3292,37 @@ def load_hash_bound_json_artifact_binding(
     return payload, []
 
 
+def surface_record_sha256_for_certificate(surface: dict[str, Any]) -> str:
+    sanitized = dict(surface)
+    evidence = sanitized.get("evidence")
+    if isinstance(evidence, dict):
+        sanitized["evidence"] = {
+            key: value
+            for key, value in evidence.items()
+            if key != "player_identity_promotion_certificate"
+        }
+    data = json.dumps(sanitized, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def active_player_identity_surface_record_sha256(manifest_path: Path) -> str | None:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    surfaces = manifest.get("surfaces") if isinstance(manifest, dict) else None
+    if not isinstance(surfaces, list):
+        return None
+    for surface in surfaces:
+        if (
+            isinstance(surface, dict)
+            and surface.get("id") == "obelisk.player_identity.v1"
+            and surface.get("status") == "promoted"
+        ):
+            return surface_record_sha256_for_certificate(surface)
+    return None
+
+
 def player_identity_promotion_certificate_missing(
     evidence: dict[str, Any],
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -3321,6 +3352,14 @@ def player_identity_promotion_certificate_missing(
     if not isinstance(identity_evidence, dict):
         missing.append("player_identity_promotion_certificate:evidence_missing")
     else:
+        active_surface_hash = active_player_identity_surface_record_sha256(manifest_path)
+        if active_surface_hash is not None:
+            certificate_surface_hash = identity_evidence.get("reviewed_surface_record_sha256")
+            if (
+                not isinstance(certificate_surface_hash, str)
+                or certificate_surface_hash.lower() != active_surface_hash
+            ):
+                missing.append("player_identity_promotion_certificate:surface_record_sha256_mismatch")
         dependency_missing = player_identity_structured_promotion_evidence_missing(
             identity_evidence,
             manifest_path,
@@ -3363,8 +3402,13 @@ def permissions_admin_structured_promotion_evidence_missing(
         and query_report.get("blockers") == []
     ):
         missing.append("query_failclosed_report:fields_invalid")
-    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(query_report):
-        missing.append("query_failclosed_report:not_promoted_evidence")
+    else:
+        if command_permission_route_gate_public_or_runtime_claims(query_report):
+            missing.append("query_failclosed_report:public_or_runtime_claim_without_blocker")
+        if secondary_report_completion_claims_without_blocker(query_report):
+            missing.append("query_failclosed_report:completion_claim_without_blocker")
+        if not dependency_missing and report_is_limited_to_non_promotional_readiness(query_report):
+            missing.append("query_failclosed_report:not_promoted_evidence")
 
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -3386,8 +3430,13 @@ def permissions_admin_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
-    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
-        missing.append("public_readiness_report:not_promoted_evidence")
+    else:
+        if command_permission_route_gate_public_or_runtime_claims(readiness_report):
+            missing.append("public_readiness_report:public_or_runtime_claim_without_blocker")
+        if secondary_report_completion_claims_without_blocker(readiness_report):
+            missing.append("public_readiness_report:completion_claim_without_blocker")
+        if not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+            missing.append("public_readiness_report:not_promoted_evidence")
 
     missing.extend(
         executed_test_report_missing(

@@ -305,6 +305,40 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
 
+    def test_command_chat_response_route_planning_target_set_uses_fixture_manifest(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_report(snapshot_root=fixture_root, target_sets=["command-chat-response-route-planning"])
+
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual(["command-chat-response-route-planning"], report["target_sets"])
+        coverage = report["target_set_coverage"]
+        self.assertEqual(tool.TARGET_SET_COVERAGE_SCHEMA, coverage["schema"])
+        self.assertEqual("complete", coverage["status"])
+        self.assertIs(True, coverage["complete"])
+        self.assertEqual([], coverage["missing_targets"])
+        self.assertEqual([], coverage["unexpected_targets"])
+        self.assertEqual(
+            ["command-chat-response-route-planning"],
+            [entry["name"] for entry in coverage["declared_target_sets"]],
+        )
+        self.assertEqual("manifest", coverage["declared_target_sets"][0]["source"])
+        self.assertEqual([], report["missing_targets"])
+        self.assertEqual(3, report["snapshot_count"])
+        self.assertEqual(3, report["signature_count"])
+        self.assertEqual(
+            [
+                "ShooterPlayerController.ClientServerChatDirectMessage",
+                "ShooterPlayerController.ClientServerChatMessage",
+                "ShooterPlayerController.ClientChatMessage",
+            ],
+            [signature["target"] for signature in report["signatures"]],
+        )
+        self.assertEqual(3, len(report["generated_from"]["input_snapshots"]))
+        self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
+
     def test_players_identity_first_evidence_uses_committed_admin_snapshots(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

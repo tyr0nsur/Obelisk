@@ -372,6 +372,16 @@ POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
     r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
     re.IGNORECASE,
 )
+OPERATIONAL_AUTHORIZATION_CLAIM_RE = re.compile(
+    r"(?:(?:server|runtime)[_ -]?(?:operations?|work|capture|observation)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|authorized|approved)|"
+    r"(?:server[_ -]?)?(?:starts?|stops?|restarts?)[_ -]?(?:allowed|authorized|approved|ready|enabled)|"
+    r"(?:marker|env|environment|state)[_ -]?(?:changes?|edits?|ops|operations?)[_ -]?"
+    r"(?:allowed|authorized|approved|ready|enabled)|"
+    r"(?:discord|github|publication|publishing|release|tag)[_ -]?"
+    r"(?:allowed|authorized|approved|ready|enabled|published))",
+    re.IGNORECASE,
+)
 NEGATIVE_CLAIM_CONTEXT_RE = re.compile(
     r"\b(?:does\s+not|do\s+not|not|no|never|without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
     re.IGNORECASE,
@@ -790,6 +800,17 @@ def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[s
                 add(
                     blockers,
                     "operational_window_sidecar_readiness_flag_overclaim",
+                    label,
+                    key_path=child_trail,
+                    actual=child,
+                )
+            if (
+                child not in (False, None, [], {})
+                and contains_unnegated_positive_capability_claim(str(key))
+            ):
+                add(
+                    blockers,
+                    "operational_window_sidecar_authorization_or_readiness_key_overclaim",
                     label,
                     key_path=child_trail,
                     actual=child,
@@ -2131,9 +2152,10 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
     normalized = re.sub(r"\s+", " ", value)
-    for match in POSITIVE_CAPABILITY_CLAIM_RE.finditer(normalized):
-        if not positive_capability_claim_is_negated(normalized, match.start()):
-            return True
+    for pattern in (POSITIVE_CAPABILITY_CLAIM_RE, OPERATIONAL_AUTHORIZATION_CLAIM_RE):
+        for match in pattern.finditer(normalized):
+            if not positive_capability_claim_is_negated(normalized, match.start()):
+                return True
     return False
 
 

@@ -382,12 +382,14 @@ FALSE_ONLY_KEYS = frozenset(
         "public_reply_or_send_chat_abi_allowed",
         "public_response_path_allowed",
         "public_sdk_ready",
+        "stable_claim_allowed",
         "replies_send_chat_allowed",
         "reply_send_chat_router_claims_allowed",
         "runtime_delivery_allowed",
         "runtime_ready",
         "send_chat_allowed",
         "send_chat_ready",
+        "v1_completion_ready",
     )
 )
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
@@ -1048,6 +1050,12 @@ def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
         return False
     if not isinstance(certificate.get("evidence"), dict):
         return False
+    reviewed_surface_hash = certificate["evidence"].get("reviewed_surface_record_sha256")
+    if (
+        not isinstance(reviewed_surface_hash, str)
+        or reviewed_surface_hash.lower() != player_identity_surface_record_sha256(identity)
+    ):
+        return False
     return (
         certificate.get("schema") == PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA
         and certificate.get("surface_id") == IDENTITY_SURFACE
@@ -1057,6 +1065,21 @@ def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
         and certificate.get("required_by_surface") == SURFACE
         and certificate.get("required_by_v1_dependency_chain_position") == 2
     )
+
+
+def player_identity_surface_record_sha256(identity: dict[str, Any]) -> str:
+    """Hash the identity surface record without the self-referential certificate binding."""
+
+    sanitized = dict(identity)
+    evidence = sanitized.get("evidence")
+    if isinstance(evidence, dict):
+        sanitized["evidence"] = {
+            key: value
+            for key, value in evidence.items()
+            if key != "player_identity_promotion_certificate"
+        }
+    data = json.dumps(sanitized, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
 
 
 def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bool:

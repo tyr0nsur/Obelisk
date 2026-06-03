@@ -1026,6 +1026,23 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("runtime_ready_string_overclaim", report["blockers"])
         self.assertIn("promoted_string_overclaim", report["blockers"])
 
+    def test_rejects_nested_stable_and_v1_completion_overclaims(self) -> None:
+        payload = manifest()
+        payload["nested_claim"] = {
+            "stable_claim_allowed": True,
+            "v1_completion_ready": True,
+        }
+        payload["claim_text"] = "stable claim allowed; v1 completion ready"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("stable_claim_allowed_overclaim", report["blockers"])
+        self.assertIn("v1_completion_ready_overclaim", report["blockers"])
+        self.assertIn("stable_claim_allowed_string_overclaim", report["blockers"])
+        self.assertIn("v1_completion_ready_string_overclaim", report["blockers"])
+
     def test_rejects_camel_hyphen_space_readiness_aliases_and_positive_texts(self) -> None:
         payload = manifest()
         payload["nested_claim"] = {

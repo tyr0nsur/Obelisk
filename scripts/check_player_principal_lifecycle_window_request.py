@@ -237,12 +237,25 @@ FORBIDDEN_VALUE_RE = re.compile(
 )
 POSITIVE_CAPABILITY_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"(?:stable|complete|full|production)[_ -]?(?:v1[_ -]?)?(?:sdk[_ -]?)?claim[_ -]?(?:allowed|ready|enabled|supported)|"
+    r"(?:stable|complete|full|production)[_ -]?sdk[_ -]?(?:ready|allowed|claim)|"
+    r"stable[_ -]?release[_ -]?contract[_ -]?claim[_ -]?allowed|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
     r"(?:sdk|runtime|runtime[_ -]?work|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
     r"(?:ready|readiness|enabled|allowed|authorized|supported|promoted|delivered)|"
     r"command[_ -]?(?:reply|response|routing|support)|"
     r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
+    re.IGNORECASE,
+)
+OPERATIONAL_AUTHORIZATION_CLAIM_RE = re.compile(
+    r"(?:(?:server|runtime)[_ -]?(?:operations?|work|capture|observation)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|authorized|approved)|"
+    r"(?:server[_ -]?)?(?:starts?|stops?|restarts?)[_ -]?(?:allowed|authorized|approved|ready|enabled)|"
+    r"(?:marker|env|environment|state)[_ -]?(?:changes?|edits?|ops|operations?)[_ -]?"
+    r"(?:allowed|authorized|approved|ready|enabled)|"
+    r"(?:discord|github|publication|publishing|release|tag)[_ -]?"
+    r"(?:allowed|authorized|approved|ready|enabled|published))",
     re.IGNORECASE,
 )
 NEGATED_CAPABILITY_ACTION_RE = re.compile(
@@ -478,9 +491,10 @@ def string_at(payload: dict[str, Any], key: str, blockers: list[dict[str, Any]])
 
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
-    for match in POSITIVE_CAPABILITY_RE.finditer(value):
-        if not is_negated_for_match(value, match.start()) and not is_negated_after_match(value, match.end()):
-            return True
+    for pattern in (POSITIVE_CAPABILITY_RE, OPERATIONAL_AUTHORIZATION_CLAIM_RE):
+        for match in pattern.finditer(value):
+            if not is_negated_for_match(value, match.start()) and not is_negated_after_match(value, match.end()):
+                return True
     return False
 
 

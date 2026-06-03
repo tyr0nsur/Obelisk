@@ -2369,6 +2369,60 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Command Route Traceability And Operational Overclaim Hardening
+
+This supervised round delegated four scoped agents: approved replay/live-ops guardrails,
+permissions/admin guardrails, command-response route guardrails, and read-only static
+research. Three agents completed; one permissions/admin worker was closed while still
+running, so the lead reviewed and validated its tree changes directly before integration.
+
+Implemented changes:
+
+- Approved runtime principal lifecycle request and approved-evidence replay now reject
+  broader operational authorization wording and truthy keys such as
+  `server_restart_authorized`, plus stable/complete SDK claim text in request/receipt
+  sidecars.
+- Commands/replies readiness now compares response-path report identity fields including
+  readiness, decisions, surfaces, and public-header paths, so stale source metadata cannot
+  masquerade as the composed response-path report.
+- Copied-response intent planning now treats a permissions query checker report as
+  prevalidated crosswalk evidence instead of feeding that report into the public-readiness
+  checker as if it were the original query contract artifact.
+- Permissions/admin readiness and SDK completion now reject nested
+  `stable_claim_allowed`/`v1_completion_ready` overclaims in query/readiness reports and
+  require a player-identity promotion certificate to bind the reviewed surface record hash.
+- `command-chat-response-route-planning` UFunction snapshots are now manifest-backed,
+  covered by a strict target-set signature test, and reflected in the historical module
+  readiness matrix as planning-only route traceability.
+- The player-principal runtime observer brief now records the post-window offline bundle
+  handoff sequence without adding runtime authorization language.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed 96 tests.
+- `bash scripts/test_check_player_principal_lifecycle_preflight.sh` passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness scripts.test_check_permissions_admin_query_failclosed_contract`
+  passed 91 tests.
+- Focused permissions/admin SDK completion tests for nested report overclaims and identity
+  certificate mismatch passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate scripts.test_check_command_chat_response_public_readiness scripts.test_check_command_copied_response_intent_planning scripts.test_check_command_copied_response_intent_lifecycle_planning`
+  passed 123 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_redacted_ufunction_signatures scripts.test_ufunction_snapshot_fixtures`
+  passed 55 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_redacted_ufunction_signatures.py --snapshot-root tests/fixtures/ufunction_snapshots --target-set command-chat-response-route-planning --json`
+  plus `validate_offline_artifact_gate.py --mode consume --strict-target-set-coverage`
+  accepted the generated command-response route signature report.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `current_route_blocker=approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, and P0 `0/4`.
+- `git diff --check` passed during integration.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## Approved Evidence Replay And Public-Claim Guardrails
 
 This supervised round resumed after conversation compaction with four delegated agents:

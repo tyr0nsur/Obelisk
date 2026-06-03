@@ -378,6 +378,8 @@ READY_OVERCLAIM_KEYS = frozenset(
         "public_sdk_ready",
         "runtime_ready",
         "send_chat_ready",
+        "stable_claim_allowed",
+        "v1_completion_ready",
     )
 )
 READY_OVERCLAIM_STRINGS = {
@@ -390,6 +392,8 @@ READY_OVERCLAIM_STRINGS = {
     "runtime ready": "runtime_ready",
     "promotion ready": "promotion_ready",
     "promote ready": "promote_ready",
+    "stable claim allowed": "stable_claim_allowed",
+    "v1 completion ready": "v1_completion_ready",
 }
 OVERCLAIM_NEGATIVE_PREFIXES = (
     "$.negative_surface_exclusions",

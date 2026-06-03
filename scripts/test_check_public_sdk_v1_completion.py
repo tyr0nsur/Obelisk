@@ -7941,6 +7941,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("query_failclosed_report:not_promoted_evidence", missing)
         self.assertIn("public_readiness_report:not_promoted_evidence", missing)
 
+    def test_permissions_admin_structured_promotion_rejects_nested_report_overclaims(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PermissionsAdminReportClaims",
+        ) as core_dir:
+            root = Path(core_dir)
+            evidence = self.write_permissions_admin_structured_promotion_artifacts(root)
+            query_report_path = REPO_ROOT / evidence["query_failclosed_report"]
+            readiness_report_path = REPO_ROOT / evidence["public_readiness_report"]
+            query_report = json.loads(query_report_path.read_text(encoding="utf-8"))
+            readiness_report = json.loads(readiness_report_path.read_text(encoding="utf-8"))
+            query_report["nested_claims"] = {"stable_claim_allowed": True}
+            readiness_report["nested_claims"] = {
+                "public_sdk_ready": True,
+                "v1_completion_ready": True,
+            }
+            query_report_path.write_text(json.dumps(query_report), encoding="utf-8")
+            readiness_report_path.write_text(json.dumps(readiness_report), encoding="utf-8")
+
+            original_dependency = module.player_identity_promotion_certificate_missing
+            try:
+                module.player_identity_promotion_certificate_missing = lambda *_args, **_kwargs: []
+                missing = module.permissions_admin_structured_promotion_evidence_missing(evidence)
+            finally:
+                module.player_identity_promotion_certificate_missing = original_dependency
+
+        self.assertIn("query_failclosed_report:completion_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:public_or_runtime_claim_without_blocker", missing)
+        self.assertIn("public_readiness_report:completion_claim_without_blocker", missing)
+        self.assertIn("query_failclosed_report:not_promoted_evidence", missing)
+        self.assertIn("public_readiness_report:not_promoted_evidence", missing)
+
     def test_permissions_admin_structured_promotion_rejects_identity_certificate_mismatch(self) -> None:
         with tempfile.TemporaryDirectory(
             dir=REPO_ROOT / "tests" / "core",
@@ -7994,6 +8034,38 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "player_identity_promotion_certificate:sha256_mismatch",
             bad_hash_missing,
         )
+
+    def test_permissions_admin_certificate_must_match_active_identity_surface_record(self) -> None:
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PermissionsAdminCertificateSurface",
+        ) as core_dir:
+            root = Path(core_dir)
+            identity_artifacts = self.write_player_identity_structured_promotion_artifacts(root)
+            permissions_evidence = self.write_permissions_admin_structured_promotion_artifacts(root)
+            certificate_path = root / "player_identity_promotion_certificate.json"
+            permissions_evidence["player_identity_promotion_certificate"] = (
+                self.write_player_identity_promotion_certificate(
+                    certificate_path,
+                    identity_artifacts,
+                )
+            )
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["support_tier"] = "release-supported copied principal"
+                    surface["evidence"] = identity_artifacts
+                    break
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            missing = permissions_admin_structured_promotion_evidence_missing(
+                permissions_evidence,
+                manifest_path,
+            )
+
+        self.assertIn("player_identity_promotion_certificate:surface_record_sha256_mismatch", missing)
 
     def test_p0_executed_test_artifact_missing_canonical_provenance_is_rejected(self) -> None:
         import importlib.util

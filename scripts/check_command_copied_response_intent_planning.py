@@ -659,6 +659,8 @@ def validate_permissions_public_readiness(
     if query_artifact_schema is None:
         add(blockers, "response_intent_accepts_without_query_failclosed_planning", "--query-failclosed-artifact")
         return
+    if query_artifact_schema == QUERY_CONTRACT_REPORT_SCHEMA:
+        return
     report = permissions_readiness.build_report(
         argparse.Namespace(
             decisions=args.permissions_decisions,

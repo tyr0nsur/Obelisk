@@ -898,6 +898,12 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 lambda sidecar: sidecar.update({"note": "stable SDK claim is allowed"}),
                 "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
             ),
+            (
+                "preflight_server_restart_authorized_key",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"server_restart_authorized": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
         )
         for name, artifact_for_payload, mutate, expected in cases:
             with self.subTest(name=name):
