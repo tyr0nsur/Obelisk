@@ -173,3 +173,40 @@ These are offline guardrails only. They keep P0 downstream gates from treating
 identity-stage progress, request/window artifacts, or wording sidecars as
 permissions/admin, response-path, replies, public SDK, runtime, or v1 completion
 promotion evidence.
+
+## P0 Claim-Surface Hardening
+
+The next supervised 4-agent round closed additional claim-surface gaps without
+changing the runtime blocker:
+
+- The route gate now imports structured public/runtime/source-claim findings
+  from the upstream player-identity first-evidence checker into
+  `critical_path_phase` and rejects request-pack, window-manifest, operator
+  receipt, planning artifact/manifest/source, placeholder evidence, and similar
+  source fields when they are presented as approved runtime identity evidence.
+- After accepted approved runtime evidence, the parent identity route may move
+  only to locked planning blocker `identity_public_contract_gate_missing`.
+  Downstream permissions/admin, command response, and commands/replies direct
+  gates still receive and must report `approved_runtime_evidence_missing`; they
+  must not inherit the identity-stage contract blocker as their own readiness
+  alias.
+- SDK completion claim scanning now recognizes structured aliases such as
+  `public_sdk.ready`, `runtime.ready`, `stable_claim.allowed`, and
+  `counts_toward.v1_completion`. Named nested report/readiness/summary/result/
+  accounting objects start their own claim context, so a parent blocker cannot
+  hide a child public/runtime/v1 overclaim.
+- Runtime window-manifest and evidence-bundle reports now explicitly emit false
+  non-authorization/readiness flags for server operations, runtime work,
+  promotion, public header, public SDK, public ABI, v1 completion, and runtime
+  readiness.
+- Downstream P0 readiness scans now catch complete/full/production/stable SDK,
+  `v1.0 stable`, and release-readiness wording overclaims while preserving
+  negative stable-release-contract contexts.
+
+Validation stayed offline-only: route-gate tests 46, downstream permissions/
+admin and command response/replies tests 135, window-manifest tests 70,
+evidence-bundle tests 45, focused SDK structured-alias tests 3, full SDK
+completion suite 211, py_compile, route JSON valid/planning-only, SDK JSON
+blocked by design, and `git diff --check`. The stable
+state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
+progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.

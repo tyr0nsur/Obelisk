@@ -262,7 +262,13 @@ FALSE_ONLY_KEYS = frozenset(
         "command_parser_allowed",
         "command_router_allowed",
         "commands_replies_ready",
+        "complete_sdk_claim_allowed",
+        "complete_sdk_ready",
+        "full_sdk_claim_allowed",
+        "full_sdk_ready",
         "parser_allowed",
+        "production_sdk_claim_allowed",
+        "production_sdk_ready",
         "promotion_ready",
         "public_abi_allowed",
         "public_abi_ready",
@@ -276,6 +282,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_response_path_allowed",
         "public_sdk_ready",
         "public_send_chat_api",
+        "release_readiness_ready",
         "reply_send_chat_router_claims_allowed",
         "reply_api_allowed",
         "public_send_chat_abi_allowed",
@@ -285,6 +292,9 @@ FALSE_ONLY_KEYS = frozenset(
         "runtime_ready",
         "send_chat_api_allowed",
         "send_chat_allowed",
+        "stable_sdk_claim_allowed",
+        "stable_sdk_ready",
+        "v1_0_stable_ready",
         "v1_completion_evidence",
     )
 )
@@ -292,6 +302,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "blocker",
     "blockers",
     "blocked",
+    "claim_requires",
     "decision_required",
     "exclusion",
     "exclusions",
@@ -301,6 +312,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "promotion_requires",
     "required_evidence",
     "required_exclusions",
+    "stable_release_contract",
     "why_blocked",
 )
 NEGATED_CLAIM_RE = re.compile(
@@ -308,7 +320,10 @@ NEGATED_CLAIM_RE = re.compile(
     r"never|no|not|only|planning|post-v1|require[sd]?|unresolved|until|without)\b",
     re.IGNORECASE,
 )
-CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+CLAIM_SCOPE_SPLIT_RE = re.compile(
+    r"(?<!\d)\.(?!\d)|[;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+",
+    re.IGNORECASE,
+)
 NEGATED_CLAIM_SUFFIX_RE = re.compile(
     r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
     r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
@@ -320,7 +335,8 @@ POSITIVE_CLAIM_RE = re.compile(
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
-    r"public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|runtime[_ -]?readiness|"
+    r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
+    r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b.{0,100}\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b",
@@ -333,7 +349,8 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
-    r"public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|runtime[_ -]?readiness|"
+    r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
+    r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b",
@@ -490,7 +507,7 @@ def string_set(value: Any) -> set[str]:
 
 def normalized_key(key: Any) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
-    return separated.casefold().replace("-", "_").replace(" ", "_")
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
 def is_negative_context(trail: str) -> bool:

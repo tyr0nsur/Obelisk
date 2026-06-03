@@ -1346,6 +1346,25 @@ priorities, and do not use history files as the active source of truth.
   valid/planning-only, SDK JSON blocked by design, and `git diff --check`. Route/SDK remain
   fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent P0 claim-surface hardening round: route gate now rejects
+  upstream identity reports whose structured source fields cite request/window/receipt/
+  planning/placeholder evidence as runtime approval, and downstream child gates no longer
+  inherit the parent post-runtime `identity_public_contract_gate_missing` lock. Parent
+  identity may use that blocker only after accepted approved runtime evidence; downstream
+  permissions/admin, command response, and commands/replies remain at canonical
+  `approved_runtime_evidence_missing` until identity and permissions/admin promotion.
+  SDK completion now detects structured nested aliases such as `public_sdk.ready`,
+  `runtime.ready`, `stable_claim.allowed`, and `counts_toward.v1_completion`, including
+  named nested report/readiness/summary/result/accounting contexts. Runtime window and
+  evidence-bundle reports explicitly emit false server/runtime/public/ABI/v1 readiness
+  and authorization flags. Downstream readiness scanners catch complete/full/production/
+  stable SDK, `v1.0 stable`, and release-readiness overclaims while preserving negative
+  stable-release-contract contexts. Validations passed: route gate 46, downstream 135,
+  window-manifest 70, evidence-bundle 45, focused SDK alias tests 3, py_compile, route
+  JSON valid/planning-only, SDK JSON blocked by design, full SDK completion suite 211,
+  and `git diff --check`. Route/SDK remain fail-closed
+  at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

@@ -372,7 +372,13 @@ QUERY_READY_FALSE_KEYS = (
 FALSE_ONLY_KEYS = frozenset(
     (
         "command_router_allowed",
+        "complete_sdk_claim_allowed",
+        "complete_sdk_ready",
+        "full_sdk_claim_allowed",
+        "full_sdk_ready",
         "permission_cache_abi_allowed",
+        "production_sdk_claim_allowed",
+        "production_sdk_ready",
         "public_abi_allowed",
         "public_abi_ready",
         "public_admin_mutation_allowed",
@@ -389,13 +395,17 @@ FALSE_ONLY_KEYS = frozenset(
         "public_reply_or_send_chat_abi_allowed",
         "public_response_path_allowed",
         "public_sdk_ready",
+        "release_readiness_ready",
         "stable_claim_allowed",
+        "stable_sdk_claim_allowed",
+        "stable_sdk_ready",
         "replies_send_chat_allowed",
         "reply_send_chat_router_claims_allowed",
         "runtime_delivery_allowed",
         "runtime_ready",
         "send_chat_allowed",
         "send_chat_ready",
+        "v1_0_stable_ready",
         "v1_completion_ready",
     )
 )
@@ -425,7 +435,9 @@ NEGATIVE_CONTEXT_TOKENS = (
     "required_behavior",
     "required_exclusions",
     "required_properties",
+    "claim_requires",
     "release_guardrails",
+    "stable_release_contract",
     "v1_sequence_gate",
 )
 NEGATED_CLAIM_RE = re.compile(
@@ -433,7 +445,10 @@ NEGATED_CLAIM_RE = re.compile(
     r"only|planning|post-v1|require[sd]?|unresolved|until|without)\b",
     re.IGNORECASE,
 )
-CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+CLAIM_SCOPE_SPLIT_RE = re.compile(
+    r"(?<!\d)\.(?!\d)|[;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+",
+    re.IGNORECASE,
+)
 NEGATED_CLAIM_SUFFIX_RE = re.compile(
     r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
     r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
@@ -443,7 +458,8 @@ POSITIVE_CLAIM_RE = re.compile(
     r"\b("
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
-    r"permission[_ -]?cache|public\s+(?:abi|headers?|sdk)|"
+    r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
+    r"release\s+readiness|stable\s+sdk|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"permissions?/admin|reply\s+endpoint|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request|endpoint))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
     r"runtime(?:[_ -]?delivery)?"
@@ -455,7 +471,8 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r".{0,100}\b("
     r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
     r"command\s+response\s+path|"
-    r"permission[_ -]?cache|public\s+(?:abi|headers?|sdk)|"
+    r"complete\s+sdk|full\s+sdk|permission[_ -]?cache|production\s+sdk|public\s+(?:abi|headers?|sdk)|"
+    r"release\s+readiness|stable\s+sdk|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"permissions?/admin|reply\s+endpoint|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request|endpoint))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
     r"runtime(?:[_ -]?delivery)?"
@@ -1219,6 +1236,15 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
+    current_route_blocker = getattr(args, "current_route_blocker", CURRENT_ROUTE_BLOCKER)
+    if current_route_blocker != CURRENT_ROUTE_BLOCKER:
+        add(
+            blockers,
+            "current_route_blocker_mismatch",
+            "$.current_route_blocker",
+            expected=CURRENT_ROUTE_BLOCKER,
+            value=current_route_blocker,
+        )
     decisions = load_json(args.decisions, "decisions", blockers)
     surfaces = load_json(args.surfaces, "surfaces", blockers)
     if decisions is not None:
@@ -1227,7 +1253,6 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         validate_surfaces(surfaces, blockers, args.public_header)
     validate_header(args.public_header, blockers)
     query_artifact_schema = validate_query_artifact(args.query_failclosed_artifact, blockers)
-    current_route_blocker = getattr(args, "current_route_blocker", CURRENT_ROUTE_BLOCKER)
     return {
         "schema": REPORT_SCHEMA,
         "surface": SURFACE,
@@ -1236,8 +1261,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "planning_only": True,
         "dependency_chain": REQUIRED_P0_CHAIN,
         "dependency_chain_locked": True,
-        "current_route_blocker": current_route_blocker,
-        "remaining_route_blockers": [current_route_blocker],
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1250,7 +1275,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "dependency": IDENTITY_SURFACE,
         "non_claim": (
             "valid planning output does not count permissions/admin while player identity remains blocked "
-            f"on {current_route_blocker}"
+            f"on {CURRENT_ROUTE_BLOCKER}"
         ),
         "query_failclosed_artifact_schema": query_artifact_schema,
         "blockers": [blocker["reason"] for blocker in blockers],

@@ -796,6 +796,34 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             [item["reason"] for item in blockers],
         )
 
+    def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "release_notes": [
+                    "complete SDK is ready",
+                    "full SDK is available",
+                    "production SDK is supported",
+                    "stable SDK is enabled",
+                    "v1.0 stable is public",
+                    "release readiness is supported",
+                ],
+                "aliases": {
+                    "completeSdkReady": True,
+                    "full-sdk-ready": True,
+                    "production sdk ready": True,
+                    "stableSdkReady": True,
+                    "releaseReadinessReady": True,
+                    "v1.0-stable-ready": True,
+                },
+            },
+            blockers,
+        )
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertEqual(6, reasons.count("positive_public_surface_claim"))
+        self.assertEqual(6, reasons.count("public_surface_overclaim"))
+
     def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims({"note": "reply API ready remains blocked"}, blockers)

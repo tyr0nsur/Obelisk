@@ -489,8 +489,13 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
         self.assertTrue(Path(report["copied_log"]["path"]).is_absolute())
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
         self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["v1_completion_ready"])
         self.assertFalse(report["runtime_ready"])
 
     def test_rejects_sidecar_in_other_approved_directory_even_with_matching_sha(self) -> None:

@@ -253,6 +253,10 @@ FALSE_ONLY_KEYS = frozenset(
         "command_router",
         "chat_router",
         "chat_routing",
+        "complete_sdk_claim_allowed",
+        "complete_sdk_ready",
+        "full_sdk_claim_allowed",
+        "full_sdk_ready",
         "generic_chat_router",
         "generic_chat_routing",
         "identity_ready",
@@ -263,6 +267,8 @@ FALSE_ONLY_KEYS = frozenset(
         "player_identity_contract",
         "player_identity_ready",
         "principal_identity_ready",
+        "production_sdk_claim_allowed",
+        "production_sdk_ready",
         "promotion_ready",
         "public_abi_ready",
         "public_chat_router",
@@ -276,6 +282,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_response_path_allowed",
         "public_reply_abi_allowed",
         "public_reply_api",
+        "release_readiness_ready",
         "generic_chat_routing_public_response_allowed",
         "minimal_chat_message_event_public_response_allowed",
         "raw_process_event_public_response_allowed",
@@ -297,10 +304,14 @@ FALSE_ONLY_KEYS = frozenset(
         "send_chat_allowed",
         "send_chat_api",
         "send_chat_api_allowed",
+        "stable_sdk_claim_allowed",
+        "stable_sdk_ready",
+        "v1_0_stable_ready",
     )
 )
 NEGATIVE_CONTEXT_TOKENS = (
     "block",
+    "claim_requires",
     "forbid",
     "guidance",
     "negative",
@@ -309,13 +320,15 @@ NEGATIVE_CONTEXT_TOKENS = (
     "not_sufficient",
     "promotion_requires",
     "required_evidence",
+    "stable_release_contract",
     "snapshot_prep_checks",
     "why_blocked",
 )
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"public\s+headers?|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
-    r"public\s+(?:command\s+)?sdk(?:\s+readiness)?|release\s+readiness|v1\s+(?:sdk\s+)?completion|"
+    r"(?:complete|full|production|stable)\s+sdk|public\s+(?:command\s+)?sdk(?:\s+readiness)?|"
+    r"release\s+readiness|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
     r"repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
     r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
@@ -327,7 +340,10 @@ NEGATED_CLAIM_RE = re.compile(
     r"never|no|not|only|planning|require[sd]?|until|without)\b",
     re.IGNORECASE,
 )
-CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+CLAIM_SCOPE_SPLIT_RE = re.compile(
+    r"(?<!\d)\.(?!\d)|[;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+",
+    re.IGNORECASE,
+)
 NEGATED_CLAIM_SUFFIX_RE = re.compile(
     r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
     r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
@@ -422,7 +438,7 @@ def contains_fragment(haystack: str, needle: str) -> bool:
 
 def normalized_key(key: Any) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
-    return separated.casefold().replace("-", "_").replace(" ", "_")
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
 def negative_context(trail: str) -> bool:

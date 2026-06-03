@@ -122,6 +122,24 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["counts_toward_v1_completion"])
         self.assertFalse(report["public_or_runtime_accounting_allowed"])
 
+    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+        result = run_checker(
+            "--current-route-blocker",
+            "identity_public_contract_gate_missing",
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("current_route_blocker_mismatch", report["blockers"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
     def test_accepts_candidate_query_failclosed_manifest_only_as_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -413,6 +431,35 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             ],
             [(item["reason"], item["label"]) for item in blockers],
         )
+
+    def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "release_notes": [
+                    "complete SDK is ready",
+                    "full SDK is available",
+                    "production SDK is supported",
+                    "stable SDK is enabled",
+                    "v1.0 stable is public",
+                    "release readiness is ready",
+                    "v1 SDK completion is supported",
+                ],
+                "aliases": {
+                    "completeSdkReady": True,
+                    "full-sdk-ready": True,
+                    "production sdk ready": True,
+                    "stableSdkReady": True,
+                    "releaseReadinessReady": True,
+                    "v1.0-stable-ready": True,
+                },
+            },
+            blockers,
+        )
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertEqual(7, reasons.count("positive_public_surface_claim"))
+        self.assertEqual(6, reasons.count("public_surface_overclaim"))
 
     def test_rejects_camel_hyphen_space_aliases_and_positive_readiness_texts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

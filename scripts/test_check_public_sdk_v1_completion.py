@@ -21,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from check_public_sdk_v1_completion import (
     SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER,
     blocker_guidance,
+    command_permission_route_gate_public_or_runtime_claims,
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
@@ -770,6 +771,28 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_structured_completion_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "public_sdk": {"ready": True},
+            "runtime": {"ready": "yes"},
+            "stable_claim": {"allowed": True},
+            "v1_completion": {"progress_ratio": "1/12"},
+            "p0_dependency_chain": {"promoted_for_claim_count": 1},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "p0_dependency_chain.promoted_for_claim_count",
+                "public_sdk.ready",
+                "runtime.ready",
+                "stable_claim.allowed",
+                "v1_completion.progress_ratio",
+            ],
+        )
+
     def test_secondary_report_scanner_allows_positive_claim_when_report_has_blocker(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",
@@ -793,6 +816,57 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             secondary_report_completion_claims_without_blocker(payload),
             ["nested_report.stable_claim_allowed"],
+        )
+
+    def test_secondary_report_scanner_rejects_named_child_report_without_schema_or_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["parent_report_blocked"],
+            "downstream_readiness_report": {
+                "public_sdk": {"ready": True},
+                "runtime": {"ready": True},
+                "v1_completion": {"ready": True},
+            },
+            "summary": {
+                "stable_claim": {"allowed": "yes"},
+            },
+            "nested": {"stable_claim_allowed": True},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "downstream_readiness_report.public_sdk.ready",
+                "downstream_readiness_report.runtime.ready",
+                "downstream_readiness_report.v1_completion.ready",
+                "summary.stable_claim.allowed",
+            ],
+        )
+
+    def test_route_gate_claim_scanner_rejects_structured_public_runtime_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "blockers": [],
+            "public_sdk": {"ready": True},
+            "runtime": {"ready": "ready"},
+            "counts_toward": {
+                "public_sdk": True,
+                "runtime": True,
+                "v1_completion": True,
+            },
+            "stable_claim": {"allowed": True},
+        }
+
+        self.assertEqual(
+            command_permission_route_gate_public_or_runtime_claims(payload),
+            [
+                "counts_toward.public_sdk",
+                "counts_toward.runtime",
+                "counts_toward.v1_completion",
+                "public_sdk.ready",
+                "runtime.ready",
+                "stable_claim.allowed",
+            ],
         )
 
     def test_completion_gate_rejects_secondary_package_and_rc_claim_aliases(self) -> None:

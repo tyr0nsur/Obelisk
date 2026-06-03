@@ -190,6 +190,7 @@ FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE = re.compile(
     r"operator_?(?:approval_?)?receipts?|"
     r"(?:live_?)?(?:validation|ops)_?sidecars?|"
     r"window_?manifests?|"
+    r"planning_?(?:artifacts?|manifests?|sources?)|"
     r"placeholder_?(?:runtime_?)?evidence|"
     r"public_identity"
     r")"
@@ -558,7 +559,12 @@ def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any])
     return blockers
 
 
-def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]:
+def collect_public_or_runtime_claims(
+    value: Any,
+    *,
+    path: str = "",
+    include_text_claims: bool = True,
+) -> list[str]:
     claims: list[str] = []
 
     def normalized_key(key: object) -> str:
@@ -596,12 +602,24 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
                 for claim in item:
                     if isinstance(claim, str) and claim:
                         claims.append(f"{item_path}:{claim}")
-            claims.extend(collect_public_or_runtime_claims(item, path=item_path))
+            claims.extend(
+                collect_public_or_runtime_claims(
+                    item,
+                    path=item_path,
+                    include_text_claims=include_text_claims,
+                )
+            )
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            claims.extend(collect_public_or_runtime_claims(item, path=f"{path}[{index}]"))
+            claims.extend(
+                collect_public_or_runtime_claims(
+                    item,
+                    path=f"{path}[{index}]",
+                    include_text_claims=include_text_claims,
+                )
+            )
     elif isinstance(value, str):
-        if contains_positive_public_or_runtime_text_claim(value):
+        if include_text_claims and contains_positive_public_or_runtime_text_claim(value):
             claims.append(f"{path}:positive_text_claim")
     return sorted(set(claims))
 
@@ -761,6 +779,9 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
         primary_blocker = report.get("primary_blocker")
         next_blocker = report.get("next_blocker")
     source_blockers = report.get("blockers") if report is not None else None
+    source_claims = (
+        collect_public_or_runtime_claims(report, include_text_claims=False) if report is not None else []
+    )
     current_blocker = primary_blocker or next_blocker
     manifest_sources = identity_manifest_source_diagnostics(args, report)
 
@@ -785,6 +806,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
             report.get("accepted_for_internal_planning") if report is not None else None
         ),
         "source_checker_blockers": source_blockers,
+        "source_checker_public_or_runtime_claims": source_claims,
         "source_checker_manifest_sources": manifest_sources,
         "planning_only": True,
         "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
@@ -823,6 +845,9 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_blockers_missing")
     elif primary_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS and primary_blocker not in source_blockers:
         blockers.append("critical_path_identity_readiness_primary_blocker_not_in_blockers")
+    source_claims = phase.get("source_checker_public_or_runtime_claims")
+    if isinstance(source_claims, list) and source_claims:
+        blockers.append("critical_path_identity_readiness_public_or_runtime_claim")
     if phase.get("current_blocker") is None:
         blockers.append("critical_path_identity_gate_current_blocker_missing")
     if phase.get("current_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
@@ -851,13 +876,19 @@ def validate_locked_child_route_alignment(
     remaining_route_blockers: list[Any],
 ) -> list[str]:
     blockers: list[str] = []
+    expected_child_blocker = (
+        None
+        if current_route_blocker in UPSTREAM_IDENTITY_LOCK_BLOCKERS
+        else "approved_runtime_evidence_missing"
+    )
+    expected_child_blockers = [expected_child_blocker] if expected_child_blocker is not None else []
     for check in checks:
         if check["name"] not in REQUIRED_LOCKED_CHILD_CHECKS:
             continue
-        if check.get("current_route_blocker") != current_route_blocker:
-            blockers.append(f"{check['name']}: current_route_blocker drifted from parent identity lock")
-        if check.get("remaining_route_blockers") != remaining_route_blockers:
-            blockers.append(f"{check['name']}: remaining_route_blockers drifted from parent identity lock")
+        if check.get("current_route_blocker") != expected_child_blocker:
+            blockers.append(f"{check['name']}: current_route_blocker drifted from downstream lock")
+        if check.get("remaining_route_blockers") != expected_child_blockers:
+            blockers.append(f"{check['name']}: remaining_route_blockers drifted from downstream lock")
     return blockers
 
 
@@ -867,11 +898,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     child_route_blocker = (
         None
         if current_route_blocker in UPSTREAM_IDENTITY_LOCK_BLOCKERS
-        else (
-            current_route_blocker
-            if current_route_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS
-            else "approved_runtime_evidence_missing"
-        )
+        else "approved_runtime_evidence_missing"
     )
     checks = []
     response_path_report: dict[str, Any] | None = None

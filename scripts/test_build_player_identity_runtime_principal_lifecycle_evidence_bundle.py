@@ -562,6 +562,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["public_sdk_ready"])
@@ -1248,8 +1250,13 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             report = json.loads(result.stdout)
             self.assertEqual(report["status"], "accepted")
             self.assertEqual(report["summary_modules"], ["player_principal_lifecycle"])
+            self.assertFalse(report["server_operations_authorized"])
+            self.assertFalse(report["runtime_work_authorized"])
             self.assertFalse(report["promotion_ready"])
+            self.assertFalse(report["public_header_allowed"])
             self.assertFalse(report["public_sdk_ready"])
+            self.assertFalse(report["public_abi_ready"])
+            self.assertFalse(report["v1_completion_ready"])
             self.assertFalse(report["runtime_ready"])
             self.assertEqual(
                 report["negative_readiness_checks"],

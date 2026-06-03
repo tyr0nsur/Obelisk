@@ -495,6 +495,33 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_broad_release_sdk_wording_overclaim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "release_notes": [
+                    "complete SDK is ready",
+                    "full SDK is available",
+                    "production SDK is supported",
+                    "stable SDK is enabled",
+                    "v1.0 stable is public",
+                ],
+                "aliases": {
+                    "completeSdkReady": True,
+                    "full-sdk-ready": True,
+                    "production sdk ready": True,
+                    "stableSdkReady": True,
+                    "releaseReadinessReady": True,
+                    "v1.0-stable-ready": True,
+                },
+            },
+            blockers,
+        )
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertEqual(5, reasons.count("positive_public_surface_claim"))
+        self.assertEqual(6, reasons.count("public_surface_overclaim"))
+
     def test_default_root_is_repo_local_and_provenance_bound(self) -> None:
         self.assertTrue(READINESS.DEFAULT_ROOT.is_relative_to(REPO_ROOT))
         self.assertNotIn("/servidor/ark", str(READINESS.DEFAULT_ROOT))

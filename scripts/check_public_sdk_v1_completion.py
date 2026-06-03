@@ -1392,7 +1392,7 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
 
     def normalized_key(key: object) -> str:
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
-        return separated.casefold().replace("-", "_").replace(" ", "_")
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
     def normalized_source(value: object) -> str:
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
@@ -1464,15 +1464,24 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
             if part
         )
 
+    def claim_key_matches_path(key_name: str, path: str) -> bool:
+        if (
+            key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
+            or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
+        ):
+            return True
+        return any(
+            suffix in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
+            or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(suffix)
+            for suffix in normalized_claim_path_suffixes(path)
+        )
+
     def visit(value: Any, path: str) -> None:
         if isinstance(value, dict):
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
                 key_name = normalized_key(key)
-                if (
-                    key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
-                    or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
-                ) and is_positive_claim_value(item):
+                if claim_key_matches_path(key_name, item_path) and is_positive_claim_value(item):
                     claims.append(item_path)
                 if (
                     key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_KEYS
@@ -1510,7 +1519,20 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         return isinstance(blockers, list) and bool(blockers)
 
     def starts_report_context(value: dict[str, Any], path: str) -> bool:
-        return path == "" or "schema" in value or "blockers" in value
+        if path == "" or "schema" in value or "blockers" in value:
+            return True
+        tail = normalized_claim_path_tail(path)
+        return (
+            tail in {"accounting", "claim", "claims", "readiness", "report", "reports", "result", "results", "summary"}
+            or tail.endswith("_accounting")
+            or tail.endswith("_claims")
+            or tail.endswith("_readiness")
+            or tail.endswith("_report")
+            or tail.endswith("_reports")
+            or tail.endswith("_result")
+            or tail.endswith("_results")
+            or tail.endswith("_summary")
+        )
 
     def visit(value: Any, path: str, blocked_report_context: bool) -> None:
         if isinstance(value, dict):
@@ -1524,8 +1546,13 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 if (
                     (
                         normalized_completion_claim_key(key) in forbidden_keys
+                        or any(suffix in forbidden_keys for suffix in normalized_claim_path_suffixes(item_path))
                         or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(
                             normalized_completion_claim_key(key)
+                        )
+                        or any(
+                            BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(suffix)
+                            for suffix in normalized_claim_path_suffixes(item_path)
                         )
                     )
                     and is_positive_completion_claim_value(item)
@@ -1543,7 +1570,28 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
 
 def normalized_completion_claim_key(key: object) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
-    return separated.casefold().replace("-", "_").replace(" ", "_")
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def normalized_claim_path_parts(path: str) -> list[str]:
+    return [
+        part
+        for part in (
+            normalized_completion_claim_key(raw_part)
+            for raw_part in re.split(r"(?:\.|\[\d+\])", path)
+        )
+        if part
+    ]
+
+
+def normalized_claim_path_tail(path: str) -> str:
+    parts = normalized_claim_path_parts(path)
+    return parts[-1] if parts else ""
+
+
+def normalized_claim_path_suffixes(path: str) -> list[str]:
+    parts = normalized_claim_path_parts(path)
+    return ["_".join(parts[index:]) for index in range(len(parts))]
 
 
 def is_positive_completion_claim_value(value: Any) -> bool:

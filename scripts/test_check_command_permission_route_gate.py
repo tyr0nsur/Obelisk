@@ -396,12 +396,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             child = next(check for check in report["checks"] if check["name"] == check_name)
             self.assertIn("--current-route-blocker", child["argv"])
             self.assertEqual(
-                "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_missing",
                 child["argv"][child["argv"].index("--current-route-blocker") + 1],
                 child,
             )
-            self.assertEqual("identity_public_contract_gate_missing", child["current_route_blocker"], child)
-            self.assertEqual(["identity_public_contract_gate_missing"], child["remaining_route_blockers"], child)
+            self.assertEqual("approved_runtime_evidence_missing", child["current_route_blocker"], child)
+            self.assertEqual(["approved_runtime_evidence_missing"], child["remaining_route_blockers"], child)
             self.assertFalse(child["counts_toward_public_sdk"], child)
             self.assertFalse(child["counts_toward_runtime"], child)
             self.assertFalse(child["counts_toward_v1_completion"], child)
@@ -445,14 +445,18 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             argv[argv.index("--approved-runtime-evidence") + 1],
         )
 
-    def test_approved_runtime_evidence_rejects_stale_child_route_locks(self) -> None:
+    def test_approved_runtime_evidence_rejects_identity_contract_child_route_locks(self) -> None:
         original_run_check = ROUTE_GATE.run_check
 
-        def stale_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
+        def identity_contract_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
             result = original_run_check(name, argv)
+            if name == "player_identity_public_contract_gap":
+                result["exit_code"] = 0
+                result["valid"] = True
+                result["blockers"] = []
             if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
-                result["current_route_blocker"] = "approved_runtime_evidence_missing"
-                result["remaining_route_blockers"] = ["approved_runtime_evidence_missing"]
+                result["current_route_blocker"] = "identity_public_contract_gate_missing"
+                result["remaining_route_blockers"] = ["identity_public_contract_gate_missing"]
             return result
 
         args = SimpleNamespace(
@@ -499,7 +503,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         with (
             mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
-            mock.patch.object(ROUTE_GATE, "run_check", side_effect=stale_child_route_lock),
+            mock.patch.object(ROUTE_GATE, "run_check", side_effect=identity_contract_child_route_lock),
         ):
             report = ROUTE_GATE.build_report(args)
 
@@ -511,15 +515,15 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(report["route_blocked"])
         self.assertFalse(report["route_lock_invariant_valid"])
         self.assertIn(
-            "permissions_admin_public_readiness: current_route_blocker drifted from parent identity lock",
+            "permissions_admin_public_readiness: current_route_blocker drifted from downstream lock",
             report["blockers"],
         )
         self.assertIn(
-            "command_chat_response_public_readiness: remaining_route_blockers drifted from parent identity lock",
+            "command_chat_response_public_readiness: remaining_route_blockers drifted from downstream lock",
             report["blockers"],
         )
         self.assertIn(
-            "commands_replies_public_readiness: current_route_blocker drifted from parent identity lock",
+            "commands_replies_public_readiness: current_route_blocker drifted from downstream lock",
             report["blockers"],
         )
 
@@ -1005,6 +1009,84 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("critical_path_identity_readiness_exit_code_unexpected", blockers)
         self.assertIn("critical_path_identity_readiness_status_unexpected", blockers)
         self.assertGreaterEqual(blockers.count("critical_path_identity_readiness_ready_flag_overclaim"), 2)
+
+    def test_build_critical_path_phase_rejects_placeholder_identity_approval_source_claims(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "primary_blocker": "identity_public_contract_gate_missing",
+                        "blockers": ["identity_public_contract_gate_missing"],
+                        "lifecycle_anchor_candidates_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+                        ),
+                        "principal_invalidation_policy_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+                        ),
+                        "status": "blocked",
+                        "ready": False,
+                        "accepted_for_internal_planning": False,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "first_evidence": {
+                            "approved_runtime_principal_lifecycle_evidence_manifest": {
+                                "approved_runtime_evidence_source": "request_pack",
+                                "runtime_evidence_source": "placeholder_runtime_evidence",
+                                "principal_source": "operator_receipt",
+                                "identity_claim_source": "window_manifest",
+                                "evidence_source": "planning_artifact",
+                            }
+                        },
+                    }
+                ),
+                stderr="",
+            )
+
+        args = SimpleNamespace(
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=Path("approved-runtime.json"),
+        )
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase(args)
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        claims = phase["source_checker_public_or_runtime_claims"]
+        self.assertIn("critical_path_identity_readiness_public_or_runtime_claim", blockers)
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.approved_runtime_evidence_source",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.runtime_evidence_source",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.principal_source",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.identity_claim_source",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.evidence_source",
+            claims,
+        )
 
     def test_route_check_requires_explicit_valid_true(self) -> None:
         original_run = ROUTE_GATE.subprocess.run

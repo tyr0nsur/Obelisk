@@ -248,3 +248,25 @@ This file is an active routing table only. Durable evidence belongs in
   audit made no edits. Route JSON remains valid/planning-only at
   `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.
+- Latest round delegated route-gate, SDK completion, approved-runtime/window replay, and
+  downstream P0 contract hardening. Integrated result: route gate now carries structured
+  upstream identity public/runtime/source-claim findings into `critical_path_phase` and
+  rejects request/window/receipt/planning/placeholder evidence source claims. After
+  accepted runtime evidence, the parent identity route may lock at
+  `identity_public_contract_gate_missing`, but downstream permissions/admin, command
+  response, and commands/replies children still receive and must report the canonical
+  `approved_runtime_evidence_missing` blocker until identity and permissions/admin are
+  promoted. SDK completion now detects structured aliases such as `public_sdk.ready`,
+  `runtime.ready`, `stable_claim.allowed`, and `counts_toward.v1_completion`, and treats
+  named nested report/readiness/summary/result/accounting objects as independent claim
+  contexts. Runtime window/evidence-bundle reports now explicitly emit false
+  non-authorization/readiness flags: `server_operations_authorized`,
+  `runtime_work_authorized`, `promotion_ready`, `public_header_allowed`,
+  `public_sdk_ready`, `public_abi_ready`, `v1_completion_ready`, and `runtime_ready`.
+  Downstream wording scans now also catch complete/full/production/stable SDK,
+  `v1.0 stable`, and release-readiness overclaims while preserving negative
+  stable-release-contract contexts. Validation passed: route gate 46, downstream 135,
+  window-manifest 70, evidence-bundle 45, focused SDK alias tests 3, py_compile, route
+  JSON valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, full SDK completion suite 211, and `git diff --check`.
+  No runtime/server operation. Agents closed.
