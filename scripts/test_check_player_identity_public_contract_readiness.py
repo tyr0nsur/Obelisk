@@ -29,6 +29,13 @@ PUBLIC_ABI_PREFLIGHT_CANDIDATE = (
     / "player-identity-planning-sources"
     / "player-identity-public-abi-preflight-candidate.json"
 )
+OWNER_TOKEN_SDK_CONSUMER_CONTRACT = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "player-identity-owner-token-sdk-consumer-contract.json"
+)
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -976,6 +983,106 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_abi_ready_not_false", report["public_abi_preflight_candidate"]["blockers"])
         self.assertIn("v1_completion_evidence_not_false", report["public_abi_preflight_candidate"]["blockers"])
         self.assertIn("public_header_symbols_now_not_empty", report["public_abi_preflight_candidate"]["blockers"])
+
+    def test_sanitizes_public_abi_preflight_helper_nested_overclaims(self) -> None:
+        overclaim = {
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_candidate_review": True,
+            "accepted_for_contract_review": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "public_header_allowed": True,
+            "public_contract_allowed": True,
+            "public_abi_ready": True,
+            "v1_completion_ready": True,
+            "v1_completion_evidence": True,
+            "public_sdk_v1_completion_claim": True,
+            "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
+            "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+            "public_callback_abi_now": ["ObeliskPlayerIdentityCallback"],
+            "sdk_consumer_contract": {
+                "accepted_for_contract_review": True,
+                "public_sdk_ready": True,
+                "public_header_symbols_now": ["RegisterPlayerIdentityCallback"],
+            },
+            "blockers": [],
+        }
+
+        blockers: list[dict] = []
+        with mock.patch.object(checker.public_abi_preflight_candidate, "build_report", return_value=overclaim):
+            report = checker.public_abi_preflight_candidate_report(PUBLIC_ABI_PREFLIGHT_CANDIDATE, HEADER, blockers)
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("nested_readiness_flag_not_false", reasons)
+        self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["v1_completion_evidence"])
+        self.assertEqual(report["public_header_symbols_now"], [])
+        self.assertEqual(report["public_capability_bits_now"], [])
+        self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertFalse(report["sdk_consumer_contract"]["accepted_for_contract_review"])
+        self.assertFalse(report["sdk_consumer_contract"]["public_sdk_ready"])
+        self.assertEqual(report["sdk_consumer_contract"]["public_header_symbols_now"], [])
+
+    def test_sanitizes_owner_token_sdk_consumer_helper_nested_overclaims(self) -> None:
+        import check_player_identity_owner_token_sdk_consumer_contract as owner_token_checker
+
+        overclaim = {
+            "ready": True,
+            "accepted_for_candidate_review": True,
+            "accepted_for_contract_review": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "public_header_allowed": True,
+            "public_abi_ready": True,
+            "v1_completion_ready": True,
+            "v1_completion_evidence": True,
+            "public_sdk_v1_completion_claim": True,
+            "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
+            "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+            "public_callback_abi_now": ["ObeliskPlayerIdentityCallback"],
+            "sdk_consumer": {
+                "public_sdk_ready": True,
+                "public_header_symbols_now": ["RegisterPlayerIdentityCallback"],
+            },
+            "blockers": [],
+        }
+
+        blockers: list[dict] = []
+        with mock.patch.object(owner_token_checker, "build_report", return_value=overclaim):
+            report = checker.owner_token_sdk_consumer_contract_report(
+                OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
+                PUBLIC_ABI_PREFLIGHT_CANDIDATE,
+                HEADER,
+                blockers,
+                {"sdk_consumer_contract": {}, "required_owner_token_lifecycle": []},
+            )
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("nested_readiness_flag_not_false", reasons)
+        self.assertIn("nested_public_header_symbols_now_not_empty", reasons)
+        self.assertTrue(report["provided"])
+        self.assertEqual(report["source"], "owner_token_sdk_consumer_contract")
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["v1_completion_evidence"])
+        self.assertEqual(report["public_header_symbols_now"], [])
+        self.assertEqual(report["public_capability_bits_now"], [])
+        self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertFalse(report["sdk_consumer"]["public_sdk_ready"])
+        self.assertEqual(report["sdk_consumer"]["public_header_symbols_now"], [])
 
     def test_approved_runtime_report_must_route_to_identity_public_contract_gate(self) -> None:
         original_build_report = checker.approved_evidence.build_report

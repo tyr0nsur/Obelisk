@@ -685,6 +685,17 @@ FORBIDDEN_RELEASE_STATEMENT_AFFIRMATIVE_NOT_PHRASE = re.compile(
     r"\bnot\s+(?:only|merely|just|simply)\b",
     re.IGNORECASE,
 )
+FORBIDDEN_RELEASE_STATEMENT_INDEPENDENT_BROAD_CLAIM_HEAD = re.compile(
+    r"^\s*(?:the\s+|this\s+|obelisk\s+)?(?:"
+    r"(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|"
+    r"release[- ]?grade|production|stable)\s+"
+    r"(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b|"
+    r"(?:sdk|api|support)\s+v?1(?:\.0)?\b|"
+    r"v1(?:\.0)?\s+(?:stable|(?:sdk|api|support)\b)|"
+    r"(?:ga|generally[- ]available)\s+(?:sdk|api|support)\b"
+    r")",
+    re.IGNORECASE,
+)
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER = re.compile(
     r"^\s*(?:(?:is|are|remains?|stays?)\s+)?"
     r"(?:blocked|cannot|disabled|forbidden|not\s+(?:allowed|approved|authorized|ready)|"
@@ -2206,6 +2217,22 @@ def text_has_affirmative_release_claim(text: str) -> bool:
     return False
 
 
+def release_claim_prefix_negator_is_detached(claim_prefix: str, matched_claim: str) -> bool:
+    negators = list(FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.finditer(claim_prefix))
+    if not negators:
+        return False
+    trailing_prefix = claim_prefix[negators[-1].end() :]
+    if "," not in trailing_prefix:
+        return False
+    comma_tail = trailing_prefix.rsplit(",", 1)[1]
+    return bool(
+        FORBIDDEN_RELEASE_STATEMENT_INDEPENDENT_BROAD_CLAIM_HEAD.match(matched_claim)
+        or FORBIDDEN_RELEASE_STATEMENT_INDEPENDENT_BROAD_CLAIM_HEAD.match(
+            f"{comma_tail}{matched_claim}"
+        )
+    )
+
+
 def release_statement_forbidden_broad_claims(text: str) -> list[str]:
     offenders: list[str] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
@@ -2222,6 +2249,7 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                     break
                 claim_prefix = lowered[clause_start : match.start()]
                 claim_clause = lowered[clause_start : match.end()]
+                matched_claim = lowered[match.start() : match.end()]
                 claim_remainder = lowered[match.end() : clause_end]
                 full_clause = lowered[clause_start:clause_end]
                 affirmative_not_phrase = FORBIDDEN_RELEASE_STATEMENT_AFFIRMATIVE_NOT_PHRASE.search(
@@ -2230,11 +2258,16 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                 if (
                     FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix)
                     and affirmative_not_phrase is None
+                    and not release_claim_prefix_negator_is_detached(claim_prefix, matched_claim)
                 ):
                     continue
                 if (
                     FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause)
                     and affirmative_not_phrase is None
+                    and (
+                        not FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix)
+                        or not release_claim_prefix_negator_is_detached(claim_prefix, matched_claim)
+                    )
                 ):
                     continue
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER.search(claim_remainder):
@@ -2249,7 +2282,10 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                     r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"
                     r"limited|must\s+not|no|not|post-v1|post v1)\b",
                     claim_clause,
-                ) and affirmative_not_phrase is None:
+                ) and affirmative_not_phrase is None and not release_claim_prefix_negator_is_detached(
+                    claim_prefix,
+                    matched_claim,
+                ):
                     continue
                 offenders.append(f"line {line_number}: {line.strip()}")
                 break

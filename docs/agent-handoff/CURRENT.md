@@ -211,9 +211,10 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised rounds integrated player-identity/permissions/commands guardrails,
-  receipt-verification, SDK completion wording, fixture consume-gate coverage, stale
-  research-note corrections, and C ABI append-only assertions. Delegated scopes were
-  live-ops request-pack, permissions, commands/replies, and static audit; agents were
-  closed. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
-  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+- Latest supervised rounds integrated player-identity readiness nested-report guards,
+  permissions/commands/Mission side-lane overclaim guards, receipt-verification, SDK
+  completion wording, fixture consume-gate coverage, stale research-note corrections, and
+  C ABI timer callback/layout assertions. Delegated scopes were identity contract, SDK
+  completion, inventory/mission, and ABI/runtime; agents were closed. Default route/SDK
+  remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. No runtime/server op.

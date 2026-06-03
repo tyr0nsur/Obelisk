@@ -3497,6 +3497,68 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "\n".join(payload["release_statement_forbidden_broad_claims"]),
         )
 
+    def test_scoped_release_statement_scope_rejects_comma_detached_negated_broad_claim(self) -> None:
+        claims = [
+            "This is not a v1 stable claim, the complete SDK ships.",
+            "This is not complete SDK, full SDK is ready.",
+            "This is not a stable release, SDK v1 ships today.",
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "\n".join(claims)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for claim in claims:
+            with self.subTest(claim=claim):
+                self.assertIn(claim, forbidden_claims)
+
+    def test_scoped_release_statement_scope_allows_comma_separated_no_api_exclusion_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "obelisk.commands_replies.v1: excluded - no public command SDK/router, "
+                "console command API, RCON command API, admin command API, player command API, "
+                "chat replies, send-chat, broadcast/notices API, or moderation API is included in v1.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--validate-release-statement-scope",
+                "--json",
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
     def test_scoped_release_statement_scope_rejects_affirmative_not_only_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"

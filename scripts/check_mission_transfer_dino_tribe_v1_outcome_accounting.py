@@ -292,6 +292,16 @@ FORBIDDEN_CLAIM_PATTERNS = (
     r"\bcross[- ]map\s+correlation\b",
 )
 FORBIDDEN_CLAIM_RE = re.compile("|".join(f"(?:{pattern})" for pattern in FORBIDDEN_CLAIM_PATTERNS), re.IGNORECASE)
+CANDIDATE_READY_CLAIM_PATTERNS = (
+    r"\b(?:public\s+SDK|public\s+ABI|runtime|runtime\s+observer|runtime\s+hook|"
+    r"v1|v1\s+SDK|promotion|release)\s+(?:ready|readiness|complete|completion)\b",
+    r"\b(?:ready|complete)\s+for\s+v1\b",
+    r"\bv1(?:\.0)?\s+(?:stable|complete|completion|ready)\b",
+)
+CANDIDATE_READY_CLAIM_RE = re.compile(
+    "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
+    re.IGNORECASE,
+)
 NEGATOR_RE = re.compile(
     r"\b(?:cannot|does\s+not|do\s+not|is\s+not|are\s+not|"
     r"must\s+not|no|not|without)\b",
@@ -433,6 +443,15 @@ def claim_is_negated(text: str, start: int, end: int) -> bool:
 def forbidden_claims(text: str) -> list[str]:
     claims: list[str] = []
     for match in FORBIDDEN_CLAIM_RE.finditer(text):
+        if claim_is_negated(text, match.start(), match.end()):
+            continue
+        claims.append(match.group(0))
+    return claims
+
+
+def candidate_ready_claims(text: str) -> list[str]:
+    claims: list[str] = []
+    for match in CANDIDATE_READY_CLAIM_RE.finditer(text):
         if claim_is_negated(text, match.start(), match.end()):
             continue
         claims.append(match.group(0))
@@ -813,6 +832,15 @@ def validate_candidate_leaf_evidence(leaf_id: str, leaf: dict[str, Any], blocker
             add(
                 blockers,
                 claim_reason,
+                label,
+                leaf=leaf_id,
+                claim=claim,
+            )
+        ready_claims = candidate_ready_claims("\n".join(flattened_strings(evidence)))
+        for claim in ready_claims:
+            add(
+                blockers,
+                ready_reason,
                 label,
                 leaf=leaf_id,
                 claim=claim,

@@ -104,6 +104,8 @@ namespace
         (void)gameplayPolicyEventDescriptorsCapability;
         (void)chatEventsCapability;
         (void)filteredCallbacksCapability;
+        (void)timersCapability;
+        (void)repeatingTimerFlag;
         (void)gameplayPolicyEventVersion;
         (void)resourceKindDescriptorVersion;
         (void)gameplayPolicyEventDescriptorVersion;
@@ -215,6 +217,7 @@ int main()
 
     static_assert(sizeof(ObeliskGameplayPolicyEventCallback) == sizeof(void*));
     static_assert(sizeof(ObeliskChatMessageEventCallback) == sizeof(void*));
+    static_assert(sizeof(ObeliskTimerCallback) == sizeof(void*));
 
     AssertAbiType<ObeliskStringView>();
     static_assert(alignof(ObeliskStringView) == 8);

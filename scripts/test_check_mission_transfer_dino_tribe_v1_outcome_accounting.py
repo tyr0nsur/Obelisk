@@ -571,6 +571,44 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             },
         )
 
+    def test_mission_candidate_leaf_rejects_textual_runtime_and_v1_overclaims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["mission"]["evidence"] = {
+            "notes": "The copied-bool side lane is runtime ready and v1 complete for mission planning."
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_leaf_candidate_ready_overclaim", report["blockers"])
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "mission_leaf_candidate_ready_overclaim"
+        }
+        self.assertIn("runtime ready", claims)
+        self.assertIn("v1 complete", claims)
+
+    def test_candidate_leaf_allows_negated_textual_readiness_non_claims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["mission"]["evidence"] = {
+            "notes": (
+                "The copied-bool side lane is not runtime ready. "
+                "It does not imply v1 completion and public SDK readiness remains blocked."
+            )
+        }
+
+        result = self.run_checker(manifest=manifest)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["blockers"], [])
+
     def test_transfer_candidate_leaf_rejects_ready_and_resource_handle_overclaims(self) -> None:
         manifest = load_manifest()
         gameplay = surface(manifest)

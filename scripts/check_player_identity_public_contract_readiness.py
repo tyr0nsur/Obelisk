@@ -505,6 +505,27 @@ FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
     "cross_map": re.compile(r"cross[_\s-]*map", re.IGNORECASE),
 }
 PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
+READINESS_FALSE_KEYS = {
+    "accepted_for_contract_review",
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_contract_allowed",
+    "public_abi_ready",
+    "v1_completion_ready",
+    "v1_completion_evidence",
+    "public_sdk_v1_completion_claim",
+}
+EMPTY_PUBLIC_LIST_KEYS = {
+    "public_header_symbols_now",
+    "public_capability_bits_now",
+    "public_callback_abi_now",
+}
+NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
+    ".private_pod_layout_candidate.accepted_for_contract_review",
+    ".identifier_redaction_evidence.accepted_for_contract_review",
+)
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE = re.compile(
     r"identity|principal|steam_?id|steamid|"
     r"player_?(?:id|handle|data_?id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
@@ -963,6 +984,12 @@ def public_abi_preflight_candidate_report(
         redaction_report=redaction_report,
         principal_report=principal_report,
     )
+    report = sanitize_non_promotional_report(
+        report,
+        blockers,
+        input_label="public_abi_preflight_candidate",
+        path="$.public_abi_preflight_candidate",
+    )
     if candidate_blockers:
         add(
             blockers,
@@ -1103,12 +1130,68 @@ def owner_token_sdk_consumer_contract_report(
             path=str(path),
             contract_blockers=report["blockers"],
         )
-    return {"provided": True, "source": "owner_token_sdk_consumer_contract", **report}
+    return sanitize_non_promotional_report(
+        {"provided": True, "source": "owner_token_sdk_consumer_contract", **report},
+        blockers,
+        input_label="owner_token_sdk_consumer_contract",
+        path="$.owner_token_sdk_consumer_contract",
+    )
 
 
 def string_list(value: Any) -> list[str] | None:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
+    return value
+
+
+def sanitize_non_promotional_report(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    *,
+    input_label: str,
+    path: str,
+    root_path: str | None = None,
+) -> Any:
+    """Copy a nested checker report while forcing public/promotion outputs closed."""
+
+    root_path = root_path or path
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            contract_review_allowed = (
+                key == "accepted_for_contract_review"
+                and path != root_path
+                and item_path.endswith(NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES)
+            )
+            if key in READINESS_FALSE_KEYS and not contract_review_allowed:
+                if item is not False:
+                    add(blockers, "nested_readiness_flag_not_false", item_path, input=input_label, value=item)
+                sanitized[key] = False
+            elif key in EMPTY_PUBLIC_LIST_KEYS:
+                if item != []:
+                    add(blockers, f"nested_{key}_not_empty", item_path, input=input_label, value=item)
+                sanitized[key] = []
+            else:
+                sanitized[key] = sanitize_non_promotional_report(
+                    item,
+                    blockers,
+                    input_label=input_label,
+                    path=item_path,
+                    root_path=root_path,
+                )
+        return sanitized
+    if isinstance(value, list):
+        return [
+            sanitize_non_promotional_report(
+                item,
+                blockers,
+                input_label=input_label,
+                path=f"{path}[{index}]",
+                root_path=root_path,
+            )
+            for index, item in enumerate(value)
+        ]
     return value
 
 
