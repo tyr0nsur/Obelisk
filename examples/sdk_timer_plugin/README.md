@@ -40,6 +40,6 @@ cmake -S examples/sdk_timer_plugin -B /tmp/obelisk-sdk-timer-build \
 cmake --build /tmp/obelisk-sdk-timer-build -j"$(nproc)"
 ```
 
-The output is `obelisk_sdk_timer_plugin.so`. Publish plugins with
-`scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a shared
-runtime `plugins/` directory.
+The output is `obelisk_sdk_timer_plugin.so`. Install plugins into a local Obelisk root
+with `scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a
+shared runtime `plugins/` directory.

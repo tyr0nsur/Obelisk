@@ -79,6 +79,12 @@ line, not a claim that a stable `v0.1.0` tag exists. The installed package also 
 `Obelisk_*ABI_VERSION` CMake variables that mirror the `OBELISK_*ABI_VERSION` macros in
 `ObeliskApi.h`; plugin source should continue to check the header macros and runtime
 `struct_size`/capability fields before using appended ABI slots.
+It also exports non-claim package metadata:
+`Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS=package-shape-evidence-only`,
+`Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED=FALSE`,
+`Obelisk_V1_COMPLETION_CLAIM_ALLOWED=FALSE`,
+`Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED=FALSE`, and
+`Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED=FALSE`.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 directory for plugin config is:

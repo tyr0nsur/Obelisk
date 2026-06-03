@@ -38,6 +38,6 @@ cmake -S examples/sdk_inventory_policy_audit -B /tmp/obelisk-sdk-inventory-polic
 cmake --build /tmp/obelisk-sdk-inventory-policy-audit-build -j"$(nproc)"
 ```
 
-The output is `obelisk_sdk_inventory_policy_audit.so`. Publish plugins with
-`scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a shared
-runtime `plugins/` directory.
+The output is `obelisk_sdk_inventory_policy_audit.so`. Install plugins into a local
+Obelisk root with `scripts/install_obelisk_plugin.sh`; do not copy a partially built
+`.so` into a shared runtime `plugins/` directory.

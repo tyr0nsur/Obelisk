@@ -49,6 +49,6 @@ cmake -S examples/sdk_minimal_plugin -B /tmp/obelisk-sdk-minimal-build \
 cmake --build /tmp/obelisk-sdk-minimal-build -j"$(nproc)"
 ```
 
-The output is `obelisk_sdk_minimal_plugin.so`. Publish plugins with
-`scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a shared
-runtime `plugins/` directory.
+The output is `obelisk_sdk_minimal_plugin.so`. Install plugins into a local Obelisk root
+with `scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a
+shared runtime `plugins/` directory.

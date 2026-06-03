@@ -210,10 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised rounds integrated SDK route/accounting JSON, child-report accounting
-  locks for permissions/commands, preflight/approved-evidence false-auth/non-claim checks,
-  synthetic-shape approved-evidence rejection, no-hash symlink source-summary policy,
-  committed identity-manifest contract provenance, Mission non-claim scanning, and
-  historical identity artifact-note superseding. Agents closed; route/SDK remain
-  fail-closed at `approved_runtime_evidence_missing`, `0/12`, P0 `0/4`,
-  public/runtime false, `stable_claim_allowed=false`. No runtime/server op.
+- Latest supervised round delegated runtime lifecycle, installed SDK non-claims,
+  ResourceHandle artifact gates, and read-only reversing triage. Integrated retry cleanup
+  reconciliation for public chat/gameplay retained unload, installed CMake package
+  false-claim metadata, ResourceHandle revalidation public-lookup overclaim blockers, and
+  the finding that the highest-value next evidence remains approved runtime principal
+  lifecycle capture. Agents closed; route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, `0/12`, P0 `0/4`, public/runtime false,
+  `stable_claim_allowed=false`. No runtime/server op.

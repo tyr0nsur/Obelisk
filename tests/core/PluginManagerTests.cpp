@@ -6584,6 +6584,116 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetriesPublicChatCleanupAfterBackingDispatcherCleanup()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_public_chat_retry");
+        ConfigureEnvironment(root);
+        EnableChatMessageEvents(root);
+
+        FakePlugin plugin{
+            .filename = "public_chat_retry.so",
+            .registerChatMessageCallback = true,
+            .captureApi = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "public-chat retry plugin was not initialized");
+        Require(plugin.chatMessageRegistrationId != 0,
+                "public-chat retry plugin did not register a public chat callback");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "public-chat retry plugin public callback was not bridged");
+
+        Obelisk::Core::SetPublicChatMessageInternalUnregisterFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "public-chat retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "public-chat retry plugin was closed despite failed public tracking cleanup");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "public-chat retry backing dispatcher cleanup did not remove the callback");
+
+        Obelisk::Core::SetPublicChatMessageInternalUnregisterFailureForTesting(false);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "public-chat retry plugin shutdown repeated during retry");
+        Require(plugin.closeCalls == 1,
+                "public-chat retry plugin was not closed after stale public tracking reconciliation");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "public-chat retry plugin owner token remained valid after unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllRetriesGameplayPolicyCleanupAfterBackingDispatcherCleanup()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_retry");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_retry.so",
+            .registerGameplayPolicyCallback = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy retry plugin was not initialized");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "gameplay-policy retry plugin did not register a public callback");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy retry structure callback was not bridged");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy retry inventory callback was not bridged");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy retry item-return callback was not bridged");
+
+        Obelisk::Core::SetPublicGameplayPolicyInternalUnregisterFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "gameplay-policy retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "gameplay-policy retry plugin was closed despite failed public tracking cleanup");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy retry backing structure cleanup did not remove the callback");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy retry backing inventory cleanup did not remove the callback");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy retry backing item-return cleanup did not remove the callback");
+
+        Obelisk::Core::SetPublicGameplayPolicyInternalUnregisterFailureForTesting(false);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "gameplay-policy retry plugin shutdown repeated during retry");
+        Require(plugin.closeCalls == 1,
+                "gameplay-policy retry plugin was not closed after stale public tracking reconciliation");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "gameplay-policy retry plugin owner token remained valid after unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_destroy_userdata_retry");
@@ -6989,6 +7099,8 @@ int main()
     TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails();
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
+    TestUnloadAllRetriesPublicChatCleanupAfterBackingDispatcherCleanup();
+    TestUnloadAllRetriesGameplayPolicyCleanupAfterBackingDispatcherCleanup();
     TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
     TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails();

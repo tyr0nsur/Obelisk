@@ -1840,8 +1840,42 @@ def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> d
             "invalid_input_count": 0,
         },
         "accepted_sample_count": 32,
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
         "post_callback_resource_handle_ready": ready,
         "uobject_flags_validity_semantics_proven": ready,
+        "evidence_checks": {
+            "evidence_without_lifetime_flags_ready": True,
+            "public_resource_handle_contract_present": False,
+            "public_resourcehandle_policy_present": False,
+            "post_callback_lifetime_contract_present": False,
+            "post_callback_lifetime_policy_proven": False,
+            "serial_reuse_or_wraparound_policy_present": False,
+            "runtime_rejection_samples_present": False,
+            "runtime_serial_semantics_present": False,
+            "runtime_resourcehandle_promotion_evidence_complete": False,
+            "zero_serial_negative_samples_satisfy_runtime_rejection_samples": False,
+            "zero_serial_negative_samples_satisfy_runtime_serial_semantics": False,
+            "version_matched_source_decompiler_correlation_for_public_lifecycle_names_present": False,
+            "rejected_runtime_object_samples_present": False,
+        },
+        "offline_zero_serial_negative_samples_summary": {
+            "candidate_only": True,
+            "does_not_satisfy_runtime_requirements": [
+                {
+                    "offline_schema": gate.RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+                    "required_runtime_schema": gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                    "blocker": "no_rejected_runtime_object_samples",
+                    "satisfied": False,
+                },
+                {
+                    "offline_schema": gate.RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+                    "required_runtime_schema": gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                    "blocker": "no_serial_reuse_or_wraparound_policy",
+                    "satisfied": False,
+                },
+            ],
+        },
         "blockers": [] if ready else ["uobject_flags_validity_semantics_unproven"],
         "promotion_gate": {
             "ready": ready,
@@ -8016,8 +8050,19 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             workspace = protected / "workspace-offline"
             manifest = workspace / "resource-handle.json"
             payload = resource_handle_revalidation_evaluator_manifest()
+            payload["promotion_ready"] = True
+            payload["public_resource_handle_ready"] = True
             payload["post_callback_resource_handle_ready"] = True
             payload["uobject_flags_validity_semantics_proven"] = True
+            payload["evidence_checks"]["public_resource_handle_contract_present"] = True
+            payload["evidence_checks"]["public_resourcehandle_policy_present"] = True
+            payload["evidence_checks"]["runtime_rejection_samples_present"] = True
+            payload["evidence_checks"]["runtime_serial_semantics_present"] = True
+            payload["evidence_checks"]["runtime_resourcehandle_promotion_evidence_complete"] = True
+            payload["evidence_checks"]["zero_serial_negative_samples_satisfy_runtime_rejection_samples"] = True
+            payload["evidence_checks"]["zero_serial_negative_samples_satisfy_runtime_serial_semantics"] = True
+            payload["offline_zero_serial_negative_samples_summary"]["candidate_only"] = False
+            payload["offline_zero_serial_negative_samples_summary"]["does_not_satisfy_runtime_requirements"][0]["satisfied"] = True
             payload["promotion_gate"]["ready"] = True
             refresh_resource_handle_revalidation_output_identity(payload)
             write_json(manifest, payload)
@@ -8025,8 +8070,20 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_revalidation_consume_promotion_ready_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_consume_public_resourcehandle_overclaim", reasons)
         self.assertIn("resource_handle_revalidation_consume_post_callback_ready_overclaim", reasons)
         self.assertIn("resource_handle_revalidation_consume_flag_semantics_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_public_contract_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_public_policy_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_runtime_rejection_samples_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_runtime_serial_semantics_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_runtime_promotion_evidence_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_zero_serial_runtime_rejection_substitution", reasons)
+        self.assertIn("resource_handle_revalidation_zero_serial_runtime_serial_substitution", reasons)
+        self.assertIn("resource_handle_revalidation_candidate_evidence_counted_as_public_lookup", reasons)
+        self.assertIn("resource_handle_revalidation_zero_serial_summary_not_candidate_only", reasons)
+        self.assertIn("resource_handle_revalidation_zero_serial_runtime_substitution", reasons)
         self.assertIn("resource_handle_revalidation_consume_promotion_gate_not_false", reasons)
         self.assertNotIn("resource_handle_revalidation_output_artifact_identity_hash_mismatch", reasons)
 

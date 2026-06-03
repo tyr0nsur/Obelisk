@@ -253,6 +253,22 @@ FName, core, or serial artifact would advance the blocker. It would not. The cur
 offline scaffolding can only consume a future approved runtime pair; it cannot synthesize
 the missing runtime observations.
 
+## 2026-06-03 Revalidation Evaluator Public-Lookup Boundary
+
+Focused offline audit found one narrow gate gap in
+`scripts/validate_offline_artifact_gate.py` for
+`obelisk.resource-handle-revalidation-evaluator.v1`: consume mode required
+post-callback and flag-semantics readiness to stay false, but did not independently
+reject top-level public `ResourceHandle`/promotion readiness or nested `evidence_checks`
+that counted candidate-only serial/object evidence as public lookup/runtime identity.
+
+The gate now rejects evaluator manifests that set `promotion_ready`,
+`public_resource_handle_ready`, public contract/policy booleans, runtime rejection or
+serial-semantics booleans, runtime promotion-complete booleans, or zero-serial
+non-substitution rows as satisfied. This preserves the current blocked outcome: offline
+serial/GObjects/object candidates can support internal accounting only, not public lookup,
+public object identity, post-callback handles, mutation, or return override.
+
 Exact next evidence needed remains unchanged:
 
 - one consume-accepted

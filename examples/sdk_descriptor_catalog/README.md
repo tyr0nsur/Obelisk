@@ -38,6 +38,6 @@ cmake -S examples/sdk_descriptor_catalog -B /tmp/obelisk-sdk-descriptor-catalog-
 cmake --build /tmp/obelisk-sdk-descriptor-catalog-build -j"$(nproc)"
 ```
 
-The output is `obelisk_sdk_descriptor_catalog.so`. Publish plugins with
-`scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a shared
-runtime `plugins/` directory.
+The output is `obelisk_sdk_descriptor_catalog.so`. Install plugins into a local Obelisk
+root with `scripts/install_obelisk_plugin.sh`; do not copy a partially built `.so` into a
+shared runtime `plugins/` directory.

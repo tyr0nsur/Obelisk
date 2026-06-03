@@ -7354,6 +7354,18 @@ def validate_resource_handle_revalidation_evaluator_manifest(
                 )
     promotion_gate = payload.get("promotion_gate")
     if mode != "promote":
+        false_fields = {
+            "promotion_ready": "resource_handle_revalidation_consume_promotion_ready_overclaim",
+            "public_resource_handle_ready": "resource_handle_revalidation_consume_public_resourcehandle_overclaim",
+        }
+        for field, reason in false_fields.items():
+            if payload.get(field) is not False:
+                blockers.append(
+                    {
+                        "reason": reason,
+                        "label": f"{label}:$.{field}",
+                    }
+                )
         if payload.get("post_callback_resource_handle_ready") is not False:
             blockers.append(
                 {
@@ -7368,6 +7380,63 @@ def validate_resource_handle_revalidation_evaluator_manifest(
                     "label": f"{label}:$.uobject_flags_validity_semantics_proven",
                 }
             )
+        evidence_checks = payload.get("evidence_checks")
+        if isinstance(evidence_checks, dict):
+            false_evidence_checks = {
+                "public_resource_handle_contract_present": "resource_handle_revalidation_public_contract_overclaim",
+                "public_resourcehandle_policy_present": "resource_handle_revalidation_public_policy_overclaim",
+                "post_callback_lifetime_contract_present": "resource_handle_revalidation_post_callback_contract_overclaim",
+                "post_callback_lifetime_policy_proven": "resource_handle_revalidation_post_callback_policy_overclaim",
+                "serial_reuse_or_wraparound_policy_present": "resource_handle_revalidation_serial_semantics_overclaim",
+                "runtime_rejection_samples_present": "resource_handle_revalidation_runtime_rejection_samples_overclaim",
+                "runtime_serial_semantics_present": "resource_handle_revalidation_runtime_serial_semantics_overclaim",
+                "runtime_resourcehandle_promotion_evidence_complete": "resource_handle_revalidation_runtime_promotion_evidence_overclaim",
+                "zero_serial_negative_samples_satisfy_runtime_rejection_samples": "resource_handle_revalidation_zero_serial_runtime_rejection_substitution",
+                "zero_serial_negative_samples_satisfy_runtime_serial_semantics": "resource_handle_revalidation_zero_serial_runtime_serial_substitution",
+                "version_matched_source_decompiler_correlation_for_public_lifecycle_names_present": "resource_handle_revalidation_public_lifecycle_names_overclaim",
+                "rejected_runtime_object_samples_present": "resource_handle_revalidation_rejected_runtime_object_samples_overclaim",
+            }
+            for field, reason in false_evidence_checks.items():
+                if evidence_checks.get(field) is not False:
+                    blockers.append(
+                        {
+                            "reason": reason,
+                            "label": f"{label}:$.evidence_checks.{field}",
+                        }
+                    )
+            if evidence_checks.get("evidence_without_lifetime_flags_ready") is True and (
+                evidence_checks.get("runtime_resourcehandle_promotion_evidence_complete") is True
+                or evidence_checks.get("public_resource_handle_contract_present") is True
+                or evidence_checks.get("public_resourcehandle_policy_present") is True
+            ):
+                blockers.append(
+                    {
+                        "reason": "resource_handle_revalidation_candidate_evidence_counted_as_public_lookup",
+                        "label": f"{label}:$.evidence_checks",
+                    }
+                )
+        zero_serial_summary = payload.get("offline_zero_serial_negative_samples_summary")
+        if isinstance(zero_serial_summary, dict):
+            if zero_serial_summary.get("candidate_only") is not True:
+                blockers.append(
+                    {
+                        "reason": "resource_handle_revalidation_zero_serial_summary_not_candidate_only",
+                        "label": f"{label}:$.offline_zero_serial_negative_samples_summary.candidate_only",
+                    }
+                )
+            substitutions = zero_serial_summary.get("does_not_satisfy_runtime_requirements")
+            if isinstance(substitutions, list):
+                for index, substitution in enumerate(substitutions):
+                    if isinstance(substitution, dict) and substitution.get("satisfied") is not False:
+                        blockers.append(
+                            {
+                                "reason": "resource_handle_revalidation_zero_serial_runtime_substitution",
+                                "label": (
+                                    f"{label}:$.offline_zero_serial_negative_samples_summary"
+                                    f".does_not_satisfy_runtime_requirements[{index}].satisfied"
+                                ),
+                            }
+                        )
         if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
             blockers.append(
                 {

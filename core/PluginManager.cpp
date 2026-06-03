@@ -1318,7 +1318,7 @@ namespace Obelisk::Core
             return publicRegistrationId;
         }
 
-        bool UnregisterChatMessageRegistrationForOwner(void* owner, uint64_t registrationId)
+        bool UnregisterChatMessageRegistrationForOwner(void* owner, uint64_t registrationId, bool ownerCleanupRetry = false)
         {
             if (!owner || registrationId == 0)
                 return false;
@@ -1337,10 +1337,16 @@ namespace Obelisk::Core
                 return false;
 #endif
 
-            if (!registration.Dispatcher ||
-                !registration.Dispatcher->Unregister(registration.InternalRegistrationId))
-            {
+            if (!registration.Dispatcher)
                 return false;
+
+            bool unregistered = registration.Dispatcher->Unregister(registration.InternalRegistrationId);
+            if (!unregistered)
+            {
+                if (!ownerCleanupRetry)
+                    return false;
+
+                (void)registration.Dispatcher->UnregisterCallbacksForOwner(owner);
             }
 
             std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
@@ -1374,7 +1380,7 @@ namespace Obelisk::Core
             size_t removed = 0;
             for (const auto& item : registrations)
             {
-                if (!UnregisterChatMessageRegistrationForOwner(owner, item.first))
+                if (!UnregisterChatMessageRegistrationForOwner(owner, item.first, true))
                     throw std::runtime_error("public chat unregister failed before tracking cleanup");
                 ++removed;
             }
@@ -1584,7 +1590,9 @@ namespace Obelisk::Core
             return publicRegistrationId;
         }
 
-        bool UnregisterGameplayPolicyRegistrationForOwner(void* owner, uint64_t registrationId)
+        bool UnregisterGameplayPolicyRegistrationForOwner(void* owner,
+                                                          uint64_t registrationId,
+                                                          bool ownerCleanupRetry = true)
         {
             if (!owner || registrationId == 0)
                 return false;
@@ -1608,26 +1616,47 @@ namespace Obelisk::Core
 #endif
             if (registration.StructureRegistrationId != 0)
             {
-                structureRemoved = cleanupSucceeded &&
-                    StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                if (cleanupSucceeded)
+                {
+                    structureRemoved = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.StructureRegistrationId);
+                    if (!structureRemoved && ownerCleanupRetry)
+                    {
+                        (void)StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        structureRemoved = true;
+                    }
+                }
                 cleanupSucceeded = cleanupSucceeded && structureRemoved;
             }
             if (registration.InventoryRegistrationId != 0)
             {
-                inventoryRemoved = cleanupSucceeded &&
-                    InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                if (cleanupSucceeded)
+                {
+                    inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.InventoryRegistrationId);
+                    if (!inventoryRemoved && ownerCleanupRetry)
+                    {
+                        (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        inventoryRemoved = true;
+                    }
+                }
                 cleanupSucceeded = cleanupSucceeded && inventoryRemoved;
             }
             if (registration.ItemReturnRegistrationId != 0)
             {
-                itemReturnRemoved = cleanupSucceeded &&
-                    ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                if (cleanupSucceeded)
+                {
+                    itemReturnRemoved = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
                         owner,
                         registration.ItemReturnRegistrationId);
+                    if (!itemReturnRemoved && ownerCleanupRetry)
+                    {
+                        (void)ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                        itemReturnRemoved = true;
+                    }
+                }
                 cleanupSucceeded = cleanupSucceeded && itemReturnRemoved;
             }
 
@@ -2098,7 +2127,7 @@ namespace Obelisk::Core
                 void* owner = ResolveOwnerTokenForUnregister("UnregisterGameplayPolicyEventWithOwnerToken", ownerToken);
                 if (!owner)
                     return false;
-                return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId);
+                return UnregisterGameplayPolicyRegistrationForOwner(owner, registrationId, false);
             }
             catch (const std::exception& e)
             {

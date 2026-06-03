@@ -4968,6 +4968,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 offenders.append(f"cmake/ObeliskConfig.cmake.in: package dependency leak {forbidden}")
 
         self.assertIn("set(Obelisk_SDK_FOUND TRUE)", package_config)
+        self.assertIn(
+            'set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")',
+            package_config,
+        )
+        for cmake_false_claim_variable in (
+            "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED",
+            "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+            "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
+            "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",
+        ):
+            with self.subTest(cmake_false_claim_variable=cmake_false_claim_variable):
+                self.assertIn(f"set({cmake_false_claim_variable} FALSE)", package_config)
         self.assertEqual(offenders, [])
 
     def test_creator_facing_sdk_examples_do_not_depend_on_private_headers_or_repo_deps(self) -> None:
@@ -6322,6 +6334,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn("foundation/contributor-readiness sample", compact)
                 self.assertIn("not ArkApi portability", compact)
                 self.assertIn("not Obelisk SDK v1 evidence", compact)
+                self.assertIn("Install plugins into a local Obelisk root", compact)
+                self.assertNotIn("Publish plugins with", compact)
 
     def test_installed_sdk_example_support_tiers_are_explicit_and_stable(self) -> None:
         examples_index = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
