@@ -24,10 +24,13 @@ import protected_paths
 from player_principal_commit_validation import is_reviewed_obelisk_commit
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_RECEIPT_SCHEMA,
-    APPROVAL_TEXT as REQUEST_APPROVAL_TEXT,
+    APPROVAL_TEXT,
+    EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     MAX_OPERATOR_APPROVAL_LEAD_SECONDS,
     REPLAY_NON_AUTHORIZATION,
+    RUN_ID_RE,
+    SCHEMA as WINDOW_REQUEST_SCHEMA,
     request_pack_digest,
 )
 from snapshot_evidence_pack import reject_symlink_component
@@ -39,11 +42,9 @@ WINDOW_REQUEST_CHECKER = Path(__file__).resolve().parent / "check_player_princip
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
-EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 EXPECTED_OBELISK_ROOT = "/servidor/ark/obelisk"
 EXPECTED_INSTALLED_WRAPPER_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh"
 
-RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PREFLIGHT_SCHEMA = "obelisk.player-principal-lifecycle-preflight.v1"
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -272,8 +273,13 @@ REQUIRED_SIMPLE_FIELDS = (
     "principal_claim",
 )
 ACCEPTED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
-EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
+EXPECTED_APPROVAL = APPROVAL_TEXT
 EXPECTED_ROLLBACK_DELTA = "removed_observer_env_and_markers_preserved_disable_plugins"
+REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS = (
+    "window manifest acceptance is operational posture only",
+    "does not promote player identity, lookup, permissions, commands, ResourceHandle, mutation, return override, plugin delivery, public SDK, or runtime readiness",
+    "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+)
 ALLOWED_FIELDS = frozenset(
     (
         *REQUIRED_TIMESTAMP_FIELDS,
@@ -1569,8 +1575,8 @@ def validate_request_pack(
     if not isinstance(payload, dict):
         add(blockers, "request_pack_not_object", "request_pack_path")
         return
-    if payload.get("schema") != "obelisk.player-principal-lifecycle-window-request.v1":
-        add(blockers, "request_pack_schema_mismatch", "request_pack_path")
+    if payload.get("schema") != WINDOW_REQUEST_SCHEMA:
+        add(blockers, "request_pack_schema_mismatch", "request_pack_path", expected=WINDOW_REQUEST_SCHEMA)
     if payload.get("run_id") != fields.get("run_id"):
         add(blockers, "request_pack_run_id_mismatch", "request_pack_path")
     if payload.get("obelisk_commit") != fields.get("obelisk_commit"):
@@ -2235,11 +2241,7 @@ def build_report(
         },
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
-        "non_claims": [
-            "window manifest acceptance is operational posture only",
-            "does not promote player identity, lookup, permissions, commands, ResourceHandle, mutation, return override, plugin delivery, public SDK, or runtime readiness",
-            "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
-        ],
+        "non_claims": list(REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS),
     }
 
 

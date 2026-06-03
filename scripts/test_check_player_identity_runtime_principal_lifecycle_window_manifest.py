@@ -26,9 +26,11 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
+    REQUEST_ROLLBACK_DELTA,
     WINDOW_MARKERS,
     env_lines,
     markdown_request,
@@ -44,7 +46,7 @@ TEST_COMMIT = subprocess.check_output(
     cwd=SCRIPT_DIR.parents[0],
     text=True,
 ).strip()
-ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+ARK_SHA = EXPECTED_BINARY_SHA256
 
 
 def future_window_fields() -> dict[str, str]:
@@ -176,7 +178,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         "forbidden_markers": FORBIDDEN_MARKERS,
         "rollback": {
             "owner": "operator",
-            "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+            "delta": REQUEST_ROLLBACK_DELTA,
         },
         "non_claims": NON_CLAIMS,
     }

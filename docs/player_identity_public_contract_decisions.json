@@ -170,6 +170,122 @@
       "decision": "permissions/admin, command/chat response, commands/replies, player lookup, persistence, mutation, and return override are separate blocked contracts"
     }
   ],
+  "contract_gate_inputs": [
+    {
+      "id": "runtime.lifecycle_evidence",
+      "status": "unresolved",
+      "review_inputs": [
+        "runtime.lifecycle_evidence"
+      ],
+      "remaining_promotion_inputs": [],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Accepted runtime lifecycle evidence is a contract-review input only; it does not resolve public identity promotion by itself."
+    },
+    {
+      "id": "privacy.identifier_redaction",
+      "status": "unresolved",
+      "review_inputs": [
+        "privacy.identifier_redaction"
+      ],
+      "remaining_promotion_inputs": [
+        "privacy.public_identifier_form",
+        "privacy.redacted_identifier_fields",
+        "privacy.logging_and_storage_policy"
+      ],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Identifier-redaction evidence is sanitized contract-review input only; the privacy blocker remains unresolved until the public identifier form, redaction policy, logging policy, and persistence prohibition are reviewed."
+    },
+    {
+      "id": "lifetime.generation_scope_invalidation",
+      "status": "unresolved",
+      "review_inputs": [
+        "lifetime.generation_scope_invalidation.candidate_policy"
+      ],
+      "remaining_promotion_inputs": [
+        "lifetime.principal_scope",
+        "lifetime.invalidation_events",
+        "lifetime.reconnect_duplicate_stale_policy"
+      ],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Candidate invalidation-policy acceptance is review input only; the full lifetime/generation/scope blocker remains unresolved."
+    },
+    {
+      "id": "abi.public_pod_contract",
+      "status": "unresolved",
+      "review_inputs": [
+        "abi.public_pod_contract.private_layout_candidate",
+        "abi.public_pod_contract.public_abi_preflight_candidate"
+      ],
+      "remaining_promotion_inputs": [
+        "abi.payload_shape",
+        "abi.capability_bits",
+        "abi.append_only_layout_tests",
+        "abi.layout",
+        "sdk.consumer"
+      ],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Private POD layout and public ABI preflight candidates are offline review inputs only; they do not add public symbols, capability bits, callbacks, ABI layout guarantees, SDK consumer readiness, or promotion readiness."
+    },
+    {
+      "id": "lifecycle.owner_cleanup",
+      "status": "unresolved",
+      "review_inputs": [
+        "lifecycle.owner_cleanup.owner_token_sdk_consumer_contract"
+      ],
+      "remaining_promotion_inputs": [
+        "abi.owner_token_registration",
+        "lifecycle.owner_cleanup.runtime_tests"
+      ],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Owner-token SDK consumer contract evidence is candidate-only review input; it does not resolve owner cleanup or expose a public callback ABI."
+    },
+    {
+      "id": "separation.downstream_surfaces",
+      "status": "unresolved",
+      "review_inputs": [
+        "separation.no_commands_permissions_persistence"
+      ],
+      "remaining_promotion_inputs": [
+        "permissions_admin_contract_blocker",
+        "command_chat_response_contract_blocker",
+        "commands_replies_contract_blocker",
+        "player_lookup_exclusion_review",
+        "storage_persistence_exclusion_review"
+      ],
+      "promotion_blocker_resolved": false,
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "non_claim": "Identity promotion cannot unlock permissions/admin, command response, commands/replies, lookup, persistence, mutation, or return override; those surfaces remain separate blocked contracts."
+    }
+  ],
   "proposed_public_pod_abi_candidate": {
     "status": "proposal_only_not_public",
     "candidate_only": true,

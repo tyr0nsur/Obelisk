@@ -16,7 +16,6 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
-SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 TEST_COMMIT = subprocess.check_output(
     ["git", "rev-parse", "HEAD"],
     cwd=SCRIPT_DIR.parents[0],
@@ -29,7 +28,13 @@ assert SPEC is not None and SPEC.loader is not None
 REQUEST_CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = REQUEST_CHECKER
 SPEC.loader.exec_module(REQUEST_CHECKER)
-from prepare_player_principal_lifecycle_window_request import operator_approval_receipt_payload  # noqa: E402
+from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    EXPECTED_BINARY_SHA256,
+    operator_approval_receipt_payload,
+)
+
+
+SHA = EXPECTED_BINARY_SHA256
 
 
 def prepare_args(output_dir: Path) -> list[str]:

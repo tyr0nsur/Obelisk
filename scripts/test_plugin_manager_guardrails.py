@@ -253,6 +253,17 @@ def cleaned_dispatcher_classes(cleanup_body: str) -> set[str]:
     return {name for name in cleaned_owner_registry_classes(cleanup_body) if name.endswith("EventDispatcher")}
 
 
+def event_dispatcher_class_names() -> set[str]:
+    dispatchers: set[str] = set()
+    for header in CORE_DIR.glob("*EventDispatcher.h"):
+        header_text = header.read_text(encoding="utf-8")
+        match = re.search(r"class\s+(\w+EventDispatcher)\b", header_text)
+        if match is None:
+            raise AssertionError(f"{header} has no event dispatcher class declaration")
+        dispatchers.add(match.group(1))
+    return dispatchers
+
+
 class PluginManagerGuardrailTests(unittest.TestCase):
     def test_obelisk_api_table_is_zero_initialized_and_fully_assigned(self) -> None:
         plugin_manager_header = PLUGIN_MANAGER_HEADER.read_text(encoding="utf-8")
@@ -586,6 +597,56 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 )
                 self.assertIn(wrapper_call, body)
                 self.assertNotIn("EventManager::Get().Register", body)
+
+    def test_plugin_manager_uses_owner_scoped_unregister_for_event_dispatchers(self) -> None:
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        dispatcher_classes = event_dispatcher_class_names()
+
+        self.assertNotRegex(
+            plugin_manager_text,
+            r"->\s*Unregister\s*\(",
+            "PluginManager pointer unregister calls must stay owner-scoped; this catches "
+            "dispatcher aliases that would bypass EventDispatcher::UnregisterCallbackForOwner.",
+        )
+
+        for dispatcher in sorted(dispatcher_classes):
+            with self.subTest(dispatcher=dispatcher):
+                self.assertNotRegex(
+                    plugin_manager_text,
+                    rf"\b{dispatcher}::Get\(\)\.Unregister\s*\(",
+                    "PluginManager must use owner-scoped dispatcher unregister so cleanup "
+                    "failures stay attributable to a plugin owner.",
+                )
+
+        dispatcher_variables: set[str] = set()
+        for dispatcher in dispatcher_classes:
+            dispatcher_variables.update(
+                re.findall(
+                    rf"\b{dispatcher}\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\b",
+                    plugin_manager_text,
+                )
+            )
+            dispatcher_variables.update(
+                re.findall(
+                    rf"\b{dispatcher}\s*&\s*([A-Za-z_][A-Za-z0-9_]*)\b",
+                    plugin_manager_text,
+                )
+            )
+
+        for variable in sorted(dispatcher_variables):
+            with self.subTest(dispatcher_variable=variable):
+                self.assertNotRegex(
+                    plugin_manager_text,
+                    rf"\b{re.escape(variable)}\s*->\s*Unregister\s*\(",
+                    "PluginManager must not call bare EventDispatcher::Unregister through "
+                    "dispatcher pointers.",
+                )
+                self.assertNotRegex(
+                    plugin_manager_text,
+                    rf"\b{re.escape(variable)}\s*\.\s*Unregister\s*\(",
+                    "PluginManager must not call bare EventDispatcher::Unregister through "
+                    "dispatcher references.",
+                )
 
     def test_inventory_gameplay_policy_kinds_are_wired_to_expected_dispatcher_family(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")

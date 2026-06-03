@@ -142,6 +142,25 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertNotEqual(report["next_blocker"], "public_readiness")
+        contract_gate_inputs = {item["id"]: item for item in report["contract_gate_inputs"]}
+        runtime_input = contract_gate_inputs["runtime.lifecycle_evidence"]
+        self.assertEqual(runtime_input["review_inputs_resolved"], ["runtime.lifecycle_evidence"])
+        self.assertEqual(runtime_input["review_inputs_missing"], [])
+        self.assertFalse(runtime_input["promotion_blocker_resolved"])
+        self.assertFalse(runtime_input["promotion_ready"])
+        self.assertFalse(runtime_input["public_sdk_ready"])
+        self.assertEqual(
+            contract_gate_inputs["privacy.identifier_redaction"]["review_inputs_missing"],
+            ["privacy.identifier_redaction"],
+        )
+        self.assertEqual(
+            contract_gate_inputs["lifetime.generation_scope_invalidation"]["review_inputs_resolved"],
+            ["lifetime.generation_scope_invalidation.candidate_policy"],
+        )
+        self.assertIn(
+            "lifetime.reconnect_duplicate_stale_policy",
+            contract_gate_inputs["lifetime.generation_scope_invalidation"]["remaining_promotion_inputs"],
+        )
         self.assertEqual(report["blockers"], [])
         self.assertIn(checker.NON_PROMOTIONAL_EVIDENCE_DENIAL, report["non_claims"])
         self.assertFalse(report["identifier_redaction_evidence"]["provided"])
@@ -244,6 +263,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_header_allowed"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
         self.assertNotIn("runtime.lifecycle_evidence", report["remaining_blockers"])
+        contract_gate_inputs = {item["id"]: item for item in report["contract_gate_inputs"]}
+        self.assertEqual(
+            contract_gate_inputs["privacy.identifier_redaction"]["review_inputs_resolved"],
+            ["privacy.identifier_redaction"],
+        )
+        self.assertFalse(contract_gate_inputs["privacy.identifier_redaction"]["promotion_blocker_resolved"])
+        self.assertFalse(contract_gate_inputs["privacy.identifier_redaction"]["public_header_allowed"])
         self.assertTrue(report["identifier_redaction_evidence"]["provided"])
         self.assertTrue(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertFalse(report["identifier_redaction_evidence"]["promotion_ready"])
@@ -568,6 +594,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         decisions["public_header_symbols_now"] = ["RegisterPlayerIdentity"]
         decisions["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
         decisions["public_callback_abi_now"] = ["ObeliskPlayerPrincipalCallback"]
+        decisions["contract_gate_inputs"][0]["promotion_ready"] = True
+        decisions["contract_gate_inputs"][1]["public_header_allowed"] = True
         result = self.run_checker(decisions, approved_manifest(), check=False)
         report = json.loads(result.stdout)
 
@@ -576,6 +604,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
         self.assertIn("public_callback_abi_now_not_empty", report["blockers"])
+        self.assertIn("contract_gate_input_flag_not_false", report["blockers"])
 
     def test_rejects_decision_gate_rerouted_to_public_readiness(self) -> None:
         decisions = self.decisions()
@@ -1018,6 +1047,36 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("public_abi_preflight_candidate_intake_missing", report["blockers"])
+
+    def test_rejects_missing_or_weakened_owner_token_sdk_consumer_contract_intake(self) -> None:
+        decisions = self.decisions()
+        decisions["owner_token_sdk_consumer_contract_intake"]["id"] = "owner_token_contract"
+        decisions["owner_token_sdk_consumer_contract_intake"]["status"] = "accepted"
+        decisions["owner_token_sdk_consumer_contract_intake"]["resolved_input"] = "lifecycle.owner_cleanup"
+        decisions["owner_token_sdk_consumer_contract_intake"]["required_checker"] = "scripts/other.py"
+        decisions["owner_token_sdk_consumer_contract_intake"]["default_manifest"] = "docs/research/other.json"
+        decisions["owner_token_sdk_consumer_contract_intake"]["non_claim"] = "promotes owner cleanup"
+        decisions["owner_token_sdk_consumer_contract_intake"]["lifecycle_owner_cleanup_ready"] = True
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("owner_token_sdk_consumer_contract_intake_id_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_status_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_resolved_input_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_checker_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_default_manifest_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_non_claim_mismatch", report["blockers"])
+        self.assertIn("owner_token_sdk_consumer_contract_intake_lifecycle_owner_cleanup_ready_not_false", report["blockers"])
+
+        decisions = self.decisions()
+        decisions.pop("owner_token_sdk_consumer_contract_intake")
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("owner_token_sdk_consumer_contract_intake_missing", report["blockers"])
 
     def test_rejects_public_abi_preflight_candidate_overclaim(self) -> None:
         preflight = self.public_abi_preflight_candidate()

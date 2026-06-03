@@ -375,6 +375,46 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("contract-review provenance only", intake["non_claim"])
 
+    def test_contract_gate_inputs_distinguish_review_inputs_from_promotion(self) -> None:
+        payload = self.load_decisions()
+        inputs = {item["id"]: item for item in payload["contract_gate_inputs"]}
+
+        self.assertEqual(
+            set(inputs),
+            {
+                "runtime.lifecycle_evidence",
+                "privacy.identifier_redaction",
+                "lifetime.generation_scope_invalidation",
+                "abi.public_pod_contract",
+                "lifecycle.owner_cleanup",
+                "separation.downstream_surfaces",
+            },
+        )
+        self.assertEqual(inputs["runtime.lifecycle_evidence"]["review_inputs"], ["runtime.lifecycle_evidence"])
+        self.assertEqual(
+            inputs["lifetime.generation_scope_invalidation"]["review_inputs"],
+            ["lifetime.generation_scope_invalidation.candidate_policy"],
+        )
+        self.assertIn(
+            "lifetime.principal_scope",
+            inputs["lifetime.generation_scope_invalidation"]["remaining_promotion_inputs"],
+        )
+        self.assertIn("abi.layout", inputs["abi.public_pod_contract"]["remaining_promotion_inputs"])
+        self.assertIn("sdk.consumer", inputs["abi.public_pod_contract"]["remaining_promotion_inputs"])
+        self.assertIn(
+            "lifecycle.owner_cleanup.runtime_tests",
+            inputs["lifecycle.owner_cleanup"]["remaining_promotion_inputs"],
+        )
+        for input_id, item in inputs.items():
+            with self.subTest(input_id=input_id):
+                self.assertEqual(item["status"], "unresolved")
+                self.assertFalse(item["promotion_blocker_resolved"])
+                self.assertFalse(item["promotion_ready"])
+                self.assertFalse(item["public_sdk_ready"])
+                self.assertFalse(item["runtime_ready"])
+                self.assertFalse(item["public_header_allowed"])
+                self.assertFalse(item["v1_completion_evidence"])
+
     def test_contract_review_input_tests_are_covered_without_promotion(self) -> None:
         payload = self.load_decisions()
         tests = {

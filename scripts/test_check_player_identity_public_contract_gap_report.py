@@ -231,6 +231,25 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("lifetime.invalidation_events", report["remaining_contract_gate_inputs"])
         self.assertIn("lifetime.reconnect_duplicate_stale_policy", report["remaining_contract_gate_inputs"])
         self.assertIn("abi.public_pod_contract", report["remaining_contract_gate_inputs"])
+        contract_gate_inputs = {item["id"]: item for item in report["contract_gate_inputs"]}
+        self.assertEqual(
+            contract_gate_inputs["runtime.lifecycle_evidence"]["review_inputs_missing"],
+            ["runtime.lifecycle_evidence"],
+        )
+        self.assertEqual(
+            contract_gate_inputs["privacy.identifier_redaction"]["review_inputs_resolved"],
+            ["privacy.identifier_redaction"],
+        )
+        self.assertEqual(
+            contract_gate_inputs["lifetime.generation_scope_invalidation"]["review_inputs_resolved"],
+            ["lifetime.generation_scope_invalidation.candidate_policy"],
+        )
+        self.assertIn(
+            "lifetime.principal_scope",
+            contract_gate_inputs["lifetime.generation_scope_invalidation"]["remaining_promotion_inputs"],
+        )
+        self.assertFalse(contract_gate_inputs["lifetime.generation_scope_invalidation"]["promotion_blocker_resolved"])
+        self.assertFalse(contract_gate_inputs["lifetime.generation_scope_invalidation"]["promotion_ready"])
         abi_preflight = report["public_abi_promotion_preflight"]
         self.assertEqual(abi_preflight["status"], "blocked")
         self.assertTrue(abi_preflight["candidate_only"])
@@ -367,6 +386,21 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertEqual(report["blocked_until"], ["reviewed_identity_public_contract"])
         self.assertIn("runtime.lifecycle_evidence", report["contract_review_inputs_resolved"])
         self.assertNotIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
+        contract_gate_inputs = {item["id"]: item for item in report["contract_gate_inputs"]}
+        runtime_input = contract_gate_inputs["runtime.lifecycle_evidence"]
+        self.assertEqual(runtime_input["review_inputs_resolved"], ["runtime.lifecycle_evidence"])
+        self.assertEqual(runtime_input["review_inputs_missing"], [])
+        self.assertFalse(runtime_input["promotion_blocker_resolved"])
+        self.assertFalse(runtime_input["promotion_ready"])
+        self.assertFalse(runtime_input["public_sdk_ready"])
+        self.assertIn(
+            "privacy.public_identifier_form",
+            contract_gate_inputs["privacy.identifier_redaction"]["remaining_promotion_inputs"],
+        )
+        self.assertIn(
+            "abi.layout",
+            contract_gate_inputs["abi.public_pod_contract"]["remaining_promotion_inputs"],
+        )
         runtime_report = report["approved_runtime_evidence"]
         self.assertTrue(runtime_report["provided"])
         self.assertTrue(runtime_report["accepted_for_contract_review"])
@@ -608,6 +642,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         decisions["identifier_redaction_evidence_intake"]["public_sdk_ready"] = True
         decisions["public_abi_preflight_candidate_intake"]["public_abi_ready"] = True
         decisions["owner_token_sdk_consumer_contract_intake"]["lifecycle_owner_cleanup_ready"] = True
+        decisions["contract_gate_inputs"][0]["promotion_blocker_resolved"] = True
+        decisions["contract_gate_inputs"][1]["public_sdk_ready"] = True
         decisions["proposed_public_pod_abi_candidate"]["runtime_ready"] = True
         self.player_identity_surface(surfaces)["evidence"]["candidate_policy_artifacts"][0]["public_sdk_ready"] = True
         candidate["runtime_ready"] = True
@@ -626,6 +662,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.proposed_public_pod_abi_candidate.runtime_ready", labels)
         self.assertIn("$.evidence.candidate_policy_artifacts[0].public_sdk_ready", labels)
         self.assertIn("$.runtime_ready", labels)
+        self.assertIn("decisions_contract_gate_input_flag_not_false", report["blockers"])
 
     def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:
         decisions = self.load_decisions()

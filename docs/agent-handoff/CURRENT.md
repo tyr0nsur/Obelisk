@@ -203,14 +203,17 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest round delegated SDK accounting, runtime ABI, UE4/static contract audit, and
-  live-ops/request-pack drift. Integrated result: SDK completion rejects
-  `runtime_replay`/`post_window_replay` aliases as promotion evidence; the identity
-  public-contract decision manifest now declares the owner-token SDK consumer contract as
-  candidate-only cleanup/lifecycle review evidence; approved-runtime evidence replay uses
-  the canonical request-pack digest helper; window-manifest path fields avoid private-term
-  false positives while retaining path/sibling/SHA checks; PluginManager chat cleanup now
-  uses owner-scoped unregister and copied dispatchers retain failed granular owner
-  `DestroyUserData` cleanup for retry. Route JSON remains valid/planning-only at
-  `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
-  `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.
+- Latest round delegated SDK contract-gate accounting, runtime ABI cleanup, UE4/static
+  side-lane audit, and live-ops/request-pack drift. Integrated result: identity
+  public-contract decisions now expose `contract_gate_inputs` separating accepted review
+  inputs from remaining promotion inputs, all fail-closed for public/header/runtime/v1
+  readiness; readiness and gap reports emit the same details. Live-ops checkers now share
+  request/window/receipt constants and replay the canonical window-manifest checker.
+  PluginManager chat rollback now uses owner-scoped dispatcher unregister, with a static
+  guardrail against bare dispatcher unregister in PluginManager. UE4/static audit found
+  the next useful offline side lane is a future tribe scalar-boundary checker; not
+  integrated this round. Validation must run approved-runtime/window sidecar suites
+  sequentially because their offline fixture sidecars are shared. Route JSON remains
+  valid/planning-only at `approved_runtime_evidence_missing`; SDK JSON remains blocked
+  with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents
+  closed.

@@ -35,6 +35,7 @@ from prepare_player_principal_lifecycle_window_request import (
     MAX_REQUEST_PREPARATION_LEAD_SECONDS,
     NON_CLAIMS,
     REQUIRED_ENV,
+    REQUEST_ROLLBACK_DELTA,
     REPLAY_NON_AUTHORIZATION,
     RUN_ID_RE,
     SCHEMA,
@@ -952,9 +953,8 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
     if rollback:
         if not isinstance(rollback.get("owner"), str) or not re.fullmatch(r"[A-Za-z0-9_.@ -]+", rollback["owner"]):
             add(blockers, "rollback_owner_invalid", "rollback.owner")
-        expected_delta = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
-        if rollback.get("delta") != expected_delta:
-            add(blockers, "rollback_delta_mismatch", "rollback.delta", expected=expected_delta)
+        if rollback.get("delta") != REQUEST_ROLLBACK_DELTA:
+            add(blockers, "rollback_delta_mismatch", "rollback.delta", expected=REQUEST_ROLLBACK_DELTA)
     run_id = string_at(payload, "run_id", blockers)
     if run_id is not None and not RUN_ID_RE.fullmatch(run_id):
         add(blockers, "run_id_invalid", "run_id")

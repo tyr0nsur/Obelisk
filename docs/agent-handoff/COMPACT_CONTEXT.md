@@ -1258,6 +1258,23 @@ priorities, and do not use history files as the active source of truth.
   route/SDK JSON, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent contract-gate/live-ops integration: identity
+  public-contract decisions, gap report, and readiness report now expose
+  `contract_gate_inputs`, distinguishing review inputs already accepted from remaining
+  promotion inputs while keeping all public/header/runtime/v1 readiness flags false.
+  Live-ops request/window/approved-evidence checkers share request schema, SHA, run-id,
+  observer env order, rollback, approval text, and operational non-claim constants; the
+  approved-evidence checker replays the canonical window-manifest checker. PluginManager
+  chat registration rollback now uses owner-scoped dispatcher unregister and the guardrail
+  rejects bare `EventDispatcher::Unregister` use in PluginManager. UE4/static audit
+  recommended a future standalone tribe scalar-boundary readiness checker; it was not
+  integrated. Validations passed when run sequentially: public-contract readiness 48,
+  gap 33, live-ops/request-window/approved-evidence 197, PluginManager guardrails 29,
+  route JSON valid/planning-only, SDK JSON blocked by design, and `git diff --check`.
+  Do not run the approved-runtime/window sidecar suites in parallel with each other:
+  their test helper rebuilds shared offline sidecars under `/servidor/ark/workspace-offline`.
+  Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

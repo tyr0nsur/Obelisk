@@ -45,6 +45,7 @@ ARTIFACT_BINDING_NON_AUTHORIZATION = (
     "artifact binding only; does not authorize runtime work, server operations, "
     "marker/env changes, public readiness, or promotion"
 )
+REQUEST_ROLLBACK_DELTA = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
 POSTURE_GUARDRAIL_TEXT = (
     "player-principal lifecycle request packs require --final-posture stable; "
     "stopped/stop-after-window is not supported because downstream manifest and "
@@ -60,6 +61,17 @@ REQUIRED_ENV = {
     "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT": "0",
     "OBELISK_PE_TRACE_LIMIT": "0",
 }
+OBSERVER_ENV_KEYS = (
+    "OBELISK_INSTANCE_ID",
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK",
+    "OBELISK_DISABLE_PLUGINS",
+    "OBELISK_WRAPPER_PROFILE",
+    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT",
+    "OBELISK_PE_TRACE_LIMIT",
+)
 WINDOW_MARKERS = [
     "enable-process-event-hook",
     "disable-plugins",
@@ -202,18 +214,7 @@ def env_lines(args: argparse.Namespace) -> list[str]:
         **REQUIRED_ENV,
         "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256": args.binary_sha256,
     }
-    order = [
-        "OBELISK_INSTANCE_ID",
-        "OBELISK_ENABLE_PROCESS_EVENT_HOOK",
-        "OBELISK_DISABLE_PLUGINS",
-        "OBELISK_WRAPPER_PROFILE",
-        "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER",
-        "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256",
-        "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT",
-        "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT",
-        "OBELISK_PE_TRACE_LIMIT",
-    ]
-    return [f"{key}={values[key]}" for key in order]
+    return [f"{key}={values[key]}" for key in OBSERVER_ENV_KEYS]
 
 
 def request_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -245,7 +246,7 @@ def request_payload(args: argparse.Namespace) -> dict[str, Any]:
         "forbidden_markers": FORBIDDEN_MARKERS,
         "rollback": {
             "owner": args.rollback_owner,
-            "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+            "delta": REQUEST_ROLLBACK_DELTA,
         },
         "non_claims": NON_CLAIMS,
     }

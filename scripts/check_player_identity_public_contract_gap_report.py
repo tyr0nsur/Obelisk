@@ -126,6 +126,58 @@ REQUIRED_PROMOTION_BLOCKERS = {
     "lifecycle.owner_cleanup",
     "separation.downstream_surfaces",
 }
+REQUIRED_CONTRACT_GATE_INPUTS = {
+    "runtime.lifecycle_evidence": {
+        "review_inputs": {"runtime.lifecycle_evidence"},
+        "remaining_promotion_inputs": set(),
+    },
+    "privacy.identifier_redaction": {
+        "review_inputs": {"privacy.identifier_redaction"},
+        "remaining_promotion_inputs": {
+            "privacy.public_identifier_form",
+            "privacy.redacted_identifier_fields",
+            "privacy.logging_and_storage_policy",
+        },
+    },
+    "lifetime.generation_scope_invalidation": {
+        "review_inputs": {"lifetime.generation_scope_invalidation.candidate_policy"},
+        "remaining_promotion_inputs": {
+            "lifetime.principal_scope",
+            "lifetime.invalidation_events",
+            "lifetime.reconnect_duplicate_stale_policy",
+        },
+    },
+    "abi.public_pod_contract": {
+        "review_inputs": {
+            "abi.public_pod_contract.private_layout_candidate",
+            "abi.public_pod_contract.public_abi_preflight_candidate",
+        },
+        "remaining_promotion_inputs": {
+            "abi.payload_shape",
+            "abi.capability_bits",
+            "abi.append_only_layout_tests",
+            "abi.layout",
+            "sdk.consumer",
+        },
+    },
+    "lifecycle.owner_cleanup": {
+        "review_inputs": {"lifecycle.owner_cleanup.owner_token_sdk_consumer_contract"},
+        "remaining_promotion_inputs": {
+            "abi.owner_token_registration",
+            "lifecycle.owner_cleanup.runtime_tests",
+        },
+    },
+    "separation.downstream_surfaces": {
+        "review_inputs": {"separation.no_commands_permissions_persistence"},
+        "remaining_promotion_inputs": {
+            "permissions_admin_contract_blocker",
+            "command_chat_response_contract_blocker",
+            "commands_replies_contract_blocker",
+            "player_lookup_exclusion_review",
+            "storage_persistence_exclusion_review",
+        },
+    },
+}
 REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS = {
     "evidence.complete_non_protected_pack",
     "evidence.accepted_session_start_anchor",
@@ -1154,6 +1206,69 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                     id=blocker_id,
                     value=by_id[blocker_id].get("status"),
                 )
+    contract_gate_inputs = decisions.get("contract_gate_inputs")
+    if not isinstance(contract_gate_inputs, list):
+        add(blockers, "decisions_contract_gate_inputs_not_list", "$.contract_gate_inputs")
+    else:
+        by_id = {
+            item.get("id"): item
+            for item in contract_gate_inputs
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        if set(by_id) != set(REQUIRED_CONTRACT_GATE_INPUTS):
+            add(
+                blockers,
+                "decisions_contract_gate_inputs_mismatch",
+                "$.contract_gate_inputs",
+                expected=sorted(REQUIRED_CONTRACT_GATE_INPUTS),
+                observed=sorted(by_id),
+            )
+        for input_id, required in REQUIRED_CONTRACT_GATE_INPUTS.items():
+            item = by_id.get(input_id)
+            if not isinstance(item, dict):
+                continue
+            if item.get("status") != "unresolved":
+                add(
+                    blockers,
+                    "decisions_contract_gate_input_not_unresolved",
+                    "$.contract_gate_inputs",
+                    id=input_id,
+                    value=item.get("status"),
+                )
+            if set(item.get("review_inputs", [])) != required["review_inputs"]:
+                add(
+                    blockers,
+                    "decisions_contract_gate_input_review_inputs_mismatch",
+                    "$.contract_gate_inputs.review_inputs",
+                    id=input_id,
+                    expected=sorted(required["review_inputs"]),
+                    observed=item.get("review_inputs"),
+                )
+            if set(item.get("remaining_promotion_inputs", [])) != required["remaining_promotion_inputs"]:
+                add(
+                    blockers,
+                    "decisions_contract_gate_input_remaining_promotion_inputs_mismatch",
+                    "$.contract_gate_inputs.remaining_promotion_inputs",
+                    id=input_id,
+                    expected=sorted(required["remaining_promotion_inputs"]),
+                    observed=item.get("remaining_promotion_inputs"),
+                )
+            for key in (
+                "promotion_blocker_resolved",
+                "promotion_ready",
+                "public_sdk_ready",
+                "runtime_ready",
+                "public_header_allowed",
+                "v1_completion_evidence",
+            ):
+                if item.get(key) is not False:
+                    add(
+                        blockers,
+                        "decisions_contract_gate_input_flag_not_false",
+                        f"$.contract_gate_inputs[{input_id}].{key}",
+                        id=input_id,
+                        value=item.get(key),
+                    )
     required_before_public_header = decisions.get("required_before_public_header")
     if not isinstance(required_before_public_header, list):
         add(blockers, "decisions_required_before_public_header_not_list", "$.required_before_public_header")
@@ -2040,6 +2155,76 @@ def validate_owner_token_sdk_consumer_contract(
     )
 
 
+def contract_gate_input_details(
+    decisions: dict[str, Any],
+    *,
+    runtime_evidence_accepted: bool,
+    redaction_accepted: bool,
+    planning_source_verified: bool,
+    principal_policy_accepted: bool,
+    private_layout_accepted: bool,
+    public_abi_preflight_report: dict[str, Any],
+    owner_token_sdk_consumer_report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    accepted_review_inputs: set[str] = set()
+    if runtime_evidence_accepted:
+        accepted_review_inputs.add(APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT)
+    if redaction_accepted:
+        accepted_review_inputs.add(PRIMARY_OFFLINE_GAP)
+    if planning_source_verified:
+        accepted_review_inputs.add(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
+    if principal_policy_accepted:
+        accepted_review_inputs.add(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
+    if private_layout_accepted:
+        accepted_review_inputs.add("abi.public_pod_contract.private_layout_candidate")
+    if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
+        accepted_review_inputs.add(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
+    if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True:
+        accepted_review_inputs.add(REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT)
+    accepted_review_inputs.add("separation.no_commands_permissions_persistence")
+
+    manifest_inputs = decisions.get("contract_gate_inputs")
+    if not isinstance(manifest_inputs, list):
+        manifest_inputs = []
+    by_id = {
+        item.get("id"): item
+        for item in manifest_inputs
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    details: list[dict[str, Any]] = []
+    for input_id in sorted(REQUIRED_CONTRACT_GATE_INPUTS):
+        manifest = by_id.get(input_id, {})
+        review_inputs = list(manifest.get("review_inputs", []))
+        if not isinstance(review_inputs, list) or not all(isinstance(item, str) for item in review_inputs):
+            review_inputs = sorted(REQUIRED_CONTRACT_GATE_INPUTS[input_id]["review_inputs"])
+        remaining_promotion_inputs = list(manifest.get("remaining_promotion_inputs", []))
+        if not isinstance(remaining_promotion_inputs, list) or not all(
+            isinstance(item, str) for item in remaining_promotion_inputs
+        ):
+            remaining_promotion_inputs = sorted(
+                REQUIRED_CONTRACT_GATE_INPUTS[input_id]["remaining_promotion_inputs"]
+            )
+        resolved_review_inputs = [item for item in review_inputs if item in accepted_review_inputs]
+        details.append(
+            {
+                "id": input_id,
+                "status": "unresolved",
+                "review_inputs": review_inputs,
+                "review_inputs_resolved": resolved_review_inputs,
+                "review_inputs_missing": [item for item in review_inputs if item not in accepted_review_inputs],
+                "remaining_promotion_inputs": remaining_promotion_inputs,
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": manifest.get("non_claim"),
+            }
+        )
+    return details
+
+
 def build_report(
     args: argparse.Namespace,
     blockers: list[dict[str, Any]],
@@ -2084,6 +2269,16 @@ def build_report(
     if not redaction_accepted:
         remaining_contract_gate_inputs.insert(1, PRIMARY_OFFLINE_GAP)
     private_layout_accepted = private_pod_layout_report.get("accepted_for_contract_review_input") is True
+    contract_gate_details = contract_gate_input_details(
+        decisions,
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        redaction_accepted=redaction_accepted,
+        planning_source_verified=planning_source_verified,
+        principal_policy_accepted=principal_policy_accepted,
+        private_layout_accepted=private_layout_accepted,
+        public_abi_preflight_report=public_abi_preflight_report,
+        owner_token_sdk_consumer_report=owner_token_sdk_consumer_report,
+    )
     next_offline_actions = [
         {
             "id": "lifetime.generation_scope_invalidation",
@@ -2128,6 +2323,7 @@ def build_report(
         "primary_offline_gap": primary_offline_gap,
         "contract_review_inputs_resolved": resolved_inputs,
         "remaining_contract_gate_inputs": remaining_contract_gate_inputs,
+        "contract_gate_inputs": contract_gate_details,
         "public_abi_promotion_preflight": public_abi_preflight_report,
         "candidate_owner_token_lifecycle": public_abi_preflight_report.get("required_owner_token_lifecycle", []),
         "sdk_consumer_contract": public_abi_preflight_report.get("sdk_consumer_contract", {}),

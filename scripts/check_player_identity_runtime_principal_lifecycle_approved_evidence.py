@@ -21,9 +21,24 @@ from typing import Any
 
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
-import check_player_principal_lifecycle_window_manifest as window_manifest_checker
+import check_player_identity_runtime_principal_lifecycle_window_manifest as window_manifest_checker
+from check_player_identity_runtime_principal_lifecycle_window_manifest import (
+    EXPECTED_PREFLIGHT_NON_CLAIM,
+    EXPECTED_ROLLBACK_DELTA,
+    PREFLIGHT_SCHEMA as EXPECTED_PREFLIGHT_SCHEMA,
+    REPORT_SCHEMA as WINDOW_CHECK_SCHEMA,
+    REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS,
+)
 from prepare_player_principal_lifecycle_window_request import (
+    APPROVAL_RECEIPT_SCHEMA as EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA,
+    APPROVAL_TEXT as EXPECTED_APPROVAL,
+    EXPECTED_BINARY_SHA256,
+    EXPECTED_SERVER_BINARY_PATH,
     NON_CLAIMS as EXPECTED_REQUEST_PACK_NON_CLAIMS,
+    OBSERVER_ENV_KEYS,
+    REQUIRED_ENV,
+    REQUEST_ROLLBACK_DELTA as EXPECTED_REQUEST_ROLLBACK_DELTA,
+    SCHEMA as EXPECTED_REQUEST_SCHEMA,
     request_pack_digest,
 )
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
@@ -34,7 +49,6 @@ SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
 SHAPE_FIXTURE_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
-EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 EXPECTED_PROCESS_EVENT_ADDRESS = "0x1d34e20"
 MODULE = "player_principal_lifecycle"
 NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
@@ -65,44 +79,19 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
         "non_claims",
     )
 )
-WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
-EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
-EXPECTED_REQUEST_SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
 EXPECTED_REQUEST_STATUS = "candidate_only_request_pack"
-EXPECTED_SERVER_BINARY_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
-EXPECTED_REQUEST_ROLLBACK_DELTA = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
-EXPECTED_PREFLIGHT_NON_CLAIM = (
-    "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers"
-)
-EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA = "obelisk.player-principal-lifecycle-operator-approval-receipt.v1"
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
     "generated receipt template only; does not record operator approval",
     "completed receipt binds one current-turn request pack only",
     "receipt does not authorize future windows, standing approval, Discord, GitHub publication, public SDK readiness, runtime readiness, or v1 completion",
     "receipt does not promote public player identity, permissions/admin, command response, lookup, mutation, return override, or ResourceHandle",
 ]
-EXPECTED_OBSERVER_ENV_KEYS = (
-    "OBELISK_INSTANCE_ID",
-    "OBELISK_ENABLE_PROCESS_EVENT_HOOK",
-    "OBELISK_DISABLE_PLUGINS",
-    "OBELISK_WRAPPER_PROFILE",
-    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER",
-    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256",
-    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT",
-    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT",
-    "OBELISK_PE_TRACE_LIMIT",
-)
+EXPECTED_OBSERVER_ENV_KEYS = OBSERVER_ENV_KEYS
 REQUIRED_OBSERVER_ENV_VALUES = {
-    "OBELISK_ENABLE_PROCESS_EVENT_HOOK": "1",
-    "OBELISK_DISABLE_PLUGINS": "1",
-    "OBELISK_WRAPPER_PROFILE": "observer-debug",
-    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER": "1",
+    **REQUIRED_ENV,
     "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256": EXPECTED_BINARY_SHA256,
-    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT": "10",
-    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT": "0",
-    "OBELISK_PE_TRACE_LIMIT": "0",
 }
 FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
     (
@@ -195,18 +184,10 @@ ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
         "single_module_summary",
     )
 )
-EXPECTED_ROLLBACK_DELTA = "removed_observer_env_and_markers_preserved_disable_plugins"
 ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
     ("completed", "observer_env_survived", "observer_marker_survived", "delta")
 )
 ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
-REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS = frozenset(
-    (
-        "window manifest acceptance is operational posture only",
-        "does not promote player identity, lookup, permissions, commands, ResourceHandle, mutation, return override, plugin delivery, public SDK, or runtime readiness",
-        "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
-    )
-)
 OPERATOR_APPROVAL_RECEIPT_SCOPE_FALSE_FLAGS = (
     "standing_approval",
     "reusable",
@@ -1020,8 +1001,14 @@ def validate_preflight_payload(
     blockers: list[dict[str, Any]],
 ) -> None:
     validate_no_sidecar_overclaims(payload, label, blockers)
-    if payload.get("schema") != "obelisk.player-principal-lifecycle-preflight.v1":
-        add(blockers, "operational_window_preflight_schema_mismatch", label)
+    if payload.get("schema") != EXPECTED_PREFLIGHT_SCHEMA:
+        add(
+            blockers,
+            "operational_window_preflight_schema_mismatch",
+            label,
+            expected=EXPECTED_PREFLIGHT_SCHEMA,
+            actual=payload.get("schema"),
+        )
     if payload.get("ready") is not True:
         add(blockers, "operational_window_preflight_ready_not_true", label)
     if payload.get("mode") != expected_mode:
@@ -1364,7 +1351,9 @@ def replay_operational_window_manifest(window: dict[str, Any], blockers: list[di
         return
 
     manifest_path = Path(path_text).expanduser()
+    old_window_server_root = window_manifest_checker.SERVER_ROOT
     old_window_roots = window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+    window_manifest_checker.SERVER_ROOT = SERVER_ROOT
     window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = APPROVED_OFFLINE_WORKSPACE_ROOTS
     try:
         try:
@@ -1383,6 +1372,7 @@ def replay_operational_window_manifest(window: dict[str, Any], blockers: list[di
             )
             return
     finally:
+        window_manifest_checker.SERVER_ROOT = old_window_server_root
         window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_window_roots
 
     if validation.blockers:
@@ -2043,7 +2033,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if window.get("log_budget") != "10":
         add(blockers, "operational_window_log_budget_mismatch", f"{label}.log_budget", expected="10")
     non_claims = window.get("non_claims")
-    if not isinstance(non_claims, list) or set(non_claims) != REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS:
+    if not isinstance(non_claims, list) or set(non_claims) != set(REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS):
         add(
             blockers,
             "operational_window_non_claims_mismatch",

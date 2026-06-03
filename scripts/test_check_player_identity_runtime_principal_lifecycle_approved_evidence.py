@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,7 +21,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
-SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 TEST_COMMIT = subprocess.check_output(
     ["git", "rev-parse", "HEAD"],
@@ -38,9 +38,11 @@ WINDOW_NON_CLAIMS = [
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
+    EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
+    REQUEST_ROLLBACK_DELTA,
     WINDOW_MARKERS,
     env_lines,
     markdown_request,
@@ -49,6 +51,9 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     post_window_replay_contract,
     request_pack_digest,
 )
+
+
+SHA = EXPECTED_BINARY_SHA256
 
 
 def add_output_artifact_identity(payload: dict) -> dict:
@@ -231,7 +236,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "forbidden_markers": FORBIDDEN_MARKERS,
         "rollback": {
             "owner": "operator",
-            "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+            "delta": REQUEST_ROLLBACK_DELTA,
         },
         "non_claims": NON_CLAIMS,
     }
@@ -368,6 +373,7 @@ def analyzer_summary() -> dict:
     if not OFFLINE_WORKSPACE.is_dir():
         raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
     log_path = OFFLINE_WORKSPACE / "live-validation-logs" / RUN_ID / "Obelisk.log"
+    shutil.rmtree(log_path.parent, ignore_errors=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
     result = subprocess.run(

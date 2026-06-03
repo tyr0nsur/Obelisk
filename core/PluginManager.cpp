@@ -1305,7 +1305,7 @@ namespace Obelisk::Core
                         std::memory_order_acquire))
 #endif
                 {
-                    unregistered = dispatcher->Unregister(internalRegistrationId);
+                    unregistered = dispatcher->UnregisterCallbackForOwner(owner, internalRegistrationId);
                 }
                 if (!unregistered)
                 {
