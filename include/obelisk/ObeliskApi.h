@@ -258,10 +258,13 @@ typedef struct ObeliskApi {
     // plugin code should use copied v0.1 ABI seeds such as GameplayPolicyEvent and
     // minimal ChatMessageEvent. Those copied seeds are promoted-experimental-only for v1
     // planning and are not a v1-complete SDK claim.
-    // Global registrations are rejected unless
-    // OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS is advertised. Filtered
-    // registrations are rejected unless
-    // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS is advertised.
+    // Global registrations are rejected unless the calling plugin's init-time capability
+    // snapshot includes OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS and the live
+    // OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS env plus allow-global-process-event-callbacks
+    // marker gate is still active. Filtered registrations likewise require
+    // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS plus the live
+    // OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS env and allow-filtered-process-event-callbacks
+    // marker gate. These gates are controlled debug windows, not production readiness signals.
     void (*RegisterPreProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPostProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPreProcessEventForNameIndex)(int32_t nameIndex, OnProcessEventCallback callback);
@@ -300,9 +303,9 @@ typedef struct ObeliskApi {
     // Handle-returning ProcessEvent callback registration. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, plugin_owner_token != 0, and
     // OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using these fields.
-    // Name-index-filtered variants also require
-    // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS. Global variants require
-    // OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS and remain debug-only.
+    // Name-index-filtered variants also require the filtered raw ProcessEvent capability
+    // and live env+marker gate. Global variants require the global raw ProcessEvent
+    // capability and live env+marker gate. Both remain debug-only.
     // A return value of 0 means the registration was rejected. Non-zero handles can be
     // passed with the same owner token to
     // UnregisterProcessEventCallbackWithOwnerToken for granular cleanup; plugin-owner

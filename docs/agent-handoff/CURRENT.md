@@ -199,17 +199,15 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: last supervised 4-agent round closed four offline guardrail
-  gaps without changing the active blocker. Downstream permissions/admin, command response,
-  and commands/replies direct readiness now reject additional nested public/runtime/route/
-  reply/send-chat/accounting aliases. ResourceHandle/object identity artifacts now reject
-  nested source markers, public-contract/capability fields, and text such as "not blocked
-  and ready" that implies public lookup/identity/runtime/SDK/v1 readiness. `SERVER_RESTORE`
-  now keeps post-start log/proc checks inside the same current-turn approved maintenance
-  window, and `check_release_readiness.sh` says "Public SDK v1 stable claim gate" rather
-  than generic completion. Historical FName/GObjects notes now carry no-repeat checkpoints
-  instead of broad scan/rerun next steps. Evidence: integrated suite 253, route JSON
-  valid/planning-only, ResourceHandle JSON planning-only with all readiness false, SDK JSON
-  blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, release-options shell,
-  and `git diff --check`. No runtime/server operation. See `COMPACT_CONTEXT.md` and
-  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.
+- Latest integration note: supervised 4-agent round plus lead integration closed offline
+  guardrail gaps without changing the active blocker. Public ABI comments now state raw
+  ProcessEvent callbacks require init-time capability plus live env+marker debug windows;
+  SDK completion release-statement scans reject hidden positive stable/ready wording;
+  Mission/Transfer/Dino/Tribe/Buff candidate markers reject promotion/runtime/public SDK
+  wording; installed CMake/installer/release output now carries explicit false/non-claim
+  markers for runtime, live-ops, Plugin Hub, support tier, stable SDK, and v1 completion;
+  Discord helper rejects internal status phrases. Evidence: route JSON valid/planning-only,
+  SDK JSON blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, mission
+  accounting candidate-only, release/SDK/runtime/layout tests, `ctest` ABI/runtime subset,
+  and `git diff --check`. No runtime/server/Discord/GitHub operation. See
+  `COMPACT_CONTEXT.md` and `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.

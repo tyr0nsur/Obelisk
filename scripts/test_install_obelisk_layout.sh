@@ -460,6 +460,23 @@ endif()
 if(NOT Obelisk_SDK_FOUND)
     message(FATAL_ERROR "Installed Obelisk package did not report SDK component found")
 endif()
+if(NOT Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS STREQUAL "package-shape-evidence-only")
+    message(FATAL_ERROR "Installed Obelisk package did not mark SDK package shape as evidence-only")
+endif()
+foreach(non_claim_var
+    Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED
+    Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED
+    Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED
+    Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED
+    Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED
+    Obelisk_V1_COMPLETION_CLAIM_ALLOWED
+    Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED
+    Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED
+)
+    if(${non_claim_var})
+        message(FATAL_ERROR "Installed Obelisk package enabled forbidden non-claim marker: ${non_claim_var}")
+    endif()
+endforeach()
 if(NOT Obelisk_VERSION STREQUAL "0.1.0")
     message(FATAL_ERROR "Unexpected Obelisk package version: ${Obelisk_VERSION}")
 endif()

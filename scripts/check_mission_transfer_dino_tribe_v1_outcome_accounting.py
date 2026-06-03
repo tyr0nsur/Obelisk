@@ -389,6 +389,25 @@ CANDIDATE_READY_CLAIM_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
     re.IGNORECASE,
 )
+CANDIDATE_MARKER_KEY_RE = re.compile(
+    r"(?:target[_ -]?sets?|source[_ -]?(?:markers?|target[_ -]?sets?)|"
+    r"artifact[_ -]?status|evidence[_ -]?status|reflection[_ -]?(?:evidence|status))",
+    re.IGNORECASE,
+)
+CANDIDATE_MARKER_PROMOTION_RE = re.compile(
+    r"\b(?:public|sdk|api|abi|runtime|observer|hook|wiring|dispatch|dispatcher|callback|"
+    r"descriptor|capability|promot(?:e|ed|ion)?|approved(?:\s+runtime)?\s+bundle|"
+    r"resource\s+handle|resourcehandle|identity|lookup|mutation|return\s+override|"
+    r"v1|completion|complete|stable|release|ready|available|enabled)\b",
+    re.IGNORECASE,
+)
+CANDIDATE_MARKER_NON_PROMOTION_RE = re.compile(
+    r"\b(?:candidate\s+only|planning\s+only|consume\s+only|evidence\s+only|"
+    r"internal(?:\s+reusable)?\s+evidence\s+only|offline\s+review\s+only|"
+    r"blocked|excluded|not\s+promoted|does\s+not|do\s+not|must\s+not|"
+    r"no\s+public|no\s+runtime|false|redacted|intake|policy\s+slice)\b",
+    re.IGNORECASE,
+)
 NEGATOR_RE = re.compile(
     r"\b(?:cannot|does\s+not|do\s+not|is\s+not|are\s+not|"
     r"must\s+not|no|not|without)\b",
@@ -914,6 +933,51 @@ def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
     return overclaims
 
 
+def normalized_marker_text(*parts: Any) -> str:
+    text = " ".join(str(part) for part in parts if isinstance(part, str))
+    return re.sub(r"[-_./]+", " ", text)
+
+
+def collect_candidate_marker_overclaims(
+    value: Any,
+    prefix: str = "$",
+    *,
+    marker_context: bool = False,
+    parent_key: str = "",
+) -> list[tuple[str, str]]:
+    overclaims: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = key if isinstance(key, str) else str(key)
+            child_path = f"{prefix}.{key_text}"
+            child_marker_context = marker_context or bool(CANDIDATE_MARKER_KEY_RE.search(key_text))
+            overclaims.extend(
+                collect_candidate_marker_overclaims(
+                    child,
+                    child_path,
+                    marker_context=child_marker_context,
+                    parent_key=key_text,
+                )
+            )
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            overclaims.extend(
+                collect_candidate_marker_overclaims(
+                    child,
+                    f"{prefix}[{index}]",
+                    marker_context=marker_context,
+                    parent_key=parent_key,
+                )
+            )
+    elif marker_context and isinstance(value, str):
+        marker_text = normalized_marker_text(parent_key, value)
+        if CANDIDATE_MARKER_PROMOTION_RE.search(marker_text) and not CANDIDATE_MARKER_NON_PROMOTION_RE.search(
+            marker_text
+        ):
+            overclaims.append((prefix, value))
+    return overclaims
+
+
 def candidate_leaf_evidence_sources(
     surface: dict[str, Any],
     leaf_id: str,
@@ -965,6 +1029,31 @@ def validate_candidate_leaf_evidence(
                 leaf=leaf_id,
                 claim=claim,
             )
+        for field, value in collect_candidate_marker_overclaims(evidence, label):
+            add(
+                blockers,
+                "leaf_candidate_marker_overclaim",
+                field,
+                leaf=leaf_id,
+                value=value,
+            )
+
+
+def validate_candidate_surface_evidence(surface: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    if surface.get("status") == "promoted":
+        return
+    evidence = surface.get("evidence")
+    if not isinstance(evidence, dict):
+        return
+    label = "$.surface.evidence"
+    for field in collect_true_ready_overclaims(evidence, label):
+        add(blockers, "surface_candidate_ready_overclaim", field)
+    for claim in forbidden_claims("\n".join(flattened_strings(evidence))):
+        add(blockers, "surface_candidate_evidence_forbidden_claim", label, claim=claim)
+    for claim in candidate_ready_claims("\n".join(flattened_strings(evidence))):
+        add(blockers, "surface_candidate_ready_overclaim", label, claim=claim)
+    for field, value in collect_candidate_marker_overclaims(evidence, label):
+        add(blockers, "surface_candidate_marker_overclaim", field, value=value)
 
 
 def validate_candidate_leaf_metadata(
@@ -1432,6 +1521,7 @@ def build_report(
         surface = {"id": SURFACE_ID, "leaf_decision_units": []}
     leaves = leaf_map(surface, blockers)
     outcome = release_statement_outcome(release_statement)
+    validate_candidate_surface_evidence(surface, blockers)
     for leaf_id in REQUIRED_LEAVES:
         leaf = leaves.get(leaf_id, {})
         validate_candidate_leaf_evidence(surface, leaf_id, leaf, blockers)

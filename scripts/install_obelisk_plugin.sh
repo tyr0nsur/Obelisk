@@ -9,6 +9,8 @@ Installs one Obelisk plugin into the shared plugin directory using a staged copy
 atomic rename inside the destination directory. The staged filename does not end in .so, so
 runtime plugin discovery will not try to dlopen a partial copy.
 The install root must be supplied as a positional argument.
+Plugin installation only publishes a file; it is not Plugin Hub readiness/publication,
+support-tier activation, public SDK scope, runtime/live-ops approval, or v1 SDK completion.
 
 Options:
   --dry-run              Print actions without changing files.
@@ -139,3 +141,4 @@ run install -m 755 "${PLUGIN_SRC}" "${PLUGIN_TMP}"
 run mv -f "${PLUGIN_TMP}" "${PLUGIN_DST}"
 
 echo "Obelisk plugin installed to ${PLUGIN_DST}"
+echo "Plugin file publication only; no Plugin Hub readiness/publication, support-tier activation, public SDK scope, runtime/live-ops approval, or v1 SDK completion is granted."

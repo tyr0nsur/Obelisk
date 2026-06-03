@@ -9,6 +9,9 @@ Installs built Obelisk runtime artifacts into a centralized server root.
 Runtime .so files are staged under temporary names in the destination directory and then
 published with atomic renames, so ARK restarts do not observe partial shared libraries.
 The install root must be supplied as a positional argument.
+Install output is package-shape evidence only; it is not runtime/live-ops approval,
+Plugin Hub readiness/publication, support-tier activation, a stable SDK claim, or v1 SDK
+completion.
 
 Options:
   --dry-run              Print actions without changing files.
@@ -356,3 +359,4 @@ if ! publish_staged_sdk_package; then
 fi
 
 echo "Obelisk installed to ${ROOT}"
+echo "Install layout/package-shape evidence only; no runtime/live-ops approval, Plugin Hub readiness/publication, support-tier activation, stable SDK claim, or v1 SDK completion is granted."

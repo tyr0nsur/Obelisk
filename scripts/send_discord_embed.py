@@ -34,6 +34,12 @@ RESERVED_FIELD_NAMES = frozenset({"estado", "alcance"})
 FORBIDDEN_TEXT = (
     "discord.com/" + "api/webhooks",
     "discordapp.com/" + "api/webhooks",
+    "agent status",
+    "internal validation",
+    "release gate completed",
+    "routine validation",
+    "route json",
+    "sdk json",
     "raw log",
     "player text",
     "token",

@@ -1526,6 +1526,47 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/test_install_obelisk_layout.sh", release_gate)
         self.assertIn("LAYOUT_CHECK_ROOT", release_gate)
 
+    def test_installed_cmake_package_non_claim_markers_stay_false(self) -> None:
+        cmake_package = read("cmake/ObeliskConfig.cmake.in")
+        layout_test = read("scripts/test_install_obelisk_layout.sh")
+        install = read("scripts/install_obelisk.sh")
+        plugin_install = read("scripts/install_obelisk_plugin.sh")
+        release_gate = read("scripts/check_release_readiness.sh")
+
+        self.assertIn(
+            'set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")',
+            cmake_package,
+        )
+        for marker in (
+            "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED",
+            "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED",
+            "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED",
+            "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED",
+            "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED",
+            "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+            "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
+            "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",
+        ):
+            with self.subTest(file="cmake/ObeliskConfig.cmake.in", marker=marker):
+                self.assertIn(f"set({marker} FALSE)", cmake_package)
+            with self.subTest(file="scripts/test_install_obelisk_layout.sh", marker=marker):
+                self.assertIn(marker, layout_test)
+
+        for text, label in (
+            (install, "runtime installer"),
+            (plugin_install, "plugin installer"),
+            (release_gate, "release gate"),
+        ):
+            compact = normalized(text)
+            with self.subTest(surface=label, claim="Plugin Hub"):
+                self.assertIn("Plugin Hub readiness/publication", text)
+            with self.subTest(surface=label, claim="support tier"):
+                self.assertIn("support-tier activation", compact)
+            with self.subTest(surface=label, claim="live ops"):
+                self.assertIn("live-ops approval", compact)
+            with self.subTest(surface=label, claim="v1 SDK"):
+                self.assertIn("v1 SDK completion", text)
+
     def test_installed_sdk_smoke_covers_release_examples_in_release_gate(self) -> None:
         release_gate = read("scripts/check_release_readiness.sh")
         layout_test = read("scripts/test_install_obelisk_layout.sh")
@@ -1588,11 +1629,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 )
                 self.assertIn(f'require_path "${{{plugin_path_var}}}"', layout_test)
                 self.assertIn(
-                    f'if ! grep -F "${{INSTALL_ROOT}}/include" "${{{example_dir_var}}}/build/compile_commands.json"',
-                    layout_test,
-                )
-                self.assertIn(
-                    f'if grep -F "${{REPO_DIR}}/include" "${{{example_dir_var}}}/build/compile_commands.json"',
+                    f'require_external_sdk_compile_commands \\\n    "${{{example_dir_var}}}/build/compile_commands.json"',
                     layout_test,
                 )
                 self.assertIn(f'"${{{plugin_path_var}}}"', layout_test)

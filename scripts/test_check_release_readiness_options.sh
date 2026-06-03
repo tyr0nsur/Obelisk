@@ -130,11 +130,27 @@ if grep -Fq -- "Public SDK v1 completion gate completed." scripts/check_release_
     printf 'release gate must not use generic v1 completion completed wording\n' >&2
     exit 1
 fi
+if ! grep -Fq -- "Release gate output is evidence for this exact gate only" scripts/check_release_readiness.sh; then
+    printf 'missing release gate final non-claim wording\n' >&2
+    exit 1
+fi
 
 if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
     printf 'missing production symbol-surface help text\n' >&2
     exit 1
 fi
+for expected in \
+    "not live-ops approval" \
+    "Plugin Hub readiness/publication" \
+    "support-tier activation" \
+    "runtime readiness" \
+    "stable SDK claim" \
+    "v1 SDK completion"; do
+    if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
+        printf 'missing release gate non-claim help text: %s\n' "${expected}" >&2
+        exit 1
+    fi
+done
 
 if ! grep -Fq -- "ScriptStruct promotion requires explicit opt-in" <<<"${help_output}"; then
     printf 'missing ScriptStruct opt-in help text\n' >&2

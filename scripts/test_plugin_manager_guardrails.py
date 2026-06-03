@@ -265,6 +265,84 @@ def event_dispatcher_class_names() -> set[str]:
 
 
 class PluginManagerGuardrailTests(unittest.TestCase):
+    def test_raw_process_event_public_abi_comments_keep_debug_window_default_deny(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+
+        for token in (
+            "OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS",
+            "allow-global-process-event-callbacks",
+            "OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS",
+            "allow-filtered-process-event-callbacks",
+            "controlled debug windows",
+            "not production readiness signals",
+            "live env+marker gate",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, api_header)
+
+    def test_raw_process_event_capabilities_are_debug_window_default_deny(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        capabilities_body = extract_function_body(text, r"uint64_t BuildApiCapabilities\(\)")
+
+        self.assertIn("AreGlobalProcessEventCallbacksAllowed()", capabilities_body)
+        self.assertIn("OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS", capabilities_body)
+        self.assertLess(
+            capabilities_body.index("AreGlobalProcessEventCallbacksAllowed()"),
+            capabilities_body.index("OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS"),
+        )
+        self.assertIn("AreFilteredProcessEventCallbacksAllowed()", capabilities_body)
+        self.assertIn("OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS", capabilities_body)
+        self.assertLess(
+            capabilities_body.index("AreFilteredProcessEventCallbacksAllowed()"),
+            capabilities_body.index("OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS"),
+        )
+        self.assertIn("IsCallProcessEventAllowed()", capabilities_body)
+        self.assertIn("OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT", capabilities_body)
+        self.assertIn("IsProcessEventBlockingAllowed()", capabilities_body)
+        self.assertIn("OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING", capabilities_body)
+
+        for pattern, capability, live_gate in (
+            (
+                r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)",
+                "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
+                "AreGlobalProcessEventCallbacksAllowed()",
+            ),
+            (
+                r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)",
+                "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
+                "AreFilteredProcessEventCallbacksAllowed()",
+            ),
+        ):
+            with self.subTest(pattern=pattern):
+                body = extract_function_body(text, pattern)
+                self.assertIn("PluginOwnerHasCapabilityLocked(owner", body)
+                self.assertIn(capability, body)
+                self.assertIn(live_gate, body)
+
+    def test_call_process_event_stays_init_owner_debug_escape_hatch(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        current_owner_body = extract_function_body(
+            text,
+            r"bool CurrentPluginOwnerHasCapability\(uint64_t capability\)",
+        )
+        self.assertIn("if (!g_CurrentPluginOwner)", current_owner_body)
+        self.assertIn("return false", current_owner_body)
+        self.assertIn("PluginOwnerHasCapabilityLocked(g_CurrentPluginOwner, capability)", current_owner_body)
+        self.assertIn("!IsUnloadingPluginOwnerLocked(g_CurrentPluginOwner)", current_owner_body)
+
+        call_process_event_body = extract_function_body(text, r"void PluginCallProcessEvent\(.*?\)")
+        self.assertIn("CurrentPluginOwnerHasCapability(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT)", call_process_event_body)
+        self.assertIn("IsCallProcessEventAllowed()", call_process_event_body)
+        self.assertLess(
+            call_process_event_body.index("CurrentPluginOwnerHasCapability(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT)"),
+            call_process_event_body.index("Hooks::ProcessEventHook::CallOriginalProcessEvent"),
+        )
+        self.assertLess(
+            call_process_event_body.index("IsCallProcessEventAllowed()"),
+            call_process_event_body.index("Hooks::ProcessEventHook::CallOriginalProcessEvent"),
+        )
+
     def test_obelisk_api_table_is_zero_initialized_and_fully_assigned(self) -> None:
         plugin_manager_header = PLUGIN_MANAGER_HEADER.read_text(encoding="utf-8")
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")

@@ -545,3 +545,77 @@ readiness false, SDK JSON blocked by design, research doc guardrails, and
 `git diff --check`. The stable state remains
 `current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
 P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Runtime, SDK, Candidate, And Package Non-Claim Hardening
+
+The next supervised 4-agent round plus lead integration closed offline
+guardrail gaps without changing the P0 route blocker or SDK completion state.
+
+Delegated scopes and integrated findings:
+
+- Core runtime ABI/default-deny: `include/obelisk/ObeliskApi.h` now documents that
+  raw global/filtered ProcessEvent registrations require the plugin's init-time
+  capability snapshot plus the live env+marker gate. These are controlled debug
+  windows, not production readiness signals. Static guardrail tests now verify
+  capability bits still depend on the live gates and that `CallProcessEvent`
+  remains an init-owner debug escape hatch.
+- SDK completion wording: `check_public_sdk_v1_completion.py` now rejects release
+  statements that hide positive stable/SDK readiness claims behind blocker
+  phrasing, including patterns like "blocked ... stable SDK is ready" and
+  contradictory tails like "stable is blocked but ready".
+- Mission/Transfer/Dino/Tribe/Buff accounting: candidate-only evidence marker
+  fields such as target/source markers, artifact status, evidence status, and
+  reflection evidence now reject values implying public SDK/API/ABI, runtime,
+  observer/hook wiring, promotion, ResourceHandle, identity, lookup, mutation,
+  return override, v1 completion, stable, release, or ready unless they carry
+  explicit candidate-only/blocked wording.
+- Build/install/package shape: installed CMake package metadata now carries
+  explicit `FALSE` markers for runtime readiness, live-ops approval, Plugin Hub
+  readiness/publication, support-tier activation, v1 completion, public-module
+  SDK coverage, and production-stable SDK claims. Installer, plugin-installer,
+  and release-gate output now state that passing or publishing artifacts is
+  evidence for the exact gate only.
+- Community helper: `send_discord_embed.py` now rejects internal status phrases
+  such as agent status, internal validation, release gate completed, routine
+  validation, route JSON, and SDK JSON in dry-run or send payload text.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`,
+  `counts_toward_v1_completion=false`, and route lock valid/locked.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with
+  `ready=false`, `status=blocked`, SDK completion `0/12`, P0 dependency chain
+  `0/4`, `stable_claim_allowed=false`, and
+  `stable_release_contract_claim_allowed=false`.
+- `check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json` remains
+  `candidate_only`, `promotion_ready=false`, `public_sdk_ready=false`,
+  `runtime_ready=false`, and `v1_accounted=false`.
+
+Validation remained offline-only:
+
+- Runtime/API guardrails: `test_plugin_manager_guardrails.py`,
+  `test_event_manager_guardrails.py`, and `ctest` for PluginManager,
+  EventManager, AbiLayout, and CAbiLayout.
+- SDK/completion guardrails: `test_public_sdk_guardrails.py`,
+  `test_check_public_sdk_v1_completion.py`, and the blocked SDK JSON gate.
+- Side-lane guardrails:
+  `test_check_mission_transfer_dino_tribe_v1_outcome_accounting.py`,
+  `test_check_mission_copied_bool_readiness.py`,
+  `test_check_transfer_baccept_readiness.py`, and candidate-only JSON output.
+- Package/release guardrails: `test_release_scope_guardrails.py`,
+  `test_check_release_readiness_options.sh`, `test_install_obelisk_plugin.sh`,
+  `test_install_obelisk_layout.sh` with a fresh `/tmp` install root, and
+  installed SDK external example builds.
+- Community/secret guardrails: `test_send_discord_embed.py`,
+  `scripts.test_agent_handoff_guardrails`, and `scripts.test_secret_guardrails`.
+- Hygiene: `git diff --check`.
+
+Non-claims:
+
+- These changes do not create approved runtime evidence and do not authorize
+  server operations, marker/env changes, runtime observation, ReflectionScanner,
+  ptrace/gcore, broad tracing, Discord sends, GitHub publication, tag updates,
+  Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
+  completion.

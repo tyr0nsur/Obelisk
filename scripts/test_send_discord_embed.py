@@ -146,6 +146,46 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden phrase", result.stderr)
 
+    def test_rejects_internal_status_phrases_in_embed_text(self) -> None:
+        forbidden_cases = (
+            ("description", "Internal validation passed for SDK JSON"),
+            ("status", "Agent status: route JSON is valid"),
+            ("scope", "Release gate completed during routine validation"),
+            ("field", "Evidence=SDK JSON blocked as expected"),
+        )
+
+        for location, phrase in forbidden_cases:
+            with self.subTest(location=location):
+                args = [
+                    "--channel",
+                    "community",
+                    "--title",
+                    "Obelisk update",
+                    "--description",
+                    "Public update for plugin authors.",
+                    "--status",
+                    "Approved milestone",
+                    "--scope",
+                    "Community update",
+                    "--field",
+                    "A=B",
+                    "--field",
+                    "C=D",
+                ]
+                if location == "description":
+                    args[args.index("--description") + 1] = phrase
+                elif location == "status":
+                    args[args.index("--status") + 1] = phrase
+                elif location == "scope":
+                    args[args.index("--scope") + 1] = phrase
+                elif location == "field":
+                    args[args.index("A=B")] = phrase
+
+                result = self.run_dry(*args)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forbidden phrase", result.stderr)
+
     def test_rejects_reserved_custom_field_names(self) -> None:
         result = self.run_dry(
             "--channel",

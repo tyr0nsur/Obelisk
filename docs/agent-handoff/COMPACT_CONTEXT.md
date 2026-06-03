@@ -17,6 +17,25 @@ priorities, and do not use history files as the active source of truth.
    and record delegated scopes, required/used skills, integrated findings, and pending
    findings in handoff/research notes before finishing so compaction does not lose them.
 
+## Latest Local Checkpoint
+
+- 2026-06-03 supervised 4-agent hardening plus lead integration closed offline guardrail
+  gaps only. No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+- Delegated scopes: core runtime public ABI/default-deny comments and tests; public SDK
+  completion release-statement overclaim scanning; Mission/Transfer/Dino/Tribe/Buff
+  candidate marker accounting; build/install/package-shape non-claim markers.
+- Integrated lead scope: Discord helper now rejects internal status phrases such as
+  agent status, internal validation, release gate completed, routine validation, route
+  JSON, and SDK JSON.
+- Current route state is unchanged: `current_route_blocker=approved_runtime_evidence_missing`,
+  SDK completion `0/12`, P0 dependency chain `0/4`, `stable_claim_allowed=false`, and
+  `stable_release_contract_claim_allowed=false`.
+- Package/install output and installed CMake config are evidence-only. They explicitly do
+  not grant runtime readiness, live-ops approval, Plugin Hub readiness/publication,
+  support-tier activation, stable SDK claims, or v1 SDK completion.
+
 ## Active Overrides
 
 - GitHub work may be delegated only for an evidenced, stable milestone; routine local

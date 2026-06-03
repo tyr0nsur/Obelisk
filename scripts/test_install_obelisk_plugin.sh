@@ -58,6 +58,10 @@ assert_exists "${root}/plugins/ExamplePlugin.so"
 assert_not_exists "${root}/plugins/.ExamplePlugin.so.incoming.$$"
 assert_contains "${root}/plugins/ExamplePlugin.so" '^first$'
 assert_contains "${TMP_DIR}/install.out" 'Obelisk plugin installed to'
+assert_contains "${TMP_DIR}/install.out" 'Plugin Hub readiness/publication'
+assert_contains "${TMP_DIR}/install.out" 'support-tier activation'
+assert_contains "${TMP_DIR}/install.out" 'runtime/live-ops approval'
+assert_contains "${TMP_DIR}/install.out" 'v1 SDK completion'
 
 printf 'second\n' > "${plugin_src}"
 "${INSTALLER}" --backup-existing "${plugin_src}" "${root}" > "${TMP_DIR}/replace.out"

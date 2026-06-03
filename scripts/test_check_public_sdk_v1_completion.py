@@ -5433,6 +5433,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Without promotion, Inventory SDK is ready in v1.\n"
             "Without promoted dependencies, command router support is available in v1.\n"
             "Without evidence, Candidate evidence proves a complete SDK for v1 plugin authors.\n"
+            "Blocked by missing evidence the stable SDK is ready.\n"
+            "v1.0 stable is blocked but ready.\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
@@ -5455,6 +5457,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         for term in (
             "Without promotion, Inventory SDK is ready in v1.",
             "Without evidence, Candidate evidence proves a complete SDK for v1 plugin authors.",
+            "Blocked by missing evidence the stable SDK is ready.",
+            "v1.0 stable is blocked but ready.",
         ):
             with self.subTest(term=term):
                 self.assertIn(term, forbidden_claims)
@@ -5472,6 +5476,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Consume-only planning evidence does not validate v1.0 stable.\n"
             "Foundation package shape support is not production-ready SDK support.\n"
             "Without promoted demand families, no complete SDK claim is allowed.\n"
+            "The stable SDK remains blocked.\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"

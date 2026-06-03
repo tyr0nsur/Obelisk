@@ -940,6 +940,56 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("ResourceHandle", claims)
         self.assertIn("lookup", claims)
 
+    def test_candidate_surface_rejects_public_runtime_target_set_markers(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        gameplay["evidence"]["planning_target_sets"].append("mission-public-sdk-runtime-ready")
+        gameplay["evidence"]["source_marker"] = "approved_runtime_bundle"
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("surface_candidate_marker_overclaim", report["blockers"])
+        details = [
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "surface_candidate_marker_overclaim"
+        ]
+        labels = {item["label"] for item in details}
+        self.assertIn("$.surface.evidence.planning_target_sets[8]", labels)
+        self.assertIn("$.surface.evidence.source_marker", labels)
+
+    def test_candidate_leaf_rejects_reflection_and_source_marker_promotion_claims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["buff_status"]["evidence"] = {
+            "reflection_evidence": {
+                "status": "promoted-runtime-ready",
+                "resource_handle_status": "available",
+            },
+            "source_target_set": "buff-v1-completion",
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_marker_overclaim", report["blockers"])
+        details = [
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_marker_overclaim"
+        ]
+        labels = {item["label"] for item in details}
+        self.assertIn("$.leaf_decision_units[buff_status].evidence.reflection_evidence.status", labels)
+        self.assertIn(
+            "$.leaf_decision_units[buff_status].evidence.reflection_evidence.resource_handle_status",
+            labels,
+        )
+        self.assertIn("$.leaf_decision_units[buff_status].evidence.source_target_set", labels)
+
 
 if __name__ == "__main__":
     unittest.main()

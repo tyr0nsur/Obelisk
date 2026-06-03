@@ -3059,12 +3059,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "This release authorizes release-grade API support for production.",
             "Obelisk API support is release-grade and ships today.",
             "The release ships a production-grade public API.",
+            "Blocked by missing evidence the stable SDK is ready.",
+            "v1.0 stable is blocked but ready.",
         )
         allowed_boundaries = (
             "Player identity surface is not public in v1.",
             "Inventory mutation API remains post-v1 and blocked.",
             "ResourceHandle API is not promoted.",
             "This release does not authorize release-grade API support.",
+            "The stable SDK remains blocked.",
         )
 
         for claim in forbidden_claims:
