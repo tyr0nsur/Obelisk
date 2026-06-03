@@ -57,6 +57,15 @@ def parse_args() -> argparse.Namespace:
         help="Consume-only principal invalidation policy manifest to bind transiently.",
     )
     parser.add_argument(
+        "--approved-runtime-principal-lifecycle-evidence-manifest",
+        type=Path,
+        help=(
+            "Optional approved runtime-principal lifecycle evidence manifest forwarded "
+            "to the route gate. It may clear only approved_runtime_evidence_missing and "
+            "must leave the route locked at identity_public_contract_gate_missing."
+        ),
+    )
+    parser.add_argument(
         "--candidate-root",
         type=Path,
         help="Optional distinct second-source candidate root forwarded to the route gate identity checker.",
@@ -249,6 +258,12 @@ def run_route_gate(
         argv.extend(["--command-response-root", str(command_response_root)])
     if command_response_readiness is not None:
         argv.extend(["--command-response-readiness", str(command_response_readiness)])
+    approved_runtime = safe_optional_input_path(
+        getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
+        "approved-runtime-principal-lifecycle-evidence-manifest",
+    )
+    if approved_runtime is not None:
+        argv.extend(["--approved-runtime-principal-lifecycle-evidence-manifest", str(approved_runtime)])
     env = os.environ.copy()
     env.update({"TMPDIR": str(temp_root), "TEMP": str(temp_root), "TMP": str(temp_root)})
     result = subprocess.run(
@@ -272,10 +287,32 @@ def run_route_gate(
     return result.returncode, report, result.stderr.strip(), parse_error
 
 
+def route_manifest_path_matches(manifest: dict[str, Any], expected_path: Path) -> bool:
+    expected = str(expected_path.resolve())
+    return (
+        manifest.get("expected_resolved_path") == expected
+        and manifest.get("observed_resolved_path") == expected
+    )
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     snapshot_root = safe_snapshot_root(args.snapshot_root)
     args.snapshot_root = snapshot_root
     lifecycle_manifest, principal_manifest = resolve_manifest_pair(args)
+    approved_runtime = safe_optional_input_path(
+        getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
+        "approved-runtime-principal-lifecycle-evidence-manifest",
+    )
+    expected_blocker = (
+        "identity_public_contract_gate_missing"
+        if approved_runtime is not None
+        else "approved_runtime_evidence_missing"
+    )
+    expected_blocked_until = (
+        ["reviewed_identity_public_contract"]
+        if approved_runtime is not None
+        else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
+    )
     with tempfile.TemporaryDirectory(prefix="obelisk-bound-player-identity-route-") as temp_dir:
         temp_root = Path(temp_dir)
         reject_symlink_component(temp_root, "temp-root")
@@ -329,11 +366,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
             if route_report.get(key) is not False:
                 blockers.append(f"route_gate_{key}_overclaim")
-        if current_blocker != "approved_runtime_evidence_missing":
+        if current_blocker != expected_blocker:
             blockers.append("route_gate_bound_identity_blocker_unexpected")
         if current_blocker is None:
             blockers.append("route_gate_bound_identity_current_blocker_missing")
-        if source_checker_primary_blocker != "approved_runtime_evidence_missing":
+        if source_checker_primary_blocker != expected_blocker:
             blockers.append("route_gate_bound_identity_primary_blocker_unexpected")
         if source_checker_status != "blocked":
             blockers.append("route_gate_identity_readiness_status_unexpected")
@@ -352,15 +389,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             if not isinstance(manifests, dict):
                 blockers.append("route_gate_bound_identity_manifest_details_missing")
             else:
+                expected_bound_paths = {
+                    "lifecycle_anchor_candidates": lifecycle_output,
+                    "principal_invalidation_policy": principal_output,
+                }
                 for key in ("lifecycle_anchor_candidates", "principal_invalidation_policy"):
                     manifest = manifests.get(key)
                     if not isinstance(manifest, dict) or manifest.get("source") != "cli_bound":
                         blockers.append(f"route_gate_bound_identity_{key}_source_unexpected")
                     elif manifest.get("matched") is not True:
                         blockers.append(f"route_gate_bound_identity_{key}_path_mismatch")
+                    elif not route_manifest_path_matches(manifest, expected_bound_paths[key]):
+                        blockers.append(f"route_gate_bound_identity_{key}_canonical_path_mismatch")
         if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
             blockers.append("route_gate_lock_unexpected")
-        expected_blocked_until = ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
         if not isinstance(route_lock, dict) or route_lock.get("blocked_until") != expected_blocked_until:
             blockers.append("route_gate_lock_blocked_until_unexpected")
 
@@ -391,6 +433,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "snapshot_root": str(snapshot_root),
             "lifecycle_anchor_candidates_manifest": str(lifecycle_manifest),
             "principal_invalidation_policy_manifest": str(principal_manifest),
+            "approved_runtime_principal_lifecycle_evidence_manifest": (
+                str(approved_runtime) if approved_runtime is not None else None
+            ),
         },
         "critical_path_phase": critical_path_phase,
         "route_lock": route_lock,

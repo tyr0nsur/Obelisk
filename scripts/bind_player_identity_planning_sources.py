@@ -392,7 +392,8 @@ def bind_lifecycle_to_first_evidence(
     artifact = bound.get("artifact_identity")
     if not isinstance(artifact, dict):
         raise SystemExit("lifecycle-anchor candidates artifact_identity missing")
-    artifact["source_artifact_ids"] = list(source_ids)
+    if not lifecycle_has_bound_static_anchor_provenance(lifecycle):
+        artifact["source_artifact_ids"] = list(source_ids)
 
     snapshots_by_target = first_evidence_snapshot_by_target(first_evidence)
     anchors = bound.get("candidate_anchors")

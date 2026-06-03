@@ -218,3 +218,18 @@ This file is an active routing table only. Durable evidence belongs in
   temp roots under `/servidor/ark/workspace-offline` leave no new top-level residue. Route
   JSON remains valid/planning-only at `approved_runtime_evidence_missing`. No runtime/server
   op. Agents closed.
+- Latest round delegated live-ops request/window audit, identity public-contract audit,
+  bound identity route audit, and SDK completion wording/accounting audit. Integrated
+  result: public-contract gap/readiness reports now keep `current_blocker` and
+  `next_blocker` at `approved_runtime_evidence_missing` until approved runtime evidence is
+  accepted; after accepted runtime evidence they may report only locked planning blocker
+  `identity_public_contract_gate_missing`, with public/header/runtime/promotion/v1 flags
+  false. Bound identity route checks now forward explicit approved runtime evidence,
+  verify exact canonical paths for transient bound lifecycle/principal manifests, and
+  preserve durable static lifecycle `source_artifact_ids` instead of replacing them with
+  first-evidence IDs. Added
+  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`. Live-ops and SDK
+  audits made no edits and found no request/window or release-wording bypass. Route JSON
+  remains valid/planning-only at `approved_runtime_evidence_missing`; SDK JSON remains
+  blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+  Agents closed.

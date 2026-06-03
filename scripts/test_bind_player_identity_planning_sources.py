@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as first_evidence_checker
+import bind_player_identity_planning_sources as binder
 from test_check_player_identity_first_evidence_readiness import (
     CheckPlayerIdentityFirstEvidenceReadinessTests,
 )
@@ -38,6 +39,11 @@ def align_lifecycle_to_first_evidence(lifecycle: dict, first_evidence: dict) -> 
         "source_artifact_ids"
     ]
     return lifecycle
+
+
+def planning_source_manifest(name: str) -> dict:
+    path = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / name
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
@@ -158,6 +164,21 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
         self.assertEqual(route_report["primary_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(["approved_runtime_evidence_missing"], route_report["blockers"])
         self.assertNotIn("lifecycle_anchor_first_evidence_provenance_unbound", route_report["blockers"])
+
+    def test_bind_preserves_static_lifecycle_source_artifact_ids(self) -> None:
+        first_evidence = planning_source_manifest("players-identity-first-evidence.json")
+        lifecycle = planning_source_manifest("players-identity-lifecycle-anchor-candidates.json")
+        lifecycle_source_ids = list(lifecycle["artifact_identity"]["source_artifact_ids"])
+
+        self.assertNotEqual(lifecycle_source_ids, first_evidence["artifact_identity"]["source_artifact_ids"])
+        self.assertTrue(binder.lifecycle_has_bound_static_anchor_provenance(lifecycle))
+
+        bound_lifecycle = binder.bind_lifecycle_to_first_evidence(lifecycle, first_evidence)
+
+        self.assertEqual(
+            bound_lifecycle["artifact_identity"]["source_artifact_ids"],
+            lifecycle_source_ids,
+        )
 
     def test_rejects_lifecycle_source_with_runtime_authorization_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

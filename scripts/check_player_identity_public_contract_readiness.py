@@ -2352,14 +2352,14 @@ def build_report(
     planning_source_report = planning_source_report or {}
     public_abi_preflight_report = public_abi_preflight_report or {}
     owner_token_sdk_consumer_report = owner_token_sdk_consumer_report or {}
-    runtime_ready = (
+    runtime_evidence_accepted = (
         runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
         and runtime_report.get("promotion_ready") is False
         and runtime_report.get("public_sdk_ready") is False
         and runtime_report.get("runtime_ready") is False
     )
-    if not runtime_ready:
+    if not runtime_evidence_accepted:
         add(blockers, "approved_runtime_evidence_missing_or_not_ready", "$.approved_runtime_evidence")
     if check_mode != "consume":
         add(blockers, f"{check_mode}_blocked_until_player_identity_public_contract_promotion", "$.promotion_blockers")
@@ -2371,7 +2371,7 @@ def build_report(
     ]
     accepted_for_contract_review = not evidence_blockers
     resolved_inputs = []
-    if accepted_for_contract_review:
+    if runtime_evidence_accepted:
         resolved_inputs.append(REQUIRED_RESOLVED_INPUT)
         if redaction_report.get("accepted_for_contract_review") is True:
             resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
@@ -2379,7 +2379,12 @@ def build_report(
             resolved_inputs.append(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
         if principal_policy_report.get("accepted_for_policy_review") is True:
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
-    runtime_input_resolved = REQUIRED_RESOLVED_INPUT in resolved_inputs
+    runtime_input_resolved = runtime_evidence_accepted
+    current_blocker = (
+        NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE
+        if runtime_evidence_accepted
+        else "approved_runtime_evidence_missing"
+    )
     contract_gate_details = contract_gate_input_details(
         decisions,
         runtime_input_resolved=runtime_input_resolved,
@@ -2424,11 +2429,8 @@ def build_report(
             and not (runtime_input_resolved and blocker.get("id") == REQUIRED_RESOLVED_INPUT)
         ],
         "contract_gate_inputs": contract_gate_details,
-        "next_blocker": (
-            NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE
-            if accepted_for_contract_review
-            else "player_identity_public_contract_gate_not_accepted"
-        ),
+        "current_blocker": current_blocker,
+        "next_blocker": current_blocker,
         "required_tests_before_public_header": {
             "covered_for_contract_review_only": sorted(CONTRACT_REVIEW_INPUT_ONLY_TESTS),
             "remaining_missing": [

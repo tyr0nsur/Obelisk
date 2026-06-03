@@ -140,6 +140,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertNotIn("identity.fail_closed", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertNotIn("runtime.lifecycle_evidence", report["remaining_blockers"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
+        self.assertEqual(report["current_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertNotEqual(report["next_blocker"], "public_readiness")
         contract_gate_inputs = {item["id"]: item for item in report["contract_gate_inputs"]}
@@ -299,7 +300,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
-        self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
+        self.assertEqual(report["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertIn("runtime.lifecycle_evidence", report["resolved_inputs"])
 
     def test_rejects_stale_source_bound_planning_manifest_verification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -619,7 +622,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
+        self.assertEqual(report["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         for blocker in (
             "decision_gate_id_mismatch",
             "decision_gate_status_mismatch",
@@ -1003,6 +1007,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_intake_missing", report["blockers"])
         self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
         self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
+        self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
+        self.assertNotIn("runtime.lifecycle_evidence", report["resolved_inputs"])
 
     def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:
         decisions = self.decisions()
@@ -1394,6 +1401,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertIn("approved_runtime_evidence_unreadable", report["blockers"])
         self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
+        self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
+        self.assertNotIn("runtime.lifecycle_evidence", report["resolved_inputs"])
 
     def test_rejects_forbidden_contract_terms_removed(self) -> None:
         decisions = self.decisions()

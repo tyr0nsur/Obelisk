@@ -1309,6 +1309,25 @@ priorities, and do not use history files as the active source of truth.
   tribe+accounting unittest 32, PluginManager guardrails 29, approved-evidence 65
   (sub-agent), route JSON valid/planning-only, SDK JSON blocked by design, py_compile, and
   `git diff --check`. No runtime/server operation.
+- 2026-06-03 supervised 4-agent P0 route/accounting hardening round: public-contract
+  gap/readiness reports now keep both `current_blocker` and `next_blocker` at
+  `approved_runtime_evidence_missing` until approved runtime evidence is accepted. With
+  accepted approved runtime evidence, they can advance only to locked planning blocker
+  `identity_public_contract_gate_missing` while keeping public header/capability/callback,
+  SDK, runtime, promotion, permissions/admin, command response, commands/replies, and v1
+  completion flags false. Bound identity route wrapper now forwards explicit approved
+  runtime principal lifecycle evidence, permits only `identity_public_contract_gate_missing`
+  in that mode, verifies canonical child report paths for transiently bound lifecycle and
+  principal manifests, and preserves durable static lifecycle
+  `artifact_identity.source_artifact_ids` during binding. Added
+  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md` with the current route
+  and SDK snapshot plus same-day hardening notes. Live-ops request/window audit found no
+  bypass and passed 180 tests; SDK completion/release wording audit found no bypass.
+  Validations passed: bind 46, bound route 8, public-contract gap/readiness/preflight/
+  owner-token 92, planning smoke + first-evidence 42, route JSON valid/planning-only, SDK
+  JSON blocked by design, py_compile, and `git diff --check`. Route/SDK remain fail-closed
+  at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

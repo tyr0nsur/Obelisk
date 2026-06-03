@@ -16,6 +16,7 @@ from types import SimpleNamespace
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_permission_route_gate_bound_identity_sources.py"
+PLANNING_SOURCE_ROOT = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources"
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("check_command_permission_route_gate_bound_identity_sources", SCRIPT)
@@ -24,37 +25,25 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 
-from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
-from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
-
-
 def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def align_lifecycle_to_snapshot_root(lifecycle: dict, snapshot_root: Path) -> dict:
-    lifecycle = json.loads(json.dumps(lifecycle))
-    first_evidence = CHECKER.build_redacted_ufunction_signatures.build_players_identity_first_evidence(
-        snapshot_root=snapshot_root
+def planning_lifecycle_manifest() -> dict:
+    return json.loads(
+        (PLANNING_SOURCE_ROOT / "players-identity-lifecycle-anchor-candidates.json").read_text(encoding="utf-8")
     )
-    lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
-        "source_artifact_ids"
-    ]
-    diagnosis = CHECKER.binder.lifecycle_anchor_snapshot_root_diagnosis(
-        lifecycle=lifecycle,
-        snapshot_root=snapshot_root,
-    )
-    expected = diagnosis["expected_snapshot_sha256_by_target"]
-    for anchor in lifecycle["candidate_anchors"]:
-        target = anchor.get("target")
-        if target in expected:
-            anchor["evidence"]["source_snapshot_sha256"] = expected[target]
-    return lifecycle
 
 
-def route_manifest_sources() -> dict:
-    lifecycle = Path("/tmp/bound/players-identity-lifecycle-anchor-candidates.json")
-    principal = Path("/tmp/bound/players-identity-principal-invalidation-policy.json")
+def planning_principal_manifest() -> dict:
+    return json.loads(
+        (PLANNING_SOURCE_ROOT / "players-identity-principal-invalidation-policy.json").read_text(encoding="utf-8")
+    )
+
+
+def route_manifest_sources(lifecycle: Path | None = None, principal: Path | None = None) -> dict:
+    lifecycle = lifecycle or Path("/tmp/bound/players-identity-lifecycle-anchor-candidates.json")
+    principal = principal or Path("/tmp/bound/players-identity-principal-invalidation-policy.json")
     return {
         "mode": "cli_bound",
         "report_available": True,
@@ -95,11 +84,18 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
-    def build_args(self, lifecycle_path: Path, principal_path: Path) -> SimpleNamespace:
+    def build_args(
+        self,
+        lifecycle_path: Path,
+        principal_path: Path,
+        *,
+        approved_runtime_path: Path | None = None,
+    ) -> SimpleNamespace:
         return SimpleNamespace(
             snapshot_root=CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
             lifecycle_anchor_candidates=lifecycle_path,
             principal_invalidation_policy=principal_path,
+            approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime_path,
             candidate_root=None,
             artifact_root=None,
             query_failclosed_artifact=CHECKER.route_gate.DEFAULT_QUERY_CONTRACT,
@@ -112,7 +108,12 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             json=True,
         )
 
-    def base_route_report(self) -> dict:
+    def base_route_report(self, *, blocker: str = "approved_runtime_evidence_missing") -> dict:
+        blocked_until = (
+            ["reviewed_identity_public_contract"]
+            if blocker == "identity_public_contract_gate_missing"
+            else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
+        )
         return {
             "schema": "obelisk.command-permission-route-gate-check.v1",
             "valid": True,
@@ -124,8 +125,8 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             "runtime_ready": False,
             "public_header_allowed": False,
             "critical_path_phase": {
-                "current_blocker": "approved_runtime_evidence_missing",
-                "source_checker_primary_blocker": "approved_runtime_evidence_missing",
+                "current_blocker": blocker,
+                "source_checker_primary_blocker": blocker,
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
                 "source_checker_accepted_for_internal_planning": False,
@@ -133,15 +134,18 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             },
             "route_lock": {
                 "locked": True,
-                "blocked_until": [
-                    "approved_runtime_principal_lifecycle_evidence",
-                    "reviewed_identity_public_contract",
-                ],
+                "blocked_until": blocked_until,
             },
             "blockers": [],
         }
 
-    def run_with_fake_route_report(self, route_report: dict) -> dict:
+    def run_with_fake_route_report(
+        self,
+        route_report: dict,
+        *,
+        approved_runtime_path: Path | None = None,
+        canonical_paths: bool = True,
+    ) -> dict:
         original = CHECKER.run_route_gate
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -150,18 +154,30 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                 principal_path = root / "players-identity-principal-invalidation-policy.json"
                 write_json(
                     lifecycle_path,
-                    align_lifecycle_to_snapshot_root(
-                        accepted_lifecycle_anchor_manifest(),
-                        CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
-                    ),
+                    planning_lifecycle_manifest(),
                 )
-                write_json(principal_path, principal_policy_manifest())
+                write_json(principal_path, planning_principal_manifest())
 
-                def fake_run_route_gate(*_args: object, **_kwargs: object) -> tuple[int, dict, str, None]:
+                def fake_run_route_gate(*_args: object, **kwargs: object) -> tuple[int, dict, str, None]:
+                    if canonical_paths:
+                        lifecycle_output = Path(kwargs["lifecycle_output"])
+                        principal_output = Path(kwargs["principal_output"])
+                        sources = route_report["critical_path_phase"].get("source_checker_manifest_sources")
+                        if isinstance(sources, dict) and isinstance(sources.get("manifests"), dict):
+                            sources["manifests"] = route_manifest_sources(
+                                lifecycle=lifecycle_output,
+                                principal=principal_output,
+                            )["manifests"]
                     return 0, route_report, "", None
 
                 CHECKER.run_route_gate = fake_run_route_gate
-                return CHECKER.build_report(self.build_args(lifecycle_path, principal_path))
+                return CHECKER.build_report(
+                    self.build_args(
+                        lifecycle_path,
+                        principal_path,
+                        approved_runtime_path=approved_runtime_path,
+                    )
+                )
         finally:
             CHECKER.run_route_gate = original
 
@@ -172,12 +188,9 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             principal_path = root / "players-identity-principal-invalidation-policy.json"
             write_json(
                 lifecycle_path,
-                align_lifecycle_to_snapshot_root(
-                    accepted_lifecycle_anchor_manifest(),
-                    CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
-                ),
+                planning_lifecycle_manifest(),
             )
-            write_json(principal_path, principal_policy_manifest())
+            write_json(principal_path, planning_principal_manifest())
 
             result = self.run_checker(
                 [
@@ -256,18 +269,38 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertIn("route_gate_lock_blocked_until_unexpected", report["blockers"])
         self.assertEqual("identity_public_contract_gate_missing", report["critical_path_phase"]["current_blocker"])
 
+    def test_bound_route_allows_contract_blocker_with_explicit_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
+            write_json(approved_runtime, {"schema": "test.approved-runtime"})
+            report = self.run_with_fake_route_report(
+                self.base_route_report(blocker="identity_public_contract_gate_missing"),
+                approved_runtime_path=approved_runtime,
+            )
+
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
+        self.assertEqual([], report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", report["critical_path_phase"]["current_blocker"])
+        self.assertEqual(["reviewed_identity_public_contract"], report["route_lock"]["blocked_until"])
+
     def test_rejects_stale_lifecycle_anchor_snapshot_hash_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_path = root / "players-identity-principal-invalidation-policy.json"
-            lifecycle = align_lifecycle_to_snapshot_root(
-                accepted_lifecycle_anchor_manifest(),
-                CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
-            )
+            lifecycle = planning_lifecycle_manifest()
             lifecycle["candidate_anchors"][0]["evidence"]["source_snapshot_sha256"] = "0" * 64
             write_json(lifecycle_path, lifecycle)
-            write_json(principal_path, principal_policy_manifest())
+            write_json(principal_path, planning_principal_manifest())
 
             result = self.run_checker(
                 [
@@ -283,6 +316,25 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertEqual(1, result.returncode)
         self.assertIn("snapshot-root provenance", result.stderr)
         self.assertIn("lifecycle_anchor_source_snapshot_root_mismatch", result.stderr)
+
+    def test_rejects_route_gate_valid_true_with_wrong_bound_manifest_canonical_paths(self) -> None:
+        route_report = self.base_route_report()
+        route_report["critical_path_phase"]["source_checker_manifest_sources"] = route_manifest_sources(
+            lifecycle=Path("/tmp/wrong/players-identity-lifecycle-anchor-candidates.json"),
+            principal=Path("/tmp/wrong/players-identity-principal-invalidation-policy.json"),
+        )
+
+        report = self.run_with_fake_route_report(route_report, canonical_paths=False)
+
+        self.assertFalse(report["valid"])
+        self.assertIn(
+            "route_gate_bound_identity_lifecycle_anchor_candidates_canonical_path_mismatch",
+            report["blockers"],
+        )
+        self.assertIn(
+            "route_gate_bound_identity_principal_invalidation_policy_canonical_path_mismatch",
+            report["blockers"],
+        )
 
     def test_rejects_route_gate_valid_true_with_bound_provenance_drift(self) -> None:
         cases = (
@@ -344,7 +396,7 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
     def test_rejects_partial_manifest_inputs_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             lifecycle_path = Path(temp_dir) / "players-identity-lifecycle-anchor-candidates.json"
-            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(lifecycle_path, planning_lifecycle_manifest())
             result = self.run_checker(
                 [
                     "--lifecycle-anchor-candidates",
@@ -362,14 +414,10 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             root = Path(temp_dir)
             lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_path = root / "players-identity-principal-invalidation-policy.json"
-            lifecycle = accepted_lifecycle_anchor_manifest()
-            lifecycle = align_lifecycle_to_snapshot_root(
-                lifecycle,
-                CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
-            )
+            lifecycle = planning_lifecycle_manifest()
             lifecycle["public_sdk_ready"] = True
             write_json(lifecycle_path, lifecycle)
-            write_json(principal_path, principal_policy_manifest())
+            write_json(principal_path, planning_principal_manifest())
             result = self.run_checker(
                 [
                     "--lifecycle-anchor-candidates",

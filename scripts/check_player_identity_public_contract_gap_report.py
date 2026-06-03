@@ -2331,7 +2331,7 @@ def build_report(
         "next_offline_actions": next_offline_actions,
         "runtime_evidence_missing": not runtime_evidence_accepted,
         "current_blocker": APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER if runtime_evidence_accepted else "approved_runtime_evidence_missing",
-        "next_blocker": APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER,
+        "next_blocker": APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER if runtime_evidence_accepted else "approved_runtime_evidence_missing",
         "blocked_until": (
             ["reviewed_identity_public_contract"]
             if runtime_evidence_accepted

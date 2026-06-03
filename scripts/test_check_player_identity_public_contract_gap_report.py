@@ -217,6 +217,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
         self.assertEqual(
             report["contract_review_inputs_resolved"],
@@ -438,6 +440,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_ready_missing", report["blockers"])
         self.assertTrue(report["runtime_evidence_missing"])
         self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
         self.assertIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
         self.assertNotIn("runtime.lifecycle_evidence", report["contract_review_inputs_resolved"])
         self.assertFalse(report["approved_runtime_evidence"]["accepted_for_contract_review"])
