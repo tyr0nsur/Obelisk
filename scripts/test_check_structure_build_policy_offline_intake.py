@@ -593,6 +593,9 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             readiness_payload = self.readiness_payload()
             readiness_payload["public_abi_ready"] = True
             readiness_payload["structure_events_ready"] = True
+            readiness_payload["counts_toward_complete_sdk"] = True
+            readiness_payload["release_supported"] = True
+            readiness_payload["stable"] = True
             manifest, _ = self.write_case(Path(temp_dir), readiness_payload)
             result = self.run_checker("--manifest", str(manifest), "--json", check=False)
 
@@ -602,6 +605,9 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         blockers = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_readiness_true"}
         self.assertTrue(any(path.endswith(".public_abi_ready") for path in blockers))
         self.assertTrue(any(path.endswith(".structure_events_ready") for path in blockers))
+        self.assertTrue(any(path.endswith(".counts_toward_complete_sdk") for path in blockers))
+        self.assertTrue(any(path.endswith(".release_supported") for path in blockers))
+        self.assertTrue(any(path.endswith(".stable") for path in blockers))
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["enforcement_ready"])
@@ -623,7 +629,14 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             )
             candidate = manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]
             candidate["status"] = "public-ready"
-            candidate["notes"] = "Structure-SDK ready"
+            candidate["notes"] = [
+                "Structure-SDK ready",
+                "build placement is release-supported",
+                "no-collision policy is release-supported",
+                "pin outcome is stable",
+                "ownership lookup is stable",
+                "structure build side lane is release-supported",
+            ]
             manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
             result = self.run_checker("--manifest", str(manifest), "--json", check=False)
 
@@ -636,9 +649,15 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertTrue(any(path.endswith(".promotion_status") for path in paths))
         self.assertTrue(any(path.endswith(".public_sdk_status") for path in paths))
         self.assertTrue(any(path.endswith(".status") for path in paths))
-        self.assertTrue(any(path.endswith(".notes") for path in paths))
+        self.assertTrue(any(".notes[" in path for path in paths))
         self.assertFalse(any(path.endswith(".negative_note") for path in paths))
         self.assertFalse(any(path.endswith(".boundary") for path in paths))
+        surfaces = {item["surface"] for item in blockers}
+        self.assertIn("build_placement_policy", surfaces)
+        self.assertIn("no_collision_policy", surfaces)
+        self.assertIn("pin_code_policy", surfaces)
+        self.assertIn("structure_ownership", surfaces)
+        self.assertIn("release_support", surfaces)
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])

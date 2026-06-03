@@ -874,6 +874,8 @@ SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
 UTC_TIMESTAMP_RE = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})"
 )
+RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE = r"[:\uff1a\ufe55\ua789\u2236]"
+RELEASE_STATEMENT_DETAIL_SEPARATOR_RE = r"[-\u2010-\u2015\u2212]"
 AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|production[- ]?grade|release[- ]?grade|stable)\s+"
     r"(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
@@ -2729,8 +2731,10 @@ def release_statement_surface_record_candidates(
     status: str | None = None,
 ) -> list[tuple[str, str, bool]]:
     pattern = re.compile(
-        rf"^\s*{re.escape(surface_id)}\s*(?P<delimiter>:|\s+-\s+)\s*"
-        rf"(?P<status>promoted|excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
+        rf"^\s*{re.escape(surface_id)}\s*"
+        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+-\s+)\s*"
+        rf"(?P<status>promoted|excluded|post-v1)"
+        rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
     )
     records: list[tuple[str, str, bool]] = []
@@ -2741,9 +2745,12 @@ def release_statement_surface_record_candidates(
         found_status = match.group("status").lower()
         if status is None or found_status == status.lower():
             has_reviewed_details = bool((match.group("details") or "").strip())
-            canonical_reviewed_record = match.group("delimiter") == ":" and (
-                found_status != "promoted" or has_reviewed_details
-            )
+            canonical_reviewed_record = bool(
+                re.fullmatch(
+                    RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
+                    match.group("delimiter"),
+                )
+            ) and (found_status != "promoted" or has_reviewed_details)
             records.append((found_status, line.strip(), canonical_reviewed_record))
     return records
 
@@ -2783,7 +2790,8 @@ def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> 
     if len(records) > 1:
         return True
     embedded_record_pattern = re.compile(
-        rf"(?<![A-Za-z0-9_.-]){re.escape(surface_id)}\s*(?::|\s+-\s+)\s*"
+        rf"(?<![A-Za-z0-9_.-]){re.escape(surface_id)}\s*"
+        rf"(?:{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s+)\s*"
         rf"(?:promoted|excluded|post-v1)\b",
         re.IGNORECASE,
     )

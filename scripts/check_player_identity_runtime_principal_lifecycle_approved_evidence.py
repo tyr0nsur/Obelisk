@@ -382,7 +382,9 @@ FORBIDDEN_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
-    r"(?:public[_ -]?(?:sdk|player[_ -]?identity|header)|"
+    r"(?:public[_ -]?ready|identity[_ -]?ready|permissions?[_ -]?unlocked|"
+    r"command[_ -]?route[_ -]?ready|counts?[_ -]?towards?[_ -]?sdk|"
+    r"public[_ -]?(?:sdk|player[_ -]?identity|header)|"
     r"(?:(?:request[_ -]?pack|window[_ -]?request|preflight|(?:completed[_ -]?)?receipt|"
     r"operator[_ -]?approval[_ -]?(?:request|receipt)|operator[_ -]?request|"
     r"approval[_ -]?request|window[_ -]?manifest|observer[_ -]?(?:window[_ -]?)?env|"
@@ -2428,12 +2430,18 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
 
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
-    normalized = re.sub(r"\s+", " ", value)
+    normalized = normalize_capability_claim_text(value)
     for pattern in (POSITIVE_CAPABILITY_CLAIM_RE, OPERATIONAL_AUTHORIZATION_CLAIM_RE):
         for match in pattern.finditer(normalized):
             if not positive_capability_claim_is_negated(normalized, match.start()):
                 return True
     return False
+
+
+def normalize_capability_claim_text(value: str) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    separated = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", separated)
+    return re.sub(r"\s+", " ", separated)
 
 
 def positive_capability_claim_is_negated(value: str, claim_start: int) -> bool:

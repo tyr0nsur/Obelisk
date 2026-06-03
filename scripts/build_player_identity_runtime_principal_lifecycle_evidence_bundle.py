@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence_checker
 from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import reject_protected_output_path, reject_symlink_component
 
@@ -139,6 +140,22 @@ def require_false_readiness_flags(payload: dict[str, Any], label: str) -> None:
     for key in ("public_capability_bits_now", "public_callback_abi_now"):
         if payload.get(key, []) != []:
             raise SystemExit(f"{label} overclaims {key}")
+    require_no_truthy_readiness_alias_keys(payload, label)
+
+
+def require_no_truthy_readiness_alias_keys(value: Any, label: str, trail: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if (
+                child not in (False, None, [], {})
+                and approved_evidence_checker.contains_unnegated_positive_capability_claim(str(key))
+            ):
+                raise SystemExit(f"{label} overclaims readiness alias {child_trail}")
+            require_no_truthy_readiness_alias_keys(child, label, child_trail)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            require_no_truthy_readiness_alias_keys(child, label, f"{trail}[{index}]")
 
 
 def require_consume_only_check_report(payload: dict[str, Any], label: str) -> None:

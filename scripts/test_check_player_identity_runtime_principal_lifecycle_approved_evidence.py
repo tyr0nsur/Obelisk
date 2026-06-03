@@ -1080,6 +1080,36 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 lambda sidecar: sidecar.update({"server_restart_authorized": True}),
                 "operational_window_sidecar_authorization_or_readiness_key_overclaim",
             ),
+            (
+                "preflight_public_ready_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"publicReady": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_identity_ready_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"nested": {"identityReady": True}}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_permissions_unlocked_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"permissionsUnlocked": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_command_route_ready_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"commandRouteReady": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_counts_toward_sdk_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"countsTowardSdk": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
         )
         for name, artifact_for_payload, mutate, expected in cases:
             with self.subTest(name=name):

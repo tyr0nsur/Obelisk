@@ -577,6 +577,14 @@ GAMEPLAY_POLICY_SCOPE_NEGATORS_RE = re.compile(
     r"outside|redacted|remain|remains|without)\b",
     re.IGNORECASE,
 )
+DESCRIPTOR_PUBLIC_ALIAS_FORBIDDEN_RE = re.compile(
+    r"\bDescribeResource\b|"
+    r"\b(?:Obelisk)?ResourceDescriptor\b|"
+    r"\bobject[- ]descriptors?\b|"
+    r"\b(?:resource|object|inventory|structure|mission)?[- ]?identity[- ]descriptors?\b|"
+    r"\bpolicy[- ]event[- ]mutation\b",
+    re.IGNORECASE,
+)
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*")
 PLUGIN_HUB_SUPPORT_TIERS = (
     "release-supported seed",
@@ -4473,6 +4481,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         def visit(value: object, path: str) -> None:
             if isinstance(value, dict):
                 for key, child in value.items():
+                    if key == "not_promoted":
+                        continue
                     visit(child, f"{path}.{key}")
                 return
             if isinstance(value, list):
@@ -4526,6 +4536,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         def visit(value: object, path: str) -> None:
             if isinstance(value, dict):
                 for key, child in value.items():
+                    if key == "not_promoted":
+                        continue
                     visit(child, f"{path}.{key}")
                 return
             if isinstance(value, list):
@@ -7246,6 +7258,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
         )
         for excluded in (
+            "module-specific SDK",
+            "Inventory SDK",
+            "Structure SDK",
+            "Mission SDK",
             "ResourceHandle",
             "object identity",
             "lookup",
@@ -7360,6 +7376,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             self.assertIn(flag, event_surface.get("flags", []))
         for excluded in (
             "module-specific SDK",
+            "Inventory SDK",
+            "Structure SDK",
+            "Mission SDK",
             "ResourceHandle",
             "persistent handles",
             "object identity",
@@ -7486,6 +7505,53 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             if field in forbidden_public_field_names
         ]
         self.assertEqual(offenders, [])
+
+    def test_descriptor_public_docs_do_not_use_identity_or_lookup_aliases(self) -> None:
+        scanned_paths = [
+            PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+            PUBLIC_SDK_SURFACES_MANIFEST,
+            REPO_ROOT / "docs" / "oDescriptorCatalog.md",
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md",
+        ]
+        offenders: list[str] = []
+
+        for path in scanned_paths:
+            text = path.read_text(encoding="utf-8")
+            for match in DESCRIPTOR_PUBLIC_ALIAS_FORBIDDEN_RE.finditer(text):
+                offenders.append(f"{path.relative_to(REPO_ROOT)}: {match.group(0)}")
+
+        self.assertEqual(offenders, [])
+
+    def test_descriptor_metadata_surfaces_do_not_claim_module_sdk_readiness(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        metadata_surfaces = [
+            surface
+            for surface in manifest.get("metadata_surfaces", [])
+            if isinstance(surface, dict)
+        ]
+        required_non_promotions = {
+            "module-specific SDK",
+            "Inventory SDK",
+            "Structure SDK",
+            "Mission SDK",
+            "ResourceHandle",
+            "object identity",
+            "lookup",
+            "mutation",
+            "return override",
+        }
+
+        self.assertEqual(
+            {surface.get("surface_id") for surface in metadata_surfaces},
+            set(V010_PUBLIC_MANIFEST_METADATA_SURFACE_IDS),
+        )
+        for surface in metadata_surfaces:
+            with self.subTest(surface=surface.get("surface_id", "<missing>")):
+                not_promoted = set(surface.get("not_promoted", []))
+                self.assertTrue(required_non_promotions.issubset(not_promoted))
+                self.assertNotIn("inventory_sdk_ready", json.dumps(surface, sort_keys=True).lower())
+                self.assertNotIn("structure_sdk_ready", json.dumps(surface, sort_keys=True).lower())
+                self.assertNotIn("mission_sdk_ready", json.dumps(surface, sort_keys=True).lower())
 
     def test_public_copied_event_and_descriptor_structs_do_not_expose_identity_lookup_or_mutation(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")

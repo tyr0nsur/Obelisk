@@ -1867,6 +1867,26 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
 
         self.assertIn("overclaims public_sdk_ready", str(raised.exception))
 
+    def test_rejects_negative_readiness_report_that_overclaims_alias_key(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_negative_readiness_report(
+                {
+                    "ready": False,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "diagnostics": {"countsTowardSdk": True},
+                    "blockers": ["public_readiness_blocked_until_identity_public_contract_gate"],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "public-readiness approved runtime principal lifecycle evidence check",
+                "public_readiness_blocked_until_identity_public_contract_gate",
+            )
+
+        self.assertIn("overclaims readiness alias $.diagnostics.countsTowardSdk", str(raised.exception))
+
     def test_rejects_readiness_reports_that_overclaim_public_abi_lists(self) -> None:
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_consume_only_check_report(
@@ -1889,6 +1909,30 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
         self.assertIn("overclaims public_callback_abi_now", str(raised.exception))
+
+    def test_rejects_consume_report_that_overclaims_nested_alias_key(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_consume_only_check_report(
+                {
+                    "ready": True,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_header_allowed": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "v1_completion_ready": False,
+                    "runtime_ready": False,
+                    "public_capability_bits_now": [],
+                    "public_callback_abi_now": [],
+                    "nested": {"publicReady": True},
+                    "blockers": [],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "consume approved runtime principal lifecycle evidence check",
+            )
+
+        self.assertIn("overclaims readiness alias $.nested.publicReady", str(raised.exception))
 
     def test_rejects_negative_readiness_report_with_wrong_blocker(self) -> None:
         with self.assertRaises(SystemExit) as raised:

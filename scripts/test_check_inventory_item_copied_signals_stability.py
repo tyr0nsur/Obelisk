@@ -780,6 +780,45 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("$.public_gameplay_events.promoted_events[0].release_ready", paths)
         self.assertIn("$.public_gameplay_events.promoted_events[0].public_abi_ready", paths)
 
+    def test_inventory_action_identity_authority_and_release_aliases_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["aliases"] = [
+            "inventory action aliases are release-supported",
+            "item stack identity is stable",
+            "ownership lookup ready",
+            "equip authority and repair authority are public",
+            "craft authority for copied item actions",
+        ]
+        event["counts_toward_complete_sdk"] = True
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        terms = {
+            blocker.get("term")
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "public_claim_forbidden_term"
+        }
+        self.assertIn("action aliases", terms)
+        self.assertIn("item stack identity", terms)
+        self.assertIn("ownership lookup", terms)
+        self.assertIn("equip authority", terms)
+        self.assertIn("repair authority", terms)
+        self.assertIn("craft authority", terms)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "readiness_claim_enabled"
+        }
+        self.assertIn("$.public_gameplay_events.promoted_events[0].counts_toward_complete_sdk", paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[0]", paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].aliases[1]", paths)
+
 
 if __name__ == "__main__":
     unittest.main()

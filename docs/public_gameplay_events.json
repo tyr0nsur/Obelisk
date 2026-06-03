@@ -51,6 +51,10 @@
       "append_only_abi": true,
       "capability_gated": true,
       "not_promoted": [
+        "module-specific SDK",
+        "Inventory SDK",
+        "Structure SDK",
+        "Mission SDK",
         "ResourceHandle",
         "object identity",
         "lookup",
@@ -108,6 +112,9 @@
       "capability_gated": true,
       "not_promoted": [
         "module-specific SDK",
+        "Inventory SDK",
+        "Structure SDK",
+        "Mission SDK",
         "ResourceHandle",
         "persistent handles",
         "object identity",

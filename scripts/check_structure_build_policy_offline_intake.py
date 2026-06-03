@@ -222,6 +222,7 @@ SNAPSHOT_CANDIDATE_DIR = "candidate"
 FORBIDDEN_TRUE_READY_KEYS = {
     "build_policy_ready",
     "build_policy_sdk_ready",
+    "counts_toward_complete_sdk",
     "enforcement_ready",
     "identity_ready",
     "lookup_ready",
@@ -230,6 +231,8 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "public_sdk_ready",
     "return_override_ready",
     "runtime_ready",
+    "stable",
+    "release_supported",
     "structure_events_ready",
     "structure_sdk_ready",
     "v1_complete",
@@ -240,6 +243,7 @@ FORBIDDEN_READY_DOMAINS = {
     "api",
     "buildpolicy",
     "callback",
+    "collision",
     "completion",
     "dispatch",
     "dispatcher",
@@ -254,6 +258,9 @@ FORBIDDEN_READY_DOMAINS = {
     "promote",
     "promoted",
     "public",
+    "pin",
+    "pincode",
+    "placement",
     "release",
     "return",
     "runtime",
@@ -268,11 +275,13 @@ READY_TERMS = {
     "accepted",
     "complete",
     "completion",
+    "counts",
     "done",
     "promoted",
     "promotion",
     "readiness",
     "ready",
+    "supported",
     "released",
 }
 FORBIDDEN_STRING_DOMAINS = {
@@ -283,9 +292,27 @@ FORBIDDEN_STRING_DOMAINS = {
     "structureevents sdk": "public_structure_events_sdk",
     "public abi": "public_abi",
     "promotion gate": "promotion_gate",
+    "build placement": "build_placement_policy",
+    "build policy": "build_policy",
+    "collision policy": "no_collision_policy",
+    "counts toward complete sdk": "v1_completion",
+    "enforcement allowed": "enforcement",
+    "enforcement ready": "enforcement",
+    "no collision": "no_collision_policy",
+    "no-collision": "no_collision_policy",
+    "owner lookup": "structure_ownership",
+    "ownership lookup": "structure_ownership",
+    "pin code outcome": "pin_code_policy",
+    "pin outcome": "pin_code_policy",
+    "pincode outcome": "pin_code_policy",
+    "placement policy": "build_placement_policy",
+    "release supported": "release_support",
+    "release-supported": "release_support",
+    "stable sdk": "structure_sdk",
 }
 POSITIVE_STRING_CLAIM_RE = re.compile(
     r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"\brelease[-_\s]+supported\b|\bstable\b|\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
     r"\bpublic[-_\s]+ready\b|\bready\b)",
     re.IGNORECASE,
 )
@@ -1172,13 +1199,16 @@ def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | Non
 
 
 def scan_for_forbidden_string_claims(payload: Any, blockers: list[dict[str, Any]], path: str) -> None:
-    if isinstance(payload, dict):
+    if isinstance(payload, str):
+        if ".promotion_requires[" in path or ".exclusion_requires[" in path:
+            return
+        key = path.rsplit(".", 1)[-1]
+        surface = forbidden_string_claim_surface(key, path, payload)
+        if surface is not None:
+            add(blockers, "forbidden_string_claim", path=path, key=key, surface=surface)
+    elif isinstance(payload, dict):
         for key, value in payload.items():
             child_path = f"{path}.{key}"
-            if isinstance(value, str):
-                surface = forbidden_string_claim_surface(str(key), child_path, value)
-                if surface is not None:
-                    add(blockers, "forbidden_string_claim", path=child_path, key=key, surface=surface)
             scan_for_forbidden_string_claims(value, blockers, child_path)
     elif isinstance(payload, list):
         for index, value in enumerate(payload):

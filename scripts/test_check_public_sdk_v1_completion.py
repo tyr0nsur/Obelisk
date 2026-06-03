@@ -7888,8 +7888,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "obelisk.chat_message.v1",
             "promoted",
         )
+        unicode_record = module.release_statement_surface_record(
+            "obelisk.chat_message.v1\uff1a promoted \u2013 reviewed ABI and SDK evidence.\n",
+            "obelisk.chat_message.v1",
+            "promoted",
+        )
 
         self.assertEqual(record, "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.")
+        self.assertEqual(
+            unicode_record,
+            "obelisk.chat_message.v1\uff1a promoted \u2013 reviewed ABI and SDK evidence.",
+        )
         self.assertIsNone(
             module.release_statement_surface_record(
                 "obelisk.chat_message.v1: promoted\n",
@@ -7908,6 +7917,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             module.release_statement_duplicate_or_mixed_records(
                 "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.\n"
                 "obelisk.chat_message.v1 - promoted - duplicate alternate record.\n",
+                "obelisk.chat_message.v1",
+            )
+        )
+        self.assertTrue(
+            module.release_statement_duplicate_or_mixed_records(
+                "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.\n"
+                "Notes: obelisk.chat_message.v1\uff1a excluded \u2013 duplicate unicode record.\n",
                 "obelisk.chat_message.v1",
             )
         )
@@ -7998,6 +8014,59 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(inventory["counts_toward_complete_sdk_claim"])
         self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
         self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+
+    def test_release_statement_unicode_row_satisfies_non_p0_excluded_bookkeeping(self) -> None:
+        surface_id = "obelisk.object_identity_resource_handle.v1"
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = release_statement.replace(
+            (
+                f"{surface_id}: excluded - no public API for this surface is included in v1; "
+                "no object identity, UObject identity, object lookup, "
+                "ResourceHandle, post-callback object handle, structure handle, item handle, "
+                "inventory handle, dino handle, tribe handle, buff/status handle, "
+                "mission/transfer correlation handle, economy/mobility handle, or "
+                "area-policy object handle API is included in v1"
+            ),
+            (
+                f"{surface_id}\uff1a excluded \u2013 no public API for this surface is included in v1; "
+                "no object identity, UObject identity, object lookup, "
+                "ResourceHandle, post-callback object handle, structure handle, item handle, "
+                "inventory handle, dino handle, tribe handle, buff/status handle, "
+                "mission/transfer correlation handle, economy/mobility handle, or "
+                "area-policy object handle API is included in v1"
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertNotIn(surface_id, payload["release_statement_missing_blocker_outcomes"])
+        self.assertNotIn(surface_id, payload["release_statement_missing_exclusion_contracts"])
+        self.assertIn(
+            surface_id,
+            payload["v1_sdk_progress"][
+                "completion_blockers_with_release_statement_post_v1_or_excluded_outcome"
+            ],
+        )
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        self.assertEqual(outcome_by_surface[surface_id]["release_statement_outcome"], "excluded")
+        self.assertTrue(outcome_by_surface[surface_id]["release_statement_contract_satisfied"])
+        self.assertFalse(outcome_by_surface[surface_id]["counts_toward_complete_sdk_claim"])
 
     def test_release_statement_rejects_mixed_alternate_promoted_surface_records(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

@@ -102,18 +102,23 @@ STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
     "build_placement_policy_ready",
     "build_policy_ready",
     "collision_policy_ready",
+    "counts_toward_complete_sdk",
     "enforcement_allowed",
     "enforcement_ready",
     "mutation_allowed",
     "mutation_ready",
     "no_collision_policy_ready",
+    "pin_code_outcome_ready",
+    "pin_outcome_ready",
     "ownership_ready",
     "placement_policy_ready",
+    "release_supported",
     "public_structure_sdk_ready",
     "return_override_allowed",
     "return_override_ready",
     "runtime_hook_ready",
     "runtime_hooks_ready",
+    "stable",
     "structure_identity_ready",
     "structure_lookup_ready",
     "structure_ownership_ready",
@@ -127,13 +132,19 @@ STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS = {
     "buildpolicy",
     "callback",
     "completion",
+    "collision",
     "event",
     "events",
     "promotion",
     "promote",
     "promoted",
     "public",
+    "release",
+    "pin",
+    "pincode",
+    "placement",
     "sdk",
+    "stable",
     "structure",
     "structureevents",
     "structuresdk",
@@ -143,11 +154,14 @@ STRUCTURE_CENSUS_READY_TERMS = {
     "accepted",
     "complete",
     "completion",
+    "counts",
     "done",
     "promoted",
     "promotion",
     "readiness",
     "ready",
+    "release",
+    "supported",
     "released",
 }
 STRUCTURE_CENSUS_NEGATED_TRUE_KEY_PREFIXES = (
@@ -160,6 +174,7 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "build placement": "build_placement_policy",
     "build policy": "build_policy",
     "collision policy": "no_collision_policy",
+    "counts toward complete sdk": "v1_completion",
     "enforcement allowed": "enforcement",
     "enforcement ready": "enforcement",
     "isallowedtobuild": "build_policy",
@@ -170,6 +185,9 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "owner identity": "structure_ownership",
     "owner lookup": "structure_ownership",
     "ownership lookup": "structure_ownership",
+    "pin code outcome": "pin_code_policy",
+    "pin outcome": "pin_code_policy",
+    "pincode outcome": "pin_code_policy",
     "placement policy": "build_placement_policy",
     "processevent hook": "runtime_hooks",
     "return override allowed": "return_override",
@@ -180,6 +198,9 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "structure lookup": "structure_lookup",
     "structure ownership": "structure_ownership",
     "structureevents sdk": "public_structureevents_sdk",
+    "release supported": "release_support",
+    "release-supported": "release_support",
+    "stable sdk": "public_structure_sdk",
     "v1 complete": "v1_completion",
     "v1 completion": "v1_completion",
     "v1 done": "v1_completion",
@@ -198,12 +219,15 @@ STRUCTURE_CENSUS_FORBIDDEN_STRING_DOMAINS = {
 }
 STRUCTURE_CENSUS_POSITIVE_STRING_RE = re.compile(
     r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"\brelease[-_\s]+supported\b|\bstable\b|\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
     r"\bpublic[-_\s]+ready\b|\bready\b)",
     re.IGNORECASE,
 )
 STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE = re.compile(
     r"(?:\bready\b|\breadiness\b|\ballowed\b|\benabled\b|\bpromoted\b|"
-    r"\bpublic\s+sdk\b|\bv1\s+(?:complete|completion|done|ready)\b|"
+    r"\bpublic\s+sdk\b|\brelease[-_\s]+supported\b|\bstable\b|"
+    r"\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
+    r"\bv1\s+(?:complete|completion|done|ready)\b|"
     r"\bruntime\s+hooks?\s+ready\b)",
     re.IGNORECASE,
 )

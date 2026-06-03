@@ -162,6 +162,8 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "AdditionalData API",
         "Inventory callback API",
         "InventoryComp",
+        "action alias",
+        "action aliases",
         "ItemId",
         "ItemID1",
         "ItemNetID identity",
@@ -169,7 +171,15 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "ServerRequestInventoryUseItemWithActor",
         "action params",
         "anActor",
+        "craft authority",
+        "crafting authority",
+        "equip authority",
+        "item stack identity",
+        "owner lookup",
+        "ownership lookup",
         "raw params",
+        "repair authority",
+        "stack identity",
     )
 )
 PUBLIC_SDK_SURFACES_INVENTORY_SIDE_LANE_TERMS = frozenset(("Inventory SDK", "Items SDK"))
@@ -277,10 +287,15 @@ POSITIVE_READINESS_PHRASES = (
     "public sdk readiness",
     "release ready",
     "release readiness",
+    "release-supported",
     "runtime ready",
     "runtime readiness",
+    "is stable",
+    "stable release",
     "stable sdk ready",
     "stable sdk readiness",
+    "counts toward complete sdk",
+    "counts_toward_complete_sdk",
     "v1 completion",
     "v1 completion ready",
     "v1 completion readiness",
@@ -965,13 +980,16 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
     forbidden_true_keys = {
         "inventory_sdk_ready",
         "items_sdk_ready",
+        "counts_toward_complete_sdk",
         "promotion_ready",
         "public_abi_ready",
         "public_inventory_sdk_ready",
         "public_items_sdk_ready",
         "public_sdk_ready",
         "release_ready",
+        "release_supported",
         "runtime_ready",
+        "stable",
         "stable_sdk_ready",
         "v1_completion_ready",
         "v1_ready",
@@ -981,6 +999,8 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
+            if key in NEGATIVE_KEYS:
+                continue
             if key in forbidden_true_keys and child is True:
                 add(blockers, "readiness_claim_enabled", child_trail)
             if key in readiness_text_keys:
@@ -990,6 +1010,8 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
                         if not match:
                             continue
                         if is_negated_for_match(text, match.start(), match.end()):
+                            continue
+                        if phrase == "release-supported" and key == "support_tier":
                             continue
                         add(blockers, "readiness_claim_enabled", text_path, value=text, term=phrase)
                         break

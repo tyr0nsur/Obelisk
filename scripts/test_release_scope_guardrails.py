@@ -588,7 +588,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("production libobelisk.so symbol surface checks", script)
         self.assertIn("check_production_runtime_symbols", script)
         self.assertIn("Production libobelisk.so exposes test-only/internal symbols", script)
-        self.assertIn("gameplay/module second-source promotion gate was not run", script)
+        self.assertIn("gameplay/module second-source layout-evidence gate was not run", script)
         self.assertIn("pre-build readiness metadata preflight", script)
         self.assertIn("current BoolProperty tail metadata", script)
         self.assertIn("test-only/internal symbol patterns", release)
@@ -1077,7 +1077,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         plugins_readme = normalized(read("plugins/README.md"))
         timer_source = read("plugins/oProcessTimer/oProcessTimer.cpp")
-        self.assertIn("`oProcessTimer` is part of the first-stable core plugin set for `v0.1.0`", plugins_readme)
+        self.assertIn(
+            "`oProcessTimer` is a current core timer reference for the pre-release `v0.1.x` SDK line",
+            plugins_readme,
+        )
         self.assertIn('out->version = "0.1.0";', timer_source)
         self.assertNotIn('out->version = "0.2.0-dev";', timer_source)
         self.assertNotIn('out->version = "0.1.0-rc.1";', timer_source)

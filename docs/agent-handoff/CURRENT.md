@@ -199,13 +199,16 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 SDK/reversing boundary hardening after `625ac05`
-  delegated four scopes: release-statement bookkeeping, public header/ABI aliases,
-  runtime-principal request/evidence sidecars, and ArkServerApi/AseApi/NextGen research
-  boundaries. Integrated checkers reject same-line mixed release outcomes, broader
-  blocked header symbol aliases, nested `present/accepted/available` runtime-evidence
-  preflight overclaims, and external-framework authority wording. Lead validation:
-  SDK/window/research/handoff 350 tests OK, bundle/evidence 119 tests OK, route JSON
-  planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`,
-  P0 `0/4`, `stable_claim_allowed=false`, `git diff --check`. No runtime/server/Discord/
-  GitHub operation.
+- Latest integration note: 2026-06-03 SDK side-lane/descriptor/runtime-evidence alias
+  hardening after `b1d2f31` delegated four scopes: release-statement delimiter parsing,
+  descriptor non-promotion metadata, inventory/structure side-lane overclaim aliases, and
+  approved runtime-principal evidence alias rejection. Integrated checkers now accept
+  Unicode colon/dash release-statement variants while still rejecting mixed records,
+  record descriptor `not_promoted` module SDK aliases without treating them as promoted
+  claims, reject compact runtime-evidence aliases such as `publicReady`/`countsTowardSdk`,
+  and keep inventory/structure reports non-promoting. Validation: public SDK/release
+  guardrails 250 OK; runtime evidence bundle/checker plus handoff 135 OK; SDK
+  completion/inventory/structure side-lane suite 300 OK; route JSON planning-only at
+  `approved_runtime_evidence_missing`; SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; `py_compile` and `git diff --check` OK. No
+  runtime/server/Discord/GitHub operation.

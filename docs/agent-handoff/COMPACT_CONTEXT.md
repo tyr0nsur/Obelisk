@@ -19,6 +19,29 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 SDK side-lane/descriptor/runtime-evidence alias hardening round after
+  `b1d2f31` delegated four scopes: release-statement delimiter parsing, descriptor
+  non-promotion metadata, inventory/structure side-lane overclaim aliases, and approved
+  runtime-principal evidence alias rejection.
+- Integrated changes: SDK completion release-statement parsing accepts canonical Unicode
+  colon variants and Unicode dash detail separators while still rejecting duplicate/mixed
+  records; public gameplay event descriptors can carry `not_promoted` module SDK aliases
+  without becoming positive promotion claims; inventory/structure side-lane checkers reject
+  action, identity, ownership, build placement, pincode/no-collision, stable/release-
+  supported, and complete-SDK counting aliases; approved runtime-principal evidence
+  tooling rejects compact camelCase readiness/capability aliases such as `publicReady`,
+  `identityReady`, `permissionsUnlocked`, `commandRouteReady`, and `countsTowardSdk`.
+- Validation observed before final commit: public SDK/release guardrails 250 OK,
+  approved runtime evidence bundle/checker plus handoff 135 OK, SDK completion plus
+  inventory/structure side-lane suite 300 OK, `py_compile` OK, `git diff --check` OK,
+  inventory/structure JSONs ready but non-promoting, route JSON valid/planning-only with
+  `current_route_blocker=approved_runtime_evidence_missing`, and SDK JSON blocked by
+  design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. Release-statement
+  outcomes still missing for seven non-P0 post-v1/excluded blockers.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 SDK/reversing boundary hardening round after `625ac05` delegated four
   scopes: release-statement bookkeeping, public header/ABI aliases, runtime-principal
   request/evidence sidecars, and ArkServerApi/AseApi/NextGen research boundaries.

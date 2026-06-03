@@ -715,6 +715,67 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## SDK Side-Lane, Descriptor, And Runtime-Evidence Alias Hardening
+
+The next delegated integration round closed more offline overclaim paths without changing
+the active P0 blocker.
+
+Delegated scopes and integrated findings:
+
+- Release-statement parsing now accepts canonical Unicode colon delimiters and Unicode
+  dash variants in scoped outcome rows, while duplicate or mixed embedded records remain
+  blocked. This prevents formatting variants from being lost without allowing a `post-v1`
+  or `excluded` row to masquerade as promoted evidence.
+- Descriptor metadata in `docs/public_gameplay_events.json` now records explicit
+  `not_promoted` aliases for module-specific SDKs such as Inventory, Structure, and
+  Mission SDKs. Public SDK guardrails skip only those negative metadata containers; the
+  same terms remain forbidden as positive promotion claims elsewhere.
+- Inventory and Structure side-lane checkers now reject broader aliases for item stack
+  identity, ownership lookup, equip/repair/craft authority, build placement,
+  no-collision, pincode/pin outcomes, stable/release-supported status, and complete SDK
+  counting. Structure build-policy scanning also covers nested list strings except
+  explicit requirement-only containers.
+- Approved runtime-principal evidence tooling now normalizes camelCase/acronym
+  boundaries and rejects compact readiness/capability aliases such as `publicReady`,
+  `identityReady`, `permissionsUnlocked`, `commandRouteReady`, and `countsTowardSdk` in
+  sidecars and reports.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with
+  `ready=false`, SDK completion `0/12`, P0 dependency chain `0/4`,
+  `stable_claim_allowed=false`, and missing release-statement outcomes for seven
+  non-P0 post-v1/excluded blockers.
+- `check_inventory_item_copied_signals_stability.py --json`: `ready=true`,
+  `public_sdk_ready=false`, and `v1_completion_ready=false`.
+- `check_structure_census_readiness.py --json`: `ready=true`,
+  `accounting_mode=candidate-only`, `public_sdk_ready=false`, and
+  `runtime_ready=false`.
+- `check_structure_build_policy_offline_intake.py --json`: `ready=true`,
+  `status=accepted_planning_only`, `planning_only=true`, `public_sdk_ready=false`,
+  and `runtime_ready=false`.
+
+Validation remained offline-only:
+
+- Public SDK/release guardrails: 250 tests passed.
+- Approved runtime evidence bundle/checker plus handoff guardrails: 135 tests passed.
+- SDK completion, inventory copied signals, Structure census, and Structure build-policy
+  side-lane tests: 300 tests passed.
+- `py_compile` passed for the changed checkers and evidence bundle tooling.
+- `git diff --check` passed.
+
+Non-claims:
+
+- This round does not create approved runtime evidence and does not authorize server
+  operations, marker/env changes, runtime observation, ReflectionScanner, ptrace/gcore,
+  broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub publication,
+  support-tier activation, stable SDK wording, public identity readiness, public
+  permissions/admin readiness, command response/replies readiness, or v1 SDK completion.
+
 ## P0 And Side-Lane Non-Claim Hardening Round
 
 The next supervised 4-agent round hardened additional offline bypasses without changing

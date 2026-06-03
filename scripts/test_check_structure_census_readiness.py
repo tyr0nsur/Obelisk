@@ -351,13 +351,20 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
             payload["public_structure_sdk_ready"] = True
             payload["build_policy_ready"] = True
             payload["enforcement_ready"] = True
+            payload["counts_toward_complete_sdk"] = True
+            payload["release_supported"] = True
+            payload["stable"] = True
             payload["v1_complete"] = True
             payload["status"] = "public-ready"
             payload["sdk_status"] = "ready"
             payload["promotion_status"] = "promoted"
             payload["public_sdk_status"] = "accepted"
             payload["negative_note"] = "does not promote Structure SDK readiness"
-            payload["notes"] = "runtime hooks ready"
+            payload["notes"] = [
+                "runtime hooks ready",
+                "build placement, no-collision, and pin code outcome ready",
+                "owner lookup is release-supported",
+            ]
             readiness.write_text(json.dumps(payload), encoding="utf-8")
 
             result = self.run_checker(
@@ -397,8 +404,15 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
                 "public_sdk_status": "accepted",
                 "negative_note": "no public SDK ready claim",
                 "boundary": "public_sdk_ready=false",
-                "notes": "Structure-SDK ready",
+                "notes": [
+                    "Structure-SDK ready",
+                    "placement policy, no-collision, and pincode outcome ready",
+                    "ownership lookup is stable",
+                ],
             }
+            payload["counts_toward_complete_sdk"] = True
+            payload["release_supported"] = True
+            payload["stable"] = True
             manifest.write_text(json.dumps(payload), encoding="utf-8")
 
             result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
@@ -417,8 +431,15 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertTrue(any(path.endswith(".public_abi_ready") for path in paths))
         self.assertTrue(any(path.endswith(".structure_events_ready") for path in paths))
         self.assertTrue(any(path.endswith(".public_sdk_gate.ready") for path in paths))
+        self.assertTrue(any(path.endswith(".counts_toward_complete_sdk") for path in paths))
+        self.assertTrue(any(path.endswith(".release_supported") for path in paths))
+        self.assertTrue(any(path.endswith(".stable") for path in paths))
         self.assertIn("public_structure_sdk", surfaces)
         self.assertIn("status", surfaces)
+        self.assertIn("build_placement_policy", surfaces)
+        self.assertIn("no_collision_policy", surfaces)
+        self.assertIn("pin_code_policy", surfaces)
+        self.assertIn("structure_ownership", surfaces)
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
