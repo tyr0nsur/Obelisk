@@ -14,6 +14,7 @@ from check_public_sdk_v1_completion import (
     CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN,
     DEFAULT_MANIFEST,
     as_string_list,
+    release_statement_forbidden_broad_claims,
     required_release_statement_text,
 )
 
@@ -46,6 +47,8 @@ def release_statement_detail(surface: dict[str, Any]) -> str:
         for requirement in as_string_list(contract.get("exclusion_requires")):
             detail = required_release_statement_text(requirement)
             if detail:
+                if "\n" in detail or "\r" in detail:
+                    raise ValueError("release-statement detail must be a single line")
                 required.append(detail.rstrip("."))
     if not required:
         required.append("scoped non-complete release bookkeeping only; no public API is included in v1")
@@ -75,7 +78,14 @@ def build_statement(manifest: dict[str, Any]) -> str:
         if status not in {"post-v1", "excluded"}:
             raise ValueError(f"{surface_id} has non-scoped status {status!r}")
         lines.append(f"{surface_id}: {status} - {release_statement_detail(surface)}")
-    return "\n".join(lines) + "\n"
+    statement = "\n".join(lines) + "\n"
+    forbidden_claims = release_statement_forbidden_broad_claims(statement)
+    if forbidden_claims:
+        raise ValueError(
+            "generated scoped release statement contains forbidden broad claim(s): "
+            + "; ".join(forbidden_claims[:3])
+        )
+    return statement
 
 
 def parse_args() -> argparse.Namespace:

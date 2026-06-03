@@ -715,6 +715,73 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## P0 Prep, Bound Route, SDK Statement, And Runtime ABI Guardrail Round
+
+Another supervised four-agent round plus lead integration hardened the offline
+path toward the active P0 blocker without running runtime work.
+
+Integrated findings:
+
+- Approved runtime principal lifecycle evidence: request-pack post-window replay
+  sidecars now directly require the full sibling set, including
+  `operator_approval_request_path` and `copied_log_path`. Unexpected sidecar keys
+  such as stale bundle paths fail closed.
+- Player identity planning sources: snapshot manifests now fail closed on
+  schema/source/status mismatch, missing binary SHA, duplicate target rows,
+  protected/symlinked paths, paths resolving outside the snapshot root, stale
+  source snapshot SHA, role/status drift, binary SHA drift, and admin targets
+  presented as lifecycle anchors. Accepted lifecycle anchors remain
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`.
+- Bound route wrapper: source diagnostics must be exact CLI-bound manifest
+  path/source/provided-by-CLI matches. The wrapper also rejects post-runtime
+  blocker drift and downstream permissions/admin, command response, or commands
+  replies unlock overclaims.
+- Scoped release statement: generated statements fail closed on multiline
+  injected details or forbidden broad stable/full/production SDK claims. Scoped
+  validation records delimiter variants, including Unicode dash variants, so P0,
+  promoted, experimental, or non-blocker rows cannot hide from unexpected-row
+  checks.
+- Runtime/ABI static guardrails: `PluginManager` tests now pin
+  `CallProcessEvent` to the `ObeliskPlugin_Init` owner window, require non-zero
+  and non-live-reused owner tokens plus chat/gameplay registration handles, and
+  assert public owner-token capability checks use per-owner captured capability
+  snapshots instead of fresh global/API capability state.
+- Contributor status now separates default release-statement outcome accounting
+  (`0/7`) from generated scoped-statement validation (`7/7` bookkeeping only),
+  while preserving P0 `0/4`, demand-family gate `0/12`, and
+  `stable_claim_allowed=false`.
+
+Observed unchanged route and SDK state:
+
+- Route JSON remains `valid=true`, `planning_only=true`,
+  `current_route_blocker=approved_runtime_evidence_missing`,
+  `remaining_route_blockers=["approved_runtime_evidence_missing"]`, and all
+  public/runtime/v1 accounting flags false.
+- SDK JSON without a release statement remains blocked by design with
+  `ready=false`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and seven
+  missing scoped release-statement outcomes.
+- SDK JSON with a generated scoped release statement reports
+  `scoped_release_statement.ready=true`, no unexpected rows, no broad claims,
+  non-P0 release-statement outcomes `7/7`, P0 scoped outcomes `0`, SDK `0/12`,
+  P0 `0/4`, and `stable_claim_allowed=false`.
+
+Validation remained offline-only:
+
+- Approved runtime evidence and bundle tests: 123 OK.
+- Planning-source and bound-route tests: 71 OK.
+- Public SDK completion tests: 234 OK.
+- PluginManager/Timer/Event guardrails: 36/7/6 OK.
+- Public SDK guardrails and public chat guardrails: 196/196 OK.
+- Handoff guardrails: 15 OK.
+- `py_compile` and `git diff --check`: OK.
+
+Non-claims:
+
+- This round did not create approved runtime evidence, promote identity, unlock
+  permissions/admin, expose command response/replies ABI, authorize server
+  operations, change markers/env, run runtime observation, send Discord, publish
+  GitHub state, or permit complete/full/production/stable SDK wording.
+
 ## Post-Identity Lock And Scoped Release Statement Hardening
 
 Another supervised four-agent round plus lead integration hardened downstream

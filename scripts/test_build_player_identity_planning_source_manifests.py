@@ -82,6 +82,15 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
         report["accepted_for_lifecycle_anchor_binding"] = False
         path.write_text(json.dumps(report), encoding="utf-8")
 
+    def write_static_report(self, path: Path, mutate) -> None:
+        report = json.loads(
+            (REPO_ROOT / "docs/research/player-identity-planning-sources/players-lifecycle-anchor-static-report.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        mutate(report)
+        path.write_text(json.dumps(report), encoding="utf-8")
+
     def test_build_binds_static_lifecycle_anchor_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "planning"
@@ -119,6 +128,57 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("lifecycle-static-report is not accepted", result.stderr)
+
+    def test_build_rejects_static_lifecycle_report_snapshot_sha_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                report["accepted_targets"][0]["source_snapshot_sha256"] = "0" * 64
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("lifecycle-static-report source snapshot SHA mismatch", result.stderr)
+
+    def test_build_rejects_admin_target_as_lifecycle_static_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                admin_target = dict(report["accepted_targets"][0])
+                admin_target["target"] = "ShooterPlayerController.ServerListPlayers"
+                report["accepted_targets"].append(admin_target)
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("admin target as lifecycle anchor", result.stderr)
+        self.assertIn("ServerListPlayers/ServerKickPlayer are admin targets, not lifecycle anchors", result.stderr)
 
     def test_verify_existing_dir_accepts_committed_static_lifecycle_provenance(self) -> None:
         result = self.run_tool(
@@ -225,6 +285,30 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("duplicate snapshot manifest target: ShooterGameMode.HandleNewPlayer", result.stderr)
+
+    def test_rejects_snapshot_manifest_path_outside_snapshot_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshot_root = root / "snapshots"
+            subprocess.run(
+                ["cp", "-a", str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"), str(snapshot_root)],
+                check=True,
+            )
+            manifest_path = snapshot_root / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for target in manifest["targets"]:
+                if f"{target.get('outer')}.{target.get('name')}" == "ShooterGameMode.HandleNewPlayer":
+                    target["module"] = "../../../outside"
+                    break
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            result = self.run_tool(
+                ["--snapshot-root", str(snapshot_root), "--output-dir", str(root / "out")],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("resolves outside snapshot-root", result.stderr)
 
 
 if __name__ == "__main__":

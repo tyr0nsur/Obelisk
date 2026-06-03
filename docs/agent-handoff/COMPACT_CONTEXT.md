@@ -1880,6 +1880,24 @@ priorities, and do not use history files as the active source of truth.
   SDK JSON blocked with SDK `0/12`, P0 `0/4`, generated scoped statement `ready=true` as
   non-complete bookkeeping only, `py_compile` OK, and `git diff --check` OK. No
   runtime/server/Discord/GitHub operation.
+- 2026-06-03 P0 runtime-evidence prep/bound-route/SDK-statement/runtime-ABI round:
+  approved runtime evidence replay sidecars now require the full post-window sibling set,
+  including `operator_approval_request_path` and `copied_log_path`, and reject unexpected
+  stale sidecar keys. Planning-source manifests fail closed on source/schema/status/SHA/
+  path drift, duplicate targets, paths outside snapshot root, and admin-target lifecycle
+  misuse; bound-route validation now requires exact CLI-bound manifest source/path
+  agreement and keeps downstream unlock flags false. Scoped release-statement validation
+  sees delimiter variants and rejects generated multiline/broad stable/full/production
+  claims. PluginManager static guardrails now pin `CallProcessEvent` to the init owner
+  window, non-zero/non-live-reused owner tokens and chat/gameplay handles, and per-owner
+  capability snapshots. `STATUS.md` differentiates default `0/7` statement outcomes from
+  generated `7/7` bookkeeping; P0 remains `0/4`, demand-family gate `0/12`,
+  `stable_claim_allowed=false`. Validation: approved-evidence/bundle 123 OK,
+  planning/bound-route 71 OK, SDK completion 234 OK, plugin/timer/event 36/7/6 OK,
+  public SDK guardrails 196 OK, public chat guardrails 196 OK, handoff 15 OK, route JSON
+  planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`,
+  P0 `0/4`, generated scoped statement `ready=true` as non-complete bookkeeping only,
+  `py_compile` OK, and `git diff --check` OK. No runtime/server/Discord/GitHub operation.
 
 ## Agent Coordination
 

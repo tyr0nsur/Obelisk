@@ -147,6 +147,10 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             "critical_path_phase": {
                 "current_blocker": blocker,
                 "source_checker_primary_blocker": blocker,
+                "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+                "permissions_admin_unlocked": False,
+                "command_response_unlocked": False,
+                "commands_replies_unlocked": False,
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
                 "source_checker_accepted_for_internal_planning": False,
@@ -497,6 +501,24 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                 ),
                 "route_gate_bound_identity_expected_manifests_missing",
             ),
+            (
+                lambda report: report["critical_path_phase"].update(
+                    {"next_after_runtime_evidence": "permissions_admin_gate_missing"}
+                ),
+                "route_gate_next_after_runtime_evidence_unexpected",
+            ),
+            (
+                lambda report: report["critical_path_phase"].update({"permissions_admin_unlocked": True}),
+                "route_gate_permissions_admin_unlocked_overclaim",
+            ),
+            (
+                lambda report: report["critical_path_phase"].update({"command_response_unlocked": True}),
+                "route_gate_command_response_unlocked_overclaim",
+            ),
+            (
+                lambda report: report["critical_path_phase"].update({"commands_replies_unlocked": True}),
+                "route_gate_commands_replies_unlocked_overclaim",
+            ),
         )
         for mutate, expected in cases:
             with self.subTest(expected=expected):
@@ -507,6 +529,31 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
 
                 self.assertFalse(report["valid"])
                 self.assertIn(expected, report["blockers"])
+
+    def test_rejects_route_gate_valid_true_with_repo_local_default_manifest_detail(self) -> None:
+        route_report = self.base_route_report()
+        manifest = route_report["critical_path_phase"]["source_checker_manifest_sources"]["manifests"][
+            "lifecycle_anchor_candidates"
+        ]
+        manifest["source"] = "repo_local_default"
+        manifest["provided_by_cli"] = False
+
+        report = self.run_with_fake_route_report(route_report, canonical_paths=False)
+
+        self.assertFalse(report["valid"])
+        self.assertIn("route_gate_bound_identity_lifecycle_anchor_candidates_source_unexpected", report["blockers"])
+
+    def test_rejects_route_gate_valid_true_with_cli_source_but_not_cli_provided(self) -> None:
+        route_report = self.base_route_report()
+        manifest = route_report["critical_path_phase"]["source_checker_manifest_sources"]["manifests"][
+            "principal_invalidation_policy"
+        ]
+        manifest["provided_by_cli"] = False
+
+        report = self.run_with_fake_route_report(route_report, canonical_paths=False)
+
+        self.assertFalse(report["valid"])
+        self.assertIn("route_gate_bound_identity_principal_invalidation_policy_not_cli_provided", report["blockers"])
 
     def test_rejects_nested_route_gate_public_runtime_or_v1_readiness_claims(self) -> None:
         route_report = self.base_route_report()

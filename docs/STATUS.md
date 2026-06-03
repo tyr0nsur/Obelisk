@@ -177,10 +177,12 @@ Current completion snapshot for agents and contributors:
 - P0 dependency chain: `0/4` promoted. Required order remains
   `obelisk.player_identity.v1`, `obelisk.permissions_admin.v1`,
   `obelisk.command_chat_response_path.v1`, and `obelisk.commands_replies.v1`.
-- Complete SDK demand families: `0/12` promoted for the complete SDK claim.
-- Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes recorded. This can
-  reduce wording/accounting blockers only; it does not increase P0 or complete-SDK
-  promotion counts.
+- v1 demand-family promotion gate: `0/12` promoted for the gated claim.
+- Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes recorded in the
+  default gate without a statement. A generated scoped statement can validate those
+  seven rows as `7/7` bookkeeping, but that only reduces wording/accounting blockers; it
+  still leaves P0 `0/4`, the v1 demand-family gate `0/12`, and
+  `stable_claim_allowed=false`.
 - Current executable route blocker: `approved_runtime_evidence_missing`. Accepted runtime
   evidence may advance only to the locked planning blocker
   `identity_public_contract_gate_missing`; it still does not unlock public identity,

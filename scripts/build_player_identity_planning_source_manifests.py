@@ -33,6 +33,8 @@ LIFECYCLE_TARGETS = (
     ("session_start", "ShooterGameMode.HandleNewPlayer"),
     ("session_end", "ShooterGameMode.OnLogout"),
 )
+LIFECYCLE_TARGET_BY_NAME = {target: role for role, target in LIFECYCLE_TARGETS}
+ADMIN_TARGETS_NOT_LIFECYCLE_ANCHORS = lifecycle_checker.ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF
 NON_CLAIMS = [
     "offline deterministic planning-manifest build only",
     "no runtime or server operation was performed",
@@ -120,12 +122,20 @@ def safe_optional_input_file(path: Path | None, label: str) -> Path | None:
 
 def manifest_target_paths(snapshot_root: Path) -> dict[str, Path]:
     manifest = load_json(snapshot_root / "manifest.json", "snapshot manifest")
+    if manifest.get("schema") != "obelisk.ufunction-snapshot-manifest.v1":
+        raise SystemExit("snapshot manifest schema mismatch")
+    for key, expected in (("source", "offline_core"), ("status", "candidate-only")):
+        if manifest.get(key) != expected:
+            raise SystemExit(f"snapshot manifest {key} mismatch")
+    if not isinstance(manifest.get("ark_binary_sha256"), str) or not manifest["ark_binary_sha256"]:
+        raise SystemExit("snapshot manifest ark_binary_sha256 missing")
     sha_prefix = manifest.get("sha_prefix")
     targets = manifest.get("targets")
     if not isinstance(sha_prefix, str) or not sha_prefix:
         raise SystemExit("snapshot manifest sha_prefix missing")
     if not isinstance(targets, list):
         raise SystemExit("snapshot manifest targets must be a list")
+    root = snapshot_root.resolve()
     result: dict[str, Path] = {}
     for entry in targets:
         if not isinstance(entry, dict):
@@ -136,7 +146,17 @@ def manifest_target_paths(snapshot_root: Path) -> dict[str, Path]:
         file_name = entry.get("file")
         if not all(isinstance(value, str) and value for value in (outer, name, module, file_name)):
             continue
-        result[f"{outer}.{name}"] = snapshot_root / sha_prefix / module / file_name
+        target = f"{outer}.{name}"
+        if target in result:
+            raise SystemExit(f"duplicate snapshot manifest target: {target}")
+        path = snapshot_root / sha_prefix / module / file_name
+        protected_paths.reject_symlink_component(path, f"snapshot-root:{target}")
+        resolved = protected_paths.reject_protected_input_path(path, f"snapshot-root:{target}")
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise SystemExit(f"snapshot-root:{target} resolves outside snapshot-root: {resolved}") from exc
+        result[target] = resolved
     return result
 
 
@@ -164,12 +184,40 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
     if not isinstance(source_ids, list) or not source_ids:
         raise SystemExit("lifecycle-static-report source_artifact_ids missing")
     accepted_targets = payload.get("accepted_targets")
-    targets_by_name = {
-        entry.get("target"): entry for entry in accepted_targets if isinstance(entry, dict)
-    } if isinstance(accepted_targets, list) else {}
+    if not isinstance(accepted_targets, list):
+        raise SystemExit("lifecycle-static-report accepted_targets must be a list")
+    targets_by_name: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(accepted_targets):
+        if not isinstance(entry, dict):
+            raise SystemExit(f"lifecycle-static-report accepted_targets[{index}] must be an object")
+        target = entry.get("target")
+        if not isinstance(target, str) or not target:
+            raise SystemExit(f"lifecycle-static-report accepted_targets[{index}].target missing")
+        if target in targets_by_name:
+            raise SystemExit(f"lifecycle-static-report duplicate accepted target: {target}")
+        targets_by_name[target] = entry
+    unexpected = sorted(target for target in targets_by_name if target not in LIFECYCLE_TARGET_BY_NAME)
+    admin = [target for target in unexpected if target in ADMIN_TARGETS_NOT_LIFECYCLE_ANCHORS]
+    if admin:
+        raise SystemExit(
+            "lifecycle-static-report uses admin target as lifecycle anchor: "
+            + ", ".join(admin)
+            + " (ServerListPlayers/ServerKickPlayer are admin targets, not lifecycle anchors)"
+        )
+    if unexpected:
+        raise SystemExit(
+            "lifecycle-static-report contains non-lifecycle accepted target: "
+            + ", ".join(unexpected)
+        )
     missing = [target for _, target in LIFECYCLE_TARGETS if target not in targets_by_name]
     if missing:
         raise SystemExit("lifecycle-static-report missing accepted lifecycle targets: " + ", ".join(missing))
+    for role, target in LIFECYCLE_TARGETS:
+        row = targets_by_name[target]
+        if row.get("role") != role:
+            raise SystemExit(f"lifecycle-static-report role mismatch for {target}")
+        if row.get("status") != "static_accepted":
+            raise SystemExit(f"lifecycle-static-report status mismatch for {target}")
     return payload, lifecycle_static_report_hash(path)
 
 
@@ -302,6 +350,35 @@ def lifecycle_anchor(
     }
 
 
+def validate_static_report_target_binding(
+    *,
+    lifecycle_static_report: dict[str, Any],
+    role: str,
+    target: str,
+    snapshot_path: Path,
+    snapshot_payload: dict[str, Any],
+) -> None:
+    accepted_targets = lifecycle_static_report.get("accepted_targets")
+    rows = {
+        entry.get("target"): entry for entry in accepted_targets if isinstance(entry, dict)
+    } if isinstance(accepted_targets, list) else {}
+    row = rows.get(target)
+    if not isinstance(row, dict):
+        raise SystemExit(f"lifecycle-static-report missing accepted lifecycle target: {target}")
+    if row.get("role") != role or row.get("status") != "static_accepted":
+        raise SystemExit(f"lifecycle-static-report target binding mismatch for {target}")
+    expected_snapshot_sha = sha256_file(snapshot_path)
+    if row.get("source_snapshot_sha256") != expected_snapshot_sha:
+        raise SystemExit(f"lifecycle-static-report source snapshot SHA mismatch for {target}")
+
+    static_identity = lifecycle_static_report.get("artifact_identity")
+    static_binary_sha = static_identity.get("ark_binary_sha256") if isinstance(static_identity, dict) else None
+    snapshot_evidence = snapshot_payload.get("evidence")
+    snapshot_binary_sha = snapshot_evidence.get("ark_binary_sha256") if isinstance(snapshot_evidence, dict) else None
+    if static_binary_sha != snapshot_binary_sha:
+        raise SystemExit(f"lifecycle-static-report binary SHA mismatch for {target}")
+
+
 def build_lifecycle_manifest(
     first_evidence: dict[str, Any],
     snapshot_root: Path,
@@ -316,6 +393,14 @@ def build_lifecycle_manifest(
         if path is None:
             raise SystemExit(f"snapshot manifest does not contain required lifecycle target: {target}")
         snapshot_payload, target_payload = snapshot_target_payload(path, target)
+        if lifecycle_static_report is not None:
+            validate_static_report_target_binding(
+                lifecycle_static_report=lifecycle_static_report,
+                role=role,
+                target=target,
+                snapshot_path=path,
+                snapshot_payload=snapshot_payload,
+            )
         anchors.append(
             lifecycle_anchor(
                 role=role,

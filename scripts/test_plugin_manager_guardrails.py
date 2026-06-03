@@ -343,6 +343,26 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             call_process_event_body.index("Hooks::ProcessEventHook::CallOriginalProcessEvent"),
         )
 
+    def test_current_plugin_owner_is_scoped_to_init_window(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+
+        previous_owner_index = load_body.index("void* previousOwner = g_CurrentPluginOwner")
+        set_current_index = load_body.index("g_CurrentPluginOwner = pluginOwner")
+        restore_guard_index = load_body.index("auto ownerRestore = MakeScopeExit")
+        init_call_index = load_body.index("initialized = initFunc(&pluginApi, &initContext)")
+        dismiss_index = load_body.index("ownerRestore.Dismiss()")
+        restore_index = load_body.index("g_CurrentPluginOwner = previousOwner", dismiss_index)
+        loaded_owner_index = load_body.index("AddLoadedPluginOwner(pluginOwner)")
+
+        self.assertLess(previous_owner_index, set_current_index)
+        self.assertLess(set_current_index, restore_guard_index)
+        self.assertLess(restore_guard_index, init_call_index)
+        self.assertLess(init_call_index, dismiss_index)
+        self.assertLess(dismiss_index, restore_index)
+        self.assertLess(restore_index, loaded_owner_index)
+        self.assertIn("g_CurrentPluginOwner = previousOwner", load_body[restore_guard_index:init_call_index])
+
     def test_obelisk_api_table_is_zero_initialized_and_fully_assigned(self) -> None:
         plugin_manager_header = PLUGIN_MANAGER_HEADER.read_text(encoding="utf-8")
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -606,6 +626,79 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             unregister_body.index("IsUnloadingPluginOwnerLocked(owner)"),
             unregister_body.index("return owner"),
         )
+
+    def test_plugin_owner_tokens_are_non_zero_and_snapshot_capabilities(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        body = extract_function_body(text, r"uint64_t AddPluginOwnerToken\(.*?\)")
+
+        self.assertIn("if (!owner)", body)
+        self.assertIn("return 0", body[: body.index("std::lock_guard<std::mutex>")])
+        self.assertIn("token = NextPluginOwnerToken().load", body)
+        self.assertIn("uint64_t nextToken = token + 1", body)
+        self.assertIn("if (nextToken == 0)", body)
+        self.assertIn("nextToken = 1", body)
+        self.assertIn("NextPluginOwnerToken().store(nextToken", body)
+        self.assertIn("token == 0 || PluginOwnerTokens().find(token) != PluginOwnerTokens().end()", body)
+        self.assertIn("PluginOwnerTokens()[token] = owner", body)
+        self.assertIn(".Capabilities = capabilities", body)
+
+        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+        self.assertIn("AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher)", load_body)
+
+    def test_public_plugin_manager_registration_handles_are_non_zero_and_not_live_reused(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        for function_name, next_id, registrations in (
+            (
+                "AllocateGameplayPolicyRegistrationIdLocked",
+                "NextGameplayPolicyRegistrationId()",
+                "GameplayPolicyRegistrations()",
+            ),
+            (
+                "AllocateChatMessageRegistrationIdLocked",
+                "NextChatMessageRegistrationId()",
+                "ChatMessageRegistrations()",
+            ),
+        ):
+            with self.subTest(function_name=function_name):
+                body = extract_function_body(text, rf"uint64_t {function_name}\(\)")
+                self.assertIn(f"id = {next_id}++", body)
+                self.assertIn(f"if ({next_id} == 0)", body)
+                self.assertIn(f"{next_id} = 1", body)
+                self.assertIn(f"id == 0 || {registrations}.find(id) != {registrations}.end()", body)
+                self.assertIn("return id", body)
+
+    def test_public_owner_token_capability_checks_use_owner_snapshot(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        capability_helpers = {
+            r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)": (
+                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS)",
+                "AreGlobalProcessEventCallbacksAllowed()",
+            ),
+            r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)": (
+                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS)",
+                "AreFilteredProcessEventCallbacksAllowed()",
+            ),
+            r"bool IsChatMessageEventCapabilityEnabledForOwnerLocked\(.*?\)": (
+                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS)",
+                "AreChatMessageEventsAllowed()",
+            ),
+            r"bool IsGameplayPolicyEventCapabilityEnabledForOwnerLocked\(.*?\)": (
+                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS)",
+            ),
+        }
+        for pattern, tokens in capability_helpers.items():
+            with self.subTest(pattern=pattern):
+                body = extract_function_body(text, pattern)
+                for token in tokens:
+                    self.assertIn(token, body)
+                self.assertNotIn("BuildApiCapabilities()", body)
+                self.assertNotIn("m_Api.capabilities", body)
+
+        timer_body = extract_function_body(text, r"uint64_t PluginRegisterTimerWithOwnerTokenHandle\(")
+        self.assertIn("PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_TIMERS)", timer_body)
+        self.assertNotIn("BuildApiCapabilities()", timer_body)
+        self.assertNotIn("m_Api.capabilities", timer_body)
 
     def test_unregister_plugin_callbacks_is_per_family_and_cleans_timers(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")

@@ -1048,6 +1048,62 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_request_pack_replay_contract_missing_required_sidecar_paths(self) -> None:
+        cases = (
+            (
+                "operator_request",
+                "operator_approval_request_path",
+                "operational_window_request_pack_replay_contract_operator_approval_request_path_mismatch",
+            ),
+            (
+                "copied_log",
+                "copied_log_path",
+                "operational_window_request_pack_replay_contract_copied_log_path_mismatch",
+            ),
+        )
+        for name, sidecar_key, expected_blocker in cases:
+            with self.subTest(name=name):
+                payload = manifest()
+                request_artifact = payload["operational_window"]["request_pack"]
+                request_path = Path(request_artifact["path"])
+                request = json.loads(request_path.read_text(encoding="utf-8"))
+                request["post_window_replay_contract"]["sidecars"].pop(sidecar_key)
+                self.rewrite_sidecar_and_refresh_identity(
+                    payload,
+                    request_artifact,
+                    json.dumps(request, sort_keys=True) + "\n",
+                )
+
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_blocker, report["blockers"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_request_pack_replay_contract_unexpected_sidecar_path(self) -> None:
+        payload = manifest()
+        request_artifact = payload["operational_window"]["request_pack"]
+        request_path = Path(request_artifact["path"])
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request["post_window_replay_contract"]["sidecars"]["stale_bundle_path"] = str(
+            request_path.parent / "stale-approved-bundle.json"
+        )
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            request_artifact,
+            json.dumps(request, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_request_pack_replay_contract_unexpected_sidecar", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_rejects_sidecar_public_sdk_or_runtime_readiness_overclaim(self) -> None:
         cases = (
             (

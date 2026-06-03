@@ -279,8 +279,10 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
 
         self.assertIn("Current completion snapshot for agents and contributors", status)
         self.assertIn("P0 dependency chain: `0/4` promoted", status)
-        self.assertIn("Complete SDK demand families: `0/12` promoted", status)
+        self.assertIn("v1 demand-family promotion gate: `0/12` promoted", status)
         self.assertIn("Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes", status)
+        self.assertIn("generated scoped statement can validate those seven rows as `7/7` bookkeeping", status)
+        self.assertIn("still leaves P0 `0/4`, the v1 demand-family gate `0/12`, and `stable_claim_allowed=false`", status)
         self.assertIn("approved_runtime_evidence_missing", status)
         self.assertIn("identity_public_contract_gate_missing", status)
         self.assertIn("does not unlock public identity, permissions/admin, command response, command replies", status)

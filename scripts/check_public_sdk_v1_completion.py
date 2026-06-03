@@ -886,6 +886,7 @@ UTC_TIMESTAMP_RE = re.compile(
 )
 RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE = r"[:\uff1a\ufe55\ua789\u2236]"
 RELEASE_STATEMENT_DETAIL_SEPARATOR_RE = r"[-\u2010-\u2015\u2212]"
+RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE = rf"\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s+"
 AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|production[- ]?grade|release[- ]?grade|stable)\s+"
     r"(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
@@ -2751,7 +2752,7 @@ def release_statement_surface_record_candidates(
 ) -> list[tuple[str, str, bool]]:
     pattern = re.compile(
         rf"^\s*{re.escape(surface_id)}\s*"
-        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+-\s+)\s*"
+        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|{RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE})\s*"
         rf"(?P<status>promoted|excluded|post-v1)"
         rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
@@ -2774,17 +2775,17 @@ def release_statement_surface_record_candidates(
     return records
 
 
-def release_statement_all_surface_records(text: str | None) -> list[dict[str, str]]:
+def release_statement_all_surface_records(text: str | None) -> list[dict[str, Any]]:
     if text is None:
         return []
     pattern = re.compile(
         rf"^\s*(?P<surface>obelisk\.[A-Za-z0-9_.-]+\.v1)\s*"
-        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+-\s+)\s*"
+        rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|{RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE})\s*"
         rf"(?P<status>promoted|excluded|post-v1)"
         rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
     )
-    records: list[dict[str, str]] = []
+    records: list[dict[str, Any]] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         match = pattern.fullmatch(line)
         if not match:
@@ -2797,14 +2798,13 @@ def release_statement_all_surface_records(text: str | None) -> list[dict[str, st
                 match.group("delimiter"),
             )
         ) and (status != "promoted" or has_reviewed_details)
-        if not canonical_reviewed_record:
-            continue
         records.append(
             {
                 "surface": match.group("surface"),
                 "outcome": status,
                 "line": line.strip(),
                 "line_number": str(line_number),
+                "canonical_reviewed_record": canonical_reviewed_record,
             }
         )
     return records
@@ -2846,7 +2846,7 @@ def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> 
         return True
     embedded_record_pattern = re.compile(
         rf"(?<![A-Za-z0-9_.-]){re.escape(surface_id)}\s*"
-        rf"(?:{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s+)\s*"
+        rf"(?:{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|{RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE})\s*"
         rf"(?:promoted|excluded|post-v1)\b",
         re.IGNORECASE,
     )

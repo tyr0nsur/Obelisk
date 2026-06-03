@@ -199,18 +199,21 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 delegated four scopes for post-identity lock and
-  SDK bookkeeping hardening. Integrated changes keep permissions/admin locked after
-  accepted runtime evidence or `identity_public_contract_gate_missing` until promoted
-  identity contract plus certificate; command response/replies reject route/reply/header/
-  accepted-runtime aliases; scoped v1 release-statement validation now accepts only the
-  seven non-P0 post-v1/excluded rows by default and rejects P0/promoted/experimental/
-  non-blocker rows unless explicitly allowed; stale player-identity pack recipes are
-  marked recovery-only and admin targets stay non-lifecycle anchors. Status docs now
-  expose SDK `0/12`, P0 `0/4`, scoped release-statement bookkeeping `0/7`, and
-  `stable_claim_allowed=false`. Validation: permissions/admin 64 OK, permissions query
-  44 OK, command response 40 OK, command replies 45 OK, public SDK completion 232 OK,
-  research+handoff 48 OK, route JSON planning-only at `approved_runtime_evidence_missing`,
-  SDK JSON blocked with SDK `0/12`, P0 `0/4`, and generated scoped statement
-  `ready=true` as non-complete bookkeeping only. `py_compile` and `git diff --check` OK.
-  No runtime/server/Discord/GitHub operation.
+- Latest integration note: 2026-06-03 delegated four scopes for P0 runtime-evidence
+  preparation, bound-route manifests, scoped release-statement parsing, and runtime ABI
+  static guardrails. Integrated changes require approved-evidence replay sidecars to name
+  the full post-window sibling set including operator request and copied log, reject
+  unexpected stale sidecar keys, make planning-source manifests fail closed on source/
+  schema/status/SHA/path drift and admin-target lifecycle misuse, require bound-route
+  checks to use exact CLI-bound manifests, make scoped release-statement validation see
+  delimiter variants and generated broad claims, and pin plugin-manager static guardrails
+  for init-window `CallProcessEvent`, non-zero/non-reused owner/registration handles, and
+  per-owner capability snapshots. `STATUS.md` now distinguishes default `0/7` statement
+  outcomes from generated `7/7` bookkeeping while keeping P0 `0/4`, demand-family gate
+  `0/12`, and `stable_claim_allowed=false`. Validation: approved-evidence/bundle 123 OK,
+  planning/bound-route 71 OK, SDK completion 234 OK, plugin/timer/event guardrails
+  36/7/6 OK, public SDK guardrails 196 OK, public chat guardrails 196 OK, handoff 15 OK,
+  route JSON planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with
+  SDK `0/12`, P0 `0/4`, generated scoped statement `ready=true` as non-complete
+  bookkeeping only, `py_compile` and `git diff --check` OK. No runtime/server/Discord/
+  GitHub operation.

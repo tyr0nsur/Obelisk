@@ -336,6 +336,18 @@ def route_manifest_path_matches(manifest: dict[str, Any], expected_path: Path) -
     )
 
 
+def route_manifest_cli_binding_matches(manifest: dict[str, Any], expected_path: Path) -> bool:
+    expected_text = str(expected_path)
+    return (
+        manifest.get("source") == "cli_bound"
+        and manifest.get("provided_by_cli") is True
+        and manifest.get("expected_path") == expected_text
+        and manifest.get("observed_path") == expected_text
+        and manifest.get("matched") is True
+        and route_manifest_path_matches(manifest, expected_path)
+    )
+
+
 def approved_runtime_evidence_diagnosis_matches_path(diagnosis: dict[str, Any], expected_path: Path) -> bool:
     expected = str(expected_path.resolve())
     observed = diagnosis.get("path")
@@ -438,6 +450,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         source_checker_internal_planning = (
             phase.get("source_checker_accepted_for_internal_planning") if isinstance(phase, dict) else None
         )
+        next_after_runtime = phase.get("next_after_runtime_evidence") if isinstance(phase, dict) else None
         manifest_sources = phase.get("source_checker_manifest_sources") if isinstance(phase, dict) else None
         approved_runtime_diagnosis = (
             phase.get("source_checker_approved_runtime_evidence_manifest") if isinstance(phase, dict) else None
@@ -471,6 +484,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append("route_gate_identity_readiness_ready_flag_overclaim")
         if source_checker_internal_planning is not False:
             blockers.append("route_gate_identity_readiness_internal_planning_overclaim")
+        if next_after_runtime != "identity_public_contract_gate_missing":
+            blockers.append("route_gate_next_after_runtime_evidence_unexpected")
+        for key in ("permissions_admin_unlocked", "command_response_unlocked", "commands_replies_unlocked"):
+            if not isinstance(phase, dict) or phase.get(key) is not False:
+                blockers.append(f"route_gate_{key}_overclaim")
         if accepted_approved_runtime is not None:
             if not isinstance(approved_runtime_diagnosis, dict):
                 blockers.append("route_gate_approved_runtime_evidence_manifest_missing")
@@ -503,11 +521,15 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 }
                 for key in ("lifecycle_anchor_candidates", "principal_invalidation_policy"):
                     manifest = manifests.get(key)
-                    if not isinstance(manifest, dict) or manifest.get("source") != "cli_bound":
+                    if not isinstance(manifest, dict):
                         blockers.append(f"route_gate_bound_identity_{key}_source_unexpected")
+                    elif manifest.get("source") != "cli_bound":
+                        blockers.append(f"route_gate_bound_identity_{key}_source_unexpected")
+                    elif manifest.get("provided_by_cli") is not True:
+                        blockers.append(f"route_gate_bound_identity_{key}_not_cli_provided")
                     elif manifest.get("matched") is not True:
                         blockers.append(f"route_gate_bound_identity_{key}_path_mismatch")
-                    elif not route_manifest_path_matches(manifest, expected_bound_paths[key]):
+                    elif not route_manifest_cli_binding_matches(manifest, expected_bound_paths[key]):
                         blockers.append(f"route_gate_bound_identity_{key}_canonical_path_mismatch")
         if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
             blockers.append("route_gate_lock_unexpected")

@@ -210,6 +210,18 @@ REQUIRED_OPERATIONAL_WINDOW_SIBLING_FILENAMES = {
 REQUIRED_IMPLICIT_OPERATIONAL_WINDOW_SIDECARS = {
     "operator_approval_request_md": "operator-approval-request.md",
 }
+REQUIRED_REQUEST_PACK_REPLAY_SIDECAR_KEYS = frozenset(
+    (
+        "request_pack_path",
+        "observer_env_path",
+        "operator_approval_request_path",
+        "operator_approval_receipt_path",
+        "preflight_pre_path",
+        "preflight_post_path",
+        "window_manifest_path",
+        "copied_log_path",
+    )
+)
 OPERATOR_APPROVAL_RECEIPT_SCOPE_FALSE_FLAGS = (
     "standing_approval",
     "reusable",
@@ -1112,16 +1124,44 @@ def validate_request_pack_binding(window: dict[str, Any], blockers: list[dict[st
     if not isinstance(sidecars, dict):
         add(blockers, "operational_window_request_pack_post_window_replay_contract_missing", label)
     else:
+        for key in sorted(set(sidecars) - REQUIRED_REQUEST_PACK_REPLAY_SIDECAR_KEYS):
+            add(
+                blockers,
+                "operational_window_request_pack_replay_contract_unexpected_sidecar",
+                label,
+                sidecar=key,
+            )
+        request_status = approved_artifact_status(window.get("request_pack"))
+        operator_request_path = (
+            str(request_status.resolved.parent / "operator-approval-request.md")
+            if request_status is not None
+            else None
+        )
         expected_sidecars = {
             "request_pack_path": resolved_artifact_path(window.get("request_pack")),
             "observer_env_path": resolved_artifact_path(window.get("observer_env")),
+            "operator_approval_request_path": operator_request_path,
             "operator_approval_receipt_path": resolved_artifact_path(window.get("operator_approval_receipt")),
-            "preflight_pre_path": resolved_artifact_path(window.get("preflight", {}).get("pre") if isinstance(window.get("preflight"), dict) else None),
-            "preflight_post_path": resolved_artifact_path(window.get("preflight", {}).get("post") if isinstance(window.get("preflight"), dict) else None),
+            "preflight_pre_path": resolved_artifact_path(
+                window.get("preflight", {}).get("pre") if isinstance(window.get("preflight"), dict) else None
+            ),
+            "preflight_post_path": resolved_artifact_path(
+                window.get("preflight", {}).get("post") if isinstance(window.get("preflight"), dict) else None
+            ),
             "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+            "copied_log_path": resolved_artifact_path(window.get("copied_log")),
         }
         for key, expected in expected_sidecars.items():
-            if expected is not None and sidecars.get(key) != expected:
+            actual = sidecars.get(key)
+            if not isinstance(actual, str):
+                add(
+                    blockers,
+                    f"operational_window_request_pack_replay_contract_{key}_mismatch",
+                    label,
+                    expected=expected,
+                    actual=actual,
+                )
+            elif expected is not None and actual != expected:
                 add(
                     blockers,
                     f"operational_window_request_pack_replay_contract_{key}_mismatch",
