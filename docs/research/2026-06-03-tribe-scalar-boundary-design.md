@@ -2,7 +2,7 @@
 
 ## Scope
 
-This note records the offline evidence boundary for a future internal tribe scalar checker.
+This note records the offline evidence boundary for the internal tribe scalar checker.
 It is not a public Tribe SDK claim, runtime observation, ABI contract, identity contract,
 lookup contract, mutation contract, return-override contract, ResourceHandle contract, or
 v1 completion signal.
@@ -46,8 +46,8 @@ Rejected/non-scalar candidates:
 
 ## Checker Shape
 
-A standalone `check_tribe_scalar_boundary_readiness.py` should stay offline and
-candidate-only. It should report a ready internal scalar boundary only if:
+`scripts/check_tribe_scalar_boundary_readiness.py` must stay offline and candidate-only.
+It should report a ready internal scalar boundary only if:
 
 - the three accepted targets above are present with exact names/outers and expected
   `num_parms`/`parms_size`;

@@ -678,6 +678,7 @@ STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS = {
 }
 STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS = re.compile(
     r"(?:approved[-_ ]?runtime(?:[-_ ]?(?:principal[-_ ]?lifecycle)?[-_ ]?evidence)?|"
+    r"runtime[-_ ]?(?:principal[-_ ]?)?lifecycle[-_ ]?evidence|"
     r"identity[-_ ]?(?:public[-_ ]?)?contract(?:[-_ ]?gate[-_ ]?missing)?)",
     re.IGNORECASE,
 )
@@ -754,6 +755,29 @@ PROMOTED_SURFACE_TEST_EXECUTION_HASH_KEYS = (
     "artifact_hash",
     "artifact_sha256",
 )
+PROMOTED_SURFACE_TEST_EXECUTION_COMMAND_MARKERS = {
+    "obelisk.player_identity.v1": (
+        "player_identity",
+        "player_identity_promotion",
+        "obelisk_player_identity_v1",
+    ),
+    "obelisk.permissions_admin.v1": (
+        "permissions_admin",
+        "permissions_admin_promotion",
+        "obelisk_permissions_admin_v1",
+    ),
+    "obelisk.command_chat_response_path.v1": (
+        "command_chat_response",
+        "command_response",
+        "command_chat_response_path",
+        "obelisk_command_chat_response_path_v1",
+    ),
+    "obelisk.commands_replies.v1": (
+        "commands_replies",
+        "command_replies",
+        "obelisk_commands_replies_v1",
+    ),
+}
 SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
 UTC_TIMESTAMP_RE = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})"
@@ -3448,16 +3472,39 @@ def load_repo_relative_json_artifact(raw_path: Any) -> tuple[dict[str, Any] | No
     return payload, None
 
 
-def executed_test_artifact_has_command(report: dict[str, Any]) -> bool:
+def normalized_execution_command_text(value: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def executed_test_artifact_command_text(report: dict[str, Any]) -> str | None:
     command = report.get("command")
     if isinstance(command, str) and command.strip():
-        return True
+        return command
     argv = report.get("argv")
-    return (
+    if (
         isinstance(argv, list)
         and bool(argv)
         and all(isinstance(item, str) and item.strip() for item in argv)
-    )
+    ):
+        return " ".join(argv)
+    return None
+
+
+def executed_test_artifact_has_command(report: dict[str, Any]) -> bool:
+    return executed_test_artifact_command_text(report) is not None
+
+
+def executed_test_artifact_command_matches_surface(report: dict[str, Any], surface_id: str) -> bool:
+    command_text = executed_test_artifact_command_text(report)
+    if command_text is None:
+        return False
+    normalized = normalized_execution_command_text(command_text)
+    markers = PROMOTED_SURFACE_TEST_EXECUTION_COMMAND_MARKERS.get(surface_id)
+    if markers is None:
+        surface_marker = surface_id.removeprefix("obelisk.").removesuffix(".v1")
+        markers = (surface_marker.replace(".", "_"),)
+    return any(normalized_execution_command_text(marker) in normalized for marker in markers)
 
 
 def executed_test_artifact_hash_problems(report: dict[str, Any]) -> list[str]:
@@ -3582,6 +3629,8 @@ def executed_test_report_missing(
             missing.append("executed_test_report:commit_mismatch")
     if not executed_test_artifact_has_command(executed):
         missing.append("executed_test_report:command_missing")
+    elif not executed_test_artifact_command_matches_surface(executed, surface_id):
+        missing.append("executed_test_report:command_surface_mismatch")
     if type(executed.get("exit_code")) is not int or executed.get("exit_code") != 0:
         missing.append("executed_test_report:exit_code_not_zero")
     missing.extend(executed_test_artifact_hash_problems(executed))

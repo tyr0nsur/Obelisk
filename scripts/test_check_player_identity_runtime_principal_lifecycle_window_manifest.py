@@ -391,6 +391,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         check: bool = True,
         create_copied_log: bool = True,
         copied_log_text: str = COPIED_LOG_TEXT,
+        post_window_replay: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "window-manifest.env"
@@ -404,8 +405,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                     copied_log_path = path.parent / copied_log_path
                     copied_log_path.parent.mkdir(parents=True, exist_ok=True)
                     copied_log_path.write_text(copied_log_text, encoding="utf-8")
+            command = [sys.executable, str(SCRIPT), str(path), "--json"]
+            if post_window_replay:
+                command.append("--post-window-replay")
             return subprocess.run(
-                [sys.executable, str(SCRIPT), str(path), "--json"],
+                command,
                 check=check,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -420,6 +424,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         create_copied_log: bool = True,
         copied_log_text: str = COPIED_LOG_TEXT,
         sidecar_mutator=None,
+        post_window_replay: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         workspace = Path("/servidor/ark/workspace-offline")
         if not workspace.is_dir() or not os.access(workspace, os.W_OK):
@@ -451,8 +456,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
                     copied_log_path = path.parent / copied_log_path
                 copied_log_path.parent.mkdir(parents=True, exist_ok=True)
                 copied_log_path.write_text(copied_log_text, encoding="utf-8")
+            command = [sys.executable, str(SCRIPT), str(path), "--json"]
+            if post_window_replay:
+                command.append("--post-window-replay")
             return subprocess.run(
-                [sys.executable, str(SCRIPT), str(path), "--json"],
+                command,
                 check=check,
                 text=True,
                 stdout=subprocess.PIPE,
@@ -507,6 +515,21 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["v1_completion_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_post_window_replay_rejects_future_operational_window(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            post_window_replay=True,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_window_ends_in_future", report["blockers"])
+        self.assertIn("actual_capture_ends_in_future", report["blockers"])
+        self.assertIn("rollback_window_ends_in_future", report["blockers"])
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["operational_window_manifest_ready"])
 
     def test_rejects_sidecar_in_other_approved_directory_even_with_matching_sha(self) -> None:
         def move_request_pack(exact_dir: Path, fields: dict[str, str]) -> None:

@@ -1441,6 +1441,26 @@ priorities, and do not use history files as the active source of truth.
   valid/planning-only, SDK JSON blocked by design, py_compile, and `git diff --check`.
   Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent replay/downstream/SDK/reflection hardening round:
+  post-window replay rejects future `approved_window_end_utc`,
+  `actual_capture_end_utc`, and `rollback_end_utc`; SDK completion treats
+  `runtime_lifecycle_evidence` and `runtime_principal_lifecycle_evidence` source markers
+  as non-promotional; promoted P0 `executed_test_report` artifacts must now have a
+  command/argv marker matching the surface (`player_identity`, `permissions_admin`,
+  `command_response`/`command_chat_response`, or `commands_replies`), so unrelated green
+  suites cannot satisfy structured promotion evidence. Tribe research docs now reference
+  the current `check_tribe_scalar_boundary_readiness.py` checker while preserving
+  candidate-only/no-public/no-runtime/no-ResourceHandle/no-v1 semantics. Handoff wording
+  explicitly records that repo-local lifecycle-anchor and principal-invalidation manifests
+  are consume-only planning inputs and source-bound, and that the default route consumes
+  those repo-local fallbacks while reporting `approved_runtime_evidence_missing`.
+  Durable note:
+  `docs/research/2026-06-03-executed-test-artifact-command-binding.md`. Validations
+  passed: SDK completion 215, public SDK guardrails 191, request/window/approved-evidence/
+  bundle 242, downstream P0/route/bound-route 195, side-lane JSON checks, route JSON
+  valid/planning-only, SDK JSON blocked by design, py_compile, and `git diff --check`.
+  Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

@@ -110,9 +110,10 @@ This file is an active routing table only. Durable evidence belongs in
   `obelisk.core-dump-evidence-pack.v1`, accepted `obelisk.reflection-inventory-pack.v1`,
   12/12 candidate fixtures, and accepted distinct second-source layout evidence from the
   vanilla-gdb core. Repo-local lifecycle-anchor and principal-invalidation manifests are
-  consume-only planning inputs; remaining blocker is approved runtime principal lifecycle
-  evidence. Do not rerun completed admin snapshot, second-source layout, or lifecycle
-  layout routes.
+  consume-only planning inputs and source-bound; the default route consumes those
+  repo-local fallbacks and reports `approved_runtime_evidence_missing`. The remaining
+  blocker is approved runtime principal lifecycle evidence. Do not rerun completed admin
+  snapshot, second-source layout, or lifecycle layout routes.
 - Player identity first evidence uses the 12-target `players-identity-lifecycle-intake`
   planning set. `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` are exact required admin targets in that set,
@@ -355,3 +356,22 @@ This file is an active routing table only. Durable evidence belongs in
   `approved_runtime_evidence_missing`, SDK JSON blocked by design with SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`, py_compile, and `git diff --check`. No
   runtime/server operation. Agents closed.
+- Latest round delegated request/window replay audit, downstream P0 dependency audit, SDK
+  source-marker/accounting audit, and offline reflection side-lane audit. Integrated
+  result: post-window replay now rejects future `approved_window_end_utc`,
+  `actual_capture_end_utc`, and `rollback_end_utc`; SDK completion rejects
+  `runtime_lifecycle_evidence` and `runtime_principal_lifecycle_evidence` source markers
+  as non-promotional; promoted P0 executed-test artifacts now require the command/argv to
+  contain a surface-specific execution marker, so unrelated green suites cannot satisfy
+  `executed_test_report`; tribe side-lane research now points at the current
+  `check_tribe_scalar_boundary_readiness.py` checker while preserving candidate-only,
+  no-public/no-runtime/no-ResourceHandle/no-v1 semantics. Current recipe wording now
+  explicitly records that repo-local lifecycle-anchor and principal-invalidation manifests
+  are consume-only planning inputs and source-bound, and that the default route consumes
+  those repo-local fallbacks while reporting `approved_runtime_evidence_missing`. Added
+  `docs/research/2026-06-03-executed-test-artifact-command-binding.md`. Validation
+  passed: SDK completion 215, public SDK guardrails 191, request/window/approved-evidence/
+  bundle 242, downstream P0/route/bound-route 195, side-lane JSON checks, route JSON
+  valid/planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked by design
+  with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, py_compile, and
+  `git diff --check`. No runtime/server operation. Agents closed.

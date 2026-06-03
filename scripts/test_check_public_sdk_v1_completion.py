@@ -7045,6 +7045,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ("sourceKind", "approvedRuntime"),
                 ("sourceKind", "approved-runtime"),
                 ("sourceKind", "approved_runtime_principal_lifecycle_evidence"),
+                ("sourceKind", "runtime_lifecycle_evidence"),
                 ("evidenceKind", "identityContract"),
                 ("evidenceKind", "identity-contract"),
                 ("evidenceKind", "identity_public_contract_gate_missing"),
@@ -8781,6 +8782,33 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, [])
+
+    def test_executed_test_artifact_command_must_match_surface(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ExecutedReportCommandSurface",
+        ) as core_dir:
+            artifact = Path(core_dir) / "permissions_admin_executed_tests.json"
+            artifact_path = write_executed_test_artifact(
+                artifact,
+                "obelisk.permissions_admin.v1",
+                command="python3 -m unittest unrelated_green_suite",
+            )
+
+            missing = module.executed_test_report_missing(
+                {"executed_test_report": artifact_path},
+                "obelisk.permissions_admin.v1",
+            )
+
+        self.assertIn("executed_test_report:command_surface_mismatch", missing)
 
     def test_executed_test_artifact_must_match_active_manifest_and_header_bindings(self) -> None:
         import importlib.util

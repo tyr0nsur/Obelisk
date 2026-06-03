@@ -406,6 +406,10 @@ def parse_utc_timestamp(value: str) -> datetime | None:
         return None
 
 
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def is_exact_or_test_fixture_run_log(path: Path, run_id: str) -> bool:
     expected_tail = (EXPECTED_COPIED_LOG_PARENT, run_id, "Obelisk.log")
     for root in APPROVED_OFFLINE_WORKSPACE_ROOTS:
@@ -1903,6 +1907,14 @@ def validate_manifest(
             add(blockers, "rollback_starts_before_capture_end", "rollback_start_utc")
         if timestamps["rollback_start_utc"] > timestamps["rollback_end_utc"]:
             add(blockers, "rollback_window_not_forward", "rollback_end_utc")
+        if post_window_replay:
+            current_time = now_utc()
+            if timestamps["approved_window_end_utc"] > current_time:
+                add(blockers, "approved_window_ends_in_future", "approved_window_end_utc")
+            if timestamps["actual_capture_end_utc"] > current_time:
+                add(blockers, "actual_capture_ends_in_future", "actual_capture_end_utc")
+            if timestamps["rollback_end_utc"] > current_time:
+                add(blockers, "rollback_window_ends_in_future", "rollback_end_utc")
         preflight_pre_checked_at = read_preflight_checked_at_utc(
             fields,
             manifest_path,
