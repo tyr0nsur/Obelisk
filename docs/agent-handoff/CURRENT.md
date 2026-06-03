@@ -233,3 +233,18 @@ This file is an active routing table only. Durable evidence belongs in
   remains valid/planning-only at `approved_runtime_evidence_missing`; SDK JSON remains
   blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
   Agents closed.
+- Latest round delegated permissions/admin dependency, command response/replies readiness,
+  approved-runtime replay, and release/SDK wording audits. Integrated result:
+  permissions/admin player-identity promotion certificates now require
+  `reviewed_artifact_hash` to match the reviewed player-identity surface record hash,
+  preventing unrelated reviewed hashes from satisfying the dependency. Command response
+  and commands/replies direct readiness now reject `identity_public_contract_gate_missing`
+  as a blocker alias; that blocker is identity-stage only, while downstream command gates
+  stay at `approved_runtime_evidence_missing` until identity and permissions/admin are
+  promoted. Command response/replies wording scans now catch public SDK, release
+  readiness, and v1 completion overclaims; commands/replies no longer treats
+  `release_guardrails` as a negative context. Approved-runtime replay/window sidecar
+  scans now catch compound `public_runtime_v1_ready`/runtime-v1-ready claims. Release/SDK
+  audit made no edits. Route JSON remains valid/planning-only at
+  `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.

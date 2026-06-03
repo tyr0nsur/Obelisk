@@ -1037,6 +1037,12 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 "operational_window_sidecar_readiness_flag_overclaim",
             ),
             (
+                "request_public_runtime_v1_ready",
+                lambda payload: payload["operational_window"]["request_pack"],
+                lambda sidecar: sidecar.update({"public_runtime_v1_ready": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
                 "request_stable_camel_case",
                 lambda payload: payload["operational_window"]["request_pack"],
                 lambda sidecar: sidecar.update({"stableClaimAllowed": True}),

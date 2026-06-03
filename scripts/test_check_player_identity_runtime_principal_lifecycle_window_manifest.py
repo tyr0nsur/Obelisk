@@ -1883,15 +1883,20 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_public_capability_or_readiness_terms_in_allowed_values(self) -> None:
-        result = self.run_checker(
-            manifest_lines(rollback_delta="removed_observer_env_after_public_sdk_ready_and_command_reply_support"),
-            check=False,
-        )
-        report = json.loads(result.stdout)
+        for rollback_delta in (
+            "removed_observer_env_after_public_sdk_ready_and_command_reply_support",
+            "removed_observer_env_after_public_runtime_v1_ready",
+        ):
+            with self.subTest(rollback_delta=rollback_delta):
+                result = self.run_checker(
+                    manifest_lines(rollback_delta=rollback_delta),
+                    check=False,
+                )
+                report = json.loads(result.stdout)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("forbidden_public_capability_or_readiness_value", report["blockers"])
-        self.assertFalse(report["ready"])
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forbidden_public_capability_or_readiness_value", report["blockers"])
+                self.assertFalse(report["ready"])
 
     def test_rejects_noncanonical_rollback_delta(self) -> None:
         result = self.run_checker(

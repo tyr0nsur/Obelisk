@@ -371,6 +371,8 @@ FORBIDDEN_KEY_RE = re.compile(
 )
 POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity|header)|"
+    r"(?:public[_ -]?)?(?:runtime[_ -]?)?v1[_ -]?(?:sdk[_ -]?)?"
+    r"(?:ready|readiness|enabled|allowed|supported|complete|completed|completion)|"
     r"(?:stable|complete|full|production)[_ -]?(?:v1[_ -]?)?(?:sdk[_ -]?)?claim[_ -]?(?:allowed|ready|enabled|supported)|"
     r"(?:stable|complete|full|production)[_ -]?sdk[_ -]?(?:ready|allowed|claim)|"
     r"stable[_ -]?release[_ -]?contract[_ -]?claim[_ -]?allowed|"

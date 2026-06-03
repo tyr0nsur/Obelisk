@@ -1328,6 +1328,24 @@ priorities, and do not use history files as the active source of truth.
   JSON blocked by design, py_compile, and `git diff --check`. Route/SDK remain fail-closed
   at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent downstream P0 guardrail round: permissions/admin now
+  requires player-identity promotion certificates to have
+  `reviewed_artifact_hash == reviewed_surface_record_sha256` in addition to matching the
+  promoted player-identity surface record hash, preventing arbitrary reviewed hash replay.
+  Command chat response and commands/replies direct readiness no longer accept
+  `identity_public_contract_gate_missing`; that remains identity-stage only after approved
+  runtime evidence, while downstream command gates require the canonical
+  `approved_runtime_evidence_missing` blocker until identity and permissions/admin are
+  promoted. Command response/replies overclaim scans now catch public SDK, release
+  readiness, and v1 completion claims, and commands/replies no longer treats
+  `release_guardrails` as a negative context. Approved-runtime replay/window sidecar
+  scans now catch compound public/runtime/v1 readiness terms such as
+  `public_runtime_v1_ready`. Release/SDK wording audit found no additional gap. Validations
+  passed: permissions/admin/query/decisions 106, command response/replies/intent/bridge
+  115, approved-runtime/window/approved-manifest 150, py_compile, route JSON
+  valid/planning-only, SDK JSON blocked by design, and `git diff --check`. Route/SDK remain
+  fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

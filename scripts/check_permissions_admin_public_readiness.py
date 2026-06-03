@@ -1089,6 +1089,8 @@ def player_identity_has_promotion_certificate(
         or reviewed_surface_hash.lower() != player_identity_surface_record_sha256(identity)
     ):
         return False
+    if reviewed_artifact_hash.lower() != reviewed_surface_hash.lower():
+        return False
     return (
         certificate.get("schema") == PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA
         and certificate.get("surface_id") == IDENTITY_SURFACE

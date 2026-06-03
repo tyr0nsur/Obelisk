@@ -33,6 +33,29 @@ sys.modules[SPEC.name] = READINESS
 SPEC.loader.exec_module(READINESS)
 
 
+def response_target_snapshot_payload(target: str) -> dict:
+    return {
+        "schema": "obelisk.ufunction-chain.snapshot.v1",
+        "evidence": {
+            "artifact_sha256": "b" * 64,
+            "capture_id": "unit-test-commands-replies-response",
+            "evidence_pack_id": "unit-test-commands-replies-response-pack",
+            "source": "unit-test",
+            "status": "candidate-only",
+        },
+        "targets": [
+            {
+                "target": {"name": target.rsplit(".", 1)[1]},
+                "property_chain": {
+                    "properties": [
+                        {"name": "UnitTestProperty", "status": "candidate-only"},
+                    ]
+                },
+            }
+        ],
+    }
+
+
 class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
     def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -77,6 +100,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             return str(root / "base-snapshots" / basename)
 
         source_root = str(root) if root is not None else "/offline"
+        candidate_root = str(root / "candidate-snapshots") if root is not None else "/offline-candidate"
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "evidence_scope": "second_source_layout_evidence_only",
@@ -88,6 +112,8 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                     "scripts/compare_reflection_snapshots.py",
                     "--base-root",
                     source_root,
+                    "--candidate-root",
+                    candidate_root,
                     "--target-set",
                     "command-chat-response-route-planning",
                     "--readiness-report",
@@ -176,10 +202,12 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
     def write_response_report(self, root: Path) -> Path:
         snapshot_root = root / "base-snapshots"
+        candidate_root = root / "candidate-snapshots"
         snapshot_root.mkdir(parents=True, exist_ok=True)
+        candidate_root.mkdir(parents=True, exist_ok=True)
         for target in RESPONSE_TARGETS:
             (snapshot_root / f"{target.rsplit(':', 1)[1]}.snapshot.json").write_text(
-                json.dumps({"schema": "obelisk.ufunction-chain.snapshot.v1", "target": target}),
+                json.dumps(response_target_snapshot_payload(target.rsplit(":", 1)[1])),
                 encoding="utf-8",
             )
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
@@ -265,6 +293,52 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
+
+    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            report = READINESS.build_report(
+                decisions_path=DECISIONS,
+                surfaces_path=SURFACES,
+                public_header_path=HEADER,
+                response_path_report_path=report_path,
+                response_path_root=root,
+                response_path_readiness=root / "command-chat-response-route-planning-readiness.json",
+                response_path_report_root=root,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("current_route_blocker_mismatch", report["blockers"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_release_guardrail_public_sdk_or_v1_readiness_overclaim(self) -> None:
+        surfaces = self.load_surfaces()
+        surfaces["release_guardrails"].append("v1 SDK completion is ready and public runtime readiness is supported.")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), surfaces=surfaces)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("positive_public_surface_claim", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_summary_only_response_path_report_without_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -113,3 +113,63 @@ changing the default blocker:
 These changes are guardrails only. They do not create approved runtime evidence,
 do not authorize runtime work, do not promote public identity, and do not move
 SDK progress above `0/12` or P0 above `0/4`.
+
+## Downstream P0 Gate Snapshot
+
+The follow-up downstream audit sampled the three public-readiness gates that
+depend on player identity:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_permissions_admin_public_readiness.py \
+  --query-failclosed-artifact docs/permissions_admin_query_failclosed_contract.json \
+  --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_chat_response_public_readiness.py --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_commands_replies_public_readiness.py --json
+```
+
+Observed results:
+
+- Permissions/admin: `valid=true`, `accepted_for_planning=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `dependency_chain_locked=true`, and `counts_toward_public_sdk=false`,
+  `counts_toward_runtime=false`, `counts_toward_v1_completion=false`.
+- Command chat response: `valid=true`, `accepted_for_planning=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `dependency_chain_locked=true`, and all public/runtime/v1 accounting flags false.
+- Commands/replies standalone: `valid=false`, `accepted_for_planning=false`, and
+  `blockers=[response_path_report_required]` when run without the composed
+  response-path report supplied by the canonical route gate. This standalone
+  failure is expected and prevents commands/replies from bypassing the response
+  path dependency.
+
+The canonical route gate remains the source of truth for composing these checks;
+standalone downstream acceptance does not imply public SDK, runtime, command
+router, reply/send-chat ABI, or v1 completion readiness.
+
+## Downstream P0 Hardening
+
+The next supervised downstream round closed three additional bypass classes:
+
+- Permissions/admin promotion certificates now require
+  `reviewed_artifact_hash == reviewed_surface_record_sha256` after the reviewed
+  surface record hash is checked against the promoted player-identity surface.
+  A non-zero but unrelated reviewed artifact hash no longer satisfies the
+  player-identity dependency certificate.
+- Command chat response and commands/replies direct public-readiness reports no
+  longer accept `identity_public_contract_gate_missing` as a route-blocker alias.
+  That blocker is valid for the identity stage after approved runtime evidence,
+  but command response/replies remain downstream of both promoted identity and
+  permissions/admin; their direct gates now accept only the canonical
+  pre-runtime blocker `approved_runtime_evidence_missing` and report
+  `current_route_blocker_mismatch` otherwise.
+- Command response/replies overclaim scans now catch explicit `public SDK`,
+  `release readiness`, and `v1 completion` wording; `release_guardrails` no
+  longer hides positive public/v1 readiness claims in the commands/replies gate.
+- Approved runtime principal lifecycle evidence and window-manifest sidecar
+  scanners now catch compound positive keys/text such as
+  `public_runtime_v1_ready` and `runtime v1 ready`.
+
+These are offline guardrails only. They keep P0 downstream gates from treating
+identity-stage progress, request/window artifacts, or wording sidecars as
+permissions/admin, response-path, replies, public SDK, runtime, or v1 completion
+promotion evidence.

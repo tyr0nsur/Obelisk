@@ -74,6 +74,8 @@ FORBIDDEN_VALUE_RE = re.compile(
 POSITIVE_CAPABILITY_VALUE_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
     r"public[_ -]?headers?[_ -]?(?:allowed|ready|enabled|supported)|"
+    r"(?:public[_ -]?)?(?:runtime[_ -]?)?v1[_ -]?(?:sdk[_ -]?)?"
+    r"(?:ready|readiness|enabled|allowed|supported|complete|completed|completion)|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
     r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"

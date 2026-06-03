@@ -448,6 +448,53 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
 
+    def test_rejects_route_blocker_alias_even_when_called_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            report = READINESS.build_report(
+                root,
+                readiness_path,
+                decisions_path,
+                public_header_path,
+                SURFACES,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("current_route_blocker_mismatch", report["blockers"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_release_or_v1_readiness_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+            decisions["release_note"] = "v1 SDK completion is ready and release readiness is public."
+            decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("positive_public_surface_claim", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_default_root_is_repo_local_and_provenance_bound(self) -> None:
         self.assertTrue(READINESS.DEFAULT_ROOT.is_relative_to(REPO_ROOT))
         self.assertNotIn("/servidor/ark", str(READINESS.DEFAULT_ROOT))

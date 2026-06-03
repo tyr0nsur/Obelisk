@@ -35,7 +35,6 @@ DEPENDENCY_CHAIN = [IDENTITY_SURFACE, PERMISSIONS_SURFACE, SURFACE, COMMANDS_REP
 CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
 ALLOWED_ROUTE_BLOCKERS = (
     "approved_runtime_evidence_missing",
-    "identity_public_contract_gate_missing",
 )
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 TARGET_SET = "command-chat-response-route-planning"
@@ -316,6 +315,7 @@ NEGATIVE_CONTEXT_TOKENS = (
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"public\s+headers?|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
+    r"public\s+(?:command\s+)?sdk(?:\s+readiness)?|release\s+readiness|v1\s+(?:sdk\s+)?completion|"
     r"repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
     r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
@@ -1239,6 +1239,14 @@ def build_report(
     if surfaces is not None:
         validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)
+    if current_route_blocker != CURRENT_ROUTE_BLOCKER:
+        add(
+            blockers,
+            "current_route_blocker_mismatch",
+            "$.current_route_blocker",
+            expected=CURRENT_ROUTE_BLOCKER,
+            value=current_route_blocker,
+        )
 
     valid = not blockers
     return {
@@ -1248,8 +1256,8 @@ def build_report(
         "planning_only": valid,
         "dependency_chain": DEPENDENCY_CHAIN,
         "dependency_chain_locked": True,
-        "current_route_blocker": current_route_blocker,
-        "remaining_route_blockers": [current_route_blocker],
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1262,7 +1270,7 @@ def build_report(
         "runtime_ready": False,
         "non_claim": (
             "valid planning output does not count command/chat response while player identity remains "
-            f"blocked on {current_route_blocker}"
+            f"blocked on {CURRENT_ROUTE_BLOCKER}"
         ),
         "surface": SURFACE,
         "target_set": TARGET_SET,
