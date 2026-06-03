@@ -1056,6 +1056,8 @@ def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str
         else []
     )
     accepted_anchor_snapshot_sha256_by_target: dict[str, str] = {}
+    accepted_anchor_corroboration_status_by_target: dict[str, str] = {}
+    accepted_anchor_static_report_sha256_by_target: dict[str, str] = {}
     for anchor in payload.get("candidate_anchors", []):
         if not isinstance(anchor, dict) or anchor.get("accepted") is not True:
             continue
@@ -1068,6 +1070,23 @@ def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str
         )
         if isinstance(target, str) and source_snapshot_sha256:
             accepted_anchor_snapshot_sha256_by_target[target] = source_snapshot_sha256
+        corroboration = anchor.get("corroboration")
+        if isinstance(target, str) and isinstance(corroboration, dict):
+            status = corroboration.get("status")
+            if isinstance(status, str):
+                accepted_anchor_corroboration_status_by_target[target] = status
+            static_report_sha256 = corroboration.get("static_report_sha256")
+            if isinstance(static_report_sha256, str):
+                accepted_anchor_static_report_sha256_by_target[target] = static_report_sha256
+    expected_static_targets = {"ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"}
+    static_anchor_provenance_bound = (
+        set(accepted_anchor_static_report_sha256_by_target) == expected_static_targets
+        and all(
+            accepted_anchor_corroboration_status_by_target.get(target) == "static_accepted"
+            for target in expected_static_targets
+        )
+        and len(set(accepted_anchor_static_report_sha256_by_target.values())) == 1
+    )
     return {
         **base,
         "ready": ready,
@@ -1083,6 +1102,9 @@ def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str
         "schema": payload.get("schema"),
         "artifact_identity_source_artifact_ids": source_artifact_ids,
         "accepted_anchor_snapshot_sha256_by_target": accepted_anchor_snapshot_sha256_by_target,
+        "accepted_anchor_corroboration_status_by_target": accepted_anchor_corroboration_status_by_target,
+        "accepted_anchor_static_report_sha256_by_target": accepted_anchor_static_report_sha256_by_target,
+        "static_anchor_provenance_bound": static_anchor_provenance_bound,
     }
 
 
@@ -1193,7 +1215,8 @@ def planning_provenance_blockers(
     if lifecycle_candidate_diagnosis.get("ready") is True:
         first_source_ids = first_evidence_source_artifact_ids(first_evidence_payload)
         lifecycle_source_ids = string_list(lifecycle_candidate_diagnosis.get("artifact_identity_source_artifact_ids"))
-        if not first_source_ids or lifecycle_source_ids != first_source_ids:
+        lifecycle_static_bound = lifecycle_candidate_diagnosis.get("static_anchor_provenance_bound") is True
+        if not first_source_ids or (lifecycle_source_ids != first_source_ids and not lifecycle_static_bound):
             blockers.append("lifecycle_anchor_source_artifact_identity_mismatch")
         first_snapshot_by_target = first_evidence_snapshot_sha256_by_target(first_evidence_payload)
         lifecycle_snapshot_by_target = lifecycle_candidate_diagnosis.get("accepted_anchor_snapshot_sha256_by_target")

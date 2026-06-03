@@ -259,13 +259,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
         self.assertTrue(report["route_lock_invariant_valid"])
-        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", report["current_route_blocker"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
         self.assertEqual(
-            ["lifecycle_anchor_first_evidence_provenance_unbound"],
+            ["approved_runtime_evidence_missing"],
             report["remaining_route_blockers"],
         )
         self.assertEqual(
-            "bind_lifecycle_anchor_and_principal_policy_sources",
+            "produce_approved_runtime_principal_lifecycle_evidence",
             report["next_route_action"],
         )
         self.assertEqual(
@@ -281,17 +281,17 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual(4, len(report["checks"]))
+        self.assertEqual(8, len(report["checks"]))
         self.assertEqual(
-            "lifecycle_anchor_first_evidence_provenance_unbound",
+            "approved_runtime_evidence_missing",
             report["critical_path_phase"]["current_blocker"],
         )
         self.assertEqual(
-            "lifecycle_anchor_first_evidence_provenance_unbound",
+            "approved_runtime_evidence_missing",
             report["critical_path_phase"]["source_checker_primary_blocker"],
         )
         self.assertIn(
-            "lifecycle_anchor_first_evidence_provenance_unbound",
+            "approved_runtime_evidence_missing",
             report["critical_path_phase"]["source_checker_blockers"],
         )
         self.assertEqual(
@@ -299,7 +299,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "locked": True,
                 "invariant_valid": True,
                 "blocked_until": [
-                    "bound_lifecycle_anchor_and_principal_policy_sources",
+                    "approved_runtime_principal_lifecycle_evidence",
                     "reviewed_identity_public_contract",
                 ],
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
@@ -308,8 +308,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         check_names = {check["name"] for check in report["checks"]}
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
-        self.assertNotIn("player_identity_public_contract_gap", check_names)
-        self.assertFalse(check_names & ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS)
+        self.assertIn("player_identity_public_contract_gap", check_names)
+        self.assertTrue(ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS.issubset(check_names))
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
@@ -1305,6 +1305,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "principal-claim-source": {"source": "runtime-local"},
                 "commandPrincipalSource": ["approved runtime evidence"],
                 "public_identity_source": "reviewed_identity_public_contract",
+                "runtime_identity_source": {"source": "lifecycle-anchor-report"},
+                "publicIdentitySource": "players_identity_lifecycle_anchor_candidates",
                 "candidate_source": "runtime_lifecycle_evidence",
             }
         }
@@ -1316,6 +1318,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.principal-claim-source", claims)
         self.assertIn("nested.commandPrincipalSource", claims)
         self.assertIn("nested.public_identity_source", claims)
+        self.assertIn("nested.runtime_identity_source", claims)
+        self.assertIn("nested.publicIdentitySource", claims)
         self.assertNotIn("nested.candidate_source", claims)
 
     def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:

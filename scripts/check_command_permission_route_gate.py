@@ -179,6 +179,8 @@ FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE = re.compile(
     r"runtime_lifecycle_evidence|"
     r"reviewed_identity_public_contract|"
     r"identity_public_contract|"
+    r"(?:players?_?)?identity_?lifecycle_?anchor_?candidates?|"
+    r"lifecycle_?anchor_?(?:candidates?|report|evidence)|"
     r"public_identity"
     r")"
 )

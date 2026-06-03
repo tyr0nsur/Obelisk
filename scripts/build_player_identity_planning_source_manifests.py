@@ -22,6 +22,13 @@ import protected_paths
 REPORT_SCHEMA = "obelisk.player-identity-planning-source-manifests-build-report.v1"
 FIRST_EVIDENCE_OUTPUT_NAME = "players-identity-first-evidence.json"
 REPORT_OUTPUT_NAME = "player-identity-planning-source-manifests-report.json"
+DEFAULT_LIFECYCLE_STATIC_REPORT = (
+    Path(__file__).resolve().parents[1]
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "players-lifecycle-anchor-static-report.json"
+)
 LIFECYCLE_TARGETS = (
     ("session_start", "ShooterGameMode.HandleNewPlayer"),
     ("session_end", "ShooterGameMode.OnLogout"),
@@ -45,6 +52,12 @@ def parse_args() -> argparse.Namespace:
         help="Sanitized UFunction snapshot root used for first-evidence and focal lifecycle snapshots.",
     )
     parser.add_argument("--output-dir", type=Path, help="Directory for generated planning manifests.")
+    parser.add_argument(
+        "--lifecycle-static-report",
+        type=Path,
+        default=DEFAULT_LIFECYCLE_STATIC_REPORT,
+        help="Repo-local lifecycle-anchor static report used to bind accepted anchor provenance.",
+    )
     parser.add_argument(
         "--verify-existing-dir",
         type=Path,
@@ -95,6 +108,16 @@ def safe_existing_dir(path: Path) -> Path:
     return resolved
 
 
+def safe_optional_input_file(path: Path | None, label: str) -> Path | None:
+    if path is None:
+        return None
+    protected_paths.reject_symlink_component(path, label)
+    resolved = protected_paths.reject_protected_input_path(path, label)
+    if not resolved.is_file():
+        raise SystemExit(f"{label} is not a file: {resolved}")
+    return resolved
+
+
 def manifest_target_paths(snapshot_root: Path) -> dict[str, Path]:
     manifest = load_json(snapshot_root / "manifest.json", "snapshot manifest")
     sha_prefix = manifest.get("sha_prefix")
@@ -115,6 +138,39 @@ def manifest_target_paths(snapshot_root: Path) -> dict[str, Path]:
             continue
         result[f"{outer}.{name}"] = snapshot_root / sha_prefix / module / file_name
     return result
+
+
+def lifecycle_static_report_hash(path: Path) -> str:
+    return sha256_file(path)
+
+
+def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | None, str | None]:
+    if path is None:
+        return None, None
+    payload = load_json(path, "lifecycle-static-report")
+    if payload.get("schema") != "obelisk.players-identity-lifecycle-anchor-static-report.v1":
+        raise SystemExit("lifecycle-static-report schema mismatch")
+    if payload.get("ready") is not True or payload.get("accepted_for_lifecycle_anchor_binding") is not True:
+        raise SystemExit("lifecycle-static-report is not accepted for lifecycle anchor binding")
+    if payload.get("corroboration_status") != "static_accepted":
+        raise SystemExit("lifecycle-static-report corroboration status mismatch")
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if payload.get(key) is not False:
+            raise SystemExit(f"lifecycle-static-report {key} must be false")
+    artifact_identity = payload.get("artifact_identity")
+    if not isinstance(artifact_identity, dict):
+        raise SystemExit("lifecycle-static-report artifact_identity missing")
+    source_ids = artifact_identity.get("source_artifact_ids")
+    if not isinstance(source_ids, list) or not source_ids:
+        raise SystemExit("lifecycle-static-report source_artifact_ids missing")
+    accepted_targets = payload.get("accepted_targets")
+    targets_by_name = {
+        entry.get("target"): entry for entry in accepted_targets if isinstance(entry, dict)
+    } if isinstance(accepted_targets, list) else {}
+    missing = [target for _, target in LIFECYCLE_TARGETS if target not in targets_by_name]
+    if missing:
+        raise SystemExit("lifecycle-static-report missing accepted lifecycle targets: " + ", ".join(missing))
+    return payload, lifecycle_static_report_hash(path)
 
 
 def snapshot_target_payload(path: Path, target: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -196,6 +252,7 @@ def lifecycle_anchor(
     snapshot_path: Path,
     snapshot_payload: dict[str, Any],
     target_payload: dict[str, Any],
+    static_report_sha256: str | None,
 ) -> dict[str, Any]:
     expected = lifecycle_checker.LIFECYCLE_LAYOUT_CANDIDATE_TARGETS[target]
     property_chain = target_payload.get("property_chain")
@@ -237,15 +294,21 @@ def lifecycle_anchor(
             "binary_sha256": evidence.get("ark_binary_sha256"),
         },
         "corroboration": {
-            "status": "second_source_accepted",
+            "status": "static_accepted" if static_report_sha256 else "second_source_accepted",
             "second_source_report_sha256": None,
-            "static_report_sha256": None,
+            "static_report_sha256": static_report_sha256,
         },
         "blockers": [],
     }
 
 
-def build_lifecycle_manifest(first_evidence: dict[str, Any], snapshot_root: Path) -> dict[str, Any]:
+def build_lifecycle_manifest(
+    first_evidence: dict[str, Any],
+    snapshot_root: Path,
+    *,
+    lifecycle_static_report: dict[str, Any] | None = None,
+    lifecycle_static_report_sha256: str | None = None,
+) -> dict[str, Any]:
     paths = manifest_target_paths(snapshot_root)
     anchors: list[dict[str, Any]] = []
     for index, (role, target) in enumerate(LIFECYCLE_TARGETS, start=1):
@@ -261,13 +324,23 @@ def build_lifecycle_manifest(first_evidence: dict[str, Any], snapshot_root: Path
                 snapshot_path=path,
                 snapshot_payload=snapshot_payload,
                 target_payload=target_payload,
+                static_report_sha256=lifecycle_static_report_sha256,
             )
         )
 
     artifact = first_evidence.get("artifact_identity")
     if not isinstance(artifact, dict):
         raise SystemExit("first-evidence artifact_identity missing")
-    source_artifact_ids = binder.first_evidence_readiness.first_evidence_source_artifact_ids(first_evidence)
+    static_identity = (
+        lifecycle_static_report.get("artifact_identity")
+        if isinstance(lifecycle_static_report, dict) and isinstance(lifecycle_static_report.get("artifact_identity"), dict)
+        else None
+    )
+    source_artifact_ids = (
+        list(static_identity.get("source_artifact_ids", []))
+        if isinstance(static_identity, dict)
+        else binder.first_evidence_readiness.first_evidence_source_artifact_ids(first_evidence)
+    )
     if not source_artifact_ids:
         raise SystemExit("first-evidence artifact_identity.source_artifact_ids is empty")
     return {
@@ -280,9 +353,13 @@ def build_lifecycle_manifest(first_evidence: dict[str, Any], snapshot_root: Path
         "input_target_set": lifecycle_checker.TARGET_SET,
         "snapshot_root": "redacted",
         "artifact_identity": {
-            "ark_binary_sha256": artifact.get("ark_binary_sha256"),
-            "obelisk_commit": artifact.get("obelisk_commit"),
-            "build_type": artifact.get("build_type"),
+            "ark_binary_sha256": (
+                static_identity.get("ark_binary_sha256") if isinstance(static_identity, dict) else artifact.get("ark_binary_sha256")
+            ),
+            "obelisk_commit": (
+                static_identity.get("obelisk_commit") if isinstance(static_identity, dict) else artifact.get("obelisk_commit")
+            ),
+            "build_type": "sanitized_snapshot" if isinstance(static_identity, dict) else artifact.get("build_type"),
             "target_set_revision": lifecycle_checker.TARGET_SET_REVISION,
             "source_artifact_ids": source_artifact_ids,
             "path_redacted": True,
@@ -687,6 +764,8 @@ def build_report(
     principal: dict[str, Any],
     binder_report: dict[str, Any],
     lifecycle_snapshot_root_binding: dict[str, Any],
+    lifecycle_static_report_path: Path | None,
+    lifecycle_static_report_sha256: str | None,
 ) -> dict[str, Any]:
     return {
         "schema": REPORT_SCHEMA,
@@ -717,6 +796,11 @@ def build_report(
                 principal["lifecycle_layout_source"]["source_binding"]
             ),
             "lifecycle_snapshot_root_binding": copy.deepcopy(lifecycle_snapshot_root_binding),
+            "lifecycle_static_report": {
+                "path": str(lifecycle_static_report_path) if lifecycle_static_report_path is not None else None,
+                "sha256": lifecycle_static_report_sha256,
+                "bound": lifecycle_static_report_sha256 is not None,
+            },
             "binder_ready": binder_report.get("ready") is True,
             "binder_blockers": binder_report.get("blockers", []),
         },
@@ -729,9 +813,11 @@ def build_into_dir(
     *,
     snapshot_root: Path,
     output_dir: Path,
+    lifecycle_static_report_path: Path | None = DEFAULT_LIFECYCLE_STATIC_REPORT,
     verify_existing_dir: Path | None = None,
 ) -> dict[str, Any]:
     output_dir = binder.prepare_output_dir(output_dir)
+    lifecycle_static_report, lifecycle_static_report_sha256 = load_lifecycle_static_report(lifecycle_static_report_path)
 
     first_evidence = build_redacted_ufunction_signatures.build_players_identity_first_evidence(
         snapshot_root=snapshot_root
@@ -744,7 +830,12 @@ def build_into_dir(
     if first_blockers:
         raise SystemExit("generated first-evidence failed validation: " + json.dumps(validation_reasons(first_blockers), sort_keys=True))
 
-    lifecycle = build_lifecycle_manifest(first_evidence, snapshot_root)
+    lifecycle = build_lifecycle_manifest(
+        first_evidence,
+        snapshot_root,
+        lifecycle_static_report=lifecycle_static_report,
+        lifecycle_static_report_sha256=lifecycle_static_report_sha256,
+    )
     lifecycle_blockers = lifecycle_checker.validate_manifest(lifecycle, promote=False)
     if lifecycle_blockers:
         return lifecycle_generation_failure_report(
@@ -799,17 +890,25 @@ def build_into_dir(
         principal=principal,
         binder_report=binder_report,
         lifecycle_snapshot_root_binding=lifecycle_snapshot_root_binding,
+        lifecycle_static_report_path=lifecycle_static_report_path,
+        lifecycle_static_report_sha256=lifecycle_static_report_sha256,
     )
     binder.atomic_write_json(report_path, report)
     return report
 
 
-def verify_existing_dir(*, snapshot_root: Path, existing_dir: Path) -> dict[str, Any]:
+def verify_existing_dir(
+    *,
+    snapshot_root: Path,
+    existing_dir: Path,
+    lifecycle_static_report_path: Path | None = DEFAULT_LIFECYCLE_STATIC_REPORT,
+) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="obelisk-player-identity-planning-verify-") as temp_dir:
         generated_dir = Path(temp_dir) / "generated"
         generated_report = build_into_dir(
             snapshot_root=snapshot_root,
             output_dir=generated_dir,
+            lifecycle_static_report_path=lifecycle_static_report_path,
             verify_existing_dir=existing_dir,
         )
         if generated_report.get("valid") is not True:
@@ -905,13 +1004,19 @@ def verify_existing_dir(*, snapshot_root: Path, existing_dir: Path) -> dict[str,
 def main() -> int:
     args = parse_args()
     snapshot_root = safe_snapshot_root(args.snapshot_root)
+    lifecycle_static_report_path = safe_optional_input_file(args.lifecycle_static_report, "lifecycle-static-report")
     if args.verify_existing_dir is not None:
         report = verify_existing_dir(
             snapshot_root=snapshot_root,
             existing_dir=safe_existing_dir(args.verify_existing_dir),
+            lifecycle_static_report_path=lifecycle_static_report_path,
         )
     else:
-        report = build_into_dir(snapshot_root=snapshot_root, output_dir=args.output_dir)
+        report = build_into_dir(
+            snapshot_root=snapshot_root,
+            output_dir=args.output_dir,
+            lifecycle_static_report_path=lifecycle_static_report_path,
+        )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     if not report["valid"] and "lifecycle_anchor_candidate_blocker_reasons" in report:

@@ -1201,6 +1201,21 @@ priorities, and do not use history files as the active source of truth.
   handle-based or documented legacy wrappers. Reversing audit found no sufficient durable
   lifecycle report; next artifact is a repo-local reviewed second-source/static report for
   `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`. No runtime/server op.
+- 2026-06-03 supervised 4-agent integration: lifecycle static report builder/artifact
+  landed and planning manifests now bind `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout` to
+  `docs/research/player-identity-planning-sources/players-lifecycle-anchor-static-report.json`
+  SHA256 `03acc0573b680d3e0b19937b30cc73028c5fd833e3796fe839006941b8779cf4`,
+  `capture_id:base-identity-core`, and
+  `evidence_pack_id:player-identity-base-core-evidence-pack`. Default route now validates
+  planning-only at `approved_runtime_evidence_missing` with
+  `blocked_until=[approved_runtime_principal_lifecycle_evidence,
+  reviewed_identity_public_contract]`; SDK remains blocked, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. Guardrails reject lifecycle-anchor reports as generic
+  promotion evidence and PluginManager cleanup guardrail scans all owner-scoped callback
+  registries. One worker accidentally invoked a default checker that read protected
+  `/servidor/ark/workspace-offline`; no output was used as evidence and no write/server op
+  occurred.
 
 ## Agent Coordination
 

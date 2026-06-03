@@ -224,16 +224,33 @@ def assert_tokens_present(test_case: unittest.TestCase, body: str, tokens: set[s
             test_case.assertIn(token, body)
 
 
-def cleaned_dispatcher_classes(cleanup_body: str) -> set[str]:
-    dispatchers = set(
+def owner_cleanup_registry_classes() -> set[str]:
+    registry_classes: set[str] = set()
+    for header in CORE_DIR.glob("*.h"):
+        header_text = header.read_text(encoding="utf-8")
+        if "UnregisterCallbacksForOwner" not in header_text:
+            continue
+        match = re.search(r"^\s*class\s+(\w+)\b", header_text, re.MULTILINE)
+        if match is None:
+            raise AssertionError(f"{header} has owner cleanup but no class declaration")
+        registry_classes.add(match.group(1))
+    return registry_classes
+
+
+def cleaned_owner_registry_classes(cleanup_body: str) -> set[str]:
+    registries = set(
         re.findall(
-            r"\b(\w+EventDispatcher)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
+            r"\b(\w+)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
             cleanup_body,
         )
     )
     if "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)" in cleanup_body:
-        dispatchers.add("ChatEventDispatcher")
-    return dispatchers
+        registries.add("ChatEventDispatcher")
+    return registries
+
+
+def cleaned_dispatcher_classes(cleanup_body: str) -> set[str]:
+    return {name for name in cleaned_owner_registry_classes(cleanup_body) if name.endswith("EventDispatcher")}
 
 
 class PluginManagerGuardrailTests(unittest.TestCase):
@@ -685,48 +702,41 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
         )
 
-    def test_plugin_owner_cleanup_covers_each_plugin_facing_event_dispatcher(self) -> None:
+    def test_plugin_owner_cleanup_covers_each_plugin_facing_owner_registry(self) -> None:
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         cleanup_body = extract_function_body(
             plugin_manager_text,
             r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
         )
 
-        dispatcher_classes: set[str] = set()
-        for header in CORE_DIR.glob("*EventDispatcher.h"):
-            header_text = header.read_text(encoding="utf-8")
-            if "UnregisterCallbacksForOwner" not in header_text:
-                continue
-            match = re.search(r"class\s+(\w+EventDispatcher)\b", header_text)
-            self.assertIsNotNone(match, f"{header} has owner cleanup but no dispatcher class")
-            dispatcher_classes.add(match.group(1))
+        registry_classes = owner_cleanup_registry_classes()
 
-        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
+        cleaned_registries = cleaned_owner_registry_classes(cleanup_body)
 
         missing = sorted(
-            dispatcher_classes
-            - cleaned_dispatchers
+            registry_classes
+            - cleaned_registries
             - set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS)
         )
         self.assertEqual(
             missing,
             [],
-            "New plugin-facing copied event dispatchers must be added to "
+            "New plugin-facing owner-scoped callback registries must be added to "
             "PluginManager::UnregisterPluginCallbacks, or explicitly documented in "
             "COPIED_DISPATCHER_CLEANUP_EXCEPTIONS while still internal/test-only.",
         )
 
         stale_exceptions = sorted(
-            set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS) - dispatcher_classes
+            set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS) - registry_classes
         )
         self.assertEqual(stale_exceptions, [])
         for dispatcher, reason in COPIED_DISPATCHER_CLEANUP_EXCEPTIONS.items():
             with self.subTest(dispatcher=dispatcher):
-                self.assertIn(dispatcher, dispatcher_classes)
+                self.assertIn(dispatcher, registry_classes)
                 self.assertIn("internal/test-only", reason)
                 self.assertIn("not plugin-facing", reason)
                 self.assertIn("PluginManager owner cleanup", reason)
-                self.assertNotIn(dispatcher, cleaned_dispatchers)
+                self.assertNotIn(dispatcher, cleaned_registries)
 
     def test_internal_test_only_dispatcher_exceptions_are_not_public_abi_or_plugin_manager_wired(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")

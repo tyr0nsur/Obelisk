@@ -394,6 +394,10 @@ BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
 PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
     "approved_bundle",
     BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    "lifecycle_anchor",
+    "lifecycle_anchor_candidates",
+    "lifecycle_anchor_candidates_only",
+    "lifecycle_anchor_only",
     "live_ops_sidecar",
     "live_validation_sidecar",
     "operator_approval_receipt",
@@ -531,6 +535,10 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "live-ops",
     "live_ops_sidecar",
     "live-ops-sidecar",
+    "lifecycle_anchor",
+    "lifecycle-anchor",
+    "lifecycle_anchor_candidates",
+    "lifecycle-anchor-candidates",
     "package_shape",
     "placeholder",
     "placeholder_provenance",
@@ -587,7 +595,9 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
+    r"players?[-_ ]?identity[-_ ]?lifecycle[-_ ]?anchor[-_ ]?candidates?|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
+    r"lifecycle[-_ ]?anchor[-_ ]?candidates?|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
     r"operator[-_ ]?(?:approval[-_ ]?)?receipts?|window[-_ ]?manifests?|"
     r"live[-_ ]?(?:validation|ops)(?:[-_ ]?sidecars?)?|"
@@ -2750,6 +2760,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if not isinstance(surface_id, str):
         return False
     if evidence_has_forbidden_ready_scope(evidence):
+        return False
+    if evidence_has_non_promotional_schema_marker(evidence):
         return False
     if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
         leaf_units = surface.get("leaf_decision_units")

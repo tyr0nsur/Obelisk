@@ -248,6 +248,39 @@ def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:
     return [str(blocker.get("reason")) for blocker in blockers]
 
 
+def lifecycle_has_bound_static_anchor_provenance(lifecycle: dict[str, Any]) -> bool:
+    anchors = lifecycle.get("candidate_anchors")
+    if not isinstance(anchors, list):
+        return False
+    required = set(REQUIRED_LIFECYCLE_SNAPSHOT_TARGETS)
+    seen: set[str] = set()
+    report_hashes: set[str] = set()
+    for anchor in anchors:
+        if not isinstance(anchor, dict) or anchor.get("accepted") is not True:
+            continue
+        target = anchor.get("target")
+        if target not in required:
+            continue
+        corroboration = anchor.get("corroboration")
+        if not isinstance(corroboration, dict) or corroboration.get("status") != "static_accepted":
+            return False
+        report_hash = corroboration.get("static_report_sha256")
+        if not isinstance(report_hash, str) or lifecycle_anchor_candidates.SHA256_RE.fullmatch(report_hash) is None:
+            return False
+        seen.add(str(target))
+        report_hashes.add(report_hash)
+    if seen != required or len(report_hashes) != 1:
+        return False
+
+    artifact = lifecycle.get("artifact_identity")
+    source_ids = artifact.get("source_artifact_ids") if isinstance(artifact, dict) else None
+    parsed_source_ids = lifecycle_anchor_candidates.parse_source_artifact_ids(source_ids, [], "$.artifact_identity.source_artifact_ids")
+    for key, placeholders in lifecycle_anchor_candidates.PLACEHOLDER_SOURCE_ARTIFACT_IDS.items():
+        if any(value in placeholders for value in parsed_source_ids.get(key, [])):
+            return False
+    return True
+
+
 def expected_lifecycle_source_binding(
     lifecycle: dict[str, Any],
     first_evidence: dict[str, Any],
@@ -284,7 +317,7 @@ def validate_prebind_provenance(
     lifecycle_source_ids = (
         lifecycle_artifact.get("source_artifact_ids") if isinstance(lifecycle_artifact, dict) else None
     )
-    if list(lifecycle_source_ids or []) != list(source_ids):
+    if list(lifecycle_source_ids or []) != list(source_ids) and not lifecycle_has_bound_static_anchor_provenance(lifecycle):
         raise SystemExit(
             "player identity planning source binding failed prebind provenance: "
             + json.dumps(

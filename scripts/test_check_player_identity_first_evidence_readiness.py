@@ -478,14 +478,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         planning_source = public_contract_gap["source_bound_planning_manifest_verification"]
         self.assertTrue(planning_source["accepted_for_contract_review"])
-        self.assertEqual(
-            "lifecycle_anchor_first_evidence_provenance_unbound",
-            planning_source["current_route_blocker"],
-        )
-        self.assertIn(
-            "accepted_anchor_second_source_report_hash_missing",
-            planning_source["blockers"],
-        )
+        self.assertIsNone(planning_source["current_route_blocker"])
+        self.assertEqual([], planning_source["blockers"])
         self.assertTrue(public_contract_gap["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertTrue(public_contract_gap["principal_invalidation_policy"]["accepted_for_policy_review"])
         self.assertFalse(public_contract_gap["promotion_ready"])
