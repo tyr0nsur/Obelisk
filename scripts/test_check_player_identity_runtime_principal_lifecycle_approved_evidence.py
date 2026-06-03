@@ -1069,6 +1069,12 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
             ),
             (
+                "preflight_approved_runtime_evidence_text",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"nested": {"note": "preflight counts as approved runtime evidence"}}),
+                "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
+            ),
+            (
                 "preflight_server_restart_authorized_key",
                 lambda payload: payload["operational_window"]["preflight"]["pre"],
                 lambda sidecar: sidecar.update({"server_restart_authorized": True}),
@@ -1804,6 +1810,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             ("non_claims", "does not authorize commands while public SDK ready"),
             ("review_note", "does not promote identity however public\tSDK\tready"),
             ("review_note", "does not promote identity then runtime   ready"),
+            ("review_note", "request pack counts as approved runtime evidence"),
         ):
             with self.subTest(claim=claim):
                 payload = manifest()

@@ -998,6 +998,26 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_secondary_records_without_local_blockers(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["parent_report_blocked"],
+            "dependency_certificate": {"stable_claim_allowed": True},
+            "manifest_record": {"public_sdk_ready": True},
+            "release_statement": {"v1_stable_sdk": True},
+            "side_lane_summary_section": {"support_ready": True},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "dependency_certificate.stable_claim_allowed",
+                "manifest_record.public_sdk_ready",
+                "release_statement.v1_stable_sdk",
+                "side_lane_summary_section.support_ready",
+            ],
+        )
+
     def test_route_gate_claim_scanner_rejects_structured_public_runtime_aliases(self) -> None:
         payload = {
             "schema": "obelisk.command-permission-route-gate-check.v1",

@@ -1633,14 +1633,48 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             return True
         tail = normalized_claim_path_tail(path)
         return (
-            tail in {"accounting", "claim", "claims", "readiness", "report", "reports", "result", "results", "summary"}
+            tail in {
+                "accounting",
+                "certificate",
+                "certificates",
+                "claim",
+                "claims",
+                "dependencies",
+                "dependency",
+                "manifest",
+                "manifests",
+                "readiness",
+                "record",
+                "records",
+                "release_statement",
+                "release_statements",
+                "report",
+                "reports",
+                "result",
+                "results",
+                "section",
+                "sections",
+                "summary",
+            }
             or tail.endswith("_accounting")
+            or tail.endswith("_certificate")
+            or tail.endswith("_certificates")
             or tail.endswith("_claims")
+            or tail.endswith("_dependencies")
+            or tail.endswith("_dependency")
+            or tail.endswith("_manifest")
+            or tail.endswith("_manifests")
             or tail.endswith("_readiness")
+            or tail.endswith("_record")
+            or tail.endswith("_records")
+            or tail.endswith("_release_statement")
+            or tail.endswith("_release_statements")
             or tail.endswith("_report")
             or tail.endswith("_reports")
             or tail.endswith("_result")
             or tail.endswith("_results")
+            or tail.endswith("_section")
+            or tail.endswith("_sections")
             or tail.endswith("_summary")
         )
 

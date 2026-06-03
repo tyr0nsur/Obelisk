@@ -74,6 +74,11 @@ FORBIDDEN_VALUE_RE = re.compile(
 POSITIVE_CAPABILITY_VALUE_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
     r"public[_ -]?headers?[_ -]?(?:allowed|ready|enabled|supported)|"
+    r"(?:(?:request[_ -]?pack|preflight|(?:completed[_ -]?)?receipt|"
+    r"operator[_ -]?approval[_ -]?receipt|window[_ -]?manifest|copied[_ -]?(?:log|bundle)|"
+    r"stale[_ -]?bundle|sidecars?|artifacts?)[_ -]?"
+    r"(?:counts?[_ -]?as|is|are|proves?|provides?|authorizes?|approves?)[_ -]?"
+    r"approved[_ -]?runtime[_ -]?evidence)|"
     r"(?:public[_ -]?)?(?:runtime[_ -]?)?v1[_ -]?(?:sdk[_ -]?)?"
     r"(?:ready|readiness|enabled|allowed|supported|complete|completed|completion)|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
@@ -85,7 +90,12 @@ POSITIVE_CAPABILITY_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 FORBIDDEN_RECEIPT_AUTHORIZATION_CLAIM_RE = re.compile(
-    r"(?:\b(?:server[_ -]?operations?|runtime(?:[_ -]?(?:work|capture|window|sdk))?|"
+    r"(?:(?:request[_ -]?pack|preflight|(?:completed[_ -]?)?receipt|"
+    r"operator[_ -]?approval[_ -]?receipt|window[_ -]?manifest|copied[_ -]?(?:log|bundle)|"
+    r"stale[_ -]?bundle|sidecars?|artifacts?)[_ -]?"
+    r"(?:counts?[_ -]?as|is|are|proves?|provides?|authorizes?|approves?)[_ -]?"
+    r"approved[_ -]?runtime[_ -]?evidence|"
+    r"\b(?:server[_ -]?operations?|runtime(?:[_ -]?(?:work|capture|window|sdk))?|"
     r"public[_ -]?(?:sdk|headers?)|v1(?:[_ -]?sdk)?(?:[_ -]?completion)?|player[_ -]?identity|"
     r"promotion|sdk|lookup|permissions?|admin|commands?)\b.{0,80}"
     r"\b(?:authorized|authorizes|approved|allowed|enabled|supported|promoted|promotion|"

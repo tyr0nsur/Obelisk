@@ -10162,6 +10162,20 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertNotIn("v1.0` core-stability track", status)
         self.assertNotIn("`v1.0` complete-SDK track", status)
 
+    def test_status_names_current_sdk_gate_blocker_and_stable_claim_flag(self) -> None:
+        status = (REPO_ROOT / "docs/STATUS.md").read_text(encoding="utf-8")
+        compact = normalized(status)
+
+        for term in (
+            "Current SDK blocker promotion is 0/12",
+            "the P0 dependency chain promotion is 0/4",
+            "stable_claim_allowed=false",
+            "approved_runtime_evidence_missing",
+            "do\nnot reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin\nHub planning, or side-lane accounting as public SDK readiness or a stable SDK claim",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
     def test_release_gate_docs_do_not_make_core_first_gate_a_v1_completion_gate(self) -> None:
         release = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
         compact = normalized(release)

@@ -482,3 +482,34 @@ runtime/preflight suites 256 by delegated audit, route JSON valid/planning-only,
 SDK JSON blocked by design, and `git diff --check`. The stable state remains
 `current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
 P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Runtime Evidence, SDK Secondary Reports, And Inventory Source-Marker Hardening
+
+The next supervised 4-agent round closed three concrete offline bypasses and
+confirmed one core runtime area had no missing guardrail:
+
+- Runtime evidence/preflight text scanners now reject phrases that present
+  request packs, preflight sidecars, window manifests, completed receipts,
+  copied logs or bundles, stale bundles, sidecars, or generic artifacts as
+  counting as approved runtime evidence.
+- SDK completion secondary-report scanning now treats certificate, dependency,
+  manifest, record, release-statement, and section child objects as independent
+  report contexts. A blocker on the parent report no longer suppresses child
+  public SDK, runtime, stable/support, or v1 completion overclaims.
+- Inventory copied-signal stability now scans source-marker/source-label,
+  marker, alias, report-section, artifact/evidence marker, and plural alias
+  fields for Inventory SDK, Items SDK, ResourceHandle, return override, runtime
+  readiness, promotion, public readiness, and v1 completion claims.
+- `docs/STATUS.md` now states the current executable SDK gate result:
+  `stable_claim_allowed=false` and canonical P0 route blocker
+  `approved_runtime_evidence_missing`.
+- Core runtime/plugin lifecycle audit made no edits. Existing guardrails still
+  cover plugin cleanup failure retention, no repeated shutdown on retry,
+  callback cleanup families, and default-deny risky runtime paths.
+
+Validated offline: integrated suite 457, public SDK guardrails 194, route JSON
+valid/planning-only, inventory JSON ready with `public_sdk_ready=false` and
+`v1_completion_ready=false`, SDK JSON blocked by design, core runtime delegated
+validations 29/6 plus `build/plugin_manager_tests`, and `git diff --check`.
+The stable state remains `current_route_blocker=approved_runtime_evidence_missing`,
+SDK progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.

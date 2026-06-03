@@ -1565,6 +1565,24 @@ priorities, and do not use history files as the active source of truth.
   `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent P0 runtime-preflight/SDK-secondary-report/inventory
+  side-lane/core-runtime round: runtime evidence wording now rejects text phrases that
+  request packs, preflight sidecars, window manifests, completed receipts, copied logs or
+  bundles, stale bundles, sidecars, or generic artifacts count as approved runtime
+  evidence. SDK completion treats certificate/dependency/manifest/record/release-statement/
+  section child objects as independent report contexts so parent blockers cannot hide child
+  public SDK/runtime/stable/support/v1 claims. Inventory copied-signal stability scans
+  source-marker, source-label, marker, alias, report-section, artifact/evidence marker, and
+  plural alias text for Inventory SDK, Items SDK, ResourceHandle, return override, runtime
+  readiness, promotion, public readiness, and v1 completion claims. `STATUS.md` now names
+  `stable_claim_allowed=false` and `approved_runtime_evidence_missing`. Core runtime audit
+  made no edits and confirmed plugin cleanup/default-deny guardrails remain covered.
+  Validations passed: integrated suite 457, public SDK guardrails 194, route JSON
+  valid/planning-only, inventory JSON ready with public SDK/v1 false, SDK JSON blocked by
+  design, core runtime delegated validations 29/6 plus `build/plugin_manager_tests`, and
+  `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

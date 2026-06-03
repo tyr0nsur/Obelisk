@@ -167,6 +167,10 @@ the P0 dependency chain must be promoted with evidence.
 Current SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
 and the stable SDK claim switch is disabled. Excluded/post-v1 accounting does not count
 as completion progress for a complete SDK claim.
+The current executable SDK gate reports `stable_claim_allowed=false` and the canonical
+P0 route blocker `approved_runtime_evidence_missing`; until the gate output changes, do
+not reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin
+Hub planning, or side-lane accounting as public SDK readiness or a stable SDK claim.
 
 ## Current Game Interaction Boundary
 

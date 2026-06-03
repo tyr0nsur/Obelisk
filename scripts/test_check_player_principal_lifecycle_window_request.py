@@ -362,6 +362,23 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("operator_live_ops_brief_non_authorization_mismatch", report["blockers"])
         self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
 
+    def test_rejects_request_pack_approved_runtime_evidence_text_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["non_authorization"] = (
+                "request pack counts as approved runtime evidence"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_non_authorization_mismatch", report["blockers"])
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
     def test_rejects_request_pack_missing_prepared_at_utc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -836,6 +853,30 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             receipt_path = write_completed_receipt(output_dir)
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             receipt["operator_completion"]["approved_by_role"] = "operator complete SDK claim"
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn(
+            "operator_approval_receipt_forbidden_public_capability_or_readiness_claim",
+            report["blockers"],
+        )
+
+    def test_rejects_operator_approval_receipt_approved_runtime_evidence_text_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["operator_completion"]["approved_by_role"] = (
+                "completed receipt counts as approved runtime evidence"
+            )
             receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
             result = self.run_checker(
                 output_dir,

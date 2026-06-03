@@ -489,6 +489,101 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertEqual("$.public_sdk_surfaces.release_note", detail["path"])
         self.assertEqual("Inventory SDK", detail["term"])
 
+    def test_source_marker_inventory_sdk_side_lane_claim_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["source_marker"] = "Inventory SDK ready from copied signal side lane"
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] in {"public_claim_forbidden_term", "readiness_claim_enabled"}
+        }
+        self.assertEqual({"$.public_gameplay_events.promoted_events[0].source_marker"}, paths)
+
+    def test_source_marker_resource_handle_promotion_claim_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
+        surface["source_marker"] = (
+            "ResourceHandle promotion ready through minimal-second-source-intake"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] in {"public_claim_forbidden_term", "readiness_claim_enabled"}
+        }
+        self.assertEqual(
+            {
+                "$.public_sdk_surfaces.obelisk.inventory_item_copied_signals.v1.source_marker",
+                "$.public_sdk_surfaces.surfaces[0].source_marker",
+            },
+            paths,
+        )
+
+    def test_alias_runtime_and_v1_completion_claims_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["aliases"] = [
+            "copied signal runtime readiness",
+            "inventory side lane v1 completion",
+        ]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "readiness_claim_enabled"
+        }
+        self.assertEqual(
+            {
+                "$.public_gameplay_events.promoted_events[0].aliases[0]",
+                "$.public_gameplay_events.promoted_events[0].aliases[1]",
+            },
+            paths,
+        )
+
+    def test_report_section_return_override_public_readiness_claim_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["report_sections"] = [
+            "inventory copied side lane has return override public readiness"
+        ]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] in {"public_claim_forbidden_term", "readiness_claim_enabled"}
+        }
+        self.assertEqual(
+            {"$.public_gameplay_events.promoted_events[0].report_sections[0]"},
+            paths,
+        )
+
     def test_negated_public_sdk_surfaces_inventory_side_lane_text_is_allowed(self) -> None:
         fixtures = self.make_fixture()
         fixtures["public_sdk_surfaces"]["release_note"] = (

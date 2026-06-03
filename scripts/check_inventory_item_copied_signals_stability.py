@@ -191,17 +191,50 @@ CONTRACT_SCAN_KEYS = frozenset(
 )
 CLAIM_TEXT_SCAN_KEYS = CONTRACT_SCAN_KEYS | frozenset(
     (
+        "alias",
+        "aliases",
+        "artifact_label",
+        "artifact_labels",
+        "evidence_marker",
+        "evidence_markers",
         "claim",
         "claims",
         "description",
         "evidence_summary",
+        "marker",
+        "markers",
         "note",
         "notes",
         "rationale",
+        "readiness_alias",
+        "readiness_aliases",
         "release_note",
+        "report_section",
+        "report_sections",
         "review_note",
         "review_notes",
+        "source_label",
+        "source_labels",
+        "source_marker",
+        "source_markers",
         "summary",
+    )
+)
+READINESS_TEXT_SCAN_KEYS = CLAIM_TEXT_SCAN_KEYS | frozenset(
+    (
+        "inventory_sdk_readiness",
+        "items_sdk_readiness",
+        "promotion_readiness",
+        "public_abi_readiness",
+        "public_inventory_sdk_readiness",
+        "public_items_sdk_readiness",
+        "public_sdk_readiness",
+        "release_readiness",
+        "runtime_readiness",
+        "stable_sdk_readiness",
+        "v1_completion_readiness",
+        "v1_readiness",
+        "v1_sdk_readiness",
     )
 )
 NEGATIVE_KEYS = frozenset(
@@ -875,51 +908,50 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
         "v1_ready",
         "v1_sdk_ready",
     }
-    readiness_text_keys = forbidden_true_keys | {
-        "inventory_sdk_readiness",
-        "items_sdk_readiness",
-        "promotion_readiness",
-        "public_abi_readiness",
-        "public_inventory_sdk_readiness",
-        "public_items_sdk_readiness",
-        "public_sdk_readiness",
-        "release_readiness",
-        "runtime_readiness",
-        "stable_sdk_readiness",
-        "v1_completion_readiness",
-        "v1_readiness",
-        "v1_sdk_readiness",
-    }
+    readiness_text_keys = forbidden_true_keys | READINESS_TEXT_SCAN_KEYS
     positive_readiness_phrases = (
         "inventory sdk ready",
+        "inventory sdk readiness",
         "items sdk ready",
+        "items sdk readiness",
         "promotion ready",
+        "promotion readiness",
         "public abi ready",
+        "public abi readiness",
+        "public readiness",
         "public sdk ready",
+        "public sdk readiness",
         "release ready",
+        "release readiness",
         "runtime ready",
         "runtime readiness",
         "stable sdk ready",
+        "stable sdk readiness",
+        "v1 completion",
         "v1 completion ready",
+        "v1 completion readiness",
         "v1 ready",
+        "v1 readiness",
         "v1 sdk ready",
+        "v1 sdk readiness",
     )
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             if key in forbidden_true_keys and child is True:
                 add(blockers, "readiness_claim_enabled", child_trail)
-            if key in readiness_text_keys and isinstance(child, str):
-                normalized = child.lower()
-                for phrase in positive_readiness_phrases:
-                    start = normalized.find(phrase)
-                    if start < 0:
-                        continue
-                    end = start + len(phrase)
-                    if is_negated_for_match(child, start, end):
-                        continue
-                    add(blockers, "readiness_claim_enabled", child_trail, value=child, term=phrase)
-                    break
+            if key in readiness_text_keys:
+                for text_path, text in string_values(child, child_trail):
+                    normalized = text.lower()
+                    for phrase in positive_readiness_phrases:
+                        start = normalized.find(phrase)
+                        if start < 0:
+                            continue
+                        end = start + len(phrase)
+                        if is_negated_for_match(text, start, end):
+                            continue
+                        add(blockers, "readiness_claim_enabled", text_path, value=text, term=phrase)
+                        break
             scan_readiness_claims(child, blockers, child_trail)
     elif isinstance(value, list):
         for index, child in enumerate(value):
