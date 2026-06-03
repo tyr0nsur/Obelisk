@@ -757,6 +757,26 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
 
         self.assertEqual([], blockers)
 
+    def test_blocker_container_does_not_hide_positive_response_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "blockers": [
+                    "command response path is ready",
+                    "reply API ready remains blocked",
+                ],
+                "promotion_requires": [
+                    "reply API must be promoted before release",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [("positive_public_surface_claim", "$.blockers[0]")],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_nested_runtime_and_supported_router_claims_are_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_surface_overclaims(

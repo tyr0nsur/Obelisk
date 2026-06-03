@@ -316,7 +316,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "why_blocked",
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|future|must|must\s+be|must\s+not|"
+    r"\b(before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|future|must|must\s+be|must\s+not|need[s]?|"
     r"never|no|not|only|planning|post-v1|require[sd]?|unresolved|until|without)\b",
     re.IGNORECASE,
 )
@@ -515,6 +515,14 @@ def is_negative_context(trail: str) -> bool:
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
 
 
+def is_claim_container_context(trail: str) -> bool:
+    segments = (segment.split("[", 1)[0] for segment in trail.split("."))
+    return any(
+        normalized_key(segment) in {"blocker", "blockers", "block_reasons", "why_blocked"}
+        for segment in segments
+    )
+
+
 def is_structural_claim_field(trail: str) -> bool:
     if trail.endswith(".id"):
         return True
@@ -606,7 +614,7 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         return
     if (
         not isinstance(value, str)
-        or is_negative_context(trail)
+        or (is_negative_context(trail) and not is_claim_container_context(trail))
         or is_structural_claim_field(trail)
     ):
         return

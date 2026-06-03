@@ -147,6 +147,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 "v1_sdk_ready": True,
                 "release_ready": True,
                 "public_abi_ready": True,
+                "stable_claim_allowed": True,
             }
             decisions_path = write_json(root, "decisions.json", decisions)
 
@@ -161,6 +162,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "v1_sdk_ready",
             "release_ready",
             "public_abi_ready",
+            "stable_claim_allowed",
         ):
             self.assertIn(
                 f"forbidden_positive_resource_handle_claim:$.decisions.metadata.{key}",
@@ -173,6 +175,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
             decisions["metadata"] = {
                 "publicResourceHandleReady": True,
+                "publicResourceLookupReady": True,
                 "runtime_resource_handle_enabled": "yes",
                 "v1ObjectLookupPromoted": "promoted",
                 "runtimeObjectSamplesPresent": True,
@@ -186,6 +189,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertEqual(result.returncode, 1)
         for key in (
             "publicResourceHandleReady",
+            "publicResourceLookupReady",
             "runtime_resource_handle_enabled",
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",
@@ -272,7 +276,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 if surface.get("id") == "obelisk.descriptors.v1":
                     surface["public_contract"].append("ObeliskResourceHandle")
                     surface["evidence"]["claim"] = (
-                        "Descriptor metadata now includes public ResourceHandle lookup API readiness."
+                        "Descriptor metadata now includes public resource lookup API readiness."
                     )
                     break
             surfaces_path = write_json(root, "surfaces.json", surfaces)
@@ -335,6 +339,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                         "v1_sdk_ready": True,
                         "release_ready": True,
                         "public_abi_ready": True,
+                        "stable_claim_allowed": True,
                     }
                     break
             surfaces_path = write_json(root, "surfaces.json", surfaces)
@@ -350,6 +355,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "v1_sdk_ready",
             "release_ready",
             "public_abi_ready",
+            "stable_claim_allowed",
         ):
             self.assertIn(
                 "forbidden_positive_resource_handle_claim:"
@@ -365,6 +371,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
                     surface["metadata"] = {
                         "publicResourceHandleReady": True,
+                        "publicResourceLookupReady": True,
                         "runtime_resource_handle_enabled": "yes",
                         "v1ObjectLookupPromoted": "promoted",
                         "runtimeObjectSamplesPresent": True,
@@ -379,6 +386,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertEqual(result.returncode, 1)
         for key in (
             "publicResourceHandleReady",
+            "publicResourceLookupReady",
             "runtime_resource_handle_enabled",
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",
@@ -475,6 +483,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             root = Path(tmp)
             events = json.loads(PUBLIC_EVENTS.read_text(encoding="utf-8"))
             events["metadata_surfaces"][0]["publicResourceHandleReady"] = True
+            events["metadata_surfaces"][0]["publicResourceLookupReady"] = True
             events["metadata_surfaces"][0]["runtime_resource_handle_enabled"] = "yes"
             events["metadata_surfaces"][0]["v1ObjectLookupPromoted"] = "promoted"
             events["metadata_surfaces"][0]["runtimeObjectSamplesPresent"] = True
@@ -487,6 +496,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertEqual(result.returncode, 1)
         for key in (
             "publicResourceHandleReady",
+            "publicResourceLookupReady",
             "runtime_resource_handle_enabled",
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",

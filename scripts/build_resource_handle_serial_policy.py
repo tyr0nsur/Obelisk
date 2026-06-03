@@ -49,6 +49,7 @@ FORBIDDEN_SOURCE_CLAIM_KEYS = frozenset(
         "public_sdk_ready",
         "release_ready",
         "runtime_ready",
+        "stable_claim_allowed",
         "v1_sdk_ready",
         "object_identity_ready",
         "post_callback_resource_handle_ready",
@@ -60,7 +61,8 @@ FORBIDDEN_SOURCE_CLAIM_KEYS = frozenset(
     )
 )
 FORBIDDEN_SOURCE_ALIAS_SUBJECT_RE = re.compile(
-    r"(?:resource_?handle|resourcehandle|object_?identity|object_?lookup|object_?handle|serial_?reuse|wraparound)",
+    r"(?:resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|object_?handle|"
+    r"serial_?reuse|wraparound)",
     re.IGNORECASE,
 )
 FORBIDDEN_SOURCE_ALIAS_CONTEXT_RE = re.compile(

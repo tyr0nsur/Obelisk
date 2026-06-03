@@ -158,6 +158,47 @@ class PlayerPrincipalLifecyclePlanningBlockerSmokeTests(unittest.TestCase):
         self.assertIn("planning_report_public_sdk_non_claim_missing", report["blockers"])
         self.assertFalse(report["public_sdk_ready"])
 
+    def test_rejects_nested_positive_claim_alias_in_planning_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "planning"
+            copy_planning_sources(root)
+            policy_path = root / POLICY_NAME
+            payload = load_json(policy_path)
+            payload["candidate_summary"] = {
+                "runtime_v1_ready": True,
+                "counts_toward_public_sdk": True,
+            }
+            write_json(policy_path, payload)
+
+            result = self.run_checker(root, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("planning_manifest_nested_positive_claim", report["blockers"])
+        labels = {detail["label"] for detail in report["blocker_details"]}
+        self.assertIn("policy.candidate_summary.runtime_v1_ready", labels)
+        self.assertIn("policy.candidate_summary.counts_toward_public_sdk", labels)
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
+
+    def test_allows_nested_negative_claim_context_in_planning_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "planning"
+            copy_planning_sources(root)
+            policy_path = root / POLICY_NAME
+            payload = load_json(policy_path)
+            payload["non_claims_detail"] = {
+                "runtime_v1_ready": "blocked",
+                "counts_toward_public_sdk": False,
+            }
+            write_json(policy_path, payload)
+
+            result = self.run_checker(root, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("planning_manifest_nested_positive_claim", report["blockers"])
+        self.assertIn("planning_report_outputs_principal_invalidation_policy_sha256_mismatch", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

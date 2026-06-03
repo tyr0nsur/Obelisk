@@ -255,10 +255,12 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "public_sdk_ready",
     "public_sdk",
     "public_abi_ready",
+    "public_abi_available",
     "public_abi_allowed",
     "public_reply_abi_ready",
     "public_response_path_ready",
     "runtime_ready",
+    "runtime_v1_ready",
     "send_chat_ready",
     "counts_toward_public_sdk",
     "counts_toward_runtime",
@@ -338,6 +340,7 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "complete_sdk_blockers_promoted_for_claim_ratio",
     "complete_sdk_claim_progress_percent",
     "complete_sdk_claim_progress_ratio",
+    "complete_sdk_allowed",
     "complete_sdk_progress_percent",
     "complete_sdk_progress_ratio",
     "p0_chain_promoted_count",
@@ -345,15 +348,19 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "p0_dependency_chain_promoted_for_claim_count",
     "p0_dependency_chain_promoted_for_claim_ratio",
     "promoted_for_claim_ratio",
+    "production_ready",
     "public_abi_ready",
+    "public_abi_available",
     "rc_ready",
     "rc_readiness_ready",
     "release_candidate_ready",
     "release_candidate_readiness_ready",
     "release_ready",
     "release_readiness_ready",
+    "runtime_v1_ready",
     "v1_completion_ready",
     "stable_claim_allowed",
+    "stable_v1_sdk",
     "public_sdk_ready",
     "promotion_ready",
     "runtime_ready",
@@ -1421,32 +1428,32 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         return False
 
     def positive_text_claim(text: str) -> bool:
-        if not (
-            COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE.search(text)
-            or COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED.search(text)
-            or COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE.search(text)
-        ):
-            return False
-        claim_start = min(
-            [
-                match.start()
-                for pattern in (
-                    COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE,
-                    COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED,
-                    COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE,
-                )
-                for match in pattern.finditer(text)
-            ]
-            or [0]
+        patterns = (
+            COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE,
+            COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED,
+            COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE,
         )
-        context = text[max(0, claim_start - 48) : min(len(text), claim_start + 128)]
-        if COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE.search(context) and not re.search(
-            r"\b(?:claims?|reports?|says|states?)\b[^,.;:\n\r]*$",
-            text[max(0, claim_start - 48) : claim_start],
-            re.IGNORECASE,
-        ):
+        matches = sorted(
+            (match for pattern in patterns for match in pattern.finditer(text)),
+            key=lambda match: match.start(),
+        )
+        if not matches:
             return False
-        return True
+        for match in matches:
+            clause_start = 0
+            for boundary in CLAUSE_START_PATTERN.finditer(text[: match.start()]):
+                clause_start = boundary.end()
+            next_boundary = CLAUSE_START_PATTERN.search(text[match.end() :])
+            clause_end = match.end() + next_boundary.start() if next_boundary else len(text)
+            clause = text[clause_start:clause_end]
+            if COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE.search(clause) and not re.search(
+                r"\b(?:claims?|reports?|says|states?)\b[^,.;:\n\r]*$",
+                text[max(clause_start, match.start() - 48) : match.start()],
+                re.IGNORECASE,
+            ):
+                continue
+            return True
+        return False
 
     def contains_forbidden_claim_source(item: Any) -> bool:
         if isinstance(item, str):

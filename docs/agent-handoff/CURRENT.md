@@ -292,3 +292,23 @@ This file is an active routing table only. Durable evidence belongs in
   JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`,
   py_compile, full SDK completion suite 213, and `git diff --check`. No runtime/server
   operation. Agents closed.
+- Latest round delegated approved-evidence timestamp hardening, downstream P0 overclaim
+  scanning, SDK completion alias scanning, and ResourceHandle side-lane guardrails. Lead
+  additionally hardened the player-principal planning smoke against nested positive
+  runtime/public/v1 aliases and integrated window-manifest timestamp parsing so invalid
+  semantic UTC values produce blockers instead of tracebacks. Integrated result:
+  approved runtime evidence consume checks now reject future completed receipts, future
+  preflight `checked_at_utc`, future post-window windows, and bad approved/capture/
+  rollback ordering. Window-manifest replay handles semantically invalid timestamps
+  fail-closed. Permissions/admin, command response, and commands/replies scans no longer
+  let blocker-like containers hide unnegated public/runtime readiness claims. SDK
+  completion scans now catch `public_abi_available`, `runtime_v1_ready`,
+  `complete_sdk_allowed`, `production_ready`, and `stable_v1_sdk`, and a detached
+  `blocked.` sentence no longer suppresses a later affirmative public SDK claim.
+  ResourceHandle guards now catch `resource_lookup`/`publicResourceLookupReady` and
+  `stable_claim_allowed` without promoting ResourceHandle. Validation passed:
+  approved-evidence/manifest 84, window-manifest 70, downstream route/permissions/
+  command/replies 184, ResourceHandle 33, planning smoke 6, route JSON
+  valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, py_compile, full SDK completion suite 213, and
+  `git diff --check`. No runtime/server operation. Agents closed.

@@ -399,8 +399,11 @@ def parse_bool(value: str | None) -> bool | None:
     return None
 
 
-def parse_utc_timestamp(value: str) -> datetime:
-    return datetime.fromisoformat(value.removesuffix("Z") + "+00:00").astimezone(timezone.utc)
+def parse_utc_timestamp(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value.removesuffix("Z") + "+00:00").astimezone(timezone.utc)
+    except ValueError:
+        return None
 
 
 def is_exact_or_test_fixture_run_log(path: Path, run_id: str) -> bool:
@@ -928,6 +931,8 @@ def validate_operator_approval_receipt(
         add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt_path")
     else:
         approved_at_dt = parse_utc_timestamp(approved_at)
+        if approved_at_dt is None:
+            add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt_path")
     approved_by_role = completion.get("approved_by_role")
     if not isinstance(approved_by_role, str) or not approved_by_role.strip():
         add(blockers, "operator_approval_receipt_approved_by_role_invalid", "operator_approval_receipt_path")
@@ -989,6 +994,8 @@ def validate_operator_approval_receipt(
         add(blockers, "operator_approval_receipt_prepared_at_utc_invalid", "operator_approval_receipt_path")
     else:
         prepared_at_dt = parse_utc_timestamp(prepared_at)
+        if prepared_at_dt is None:
+            add(blockers, "operator_approval_receipt_prepared_at_utc_invalid", "operator_approval_receipt_path")
     if request_payload and bound_request.get("prepared_at_utc") != prepared_at:
         add(blockers, "operator_approval_receipt_prepared_at_utc_mismatch", "operator_approval_receipt_path")
     approved_window_start = (
@@ -1280,6 +1287,8 @@ def validate_preflight_content(
 
     checked_at_utc = payload.get("checked_at_utc")
     if not isinstance(checked_at_utc, str) or UTC_TIMESTAMP_RE.fullmatch(checked_at_utc) is None:
+        add(blockers, f"{path_key}_checked_at_utc_invalid", path_key, actual=checked_at_utc)
+    elif parse_utc_timestamp(checked_at_utc) is None:
         add(blockers, f"{path_key}_checked_at_utc_invalid", path_key, actual=checked_at_utc)
 
     manifest_status = protected_paths.protected_path_status(
@@ -1779,7 +1788,11 @@ def validate_manifest(
         elif not UTC_TIMESTAMP_RE.fullmatch(value):
             add(blockers, "utc_timestamp_invalid", key)
         else:
-            timestamps[key] = parse_utc_timestamp(value)
+            parsed = parse_utc_timestamp(value)
+            if parsed is None:
+                add(blockers, "utc_timestamp_invalid", key)
+            else:
+                timestamps[key] = parsed
 
     run_id = fields.get("run_id")
     if run_id is not None and RUN_ID_RE.fullmatch(run_id) is None:

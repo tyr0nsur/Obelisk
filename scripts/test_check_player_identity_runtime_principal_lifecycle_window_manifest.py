@@ -50,7 +50,7 @@ ARK_SHA = EXPECTED_BINARY_SHA256
 
 
 def future_window_fields() -> dict[str, str]:
-    start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+    start = (datetime.now(timezone.utc) + timedelta(minutes=5)).replace(microsecond=0)
     capture_start = start + timedelta(minutes=1)
     capture_end = start + timedelta(minutes=8)
     rollback_end = start + timedelta(minutes=10)
@@ -150,7 +150,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     ).astimezone(timezone.utc)
     prepared_at_utc = fields.get(
         "prepared_at_utc",
-        (approved_start - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        (datetime.now(timezone.utc) - timedelta(minutes=1)).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     payload = {
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
@@ -168,6 +168,18 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         },
         "restart_expectation": "restart",
         "final_posture": "stable",
+        "authorization_flags": {
+            "server_operations_authorized": False,
+            "runtime_work_authorized": False,
+            "request_pack_counts_as_approved_runtime_evidence": False,
+            "publication_authorized": False,
+            "stable_claim_allowed": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+            "promotion_ready": False,
+            "v1_completion_ready": False,
+        },
         "user_policy": fields.get("user_policy", "no_regular_users"),
         "notice_path": "not_applicable",
         "copied_evidence_dir": str(copied_log_path.parent),
@@ -345,9 +357,7 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
             operator_reference="test-current-turn-approval",
             approved_at_utc=fields.get(
                 "approval_recorded_at_utc",
-                (datetime.fromisoformat(fields["approved_window_start_utc"].replace("Z", "+00:00"))
-                .astimezone(timezone.utc)
-                - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
             ),
         )
         receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
@@ -2302,6 +2312,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
             ("copied_log_path", "stale/Obelisk.log", "preflight_pre_path_copied_log_path_mismatch"),
             ("copied_evidence_dir", "stale", "preflight_pre_path_copied_evidence_dir_mismatch"),
             ("checked_at_utc", "not-utc", "preflight_pre_path_checked_at_utc_invalid"),
+            ("checked_at_utc", "2026-99-99T99:99:99Z", "preflight_pre_path_checked_at_utc_invalid"),
         )
         for key, value, reason in cases:
             with self.subTest(reason=reason):

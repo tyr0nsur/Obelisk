@@ -130,7 +130,9 @@ class ResourceHandleSerialPolicyBuilderTests(unittest.TestCase):
     def test_rejects_source_public_runtime_v1_alias_overclaims(self) -> None:
         for key, value in (
             ("publicResourceHandleReady", True),
+            ("publicResourceLookupReady", True),
             ("runtime_resource_handle_enabled", "yes"),
+            ("stableClaimAllowed", True),
             ("v1ResourceHandlePromoted", "promoted"),
             ("serialReuseWraparoundSafetyProven", True),
         ):

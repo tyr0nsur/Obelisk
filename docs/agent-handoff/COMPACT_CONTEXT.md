@@ -1384,6 +1384,24 @@ priorities, and do not use history files as the active source of truth.
   Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent evidence/claim-scan hardening round: approved-runtime
+  evidence consume checks reject future completed receipts, future preflight
+  `checked_at_utc`, future post-window windows, and bad approved/capture/rollback
+  ordering. Window-manifest replay now turns semantically invalid UTC values into
+  blockers instead of tracebacks. Player-principal planning smoke rejects nested positive
+  runtime/public/v1 aliases while remaining planning-only. Permissions/admin, command
+  response, and commands/replies no longer let blocker-like containers hide unnegated
+  public/runtime readiness claims. SDK completion scanning catches
+  `public_abi_available`, `runtime_v1_ready`, `complete_sdk_allowed`,
+  `production_ready`, and `stable_v1_sdk`, and detached negators no longer suppress later
+  affirmative public SDK claims. ResourceHandle side-lane guards catch
+  `resource_lookup`/`publicResourceLookupReady` and `stable_claim_allowed` while staying
+  candidate-only. Validations passed: approved-evidence/manifest 84, window-manifest 70,
+  downstream route/permissions/command/replies 184, ResourceHandle 33, planning smoke 6,
+  route JSON valid/planning-only, SDK JSON blocked by design, py_compile, full SDK
+  completion suite 213, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

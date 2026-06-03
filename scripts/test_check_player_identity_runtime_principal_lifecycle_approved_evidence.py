@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -1186,6 +1187,97 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertIn(blocker, report["blockers"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_future_completed_operator_receipt(self) -> None:
+        payload = manifest()
+        future_approval = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+        self.rewrite_receipt_and_manifest_sha(
+            payload,
+            lambda receipt: receipt["operator_completion"].update(
+                {"approval_recorded_at_utc": future_approval.strftime("%Y-%m-%dT%H:%M:%SZ")}
+            ),
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "operational_window_operator_approval_receipt_approved_at_utc_in_future",
+            report["blockers"],
+        )
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_future_post_window_operational_window(self) -> None:
+        payload = manifest()
+        future_start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+        payload["operational_window"]["approved_window"] = {
+            "start_utc": future_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_utc": (future_start + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        payload["operational_window"]["actual_capture"] = {
+            "start_utc": (future_start + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_utc": (future_start + timedelta(minutes=9)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        payload["operational_window"]["rollback_window"] = {
+            "start_utc": (future_start + timedelta(minutes=9)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_utc": (future_start + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        payload.pop("output_artifact_identity", None)
+        add_output_artifact_identity(payload)
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_approved_window_ends_in_future", report["blockers"])
+        self.assertIn("operational_window_actual_capture_ends_in_future", report["blockers"])
+        self.assertIn("operational_window_rollback_window_ends_in_future", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_future_preflight_sidecar_checked_at(self) -> None:
+        payload = manifest()
+        artifact = payload["operational_window"]["preflight"]["post"]
+        sidecar_path = Path(artifact["path"])
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        future_checked_at = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+        sidecar["checked_at_utc"] = future_checked_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            artifact,
+            json.dumps(sidecar, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_preflight_checked_at_utc_in_future", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_semantically_invalid_preflight_timestamp_without_traceback(self) -> None:
+        payload = manifest()
+        artifact = payload["operational_window"]["preflight"]["post"]
+        sidecar_path = Path(artifact["path"])
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["checked_at_utc"] = "2026-99-99T99:99:99Z"
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            artifact,
+            json.dumps(sidecar, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual("", result.stderr)
+        self.assertIn("operational_window_preflight_checked_at_utc_invalid", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_operational_window_artifact_does_not_hash_protected_path(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_protected_sidecar")

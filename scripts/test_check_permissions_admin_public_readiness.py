@@ -412,6 +412,26 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
 
         self.assertEqual([], blockers)
 
+    def test_blocker_container_does_not_hide_positive_readiness_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "blockers": [
+                    "public SDK is ready",
+                    "runtime ready remains blocked",
+                ],
+                "promotion_requires": [
+                    "public SDK must be promoted before release",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [("positive_public_surface_claim", "$.blockers[0]")],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_nested_stable_and_v1_completion_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims(

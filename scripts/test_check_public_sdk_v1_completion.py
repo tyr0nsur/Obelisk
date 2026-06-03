@@ -710,6 +710,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "complete_sdk_blockers_promoted_for_claim_ratio",
             "complete_sdk_claim_progress_percent",
             "complete_sdk_claim_progress_ratio",
+            "complete_sdk_allowed",
             "complete_sdk_progress_percent",
             "complete_sdk_progress_ratio",
             "full_api_supported",
@@ -719,13 +720,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "p0_dependency_chain_promoted_for_claim_ratio",
             "package_shape_release_ready",
             "promoted_for_claim_ratio",
+            "production_ready",
             "public_package_available",
             "public_abi_ready",
+            "public_abi_available",
             "rc_ready",
             "release_candidate_ready",
             "release_package_ready",
             "release_ready",
+            "runtime_v1_ready",
             "stable_sdk_allowed",
+            "stable_v1_sdk",
             "v1_completion_ready",
             "stable_claim_allowed",
             "public_sdk_ready",
@@ -2634,7 +2639,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "public_sdk_ready": False,
                 "public_sdk": True,
                 "public_abi_ready": False,
+                "public_abi_available": True,
                 "runtime_ready": False,
+                "runtime_v1_ready": True,
                 "public_header_allowed": False,
                 "public_header_ready": True,
                 "complete_sdk_ready": True,
@@ -2656,6 +2663,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_send_chat_api": True,
                         "public_reply_abi_allowed": True,
                         "public_send_chat_abi_allowed": "ready",
+                        "public_abi_available": "available",
                         "send_chat_ready": True,
                         "public-reply-api": True,
                         "publicSendChatApi": True,
@@ -2668,6 +2676,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "runtime_approval": True,
                         "runtime_approval_granted": True,
                         "runtime_work_authorized": True,
+                        "runtime_v1_ready": "yes",
                         "server_operations_authorized": True,
                         "approved_runtime_evidence_source": "operator_receipt",
                         "runtimeEvidenceSource": "request-pack",
@@ -2694,6 +2703,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "operator approval is granted",
                             "runtime approval is granted",
                             "stable SDK remains blocked",
+                            "route gate remains blocked. public SDK is ready",
                             {
                                 "non_claims": [
                                     "public SDK readiness remains blocked",
@@ -2713,6 +2723,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].public_send_chat_api", claims)
         self.assertIn("checks[0].public_reply_abi_allowed", claims)
         self.assertIn("checks[0].public_send_chat_abi_allowed", claims)
+        self.assertIn("checks[0].public_abi_available", claims)
         self.assertIn("checks[0].send_chat_ready", claims)
         self.assertIn("checks[0].public-reply-api", claims)
         self.assertIn("checks[0].publicSendChatApi", claims)
@@ -2725,6 +2736,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].runtime_approval", claims)
         self.assertIn("checks[0].runtime_approval_granted", claims)
         self.assertIn("checks[0].runtime_work_authorized", claims)
+        self.assertIn("checks[0].runtime_v1_ready", claims)
         self.assertIn("checks[0].server_operations_authorized", claims)
         self.assertIn("checks[0].approved_runtime_evidence_source", claims)
         self.assertIn("checks[0].runtimeEvidenceSource", claims)
@@ -2750,13 +2762,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[15]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[16]:positive_text_claim", claims)
         self.assertNotIn("checks[0].notes[17]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[18].non_claims[0]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[18].non_claims[1]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[18]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[19].non_claims[0]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[19].non_claims[1]:positive_text_claim", claims)
         self.assertIn("complete_sdk_ready", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)
         self.assertIn("stable_sdk_allowed", claims)
         self.assertIn("public_api_allowed", claims)
+        self.assertIn("public_abi_available", claims)
+        self.assertIn("runtime_v1_ready", claims)
         self.assertIn("counts_toward_public_sdk", claims)
         self.assertIn("countsTowardRuntime", claims)
         self.assertIn("counts_toward_v1_completion", claims)

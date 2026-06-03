@@ -248,3 +248,34 @@ consolidated touched suite 159, route JSON valid/planning-only, SDK JSON
 blocked by design, py_compile, full SDK completion suite 213, and `git diff --check`.
 The stable state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
 progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Evidence And Claim-Scan Hardening
+
+The next supervised 4-agent round tightened the same P0 boundary without running
+a server or changing the blocker:
+
+- Approved runtime evidence consume checks reject future completed receipts,
+  future preflight `checked_at_utc`, future post-window approved/capture/
+  rollback windows, and bad approved/capture/rollback ordering.
+- Window-manifest replay now treats semantically invalid UTC values as blockers
+  instead of allowing a traceback during replay.
+- Player-principal planning smoke rejects nested positive runtime/public/v1
+  alias claims while remaining planning-only and non-authorizing.
+- Permissions/admin, command response, and commands/replies readiness scans no
+  longer let blocker-like containers such as `blockers`, `block_reasons`, or
+  `why_blocked` hide unnegated public/runtime readiness claims.
+- SDK completion scanning catches additional structured aliases:
+  `public_abi_available`, `runtime_v1_ready`, `complete_sdk_allowed`,
+  `production_ready`, and `stable_v1_sdk`; detached negators no longer suppress
+  later affirmative public SDK claims.
+- ResourceHandle side-lane guardrails catch `resource_lookup`,
+  `publicResourceLookupReady`, and `stable_claim_allowed` without promoting
+  ResourceHandle, object lookup, runtime object samples, serial reuse/
+  wraparound safety, or SDK completion.
+
+Validated offline: approved-evidence/manifest 84, window-manifest 70,
+downstream route/permissions/command/replies 184, ResourceHandle 33, planning
+smoke 6, route JSON valid/planning-only, SDK JSON blocked by design,
+py_compile, full SDK completion suite 213, and `git diff --check`. The stable
+state remains `current_route_blocker=approved_runtime_evidence_missing`, SDK
+progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.

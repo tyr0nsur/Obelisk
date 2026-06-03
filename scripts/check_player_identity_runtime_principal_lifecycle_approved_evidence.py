@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -533,6 +534,33 @@ def current_obelisk_commit() -> str | None:
     if result.returncode != 0 or GIT_COMMIT_RE.fullmatch(commit) is None:
         return None
     return commit
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def parse_utc_timestamp(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError:
+        return None
+
+
+def parsed_window_timestamp(
+    value: Any,
+    *,
+    reason: str,
+    label: str,
+    blockers: list[dict[str, Any]],
+) -> datetime | None:
+    if not isinstance(value, str) or UTC_TIMESTAMP_RE.fullmatch(value) is None:
+        add(blockers, reason, label)
+        return None
+    parsed = parse_utc_timestamp(value)
+    if parsed is None:
+        add(blockers, reason, label)
+    return parsed
 
 
 def expected_output_artifact_sha256(payload: dict[str, Any], identity: dict[str, str]) -> str:
@@ -1068,6 +1096,17 @@ def validate_preflight_payload(
     checked_at_utc = payload.get("checked_at_utc")
     if not isinstance(checked_at_utc, str) or UTC_TIMESTAMP_RE.fullmatch(checked_at_utc) is None:
         add(blockers, "operational_window_preflight_checked_at_utc_invalid", label)
+    else:
+        checked_at_dt = parse_utc_timestamp(checked_at_utc)
+        if checked_at_dt is None:
+            add(blockers, "operational_window_preflight_checked_at_utc_invalid", label)
+        elif checked_at_dt > now_utc():
+            add(
+                blockers,
+                "operational_window_preflight_checked_at_utc_in_future",
+                label,
+                checked_at_utc=checked_at_utc,
+            )
     if payload.get("posture_check") != "accepted":
         add(blockers, "operational_window_preflight_posture_check_mismatch", label)
     if payload.get("non_claim") != EXPECTED_PREFLIGHT_NON_CLAIM:
@@ -1218,6 +1257,23 @@ def validate_operator_approval_receipt_binding(
             "operational_window_operator_approval_receipt_approved_at_utc_invalid",
             "$.operational_window.operator_approval_receipt.path",
         )
+        approved_at_dt = None
+    else:
+        approved_at = completion["approval_recorded_at_utc"]
+        approved_at_dt = parse_utc_timestamp(approved_at)
+        if approved_at_dt is None:
+            add(
+                blockers,
+                "operational_window_operator_approval_receipt_approved_at_utc_invalid",
+                "$.operational_window.operator_approval_receipt.path",
+            )
+        elif approved_at_dt > now_utc():
+            add(
+                blockers,
+                "operational_window_operator_approval_receipt_approved_at_utc_in_future",
+                "$.operational_window.operator_approval_receipt.path",
+                approval_recorded_at_utc=approved_at,
+            )
     if not isinstance(completion.get("approved_by_role"), str) or not completion.get("approved_by_role", "").strip():
         add(
             blockers,
@@ -1293,6 +1349,37 @@ def validate_operator_approval_receipt_binding(
                 "$.operational_window.operator_approval_receipt.path",
                 expected=expected,
                 actual=bound_request.get(key),
+            )
+
+    approved_window = window.get("approved_window")
+    if isinstance(approved_window, dict) and approved_at_dt is not None:
+        approved_start = (
+            parse_utc_timestamp(approved_window["start_utc"])
+            if isinstance(approved_window.get("start_utc"), str)
+            and UTC_TIMESTAMP_RE.fullmatch(approved_window["start_utc"])
+            else None
+        )
+        approved_end = (
+            parse_utc_timestamp(approved_window["end_utc"])
+            if isinstance(approved_window.get("end_utc"), str)
+            and UTC_TIMESTAMP_RE.fullmatch(approved_window["end_utc"])
+            else None
+        )
+        if approved_start is not None and approved_at_dt >= approved_start:
+            add(
+                blockers,
+                "operational_window_operator_approval_receipt_approved_at_or_after_window_start",
+                "$.operational_window.operator_approval_receipt.path",
+                approval_recorded_at_utc=completion.get("approval_recorded_at_utc"),
+                approved_window_start_utc=approved_window.get("start_utc"),
+            )
+        if approved_end is not None and approved_at_dt >= approved_end:
+            add(
+                blockers,
+                "operational_window_operator_approval_receipt_approved_at_or_after_window_end",
+                "$.operational_window.operator_approval_receipt.path",
+                approval_recorded_at_utc=completion.get("approval_recorded_at_utc"),
+                approved_window_end_utc=approved_window.get("end_utc"),
             )
 
     bound_artifacts = payload.get("bound_artifacts")
@@ -1824,6 +1911,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             add(blockers, f"operational_window_{key}_not_false", f"{label}.{key}")
     if window.get("approval") != EXPECTED_APPROVAL:
         add(blockers, "operational_window_approval_mismatch", f"{label}.approval", expected=EXPECTED_APPROVAL)
+    timestamps: dict[str, dict[str, datetime]] = {}
     for key in ("approved_window", "actual_capture", "rollback_window"):
         value = window.get(key)
         if not isinstance(value, dict):
@@ -1833,13 +1921,40 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         if unexpected_keys:
             add(blockers, f"operational_window_{key}_keys_unexpected", f"{label}.{key}", unexpected=sorted(unexpected_keys))
         for timestamp_key in ("start_utc", "end_utc"):
-            timestamp_value = value.get(timestamp_key)
-            if not isinstance(timestamp_value, str) or UTC_TIMESTAMP_RE.fullmatch(timestamp_value) is None:
+            parsed = parsed_window_timestamp(
+                value.get(timestamp_key),
+                reason=f"operational_window_{key}_{timestamp_key}_invalid",
+                label=f"{label}.{key}.{timestamp_key}",
+                blockers=blockers,
+            )
+            if parsed is not None:
+                timestamps.setdefault(key, {})[timestamp_key] = parsed
+    current_time = now_utc()
+    for key, parsed in timestamps.items():
+        start = parsed.get("start_utc")
+        end = parsed.get("end_utc")
+        if start is not None and end is not None:
+            if start >= end:
+                add(blockers, f"operational_window_{key}_not_forward", f"{label}.{key}.end_utc")
+            if end > current_time:
                 add(
                     blockers,
-                    f"operational_window_{key}_{timestamp_key}_invalid",
-                    f"{label}.{key}.{timestamp_key}",
+                    f"operational_window_{key}_ends_in_future",
+                    f"{label}.{key}.end_utc",
+                    end_utc=window.get(key, {}).get("end_utc") if isinstance(window.get(key), dict) else None,
                 )
+    approved = timestamps.get("approved_window", {})
+    actual = timestamps.get("actual_capture", {})
+    rollback_timestamps = timestamps.get("rollback_window", {})
+    if actual.get("start_utc") is not None and approved.get("start_utc") is not None:
+        if actual["start_utc"] < approved["start_utc"]:
+            add(blockers, "operational_window_actual_capture_starts_before_approved_window", f"{label}.actual_capture.start_utc")
+    if actual.get("end_utc") is not None and approved.get("end_utc") is not None:
+        if actual["end_utc"] > approved["end_utc"]:
+            add(blockers, "operational_window_actual_capture_ends_after_approved_window", f"{label}.actual_capture.end_utc")
+    if rollback_timestamps.get("start_utc") is not None and actual.get("end_utc") is not None:
+        if rollback_timestamps["start_utc"] < actual["end_utc"]:
+            add(blockers, "operational_window_rollback_starts_before_capture_end", f"{label}.rollback_window.start_utc")
     target = window.get("target")
     if not isinstance(target, dict) or not target.get("instance") or not target.get("map"):
         add(blockers, "operational_window_target_missing", f"{label}.target")

@@ -465,6 +465,26 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_blocker_container_does_not_hide_positive_command_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "blockers": [
+                    "command router is ready",
+                    "send-chat API ready remains blocked",
+                ],
+                "promotion_requires": [
+                    "command router must be promoted before release",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [("positive_public_surface_claim", "$.blockers[0]")],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_missing_response_path_report(self) -> None:
         result = self.run_checker("--json", check=False)
         report = json.loads(result.stdout)

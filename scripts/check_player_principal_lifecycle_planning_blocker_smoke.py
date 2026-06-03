@@ -40,6 +40,40 @@ NO_RUNTIME_NON_CLAIM = "no runtime or server operation was performed"
 NO_PUBLIC_SDK_NON_CLAIM = "no public SDK, public ABI, release, or v1 completion readiness is claimed"
 APPROVED_MANIFEST_CHECKER = "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 APPROVED_MANIFEST_BUILDER = "scripts/build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
+POSITIVE_CLAIM_ALIAS_RE = (
+    "public_sdk",
+    "public_abi",
+    "public_header",
+    "runtime_ready",
+    "runtime_evidence_ready",
+    "runtime_work_authorized",
+    "server_operations_authorized",
+    "promotion_ready",
+    "v1_completion",
+    "complete_sdk",
+    "stable_claim",
+    "stable_sdk",
+    "production_ready",
+    "release_ready",
+    "runtime_v1",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+)
+NEGATIVE_CONTEXT_KEYS = frozenset(
+    (
+        "blocker",
+        "blockers",
+        "forbidden",
+        "missing",
+        "non_claim",
+        "non_claims",
+        "not_sufficient",
+        "reject",
+        "rejected",
+        "remaining_blockers",
+    )
+)
 
 
 def required_runtime_event_cases() -> list[dict[str, Any]]:
@@ -144,6 +178,34 @@ def validate_no_readiness_overclaim(payload: dict[str, Any], blockers: list[dict
             bool_false(payload, key, blockers, label)
 
 
+def normalized_claim_key(value: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "_" for ch in value).strip("_")
+
+
+def is_negative_context(path: tuple[str, ...]) -> bool:
+    return any(normalized_claim_key(part) in NEGATIVE_CONTEXT_KEYS for part in path)
+
+
+def validate_no_nested_positive_claims(value: Any, blockers: list[dict[str, Any]], label: str, path: tuple[str, ...] = ()) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            normalized = normalized_claim_key(key_text)
+            child_path = (*path, key_text)
+            if any(alias in normalized for alias in POSITIVE_CLAIM_ALIAS_RE) and not is_negative_context(child_path):
+                if child not in (False, None, [], {}, "false", "False", "not_ready", "blocked", "no", "none"):
+                    add(
+                        blockers,
+                        "planning_manifest_nested_positive_claim",
+                        f"{label}.{'.'.join(child_path)}",
+                        value=child,
+                    )
+            validate_no_nested_positive_claims(child, blockers, label, child_path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            validate_no_nested_positive_claims(child, blockers, label, (*path, str(index)))
+
+
 def output_entry(report: dict[str, Any], key: str) -> dict[str, Any] | None:
     outputs = report.get("outputs")
     if not isinstance(outputs, dict):
@@ -203,6 +265,7 @@ def validate_lifecycle(lifecycle: dict[str, Any], blockers: list[dict[str, Any]]
     if lifecycle.get("readiness_classification") != "planning_only":
         add(blockers, "lifecycle_readiness_not_planning_only", "lifecycle.readiness_classification")
     validate_no_readiness_overclaim(lifecycle, blockers, "lifecycle")
+    validate_no_nested_positive_claims(lifecycle, blockers, "lifecycle")
     acceptance = lifecycle.get("lifecycle_acceptance")
     if not isinstance(acceptance, dict):
         add(blockers, "lifecycle_acceptance_missing", "lifecycle.lifecycle_acceptance")
@@ -225,6 +288,7 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> N
     if policy.get("readiness_classification") != "planning_only":
         add(blockers, "policy_readiness_not_planning_only", "policy.readiness_classification")
     validate_no_readiness_overclaim(policy, blockers, "policy")
+    validate_no_nested_positive_claims(policy, blockers, "policy")
 
     runtime_evidence = policy.get("runtime_evidence")
     if not isinstance(runtime_evidence, dict):
@@ -261,6 +325,7 @@ def validate_first_evidence(first_evidence: dict[str, Any], blockers: list[dict[
     if first_evidence.get("readiness_classification") != "planning_only":
         add(blockers, "first_evidence_readiness_not_planning_only", "first_evidence.readiness_classification")
     validate_no_readiness_overclaim(first_evidence, blockers, "first_evidence")
+    validate_no_nested_positive_claims(first_evidence, blockers, "first_evidence")
 
 
 def validate_build_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -275,6 +340,7 @@ def validate_build_report(report: dict[str, Any], blockers: list[dict[str, Any]]
     if report.get("blockers") not in ([], None):
         add(blockers, "planning_report_has_blockers", "report.blockers", actual=report.get("blockers"))
     validate_no_readiness_overclaim(report, blockers, "report")
+    validate_no_nested_positive_claims(report, blockers, "report")
     non_claims = report.get("non_claims")
     if not isinstance(non_claims, list) or NO_RUNTIME_NON_CLAIM not in non_claims:
         add(blockers, "planning_report_runtime_non_claim_missing", "report.non_claims")

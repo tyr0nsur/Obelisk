@@ -71,6 +71,7 @@ FORBIDDEN_TRUE_KEYS = (
     "public_sdk_ready",
     "release_ready",
     "runtime_ready",
+    "stable_claim_allowed",
     "v1_sdk_ready",
     "object_identity_ready",
     "post_callback_resource_handle_ready",
@@ -86,7 +87,7 @@ FORBIDDEN_READY_VALUE_KEYS = {
     "ResourceHandle",
 }
 FORBIDDEN_ALIAS_SUBJECT_RE = re.compile(
-    r"(?:resource_?handle|resourcehandle|object_?identity|object_?lookup|object_?handle|"
+    r"(?:resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|object_?handle|"
     r"runtime_?object|serial_?reuse|wraparound)",
     re.IGNORECASE,
 )
@@ -96,7 +97,7 @@ FORBIDDEN_ALIAS_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 SURFACE_FORBIDDEN_TERM_RE = re.compile(
-    r"(?:resourcehandle|resource[_ -]?handle|object[_ -]?identity|object[_ -]?lookup|"
+    r"(?:resourcehandle|resource[_ -]?handle|resource[_ -]?lookup|object[_ -]?identity|object[_ -]?lookup|"
     r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity)|"
     r"(?:structure|item|inventory|dino|tribe|buff|mission|transfer|economy|mobility|area[_ -]?policy)[_ -]?handle)",
     re.IGNORECASE,
@@ -117,7 +118,7 @@ DESCRIPTOR_FORBIDDEN_PUBLIC_CONTRACT_RE = re.compile(
     r"(?:"
     r"\bObelisk(?:ResourceHandle|ObjectIdentity|ObjectLookup)[A-Za-z0-9_]*\b|"
     r"\bOBELISK_API_CAPABILITY_(?:RESOURCE_HANDLE|OBJECT_IDENTITY|OBJECT_LOOKUP)\b|"
-    r"\b(?:resourcehandle|resource[_ -]?handle|object[_ -]?identity|object[_ -]?lookup|"
+    r"\b(?:resourcehandle|resource[_ -]?handle|resource[_ -]?lookup|object[_ -]?identity|object[_ -]?lookup|"
     r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity))\b"
     r")",
     re.IGNORECASE,
