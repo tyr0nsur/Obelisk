@@ -77,6 +77,14 @@ PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "lifecycle.owner_cleanup",
     "separation.downstream_surfaces",
 }
+PLAYER_IDENTITY_PUBLIC_CONTRACT_GATE_INPUT_REQUIRED_FALSE_KEYS = (
+    "promotion_blocker_resolved",
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "v1_completion_evidence",
+)
 CANONICAL_MANIFEST_RELEASE_CLAIM = "no-v1-stable-release-claim-post-rc-surface-inventory"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
@@ -3487,6 +3495,44 @@ def executed_test_report_missing(
     return missing
 
 
+def player_identity_contract_gate_inputs_invalid(contract_report: dict[str, Any]) -> bool:
+    gate_inputs = contract_report.get("contract_gate_inputs")
+    if not isinstance(gate_inputs, list):
+        return True
+    expected_ids = PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS
+    if len(gate_inputs) != len(expected_ids):
+        return True
+    seen_ids: set[str] = set()
+    for entry in gate_inputs:
+        if not isinstance(entry, dict):
+            return True
+        entry_id = entry.get("id")
+        if not isinstance(entry_id, str) or entry_id not in expected_ids or entry_id in seen_ids:
+            return True
+        seen_ids.add(entry_id)
+        review_inputs = entry.get("review_inputs")
+        remaining_promotion_inputs = entry.get("remaining_promotion_inputs")
+        if (
+            entry.get("status") != "unresolved"
+            or not isinstance(review_inputs, list)
+            or not review_inputs
+            or not all(isinstance(item, str) and item for item in review_inputs)
+            or not isinstance(remaining_promotion_inputs, list)
+            or not all(isinstance(item, str) and item for item in remaining_promotion_inputs)
+            or not isinstance(entry.get("non_claim"), str)
+            or not entry.get("non_claim")
+        ):
+            return True
+        if any(entry.get(key) is not False for key in PLAYER_IDENTITY_PUBLIC_CONTRACT_GATE_INPUT_REQUIRED_FALSE_KEYS):
+            return True
+        if entry_id == "runtime.lifecycle_evidence":
+            if review_inputs != ["runtime.lifecycle_evidence"] or remaining_promotion_inputs != []:
+                return True
+        elif not remaining_promotion_inputs:
+            return True
+    return seen_ids != expected_ids
+
+
 def player_identity_structured_promotion_evidence_missing(
     evidence: dict[str, Any],
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -3552,6 +3598,7 @@ def player_identity_structured_promotion_evidence_missing(
         private_candidate_contract = private_candidate_contract if isinstance(private_candidate_contract, dict) else {}
         private_pod_layout_candidate = contract_report.get("private_pod_layout_candidate")
         private_pod_layout_candidate = private_pod_layout_candidate if isinstance(private_pod_layout_candidate, dict) else {}
+        contract_gate_inputs_invalid = player_identity_contract_gate_inputs_invalid(contract_report)
         if not (
             contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
             and contract_report.get("ready") is True
@@ -3571,10 +3618,17 @@ def player_identity_structured_promotion_evidence_missing(
             == PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS
             and contract_report.get("blockers") == []
             and contract_report.get("resolved_inputs") == ["runtime.lifecycle_evidence"]
+            and not contract_gate_inputs_invalid
             and approved_runtime.get("approved_runtime_evidence_present") is True
             and approved_runtime.get("runtime_evidence_ready") is True
         ):
             missing.append("public_contract_readiness_report:fields_invalid")
+        if contract_gate_inputs_invalid:
+            missing.append("public_contract_readiness_report:contract_gate_inputs_invalid")
+        if command_permission_route_gate_public_or_runtime_claims(contract_report):
+            missing.append("public_contract_readiness_report:public_or_runtime_claim_without_blocker")
+        if secondary_report_completion_claims_without_blocker(contract_report):
+            missing.append("public_contract_readiness_report:completion_claim_without_blocker")
         if remaining_blockers & {
             "lifetime.generation_scope_invalidation",
             "abi.public_pod_contract",

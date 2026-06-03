@@ -8,7 +8,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -94,6 +93,17 @@ def temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
     if not OFFLINE_WORKSPACE.is_dir():
         raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
     return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+
+
+def retained_temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
+    temp_dir = temp_offline_workspace()
+    LIVE_TEMP_DIRS.append(temp_dir)
+    return temp_dir
+
+
+def cleanup_live_temp_dirs() -> None:
+    while LIVE_TEMP_DIRS:
+        LIVE_TEMP_DIRS.pop().cleanup()
 
 
 def runtime_log_lines() -> list[str]:
@@ -370,10 +380,8 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
 
 
 def analyzer_summary() -> dict:
-    if not OFFLINE_WORKSPACE.is_dir():
-        raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
-    log_path = OFFLINE_WORKSPACE / "live-validation-logs" / RUN_ID / "Obelisk.log"
-    shutil.rmtree(log_path.parent, ignore_errors=True)
+    temp_dir = retained_temp_offline_workspace()
+    log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
     result = subprocess.run(
@@ -641,6 +649,9 @@ def manifest_for_copied_log(copied_log: Path, *, log_lines: list[str] | None = N
 
 
 class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        cleanup_live_temp_dirs()
+
     def test_request_pack_digest_uses_prepare_helper(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_digest")
         self.assertIs(checker.request_pack_digest, request_pack_digest)
@@ -742,8 +753,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             line.replace("ProcessEvent candidate[0] = 0x1d34e20", "ProcessEvent candidate[0] = 0x1d34e21")
             for line in runtime_log_lines()
         ]
-        temp_dir = temp_offline_workspace()
-        LIVE_TEMP_DIRS.append(temp_dir)
+        temp_dir = retained_temp_offline_workspace()
         log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -759,8 +769,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             line.replace("Found ProcessEvent at address: 0x1d34e20", "Found ProcessEvent at address: 0x1d34e21")
             for line in runtime_log_lines()
         ]
-        temp_dir = temp_offline_workspace()
-        LIVE_TEMP_DIRS.append(temp_dir)
+        temp_dir = retained_temp_offline_workspace()
         log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -777,8 +786,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 .replace("Found ProcessEvent at address: 0x1d34e20", "Found ProcessEvent at address: 0x1d11cb0")
             for line in runtime_log_lines()
         ]
-        temp_dir = temp_offline_workspace()
-        LIVE_TEMP_DIRS.append(temp_dir)
+        temp_dir = retained_temp_offline_workspace()
         log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

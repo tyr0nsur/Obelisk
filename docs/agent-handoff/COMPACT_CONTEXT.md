@@ -1275,6 +1275,24 @@ priorities, and do not use history files as the active source of truth.
   their test helper rebuilds shared offline sidecars under `/servidor/ark/workspace-offline`.
   Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
   `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent SDK/tribe/test-isolation round: SDK completion now
+  validates identity public-contract `contract_gate_inputs` when structured promotion
+  evidence is presented and rejects nested public/runtime/v1 overclaims inside that
+  report. Added standalone offline `check_tribe_scalar_boundary_readiness.py` plus tests:
+  it accepts only internal scalar/control evidence for `ServerRequestTribeLog`,
+  `IsInTribe.ReturnValue`, `AllowTribeGroupPermission.TribeGroupPermission`, and
+  `AllowTribeGroupPermission.ReturnValue`, while redacting `OnObject`, online-list and
+  mission-tag arrays, strings/log payloads, identity, lookup, mutation, return override,
+  ResourceHandle, runtime, public ABI/SDK, and v1 claims. Added
+  `docs/research/2026-06-03-tribe-scalar-boundary-design.md` with fixture evidence and
+  rejected hypotheses. Approved-runtime evidence tests now use per-test temp roots under
+  `/servidor/ark/workspace-offline` instead of mutating one fixed sidecar directory.
+  PluginManager guardrails now catch `auto` aliases to event dispatchers before bare
+  unregister calls. Validations passed: SDK completion suite 208, tribe checker 12 plus
+  JSON, approved-evidence 65, window-manifest 70, evidence-bundle 45, PluginManager
+  guardrails 29, py_compile, route/SDK JSON, and `git diff --check`. Route/SDK remain
+  fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

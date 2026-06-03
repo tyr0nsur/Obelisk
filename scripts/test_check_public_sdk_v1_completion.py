@@ -280,6 +280,114 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 }
             )
 
+    def player_identity_contract_gate_inputs(self) -> list[dict[str, object]]:
+        return [
+            {
+                "id": "runtime.lifecycle_evidence",
+                "status": "unresolved",
+                "review_inputs": ["runtime.lifecycle_evidence"],
+                "remaining_promotion_inputs": [],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Accepted runtime lifecycle evidence is a contract-review input only.",
+            },
+            {
+                "id": "privacy.identifier_redaction",
+                "status": "unresolved",
+                "review_inputs": ["privacy.identifier_redaction"],
+                "remaining_promotion_inputs": [
+                    "privacy.public_identifier_form",
+                    "privacy.redacted_identifier_fields",
+                    "privacy.logging_and_storage_policy",
+                ],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Identifier-redaction evidence is sanitized contract-review input only.",
+            },
+            {
+                "id": "lifetime.generation_scope_invalidation",
+                "status": "unresolved",
+                "review_inputs": ["lifetime.generation_scope_invalidation.candidate_policy"],
+                "remaining_promotion_inputs": [
+                    "lifetime.principal_scope",
+                    "lifetime.invalidation_events",
+                    "lifetime.reconnect_duplicate_stale_policy",
+                ],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Candidate invalidation-policy acceptance is review input only.",
+            },
+            {
+                "id": "abi.public_pod_contract",
+                "status": "unresolved",
+                "review_inputs": [
+                    "abi.public_pod_contract.private_layout_candidate",
+                    "abi.public_pod_contract.public_abi_preflight_candidate",
+                ],
+                "remaining_promotion_inputs": [
+                    "abi.payload_shape",
+                    "abi.capability_bits",
+                    "abi.append_only_layout_tests",
+                    "abi.layout",
+                    "sdk.consumer",
+                ],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Private POD layout and public ABI preflight candidates are offline review inputs only.",
+            },
+            {
+                "id": "lifecycle.owner_cleanup",
+                "status": "unresolved",
+                "review_inputs": ["lifecycle.owner_cleanup.owner_token_sdk_consumer_contract"],
+                "remaining_promotion_inputs": [
+                    "abi.owner_token_registration",
+                    "lifecycle.owner_cleanup.runtime_tests",
+                ],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Owner-token SDK consumer contract evidence is candidate-only review input.",
+            },
+            {
+                "id": "separation.downstream_surfaces",
+                "status": "unresolved",
+                "review_inputs": ["separation.no_commands_permissions_persistence"],
+                "remaining_promotion_inputs": [
+                    "permissions_admin_contract_blocker",
+                    "command_chat_response_contract_blocker",
+                    "commands_replies_contract_blocker",
+                    "player_lookup_exclusion_review",
+                    "storage_persistence_exclusion_review",
+                ],
+                "promotion_blocker_resolved": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "v1_completion_evidence": False,
+                "non_claim": "Identity promotion cannot unlock downstream surfaces.",
+            },
+        ]
+
     def write_player_identity_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
         runtime_manifest = root / "approved-runtime-principal-lifecycle-evidence.json"
         runtime_report = root / "player_identity_approved_runtime_report.json"
@@ -305,6 +413,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "next_blocker": "identity_public_contract_gate_missing",
                     "blockers": [],
                     "resolved_inputs": ["runtime.lifecycle_evidence"],
+                    "contract_gate_inputs": self.player_identity_contract_gate_inputs(),
                     "remaining_blockers": [
                         "runtime.lifecycle_evidence",
                         "privacy.identifier_redaction",
@@ -6184,6 +6293,51 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("public_contract_readiness_report:fields_invalid", missing)
         self.assertIn("public_contract_readiness_report:promotion_blockers_remaining", missing)
         self.assertIn("public_contract_readiness_report:private_candidate_contract_candidate_only", missing)
+
+    def test_identity_structured_contract_report_requires_contract_gate_inputs(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report.pop("contract_gate_inputs")
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+        self.assertIn("public_contract_readiness_report:contract_gate_inputs_invalid", missing)
+
+    def test_identity_structured_contract_report_rejects_contract_gate_input_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report["contract_gate_inputs"][1]["promotion_ready"] = True
+            contract_report["contract_gate_inputs"][1]["v1_completion_evidence"] = True
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+        self.assertIn("public_contract_readiness_report:contract_gate_inputs_invalid", missing)
+        self.assertIn("public_contract_readiness_report:public_or_runtime_claim_without_blocker", missing)
+
+    def test_identity_structured_contract_report_rejects_nested_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report["nested_claims"] = {
+                "public_sdk_ready": True,
+                "stable_claim_allowed": True,
+            }
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("public_contract_readiness_report:public_or_runtime_claim_without_blocker", missing)
+        self.assertIn("public_contract_readiness_report:completion_claim_without_blocker", missing)
+        self.assertNotIn("public_contract_readiness_report:contract_gate_inputs_invalid", missing)
 
     def test_identity_structured_contract_report_rejects_legacy_next_blocker_alias(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(

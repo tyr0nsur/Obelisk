@@ -619,6 +619,13 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 )
 
         dispatcher_variables: set[str] = set()
+        dispatcher_variables.update(
+            re.findall(
+                r"\b(?:const\s+)?auto\s*(?:[&*]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"
+                r"(?:&\s*)?(?:\*\s*)?(?:m_ChatDispatcher|\w+EventDispatcher::Get\(\))",
+                plugin_manager_text,
+            )
+        )
         for dispatcher in dispatcher_classes:
             dispatcher_variables.update(
                 re.findall(
