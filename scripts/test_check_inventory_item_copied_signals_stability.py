@@ -673,6 +673,51 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["blockers"], [])
 
+    def test_negative_guardrail_containers_cannot_hide_positive_readiness_claims(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["non_claims"] = [
+            "Inventory SDK ready from copied signals",
+            "ResourceHandle promotion ready through item return signals",
+        ]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] in {"public_claim_forbidden_term", "readiness_claim_enabled"}
+        }
+        self.assertEqual(
+            {
+                "$.public_gameplay_events.promoted_events[0].non_claims[0]",
+                "$.public_gameplay_events.promoted_events[0].non_claims[1]",
+            },
+            paths,
+        )
+
+    def test_negative_guardrail_containers_still_allow_bare_excluded_terms(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["non_claims"] = [
+            "Inventory SDK",
+            "Items SDK",
+            "ResourceHandle",
+            "return override",
+            "no Inventory SDK or Items SDK readiness",
+        ]
+
+        result = self.run_fixture(fixtures)
+        payload = json.loads(result.stdout)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["blockers"], [])
+
     def test_public_sdk_and_v1_readiness_cannot_be_activated_by_this_surface(self) -> None:
         fixtures = self.make_fixture()
         surfaces = fixtures["public_sdk_surfaces"]

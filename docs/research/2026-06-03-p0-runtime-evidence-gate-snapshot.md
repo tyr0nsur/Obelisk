@@ -225,6 +225,40 @@ No server/runtime operation, protected live-path write, marker/env change,
 ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish,
 tag, or push occurred.
 
+## Route Bookkeeping And Alias Hardening Snapshot
+
+The next supervised round after `a178b0b` closed additional offline accounting and
+alias bypasses without changing the active route blocker:
+
+- Complete-SDK release-statement bookkeeping now requires non-promoted outcome
+  records to match the manifest status exactly. A `post-v1` blocker no longer
+  satisfies accounting with an `excluded` record, even if the exclusion contract
+  text would otherwise pass. Blocker rows now expose whether the release-statement
+  outcome matches the manifest.
+- Runtime window/preflight validation normalizes nested JSON flag keys before
+  checking forbidden positive authorization/readiness flags. CamelCase, kebab,
+  and spaced aliases such as `runtimeWorkAuthorized`,
+  `server-operations-authorized`, and `public sdk ready` now fail closed.
+- Command response and commands/replies public-readiness gates treat
+  broadcast/notices/moderation as downstream public API/ABI/header aliases. They
+  remain blocked until the identity -> permissions/admin -> response path ->
+  replies chain is promoted with evidence.
+- Inventory copied-signal guardrails still allow bare excluded terms in
+  `non_claims`/guardrail containers, but positive wording such as `Inventory SDK
+  ready` or `ResourceHandle promotion ready` is now rejected.
+
+Lead validation observed SDK completion 227 OK, runtime window manifest 74 OK,
+command response/replies 85 OK, inventory copied signals 29 OK, inventory checker
+JSON category-only with `public_sdk_ready=false` and `v1_completion_ready=false`,
+route JSON valid/planning-only with
+`current_route_blocker=approved_runtime_evidence_missing`, SDK JSON blocked with
+complete SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile` OK,
+and `git diff --check` OK.
+
+No server/runtime operation, protected live-path write, marker/env change,
+ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish,
+tag, or push occurred.
+
 ## P0 Claim-Surface Hardening
 
 The next supervised 4-agent round closed additional claim-surface gaps without

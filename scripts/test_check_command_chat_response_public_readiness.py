@@ -871,6 +871,34 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             [item["label"] for item in blockers],
         )
 
+    def test_rejects_nested_moderation_broadcast_aliases_and_claims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "nested_report": {
+                    "publicBroadcastApiAllowed": True,
+                    "publicNoticeAbiAllowed": True,
+                    "moderationApiAllowed": True,
+                    "claims": [
+                        "broadcast/notices API is ready",
+                        "moderation authority is supported",
+                    ],
+                },
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.nested_report.publicBroadcastApiAllowed"),
+                ("public_surface_overclaim", "$.nested_report.publicNoticeAbiAllowed"),
+                ("public_surface_overclaim", "$.nested_report.moderationApiAllowed"),
+                ("positive_public_surface_claim", "$.nested_report.claims[0]"),
+                ("positive_public_surface_claim", "$.nested_report.claims[1]"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_decision_public_header_overclaims(self) -> None:
         decisions = self.make_decisions()
         decisions["status"] = "promoted"
@@ -903,8 +931,10 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             public_header_path.write_text(
                 "typedef struct ObeliskCommandChatResponse ObeliskCommandChatResponse;\n"
                 "typedef struct ObeliskChatRouter ObeliskChatRouter;\n"
+                "typedef struct ObeliskModeration ObeliskModeration;\n"
                 "void RegisterCommandChatResponse(void);\n"
                 "void RegisterChatRouter(void);\n"
+                "void ModerateChat(void);\n"
                 "#define OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH 0x80000000u\n",
                 encoding="utf-8",
             )
@@ -924,8 +954,10 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
         self.assertIn("ObeliskCommandChatResponse", detail["symbols"])
         self.assertIn("ObeliskChatRouter", detail["symbols"])
+        self.assertIn("ObeliskModeration", detail["symbols"])
         self.assertIn("RegisterCommandChatResponse", detail["symbols"])
         self.assertIn("RegisterChatRouter", detail["symbols"])
+        self.assertIn("ModerateChat", detail["symbols"])
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH", detail["symbols"])
 
     def test_public_header_scan_ignores_comments_and_identifier_supersets(self) -> None:

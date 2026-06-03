@@ -263,6 +263,32 @@ POSITIVE_TERM_SUFFIX_RE = re.compile(
     r"^\s+(?:ready|enabled|public|supported|allowed|live|operational|exposes?|provides?)\b",
     re.IGNORECASE,
 )
+POSITIVE_READINESS_PHRASES = (
+    "inventory sdk ready",
+    "inventory sdk readiness",
+    "items sdk ready",
+    "items sdk readiness",
+    "promotion ready",
+    "promotion readiness",
+    "public abi ready",
+    "public abi readiness",
+    "public readiness",
+    "public sdk ready",
+    "public sdk readiness",
+    "release ready",
+    "release readiness",
+    "runtime ready",
+    "runtime readiness",
+    "stable sdk ready",
+    "stable sdk readiness",
+    "v1 completion",
+    "v1 completion ready",
+    "v1 completion readiness",
+    "v1 ready",
+    "v1 readiness",
+    "v1 sdk ready",
+    "v1 sdk readiness",
+)
 C_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 CPP_COMMENT_RE = re.compile(r"//.*")
 
@@ -359,13 +385,17 @@ def has_positive_term_suffix(text: str, end: int) -> bool:
     return bool(POSITIVE_TERM_SUFFIX_RE.match(text[end:]))
 
 
-def is_negated_for_match(text: str, start: int, end: int) -> bool:
-    if has_positive_term_suffix(text, end):
-        return False
+def has_negation_before_match(text: str, start: int) -> bool:
     return bool(
         NEGATED_OR_BOUNDARY_RE.search(preceding_clause(text, start))
         or NEGATED_OR_BOUNDARY_RE.search(preceding_negation_list_scope(text, start))
     )
+
+
+def is_negated_for_match(text: str, start: int, end: int) -> bool:
+    if has_positive_term_suffix(text, end):
+        return False
+    return has_negation_before_match(text, start)
 
 
 def flexible_phrase_match(text: str, phrase: str) -> re.Match[str] | None:
@@ -381,6 +411,7 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             if key in NEGATIVE_KEYS:
+                scan_positive_claim_terms_in_negative_container(child, blockers, child_trail)
                 continue
             if key in CLAIM_TEXT_SCAN_KEYS:
                 for text_path, text in string_values(child, child_trail):
@@ -396,6 +427,36 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
     elif isinstance(value, list):
         for index, child in enumerate(value):
             scan_public_claim_terms(child, blockers, f"{trail}[{index}]")
+
+
+def scan_positive_claim_terms_in_negative_container(
+    value: Any, blockers: list[dict[str, Any]], trail: str
+) -> None:
+    if isinstance(value, str):
+        for phrase in POSITIVE_READINESS_PHRASES:
+            match = flexible_phrase_match(value, phrase)
+            if not match:
+                continue
+            if has_negation_before_match(value, match.start()):
+                continue
+            add(blockers, "readiness_claim_enabled", trail, value=value, term=phrase)
+            break
+        for term in PUBLIC_CLAIM_TERMS:
+            match = flexible_phrase_match(value, term)
+            if not match:
+                continue
+            if not has_positive_term_suffix(value, match.end()):
+                continue
+            if has_negation_before_match(value, match.start()):
+                continue
+            add(blockers, "public_claim_forbidden_term", trail, term=term, value=value)
+        return
+    if isinstance(value, dict):
+        for key, child in value.items():
+            scan_positive_claim_terms_in_negative_container(child, blockers, f"{trail}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            scan_positive_claim_terms_in_negative_container(child, blockers, f"{trail}[{index}]")
 
 
 def scan_public_sdk_surfaces_inventory_side_lane_claims(
@@ -917,32 +978,6 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
         "v1_sdk_ready",
     }
     readiness_text_keys = forbidden_true_keys | READINESS_TEXT_SCAN_KEYS
-    positive_readiness_phrases = (
-        "inventory sdk ready",
-        "inventory sdk readiness",
-        "items sdk ready",
-        "items sdk readiness",
-        "promotion ready",
-        "promotion readiness",
-        "public abi ready",
-        "public abi readiness",
-        "public readiness",
-        "public sdk ready",
-        "public sdk readiness",
-        "release ready",
-        "release readiness",
-        "runtime ready",
-        "runtime readiness",
-        "stable sdk ready",
-        "stable sdk readiness",
-        "v1 completion",
-        "v1 completion ready",
-        "v1 completion readiness",
-        "v1 ready",
-        "v1 readiness",
-        "v1 sdk ready",
-        "v1 sdk readiness",
-    )
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
@@ -950,7 +985,7 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
                 add(blockers, "readiness_claim_enabled", child_trail)
             if key in readiness_text_keys:
                 for text_path, text in string_values(child, child_trail):
-                    for phrase in positive_readiness_phrases:
+                    for phrase in POSITIVE_READINESS_PHRASES:
                         match = flexible_phrase_match(text, phrase)
                         if not match:
                             continue

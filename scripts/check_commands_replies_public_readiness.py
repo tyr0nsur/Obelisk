@@ -233,6 +233,9 @@ REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
         "OBELISK_API_CAPABILITY_COMMAND_ROUTER",
         "OBELISK_API_CAPABILITY_CHAT_REPLIES",
         "OBELISK_API_CAPABILITY_SEND_CHAT",
+        "OBELISK_API_CAPABILITY_BROADCAST",
+        "OBELISK_API_CAPABILITY_NOTICES",
+        "OBELISK_API_CAPABILITY_MODERATION",
         "OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH",
         "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT_RESPONSE",
         "OBELISK_COMMANDS_REPLIES_ABI_VERSION",
@@ -247,10 +250,17 @@ REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
         "ObeliskCommandReply",
         "ObeliskChatReply",
         "ObeliskSendChat",
+        "ObeliskBroadcast",
+        "ObeliskNotice",
+        "ObeliskModeration",
         "RegisterCommandWithOwnerToken",
         "UnregisterCommandWithOwnerToken",
         "ReplyToCommandWithOwnerToken",
         "SendChatWithOwnerToken",
+        "BroadcastChat",
+        "BroadcastNotice",
+        "SendNotice",
+        "ModerateChat",
         "CallProcessEventCommandResponse",
         "CallProcessEventReply",
     )
@@ -259,6 +269,11 @@ FALSE_ONLY_KEYS = frozenset(
     (
         "arkapi_parser_copy_allowed",
         "aseapi_parser_copy_allowed",
+        "broadcast_abi_allowed",
+        "broadcast_allowed",
+        "broadcast_api",
+        "broadcast_api_allowed",
+        "broadcast_ready",
         "call_process_event_response_allowed",
         "command_parser_allowed",
         "command_router_allowed",
@@ -281,12 +296,24 @@ FALSE_ONLY_KEYS = frozenset(
         "promotion_ready",
         "public_abi_allowed",
         "public_abi_ready",
+        "public_broadcast_abi_allowed",
+        "public_broadcast_api",
+        "public_broadcast_api_allowed",
         "public_bridge_abi_allowed",
         "public_or_runtime_accounting_allowed",
         "public_command_parser_allowed",
         "public_command_router_allowed",
         "public_header_allowed",
         "public_header_ready",
+        "public_moderation_api",
+        "public_moderation_api_allowed",
+        "public_moderation_ready",
+        "public_notice_abi_allowed",
+        "public_notice_api",
+        "public_notice_api_allowed",
+        "public_notices_abi_allowed",
+        "public_notices_api",
+        "public_notices_api_allowed",
         "public_route_ready",
         "public_reply_api",
         "public_readiness_ready",
@@ -307,6 +334,18 @@ FALSE_ONLY_KEYS = frozenset(
         "reply_allowed",
         "route_ready",
         "route_readiness_ready",
+        "moderation_allowed",
+        "moderation_api",
+        "moderation_api_allowed",
+        "moderation_ready",
+        "notice_allowed",
+        "notice_api",
+        "notice_api_allowed",
+        "notice_ready",
+        "notices_allowed",
+        "notices_api",
+        "notices_api_allowed",
+        "notices_ready",
         "runtime_approval",
         "runtime_approval_granted",
         "runtime_delivery_allowed",
@@ -365,7 +404,9 @@ POSITIVE_CLAIM_RE = re.compile(
     r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
     r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
-    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
+    r"broadcast(?:[/_ -]?notices?)?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|"
+    r"notices?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|moderation(?:[_ -]?(?:abi|api|path|request|authority))?"
     r")\b.{0,100}\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b",
     re.IGNORECASE,
 )
@@ -379,7 +420,9 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
     r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
-    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
+    r"broadcast(?:[/_ -]?notices?)?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|"
+    r"notices?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|moderation(?:[_ -]?(?:abi|api|path|request|authority))?"
     r")\b",
     re.IGNORECASE,
 )

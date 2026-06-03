@@ -199,69 +199,19 @@ This file is an active routing table only. Durable evidence belongs in
   skills, integrated findings, and pending findings so compaction does not erase them.
 
 
-- Latest integration note: 2026-06-03 turbo SDK P0/non-claim round after `7a3f882`
-  delegated four scopes: approved runtime principal lifecycle evidence hardening to
-  Hegel, player-identity public-contract helper overclaim scanning to Popper,
-  permissions/admin authority fail-closed drift to Singer, and examples/plugin docs
-  stable-SDK wording to Gibbs. Integrated changes require approved runtime sidecars,
-  plus implicit `operator-approval-request.md`, to be exact siblings of the copied
-  `live-validation-logs/<run-id>/Obelisk.log`; reject identifier-redaction and
-  principal-invalidation helper reports that imply public identity/principal, ABI/header,
-  lookup, runtime, promotion, or complete-SDK readiness; reject duplicate
-  recognized/allow-capable authority kind lists and legacy allowed-authority aliases; and
-  replace `oProcessTimer` first-stable wording with pre-release/non-claim wording. Lead
-  validation: approved runtime evidence 71, identity public contract 36, permissions
-  query 43, permissions public readiness 62, public SDK guardrails 194, route JSON
-  valid/planning-only with `approved_runtime_evidence_missing`, SDK JSON blocked with
-  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile`, and
+- Latest integration note: 2026-06-03 turbo SDK route/bookkeeping hardening round after
+  `a178b0b` delegated four scopes: release-statement exact outcome bookkeeping to
+  Chandrasekhar, runtime window/preflight alias authorization to Lorentz, downstream
+  command response/replies moderation-broadcast aliases to Hubble, and inventory copied
+  signal non-claim containers to Averroes. Integrated changes require non-promoted
+  release-statement outcome records to match the manifest status exactly; normalize
+  nested preflight positive authorization/readiness flag aliases such as
+  `runtimeWorkAuthorized`; reject broadcast/notices/moderation public ABI/API/header and
+  positive readiness aliases in command response/replies; and reject positive inventory
+  SDK/ResourceHandle readiness wording hidden inside negative guardrail containers while
+  still allowing bare excluded-term lists. Lead validation: SDK completion suite 227,
+  runtime window manifest 74, command response/replies 85, inventory copied signals 29,
+  inventory JSON ready only as category/copied signal with `public_sdk_ready=false`,
+  route JSON valid/planning-only with `approved_runtime_evidence_missing`, SDK JSON
+  blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, `py_compile`, and
   `git diff --check`. No runtime/server/Discord/GitHub operation.
-- Previous integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
-  after `36e191b`: SDK completion/release-statement bookkeeping to Jason,
-  Mission/Transfer/Dino/Tribe/Buff side-lanes to Herschel, ResourceHandle/object identity
-  to Mendel, and build/install/package-shape release boundaries to Meitner. Integrated
-  changes harden secondary route/side-lane reports against standalone release-looking
-  `support_tier`/status claims, side-lane release/candidate evidence against module
-  SDK/API and ABI/header callback readiness, ResourceHandle against public GObjects,
-  static globals, strict serial, zero-serial, source/helper, runtime rejection, and future
-  runtime observation readiness aliases, and install/release output so dry-runs say
-  `would publish` package-shape artifacts instead of completed installs. README now names
-  the current executable SDK gate totals: SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, blocker `approved_runtime_evidence_missing`. Evidence:
-  SDK completion suite 226, public SDK guardrails 194, side-lane 32, ResourceHandle 25,
-  ResourceHandle/offline-artifact focus 126, install plugin, install layout, release
-  readiness options, route JSON valid/planning-only, SDK JSON blocked, and
-  `git diff --check`. No runtime/server/Discord/GitHub operation.
-- Previous integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
-  directly after compaction: P0 lifecycle/request-window route safety to Hypatia,
-  permissions/command downstream to Harvey, operator ingress/storage to Russell, and
-  C ABI/runtime cleanup/default-deny to Carver. Due the active thread limit, two scopes
-  used existing agents. Integrated disk changes harden command response intent planning
-  against nested dependency positive public/reply/send-chat SDK claims and nested
-  public/runtime/v1 alias flags, lifecycle intent planning against nested public/runtime/v1
-  aliases, operator ingress/storage against support-tier, release-readiness,
-  public/external/Plugin Hub service, stable/production/complete SDK, and v1
-  ready/complete wording, and the player identity runtime window manifest receipt scanner
-  against unrelated `not ... runtime work authorized` wording. A runtime/C ABI report
-  found no patchable gap and passed PluginManager/EventManager/ABI validations. Worker
-  reports covered all four delegated scopes and none advanced SDK/P0 readiness. Evidence
-  observed by the lead: command intent planning, lifecycle planning, operator
-  ingress/storage, and window manifest tests pass, downstream command/permissions tests
-  passed 189 cases, route-gate tests passed 51 cases, focused checker JSONs preserve
-  planning-only non-claim state, route JSON remains valid/planning-only with
-  `approved_runtime_evidence_missing`, SDK JSON remains blocked with P0 `0/4`,
-  `stable_claim_allowed=false`, and `git diff --check` passes. No
-  runtime/server/Discord/GitHub operation. See `COMPACT_CONTEXT.md` and
-  `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.
-- Previous integration note: supervised 4-agent round plus lead integration closed offline
-  guardrail gaps without changing the active blocker. P0 route/evidence scanners now
-  reject window-request/operator-request/observer-env/source-marker aliases as approved
-  runtime evidence. SDK completion now rejects split `name/status` section claims and
-  package/support-tier release-supported wording. Inventory/Structure side lanes now
-  catch separator variants such as `Inventory-SDK ready` and `Structure-SDK ready`.
-  Research guardrails preserve ArkServerApi/AseApi/NextGenPlugins as names/demand only,
-  and Discord helper rejects additional internal gate/test status phrases. Evidence:
-  route JSON valid/planning-only, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`, side-lane JSON outputs all non-public/non-runtime,
-  focused P0/SDK/side-lane/research/Discord tests, public SDK guardrails, and
-  `git diff --check`. No runtime/server/Discord/GitHub operation. See
-  `COMPACT_CONTEXT.md` and `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.

@@ -773,6 +773,11 @@ def preflight_flag_value_is_positive(value: Any) -> bool:
     return False
 
 
+def normalized_preflight_flag_key(key: str) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
 def validate_preflight_non_authorization_claims(
     payload: dict[str, Any],
     blockers: list[dict[str, Any]],
@@ -797,10 +802,13 @@ def validate_preflight_non_authorization_claims(
             actual=payload.get("non_claim"),
         )
     for key_path, key, value in iter_json_object_entries(payload):
-        if key in PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS and preflight_flag_value_is_positive(value):
+        if (
+            normalized_preflight_flag_key(key) in PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS
+            and preflight_flag_value_is_positive(value)
+        ):
             add(
                 blockers,
-                f"{path_key}_{key}_not_false",
+                f"{path_key}_{normalized_preflight_flag_key(key)}_not_false",
                 path_key,
                 key_path=key_path,
                 actual=value,

@@ -19,6 +19,29 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 turbo SDK route/bookkeeping hardening round after `a178b0b` delegated four
+  scopes: release-statement exact outcome bookkeeping, runtime window/preflight alias
+  authorization, downstream command response/replies moderation-broadcast aliases, and
+  inventory copied signal non-claim container scanning.
+- Integrated changes: non-promoted release-statement outcome records must now match the
+  manifest status exactly (`post-v1` cannot be satisfied by an `excluded` record);
+  nested preflight JSON flag keys are normalized so aliases such as
+  `runtimeWorkAuthorized`, `server-operations-authorized`, and `public sdk ready` fail
+  closed; command response/replies gates treat broadcast/notices/moderation public
+  ABI/API/header symbols and positive readiness wording as blocked downstream aliases;
+  inventory copied-signal negative guardrail containers can list bare excluded terms but
+  cannot hide positive wording such as `Inventory SDK ready` or `ResourceHandle promotion
+  ready`.
+- Validation observed: SDK completion suite 227 OK, runtime window manifest 74 OK,
+  command response/replies 85 OK, inventory copied signals 29 OK, inventory checker JSON
+  remains category-only with `public_sdk_ready=false` and `v1_completion_ready=false`,
+  route JSON valid/planning-only with `current_route_blocker=approved_runtime_evidence_missing`,
+  SDK JSON blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`,
+  `py_compile` OK, and `git diff --check` OK.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 turbo SDK P0/non-claim round after `7a3f882` delegated four scopes:
   approved runtime principal lifecycle evidence sidecar hardening, player-identity
   public-contract helper overclaim scanning, permissions/admin authority fail-closed

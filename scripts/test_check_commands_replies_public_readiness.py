@@ -726,8 +726,14 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         header = (
             HEADER.read_text(encoding="utf-8")
             + "\n#define OBELISK_API_CAPABILITY_COMMAND_ROUTER (1ull << 50)\n"
+            + "#define OBELISK_API_CAPABILITY_BROADCAST (1ull << 51)\n"
+            + "#define OBELISK_API_CAPABILITY_MODERATION (1ull << 52)\n"
             + "typedef struct ObeliskCommandParser { uint32_t struct_size; } ObeliskCommandParser;\n"
+            + "typedef struct ObeliskBroadcast { uint32_t struct_size; } ObeliskBroadcast;\n"
+            + "typedef struct ObeliskModeration { uint32_t struct_size; } ObeliskModeration;\n"
             + "typedef void (*ReplyToCommandWithOwnerToken)(uint64_t ownerToken);\n"
+            + "typedef void (*BroadcastNotice)(const char* message);\n"
+            + "typedef void (*ModerateChat)(uint64_t ownerToken);\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), header=header)
@@ -747,8 +753,14 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
         detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_ROUTER", detail["symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_BROADCAST", detail["symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_MODERATION", detail["symbols"])
         self.assertIn("ObeliskCommandParser", detail["symbols"])
+        self.assertIn("ObeliskBroadcast", detail["symbols"])
+        self.assertIn("ObeliskModeration", detail["symbols"])
         self.assertIn("ReplyToCommandWithOwnerToken", detail["symbols"])
+        self.assertIn("BroadcastNotice", detail["symbols"])
+        self.assertIn("ModerateChat", detail["symbols"])
 
     def test_rejects_public_header_not_canonical_repo_header(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -854,6 +866,34 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                 "positive_public_surface_claim",
             ],
             [item["reason"] for item in blockers],
+        )
+
+    def test_rejects_nested_moderation_broadcast_aliases_and_claims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "publicBroadcastApiAllowed": True,
+                    "publicNoticeAbiAllowed": True,
+                    "moderationApiAllowed": True,
+                    "claims": [
+                        "broadcast/notices API is ready",
+                        "moderation authority is supported",
+                    ],
+                },
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.publicBroadcastApiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.publicNoticeAbiAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.moderationApiAllowed"),
+                ("positive_public_surface_claim", "$.secondary_report.claims[0]"),
+                ("positive_public_surface_claim", "$.secondary_report.claims[1]"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
         )
 
     def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:

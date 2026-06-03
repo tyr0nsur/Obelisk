@@ -3009,6 +3009,8 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
         return False
     allowed_outcomes = required_release_statement_outcomes(surface)
     recorded_outcome = release_statement_recorded_outcome(text, surface_id)
+    if recorded_outcome != status:
+        return False
     if recorded_outcome not in allowed_outcomes:
         return False
     record = release_statement_surface_record(text, surface_id, recorded_outcome)
@@ -4771,7 +4773,7 @@ def blocker_outcome_next_action(
     if manifest_outcome in {"post-v1", "excluded"}:
         if release_statement_contract_satisfied:
             return "release-statement outcome accounted; remaining SDK claim still depends on all blockers"
-        expected = "post-v1 or excluded"
+        expected = manifest_outcome
         return f"add one reviewed {expected} release-statement record satisfying this surface's exclusion contract"
     if status == "missing":
         return "restore the canonical blocker row in docs/public_sdk_surfaces.json"
@@ -4827,12 +4829,14 @@ def completion_blocker_outcome_rows(
             public_header_path,
         )
         release_statement_contract_satisfied = False
+        release_statement_outcome_matches_manifest = release_statement_outcome == manifest_outcome
         if status == "promoted":
             release_statement_contract_satisfied = release_statement_outcome == "promoted"
         elif status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             allowed_outcomes = required_release_statement_outcomes(surface)
             release_statement_contract_satisfied = (
                 release_statement_text is not None
+                and release_statement_outcome_matches_manifest
                 and release_statement_outcome in allowed_outcomes
                 and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
             )
@@ -4915,6 +4919,7 @@ def completion_blocker_outcome_rows(
                 "is_p0_dependency_chain": is_p0_dependency_chain,
                 "manifest_outcome": manifest_outcome,
                 "release_statement_outcome": release_statement_outcome,
+                "release_statement_outcome_matches_manifest": release_statement_outcome_matches_manifest,
                 "release_statement_contract_satisfied": release_statement_contract_satisfied,
                 "required_release_statement_outcomes": required_outcomes,
                 "promotion_evidence_satisfied": promotion_evidence_satisfied,
@@ -5719,6 +5724,8 @@ def build_report(
                 release_statement_missing_blockers.append(surface_id)
             elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
                 release_statement_duplicate_records.append(surface_id)
+            elif release_statement_recorded_outcome(release_statement_text, surface_id) != status:
+                release_statement_missing_blockers.append(surface_id)
             elif release_statement_recorded_outcome(release_statement_text, surface_id) not in allowed_outcomes:
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_satisfies_exclusion_contract(release_statement_text, surface):

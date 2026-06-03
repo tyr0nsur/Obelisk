@@ -3822,7 +3822,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(full_payload["ready"])
         self.assertIn("v1_completion_required_false", full_payload["blockers"])
 
-    def test_scoped_release_statement_allows_alternate_non_complete_outcome_when_contract_allows(self) -> None:
+    def test_scoped_release_statement_rejects_alternate_non_complete_outcome(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
             build_policy_checker = self.write_fake_structure_build_policy_checker(
@@ -3841,6 +3841,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 str(build_policy_checker),
                 "--validate-release-statement-scope",
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
@@ -3849,14 +3850,24 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             for row in payload["v1_sdk_blocker_outcomes"]
             if row["surface"] == "obelisk.inventory_items_mutation.v1"
         )
-        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+            ["release_statement_missing_non_promoted_blocker_outcomes"],
+        )
         self.assertEqual(row["manifest_outcome"], "post-v1")
         self.assertEqual(row["release_statement_outcome"], "excluded")
+        self.assertFalse(row["release_statement_outcome_matches_manifest"])
         self.assertEqual(row["required_release_statement_outcomes"], ["excluded", "post-v1"])
-        self.assertTrue(row["release_statement_contract_satisfied"])
+        self.assertFalse(row["release_statement_contract_satisfied"])
         self.assertFalse(row["counts_toward_complete_sdk_claim"])
-        self.assertNotIn("obelisk.inventory_items_mutation.v1", payload["release_statement_missing_blocker_outcomes"])
+        self.assertEqual(
+            payload["release_statement_missing_blocker_outcomes"],
+            ["obelisk.inventory_items_mutation.v1"],
+        )
         self.assertFalse(payload["stable_claim_allowed"])
+        self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertIn("v1_completion_required_false", payload["blockers"])
 
     def test_structure_excluded_outcome_is_bookkeeping_only_and_requires_exact_wording(self) -> None:
@@ -7786,6 +7797,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], ["obelisk.player_identity.v1"])
         self.assertIsNone(payload["v1_sdk_blocker_outcomes"][0]["release_statement_outcome"])
+
+    def test_release_statement_outcome_must_match_manifest_non_promoted_status(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.inventory_items_mutation.v1":
+                surface["status"] = "post-v1"
+                break
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(
+            payload["release_statement_missing_blocker_outcomes"],
+            ["obelisk.inventory_items_mutation.v1"],
+        )
+        self.assertNotIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        inventory = outcome_by_surface["obelisk.inventory_items_mutation.v1"]
+        self.assertEqual(inventory["manifest_outcome"], "post-v1")
+        self.assertEqual(inventory["release_statement_outcome"], "excluded")
+        self.assertFalse(inventory["release_statement_outcome_matches_manifest"])
+        self.assertFalse(inventory["release_statement_contract_satisfied"])
+        self.assertFalse(inventory["counts_toward_complete_sdk_claim"])
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
 
     def test_release_statement_rejects_mixed_alternate_promoted_surface_records(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

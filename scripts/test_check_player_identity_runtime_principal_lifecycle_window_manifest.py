@@ -1060,6 +1060,67 @@ class WindowManifestCheckerTests(unittest.TestCase):
         for flag in forbidden_flags:
             self.assertIn(f"preflight_pre_path_{flag}_not_false", reasons)
 
+    def test_rejects_preflight_pre_nested_positive_authorization_flag_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
+            preflight_path = root / "preflight-pre.json"
+            payload = preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                window_manifest_path=manifest_path,
+                copied_log_path=copied_log,
+                env_file=observer_env,
+                env_sha256=observer_env_sha256,
+            )
+            payload["nested_flags"] = {
+                "runtimeWorkAuthorized": True,
+                "server-operations-authorized": "yes",
+                "public sdk ready": "ready",
+            }
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("preflight_pre_path_runtime_work_authorized_not_false", reasons)
+        self.assertIn("preflight_pre_path_server_operations_authorized_not_false", reasons)
+        self.assertIn("preflight_pre_path_public_sdk_ready_not_false", reasons)
+        key_paths = {
+            detail.get("key_path")
+            for detail in blockers
+            if detail["reason"].endswith("_not_false")
+        }
+        self.assertIn("nested_flags.runtimeWorkAuthorized", key_paths)
+        self.assertIn("nested_flags.server-operations-authorized", key_paths)
+        self.assertIn("nested_flags.public sdk ready", key_paths)
+
     def test_rejects_preflight_pre_positive_textual_authorization_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
