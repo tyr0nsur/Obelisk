@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-06-03
+Updated: 2026-06-04
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -18,6 +18,54 @@ priorities, and do not use history files as the active source of truth.
    findings in handoff/research notes before finishing so compaction does not lose them.
 
 ## Latest Local Checkpoint
+
+- 2026-06-04 live-ops correction after chained windows: stop using repeated short
+  observer-window restarts while waiting for organic players. The operator explicitly
+  pointed out that restarting all the time prevents players from entering. Lead killed
+  the remaining scheduled TheIsland window controller and the old grep monitor, removed
+  future observer markers from `/servidor/ark/obelisk/state/instances/arkserver2`, and
+  left only `enable-process-event-hook` plus `disable-plugins` markers for future
+  posture. Current server processes stayed running: `arkserver` is `Ragnarok` with
+  `-ActiveEvent=Summer`; `arkserver2` is `TheIsland` with `-ActiveEvent=Summer`. The
+  current TheIsland process still has the player-principal observer loaded from its
+  existing launch, but no future observer markers remain, so the next normal restart will
+  return to stable hook/plugins-disabled posture. Do not force that restart just to tidy
+  state while waiting for players.
+- Added `scripts/monitor_ark_player_presence_passive.sh`. It prefers local GameDig Steam
+  query with type `ase` against query ports `27015` (`arkserver:Ragnarok`) and `27016`
+  (`arkserver2:TheIsland`), treats JSON/query errors as `unknown` rather than zero
+  players, never calls LinuxGSM `monitor`, and never starts/stops/restarts servers or edits
+  markers. It filters LinuxGSM `details` output only as a fallback so secrets are not
+  printed. A detached monitor was started with log/PID outside `/servidor/ark`:
+  `/tmp/obelisk-player-presence-monitor.log` and
+  `/tmp/obelisk-player-presence-monitor.pid`; it checks every 30 seconds and exits if it
+  sees `players>0`.
+- Delegation round closed: SDK fast-path explorer recommended offline work on public
+  identity contract readiness, public ABI/owner-token candidate-only preflight hardening,
+  and scoped non-complete release statement bookkeeping; passive-monitor explorer
+  recommended GameDig over RCON/LinuxGSM. Integration corrected the proposed command:
+  this installed GameDig uses `--type ase`, while old alias `arkse` returns
+  `{"error":"Invalid game: arkse"}` and must not be treated as zero players.
+
+- 2026-06-04 approved live-ops window attempted on `arkserver2` / `TheIsland` for
+  player-principal lifecycle evidence, run id
+  `20260603T233330Z-player-principal-lifecycle`, artifacts under
+  `/servidor/ark/workspace-offline/live-validation-logs/20260603T233330Z-player-principal-lifecycle/`.
+  Operator approval for this target/window was recorded in the current turn. Runtime was
+  installed/refreshed before the run, the LinuxGSM wrapper matched the versioned template,
+  observer window preflight passed, `arkserver2` restarted inside the approved window,
+  copied `Obelisk.log` recorded runtime LD_PRELOAD, ProcessEvent hook address
+  `0x1d34e20`, scanner disabled, plugins disabled, and a single
+  `PlayerPrincipalLifecycleObserver enabled` gate. Rollback removed observer markers,
+  preserved `enable-process-event-hook` and `disable-plugins`, restarted stable, and
+  stable posture/preflight passed with no observer env. The post-window manifest is
+  accepted, but the evidence bundle intentionally fails because no player/client was
+  available to produce lifecycle events:
+  `player_principal_lifecycle: no_accepted_or_rejected_observer_lines`. The route check
+  remains valid and locked at `approved_runtime_evidence_missing`; no SDK/public/runtime
+  readiness claim is allowed. Next retry requires real player lifecycle activity during
+  the scoped window: accepted `session_start`, rejected/non-login `session_start_rejected`,
+  and `session_end`.
 
 - 2026-06-03 P0 runtime-evidence preparation hardening round after `7581cd9`
   delegated four scopes: request-pack/preflight/window sidecars, player identity
