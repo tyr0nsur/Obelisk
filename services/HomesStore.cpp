@@ -577,4 +577,3 @@ PRAGMA user_version=1;
         catch (...) { result.Status = Status::StorageError; return result; }
     }
 }
-
