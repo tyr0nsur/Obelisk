@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "ObeliskCommandApi.h"
+#include "ObeliskChatSessionApi.h"
 #include "ObeliskPlayerLifecycleApi.h"
 
 #define OBELISK_API_ABI_VERSION 1u
@@ -25,6 +26,9 @@
 #define OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT (1ull << 13)
 #define OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS (1ull << 14)
 #define OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 15)
+#define OBELISK_API_CAPABILITY_CHAT_SESSIONS (1ull << 16)
+#define OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE (1ull << 17)
+#define OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT (1ull << 18)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
@@ -477,6 +481,28 @@ typedef struct ObeliskApi {
     uint64_t (*RegisterCommandWithOptionsWithOwnerTokenHandle)(
         uint64_t ownerToken, const char* commandName, uint64_t matchFlags,
         ObeliskCommandCallback callback, void* userData);
+    // All four operations require this owner's currently executing command
+    // invocation, same main thread and scope. Returned records are copied into
+    // caller-owned memory. Observed sessions are not an authoritative online
+    // roster or authenticated platform accounts. List returns written/total;
+    // callers must reject partial global delivery if total exceeds capacity.
+    bool (*GetCommandChatSessionWithOwnerToken)(uint64_t ownerToken, uint64_t invocationToken,
+        ObeliskChatSession* out);
+    bool (*ListChatSessionsWithOwnerToken)(uint64_t ownerToken, uint64_t invocationToken,
+        ObeliskChatSession* records, size_t capacity, size_t* written, size_t* total);
+    // True means the checked RPC was dispatched, not acknowledged by a client.
+    // Both destination token and process epoch must match. UTF-8 max1024 bytes.
+    bool (*SendChatToSessionWithOwnerToken)(uint64_t ownerToken, uint64_t invocationToken,
+        uint64_t destinationToken, uint64_t destinationProcessEpoch, ObeliskCommandStringView text);
+    bool (*GetCommandWorldInfoWithOwnerToken)(uint64_t ownerToken, uint64_t invocationToken,
+        ObeliskCommandWorldInfo* out);
+    // Operator-enabled, synchronous movement of ONLY the current command origin.
+    // Destination must carry the current session token/process epoch and finite
+    // bounded coordinates. Native checks reject dead, sleeping or riding players;
+    // the checked engine collision path is used, preserving current rotation.
+    // Success is an engine return observation, not real-client acceptance.
+    bool (*TeleportCommandOriginWithOwnerToken)(uint64_t ownerToken, uint64_t invocationToken,
+        const ObeliskCommandWorldInfo* destination);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

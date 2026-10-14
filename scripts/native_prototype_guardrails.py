@@ -15,6 +15,9 @@ NATIVE_PROTOTYPE_CAPABILITIES = (
     "OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT",
     "OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS",
     "OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS",
+    "OBELISK_API_CAPABILITY_CHAT_SESSIONS",
+    "OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE",
+    "OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT",
 )
 NATIVE_PROTOTYPE_API_FIELDS = (
     "RegisterCommandWithOwnerTokenHandle",
@@ -24,10 +27,16 @@ NATIVE_PROTOTYPE_API_FIELDS = (
     "RegisterPlayerLifecycleWithOwnerTokenHandle",
     "UnregisterPlayerLifecycleWithOwnerToken",
     "RegisterCommandWithOptionsWithOwnerTokenHandle",
+    "GetCommandChatSessionWithOwnerToken",
+    "ListChatSessionsWithOwnerToken",
+    "SendChatToSessionWithOwnerToken",
+    "GetCommandWorldInfoWithOwnerToken",
+    "TeleportCommandOriginWithOwnerToken",
 )
-NATIVE_PROTOTYPE_HEADER_NAMES = ("ObeliskCommandApi.h", "ObeliskPlayerLifecycleApi.h")
+NATIVE_PROTOTYPE_HEADER_NAMES = ("ObeliskCommandApi.h", "ObeliskPlayerLifecycleApi.h", "ObeliskChatSessionApi.h")
 NATIVE_PROTOTYPE_TYPES = (
-    "ObeliskCommandApi", "ObeliskPlayerLifecycleApi",
+    "ObeliskCommandApi", "ObeliskPlayerLifecycleApi", "ObeliskChatSessionApi",
+    "ObeliskChatSession", "ObeliskCommandWorldInfo",
     "ObeliskCommandStringView", "ObeliskCommandInvocation", "ObeliskCommandPlayer",
     "ObeliskCommandCallback", "ObeliskPlayerLifecycleStringView",
     "ObeliskPlayerLifecycleEvent", "ObeliskPlayerLifecycleCallback",
@@ -50,6 +59,12 @@ NATIVE_PROTOTYPE_MACROS = (
     "OBELISK_PLAYER_LIFECYCLE_FLAG_NET_CONNECTION_AVAILABLE",
     "OBELISK_PLAYER_LIFECYCLE_FLAGS_SUPPORTED_MASK",
     "OBELISK_PLAYER_LIFECYCLE_NAME_MAX_BYTES", "OBELISK_PLAYER_LIFECYCLE_PLATFORM_ID_MAX_BYTES",
+    "OBELISK_CHAT_SESSION_ABI_VERSION", "OBELISK_COMMAND_WORLD_INFO_ABI_VERSION",
+    "OBELISK_CHAT_SESSION_NAME_MAX_BYTES", "OBELISK_CHAT_SESSION_LIST_MAX",
+    "OBELISK_CHAT_SESSION_FLAG_NAME_AVAILABLE",
+    "OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE", "OBELISK_COMMAND_WORLD_FLAG_TRIBE_ID_AVAILABLE",
+    "OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE", "OBELISK_COMMAND_WORLD_FLAG_MOUNTED_DINO_IDS_AVAILABLE",
+    "OBELISK_COMMAND_WORLD_FLAG_TARGET_STRUCTURE_ID_AVAILABLE",
 )
 NATIVE_PROTOTYPE_SYMBOLS = frozenset(
     (*NATIVE_PROTOTYPE_CAPABILITIES, *NATIVE_PROTOTYPE_API_FIELDS,
@@ -63,6 +78,11 @@ _NATIVE_API_SIGNATURES = (
     "uint64_t(*RegisterPlayerLifecycleWithOwnerTokenHandle)(uint64_townerToken,ObeliskPlayerLifecycleCallbackcallback,void*userData);",
     "bool(*UnregisterPlayerLifecycleWithOwnerToken)(uint64_townerToken,uint64_tregistrationId);",
     "uint64_t(*RegisterCommandWithOptionsWithOwnerTokenHandle)(uint64_townerToken,constchar*commandName,uint64_tmatchFlags,ObeliskCommandCallbackcallback,void*userData);",
+    "bool(*GetCommandChatSessionWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,ObeliskChatSession*out);",
+    "bool(*ListChatSessionsWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,ObeliskChatSession*records,size_tcapacity,size_t*written,size_t*total);",
+    "bool(*SendChatToSessionWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,uint64_tdestinationToken,uint64_tdestinationProcessEpoch,ObeliskCommandStringViewtext);",
+    "bool(*GetCommandWorldInfoWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,ObeliskCommandWorldInfo*out);",
+    "bool(*TeleportCommandOriginWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,constObeliskCommandWorldInfo*destination);",
 )
 
 
@@ -112,7 +132,7 @@ def without_native_prototype_symbols(text: str, *, header_only: bool = False) ->
 def native_prototype_scan_text(text: str) -> str:
     # The copied display-name member is legal only alongside these exact types;
     # their fields are separately frozen by the public-header layout checks.
-    copied_player = re.search(r"\b(?:ObeliskCommandPlayer|ObeliskPlayerLifecycleEvent)\b", text)
+    copied_player = re.search(r"\b(?:ObeliskCommandPlayer|ObeliskPlayerLifecycleEvent|ObeliskChatSession)\b", text)
     text = without_native_prototype_symbols(text)
     if copied_player:
         text = re.sub(r"\bplayer_name\b", "copied_display_name", text)

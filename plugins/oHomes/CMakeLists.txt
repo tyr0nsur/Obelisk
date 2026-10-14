@@ -1,0 +1,7 @@
+add_library(oHomes SHARED oHomes.cpp)
+target_include_directories(oHomes PRIVATE ${PROJECT_SOURCE_DIR}/extern)
+target_link_libraries(oHomes PRIVATE obelisk_sdk)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(oHomes PRIVATE -fno-gnu-unique)
+endif()
+set_target_properties(oHomes PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN 1)

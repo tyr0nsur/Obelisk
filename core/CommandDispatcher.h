@@ -2,6 +2,7 @@
 
 #include "obelisk/ObeliskCommandApi.h"
 #include "OwnerExecutionGate.h"
+#include "ChatSessionRegistry.h"
 
 #include <atomic>
 #include <chrono>
@@ -24,6 +25,15 @@ namespace Obelisk::Core
         std::string_view PlatformId;
     };
 
+    using CommandSelfTeleportBackend = bool (*)(void*, const ObeliskCommandWorldInfo*, void*) noexcept;
+    using CommandWorldInfoBackend = bool (*)(void*, ObeliskCommandWorldInfo*, void*) noexcept;
+    struct CommandRuntimeContext {
+        uint64_t ChatSessionToken = 0;
+        CommandWorldInfoBackend WorldInfo = nullptr;
+        void* Data = nullptr;
+        CommandSelfTeleportBackend Teleport = nullptr;
+    };
+
     // Controller pointers and the backend stay private to the Linux adapter.
     class CommandDispatcher
     {
@@ -35,6 +45,12 @@ namespace Obelisk::Core
         bool IsAvailable() const noexcept;
         void SetPlayerSnapshotsAvailable(bool available) noexcept;
         bool IsPlayerSnapshotsAvailable() const noexcept;
+        void SetChatSessionRegistry(ChatSessionRegistry* registry) noexcept;
+        bool IsChatSessionsAvailable() const noexcept;
+        void SetWorldInfoAvailable(bool available) noexcept;
+        bool IsWorldInfoAvailable() const noexcept;
+        void SetSelfTeleportAvailable(bool) noexcept;
+        bool IsSelfTeleportAvailable() const noexcept;
 
         uint64_t Register(void* owner, std::string_view command, ObeliskCommandCallback callback, void* userData);
         uint64_t RegisterWithOptions(void* owner, std::string_view command, uint64_t matchFlags,
@@ -48,9 +64,15 @@ namespace Obelisk::Core
 
         size_t Dispatch(void* controller, std::string_view message, uint32_t sendMode,
                         ReplyBackend backend, void* backendData = nullptr,
-                        const CommandPlayerSnapshot* player = nullptr);
+                        const CommandPlayerSnapshot* player = nullptr,
+                        const CommandRuntimeContext* runtimeContext = nullptr);
         bool Reply(void* owner, uint64_t invocationToken, std::string_view reply) noexcept;
         bool GetPlayer(void* owner, uint64_t invocationToken, ObeliskCommandPlayer* out) noexcept;
+        bool GetChatSession(void*, uint64_t, ObeliskChatSession*) noexcept;
+        bool ListChatSessions(void*, uint64_t, ObeliskChatSession*, size_t, size_t*, size_t*) noexcept;
+        bool SendChatToSession(void*, uint64_t, uint64_t, uint64_t, std::string_view) noexcept;
+        bool GetWorldInfo(void*, uint64_t, ObeliskCommandWorldInfo*) noexcept;
+        bool TeleportOrigin(void*, uint64_t, const ObeliskCommandWorldInfo*) noexcept;
 
     private:
         struct Registration
@@ -72,6 +94,9 @@ namespace Obelisk::Core
 
         std::atomic_bool m_Available{false};
         std::atomic_bool m_PlayerSnapshotsAvailable{false};
+        std::atomic_bool m_WorldInfoAvailable{false};
+        std::atomic_bool m_SelfTeleportAvailable{false};
+        std::atomic<ChatSessionRegistry*> m_ChatSessions{nullptr};
         mutable std::mutex m_Mutex;
         std::condition_variable m_Quiescence;
         uint64_t m_NextRegistrationId = 1;

@@ -1,6 +1,7 @@
 #include "NativeChatHook.h"
 #include "StartupNativeHook.h"
 #include "core/CommandDispatcher.h"
+#include "core/ChatSessionRegistry.h"
 #include "core/PlayerLifecycleDispatcher.h"
 #include "runtime/BinaryIdentity.h"
 #include "runtime/Logger.h"
@@ -13,6 +14,8 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
 #include <vector>
@@ -176,6 +179,8 @@ namespace Obelisk::Hooks::NativeChatHook
             return true;
         }
 
+        #include "NativeSuiteProfile.inc"
+
         struct State
         {
             StartupNativeHook Hook;
@@ -183,6 +188,8 @@ namespace Obelisk::Hooks::NativeChatHook
             Reply Send = nullptr;
             UniqueId GetUniqueId = nullptr;
             Free FreeString = nullptr;
+            bool SuiteWorldVerified = false;
+            bool SelfTeleportEnabled = false;
             uintptr_t ImageBase = 0;
             std::atomic<bool> Installed{false};
             std::atomic<uint64_t> CommandCount{0};
@@ -208,6 +215,7 @@ namespace Obelisk::Hooks::NativeChatHook
         {
             void* Controller;
             void* Connection;
+            uint64_t SessionToken = 0;
         };
         bool ReadPointer(void* object, uintptr_t offset, void*& result)
         {
@@ -407,6 +415,8 @@ namespace Obelisk::Hooks::NativeChatHook
                     !IsInstanceOfProfileClass(controller, kShooterPlayerControllerClassGlobal) ||
                     !ReadPointer(controller, kNetConnectionOffset, connection) || connection != context->Connection)
                     return false;
+                if(context->SessionToken){ObeliskChatSession session{};session.struct_size=sizeof(session);
+                    if(!Core::ChatSessionRegistry::Get().Snapshot(context->SessionToken,&session))return false;}
                 std::vector<char32_t> text;
                 if (!UE::NativeChatText::Encode(message, text))
                     return false;
@@ -426,6 +436,97 @@ namespace Obelisk::Hooks::NativeChatHook
             }
         }
 
+        bool ValidateSessionEndpoint(const Core::ChatSessionRegistry::Endpoint& endpoint,void*) noexcept {
+            void* connection=nullptr;void* playerState=nullptr;
+            return IsMainThread() && GetState().Installed.load() && endpoint.Controller && endpoint.Connection && endpoint.PlayerState &&
+                IsInstanceOfProfileClass(endpoint.Controller,kShooterPlayerControllerClassGlobal) &&
+                ReadPointer(endpoint.Controller,kNetConnectionOffset,connection) && connection==endpoint.Connection &&
+                ReadPointer(endpoint.Controller,kPlayerStateOffset,playerState) && playerState==endpoint.PlayerState &&
+                IsInstanceOfProfileClass(playerState,kShooterPlayerStateClassGlobal);
+        }
+        bool SendToSession(const Core::ChatSessionRegistry::Endpoint& endpoint,std::string_view text,void*) noexcept {
+            ReplyContext context{endpoint.Controller,endpoint.Connection};
+            return ValidateSessionEndpoint(endpoint,nullptr)&&ReplyToOrigin(endpoint.Controller,text,&context);
+        }
+        Core::ChatSessionRegistry::Endpoint EndpointFor(void* controller) noexcept {
+            Core::ChatSessionRegistry::Endpoint endpoint;endpoint.Controller=controller;
+            ReadPointer(controller,kNetConnectionOffset,endpoint.Connection);ReadPointer(controller,kPlayerStateOffset,endpoint.PlayerState);
+            return endpoint;
+        }
+        struct FloatVector3 {float X,Y,Z;};
+        static_assert(sizeof(FloatVector3)==12);
+        bool CaptureCommandWorld(void* controller,ObeliskCommandWorldInfo* out,void* data) noexcept {
+            try{
+                const auto* context=static_cast<const ReplyContext*>(data);
+                auto endpoint=EndpointFor(controller);
+                if(!out||out->struct_size<sizeof(*out)||!context||context->Controller!=controller||
+                    endpoint.Connection!=context->Connection||!ValidateSessionEndpoint(endpoint,nullptr)||!GetState().SuiteWorldVerified)return false;
+                ObeliskCommandWorldInfo value{};value.abi_version=OBELISK_COMMAND_WORLD_INFO_ABI_VERSION;value.struct_size=sizeof(value);
+                value.process_epoch=GetState().LifecycleProcessEpoch;
+                ObeliskChatSession session{};session.struct_size=sizeof(session);
+                if(!Core::ChatSessionRegistry::Get().Snapshot(context->SessionToken,&session))return false;
+                value.session_token=session.session_token;
+                using Character=void*(*)(void*);using Vector=FloatVector3(*)(void*);using Tribe=uint32_t(*)(void*);
+                auto character=reinterpret_cast<Character>(const_cast<void*>(ProfileAddress(0xf440a0)))(controller);
+                value.native_tribe_id=reinterpret_cast<Tribe>(const_cast<void*>(ProfileAddress(0xfcf050)))(endpoint.PlayerState);
+                value.flags|=OBELISK_COMMAND_WORLD_FLAG_TRIBE_ID_AVAILABLE;
+                if(character&&IsInstanceOfProfileClass(character,0x58f0ab0)){
+                    void* component=nullptr;
+                    if(ReadPointer(character,0x248,component)&&IsInstanceOfProfileClass(component,0x59a7d18)){
+                        auto location=reinterpret_cast<Vector>(const_cast<void*>(ProfileAddress(0x2521760)))(character);
+                        auto rotation=reinterpret_cast<Vector>(const_cast<void*>(ProfileAddress(0x25217b0)))(character);
+                        if(std::isfinite(location.X)&&std::isfinite(location.Y)&&std::isfinite(location.Z)&&
+                            std::abs(location.X)<=1e8&&std::abs(location.Y)<=1e8&&std::abs(location.Z)<=1e8){
+                            value.x=location.X;value.y=location.Y;value.z=location.Z;value.flags|=OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE;
+                        }
+                        if(std::isfinite(rotation.X)&&std::isfinite(rotation.Y)&&std::isfinite(rotation.Z)){
+                            value.pitch=rotation.X;value.yaw=rotation.Y;value.roll=rotation.Z;value.flags|=OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE;
+                        }
+                    }
+                }
+                if(character&&IsInstanceOfProfileClass(character,0x58f0ab0)){
+                    using Mount=void*(*)(void*);using Ids=void(*)(void*,uint32_t*,uint32_t*);
+                    auto mount=reinterpret_cast<Mount>(const_cast<void*>(ProfileAddress(0xd81bb0)))(character);
+                    if(mount&&IsInstanceOfProfileClass(mount,0x58f08c8)){
+                        reinterpret_cast<Ids>(const_cast<void*>(ProfileAddress(0xb03670)))(mount,&value.mounted_dino_id1,&value.mounted_dino_id2);
+                        value.flags|=OBELISK_COMMAND_WORLD_FLAG_MOUNTED_DINO_IDS_AVAILABLE;
+                    }
+                }
+                using Aim=void*(*)(void*);using Structure=uint32_t(*)(void*);
+                auto aimed=reinterpret_cast<Aim>(const_cast<void*>(ProfileAddress(0x27871e0)))(controller);
+                if(aimed&&IsInstanceOfProfileClass(aimed,0x58eff18)){
+                    value.target_structure_id=reinterpret_cast<Structure>(const_cast<void*>(ProfileAddress(0xc25fc0)))(aimed);
+                    value.flags|=OBELISK_COMMAND_WORLD_FLAG_TARGET_STRUCTURE_ID_AVAILABLE;
+                }
+                *out=value;return true;
+            }catch(...){return false;}
+        }
+
+        bool TeleportCommandSelf(void* controller,const ObeliskCommandWorldInfo* destination,void* data) noexcept {
+            try{
+                if(!GetState().SelfTeleportEnabled||!destination||destination->struct_size<sizeof(*destination)||
+                    destination->process_epoch!=GetState().LifecycleProcessEpoch||
+                    !std::isfinite(destination->x)||!std::isfinite(destination->y)||!std::isfinite(destination->z)||
+                    std::abs(destination->x)>1e8||std::abs(destination->y)>1e8||std::abs(destination->z)>1e8)return false;
+                const auto* context=static_cast<const ReplyContext*>(data);auto endpoint=EndpointFor(controller);
+                if(!context||context->Controller!=controller||context->Connection!=endpoint.Connection||!ValidateSessionEndpoint(endpoint,nullptr))return false;
+                using Character=void*(*)(void*);using StateCheck=bool(*)(void*);using Rotation=FloatVector3(*)(void*);
+                auto character=reinterpret_cast<Character>(const_cast<void*>(ProfileAddress(0xf440a0)))(controller);
+                if(!character||!IsInstanceOfProfileClass(character,0x58f0ab0))return false;
+                uint8_t sleeping=0;
+                if(!ReadField(character,0x894,sleeping)||(sleeping&1)||
+                    reinterpret_cast<StateCheck>(const_cast<void*>(ProfileAddress(0xa43eb0)))(character)||
+                    reinterpret_cast<StateCheck>(const_cast<void*>(ProfileAddress(0xd87d50)))(character)||
+                    reinterpret_cast<Character>(const_cast<void*>(ProfileAddress(0xd81bb0)))(character))return false;
+                void* root=nullptr;if(!ReadPointer(character,0x248,root)||!IsInstanceOfProfileClass(root,0x59a7d18))return false;
+                const auto rotation=reinterpret_cast<Rotation>(const_cast<void*>(ProfileAddress(0x25217b0)))(character);
+                if(!std::isfinite(rotation.X)||!std::isfinite(rotation.Y)||!std::isfinite(rotation.Z))return false;
+                using Teleport=bool(*)(void*,FloatVector3,FloatVector3,bool);
+                return reinterpret_cast<Teleport>(const_cast<void*>(ProfileAddress(0x25177f0)))(character,
+                    FloatVector3{destination->x,destination->y,destination->z},rotation,false);
+            }catch(...){return false;}
+        }
+
         void ReceiveDetour(void* controller, const FString* message, uint8_t mode)
         {
             auto& state = GetState();
@@ -440,15 +541,18 @@ namespace Obelisk::Hooks::NativeChatHook
                     ReplyContext context{controller, nullptr};
                     if (ReadPointer(controller, kNetConnectionOffset, connection) && connection &&
                         (context.Connection = connection) && UE::NativeChatText::Decode(message, copied) &&
-                        !copied.empty() && copied.front() == '/')
+                        !copied.empty())
                     {
                         // A plugin may cause nested engine calls. Capture identity
                         // before its entry and use only these copies afterward.
                         const auto player = CapturePlayer(controller);
+                        const auto sessionToken=Core::ChatSessionRegistry::Get().Observe(EndpointFor(controller),player.PlayerName);
+                        context.SessionToken=sessionToken;
+                        const Core::CommandRuntimeContext runtimeContext{sessionToken,CaptureCommandWorld,&context,TeleportCommandSelf};
                         const Core::CommandPlayerSnapshot snapshot{
                             player.IdentityFlags, player.PlayerName, player.PlatformId};
-                        if (Core::CommandDispatcher::Get().Dispatch(controller, copied, mode,
-                                ReplyToOrigin, &context, &snapshot) > 0)
+                        if (copied.front()=='/' && Core::CommandDispatcher::Get().Dispatch(controller, copied, mode,
+                                ReplyToOrigin, &context, &snapshot, &runtimeContext) > 0)
                         {
                             handled = true;
                             const auto sequence = state.CommandCount.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -519,6 +623,9 @@ namespace Obelisk::Hooks::NativeChatHook
             OBELISK_ERROR("Native commands disabled: directed reply RPC profile mismatch.");
             return false;
         }
+        state.SuiteWorldVerified=ValidateMappedProfile(module.imageBase,kSuiteWorldProfileProofs);
+        const char* homes=std::getenv("OBELISK_ENABLE_SESSION_HOMES");
+        state.SelfTeleportEnabled=state.SuiteWorldVerified&&homes&&std::strcmp(homes,"1")==0;
         state.Send = reinterpret_cast<Reply>(reply);
         state.ImageBase = module.imageBase;
         state.GetUniqueId = reinterpret_cast<UniqueId>(module.imageBase + kUniqueIdAddress - kElfImageBase);
@@ -533,6 +640,11 @@ namespace Obelisk::Hooks::NativeChatHook
         const auto epoch = std::chrono::steady_clock::now().time_since_epoch().count();
         state.LifecycleProcessEpoch = epoch > 0 ? static_cast<uint64_t>(epoch) : 1;
         state.Installed.store(true, std::memory_order_release);
+        Core::ChatSessionRegistry::Get().Configure(state.LifecycleProcessEpoch,ValidateSessionEndpoint,SendToSession);
+        Core::CommandDispatcher::Get().SetChatSessionRegistry(&Core::ChatSessionRegistry::Get());
+        Core::CommandDispatcher::Get().SetWorldInfoAvailable(state.SuiteWorldVerified);
+        Core::CommandDispatcher::Get().SetSelfTeleportAvailable(state.SelfTeleportEnabled);
+        OBELISK_INFO("Native suite query profile points={} verified={}",kSuiteWorldProfileProofs.size(),state.SuiteWorldVerified);
         Core::CommandDispatcher::Get().SetAvailable(true);
         Core::CommandDispatcher::Get().SetPlayerSnapshotsAvailable(true);
         Core::PlayerLifecycleDispatcher::Get().SetAvailable(true);
@@ -631,8 +743,14 @@ namespace Obelisk::Hooks::NativeChatHook
 
             // Logout identity must be copied and published before the engine
             // cleanup. Connection availability is informative, never required.
-            if (frame.Selected == PlayerLifecycleFrame::Event::Logout)
+            if (frame.Selected == PlayerLifecycleFrame::Event::Logout){
+                Core::ChatSessionRegistry::Get().InvalidateController(controller);
                 EmitLifecycle(frame, OBELISK_PLAYER_LIFECYCLE_KIND_LOGOUT_OBSERVED);
+            }
+            if(frame.Selected==PlayerLifecycleFrame::Event::PostLogin){
+                Core::ChatSessionRegistry::Get().InvalidateController(controller);
+                frame.ChatSessionToken=Core::ChatSessionRegistry::Get().Observe(EndpointFor(controller),frame.PlayerName,true);
+            }
             OBELISK_INFO("Native player lifecycle observation: {}", LifecycleDetails(frame, "entered").dump());
         }
         catch (...)
@@ -649,6 +767,7 @@ namespace Obelisk::Hooks::NativeChatHook
             return;
         if (!originalReturnedNormally)
         {
+            Core::ChatSessionRegistry::Get().InvalidateToken(frame.ChatSessionToken);
             frame = {};
             return;
         }
@@ -659,6 +778,7 @@ namespace Obelisk::Hooks::NativeChatHook
             // dereference any object or call UE identity functions here.
             if (frame.Selected == PlayerLifecycleFrame::Event::PostLogin)
             {
+                Core::ChatSessionRegistry::Get().Activate(frame.ChatSessionToken);
                 frame.Flags |= OBELISK_PLAYER_LIFECYCLE_FLAG_ORIGINAL_CALLED;
                 EmitLifecycle(frame, OBELISK_PLAYER_LIFECYCLE_KIND_LOGIN_OBSERVED);
             }

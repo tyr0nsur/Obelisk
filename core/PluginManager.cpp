@@ -2652,6 +2652,35 @@ namespace Obelisk::Core
             }
         }
 
+        CommandDispatcher* ResolveCommandOperation(uint64_t ownerToken,uint64_t capability,void*& owner) {
+            std::lock_guard lock(PluginOwnerLifecycleMutex());
+            owner=ResolveOwnerTokenForRegistrationLocked("ScopedOperation",ownerToken);
+            if(!owner||!PluginOwnerHasCapabilityLocked(owner,capability))return nullptr;
+            return PluginOwnerCommandDispatcherLocked(owner);
+        }
+        bool PluginGetCommandChatSessionWithOwnerToken(uint64_t ownerToken,uint64_t invocation,ObeliskChatSession* out) {
+            try{void* owner=nullptr;auto* d=ResolveCommandOperation(ownerToken,OBELISK_API_CAPABILITY_CHAT_SESSIONS,owner);
+                return d&&d->GetChatSession(owner,invocation,out);}catch(...){return false;}
+        }
+        bool PluginListChatSessionsWithOwnerToken(uint64_t ownerToken,uint64_t invocation,ObeliskChatSession* records,size_t capacity,size_t* written,size_t* total) {
+            try{void* owner=nullptr;auto* d=ResolveCommandOperation(ownerToken,OBELISK_API_CAPABILITY_CHAT_SESSIONS,owner);
+                return d&&d->ListChatSessions(owner,invocation,records,capacity,written,total);}catch(...){return false;}
+        }
+        bool PluginSendChatToSessionWithOwnerToken(uint64_t ownerToken,uint64_t invocation,uint64_t destination,uint64_t epoch,ObeliskCommandStringView text) {
+            if(!text.data||!text.size||text.size>1024)return false;
+            try{void* owner=nullptr;auto* d=ResolveCommandOperation(ownerToken,OBELISK_API_CAPABILITY_CHAT_SESSIONS,owner);
+                return d&&d->SendChatToSession(owner,invocation,destination,epoch,{text.data,text.size});}catch(...){return false;}
+        }
+        bool PluginGetCommandWorldInfoWithOwnerToken(uint64_t ownerToken,uint64_t invocation,ObeliskCommandWorldInfo* out) {
+            try{void* owner=nullptr;auto* d=ResolveCommandOperation(ownerToken,OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE,owner);
+                return d&&d->GetWorldInfo(owner,invocation,out);}catch(...){return false;}
+        }
+
+        bool PluginTeleportCommandOriginWithOwnerToken(uint64_t ownerToken,uint64_t invocation,const ObeliskCommandWorldInfo* destination) {
+            try{void* owner=nullptr;auto* d=ResolveCommandOperation(ownerToken,OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT,owner);
+                return d&&d->TeleportOrigin(owner,invocation,destination);}catch(...){return false;}
+        }
+
         uint64_t PluginRegisterPlayerLifecycleWithOwnerTokenHandle(
             uint64_t ownerToken, ObeliskPlayerLifecycleCallback callback, void* userData)
         {
@@ -2991,6 +3020,14 @@ namespace Obelisk::Core
         m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
         m_Api.RegisterTimerWithOwnerTokenHandle = PluginRegisterTimerWithOwnerTokenHandle;
         m_Api.UnregisterTimerWithOwnerToken = PluginUnregisterTimerWithOwnerToken;
+        if(m_CommandDispatcher->IsChatSessionsAvailable())m_Api.capabilities|=OBELISK_API_CAPABILITY_CHAT_SESSIONS;
+        if(m_CommandDispatcher->IsWorldInfoAvailable())m_Api.capabilities|=OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE;
+        if(m_CommandDispatcher->IsSelfTeleportAvailable())m_Api.capabilities|=OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT;
+        m_Api.TeleportCommandOriginWithOwnerToken=PluginTeleportCommandOriginWithOwnerToken;
+        m_Api.GetCommandChatSessionWithOwnerToken=PluginGetCommandChatSessionWithOwnerToken;
+        m_Api.ListChatSessionsWithOwnerToken=PluginListChatSessionsWithOwnerToken;
+        m_Api.SendChatToSessionWithOwnerToken=PluginSendChatToSessionWithOwnerToken;
+        m_Api.GetCommandWorldInfoWithOwnerToken=PluginGetCommandWorldInfoWithOwnerToken;
         m_Api.RegisterCommandWithOwnerTokenHandle = PluginRegisterCommandWithOwnerTokenHandle;
         m_Api.RegisterCommandWithOptionsWithOwnerTokenHandle = PluginRegisterCommandWithOptionsWithOwnerTokenHandle;
         m_Api.UnregisterCommandWithOwnerToken = PluginUnregisterCommandWithOwnerToken;

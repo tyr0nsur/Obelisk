@@ -22,7 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import check_public_sdk_v1_completion as completion_checker
 from native_prototype_guardrails import (
     NATIVE_PROTOTYPE_CAPABILITIES, NATIVE_PROTOTYPE_API_FIELDS,
-    NATIVE_PROTOTYPE_TYPES, NATIVE_PROTOTYPE_MACROS,
+    NATIVE_PROTOTYPE_TYPES, NATIVE_PROTOTYPE_MACROS, NATIVE_PROTOTYPE_HEADER_NAMES,
     native_prototype_header_symbols, native_prototype_symbols_for_header,
     native_prototype_scan_text, without_native_prototype_symbols,
 )
@@ -5595,6 +5595,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(public_headers, [
             "include/obelisk/ObeliskApi.h",
+            "include/obelisk/ObeliskChatSessionApi.h",
             "include/obelisk/ObeliskCommandApi.h",
             "include/obelisk/ObeliskPlayerLifecycleApi.h",
         ])
@@ -5633,6 +5634,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             root_cmake,
             r"install\s*\(\s*FILES\s+include/obelisk/ObeliskApi\.h\s+"
             r"include/obelisk/ObeliskCommandApi\.h\s+include/obelisk/ObeliskPlayerLifecycleApi\.h\s+"
+            r"include/obelisk/ObeliskChatSessionApi\.h\s+"
             r"DESTINATION\s+\$\{CMAKE_INSTALL_INCLUDEDIR\}/obelisk\s+COMPONENT\s+SDK\s*\)",
         )
         self.assertIn('"include/obelisk/ObeliskApi.h"', installer)
@@ -6232,13 +6234,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_native_prototype_headers_freeze_copied_payloads_without_v1_promotion(self) -> None:
         command = (PUBLIC_API_HEADER.parent / "ObeliskCommandApi.h").read_text(encoding="utf-8")
         lifecycle = (PUBLIC_API_HEADER.parent / "ObeliskPlayerLifecycleApi.h").read_text(encoding="utf-8")
+        sessions = (PUBLIC_API_HEADER.parent / "ObeliskChatSessionApi.h").read_text(encoding="utf-8")
         self.assertEqual(public_struct_typedefs(command), [
             "ObeliskCommandStringView", "ObeliskCommandPlayer", "ObeliskCommandInvocation"])
         self.assertEqual(public_struct_typedefs(lifecycle), [
             "ObeliskPlayerLifecycleStringView", "ObeliskPlayerLifecycleEvent"])
         self.assertEqual(public_callback_typedefs(command), ["ObeliskCommandCallback"])
         self.assertEqual(public_callback_typedefs(lifecycle), ["ObeliskPlayerLifecycleCallback"])
-        macros = public_obelisk_macro_defines(command) + public_obelisk_macro_defines(lifecycle)
+        macros = (public_obelisk_macro_defines(command) + public_obelisk_macro_defines(lifecycle) +
+                  public_obelisk_macro_defines(sessions))
         self.assertEqual(macros, list(NATIVE_PROTOTYPE_MACROS))
         self.assertEqual(public_struct_field_names(command, "ObeliskCommandPlayer"), [
             "abi_version", "struct_size", "flags", "player_name", "platform_id"])
@@ -6258,11 +6262,44 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertNotEqual(row["status"], "promoted")
                 self.assertEqual(row["public_contract"], [])
 
+    def test_native_chat_world_records_are_copied_destinations_without_authority(self) -> None:
+        text = (PUBLIC_API_HEADER.parent / "ObeliskChatSessionApi.h").read_text(encoding="utf-8")
+        self.assertEqual(public_struct_typedefs(text), ["ObeliskChatSession", "ObeliskCommandWorldInfo"])
+        self.assertEqual(public_callback_typedefs(text), [])
+        self.assertEqual(public_struct_field_declarations(text, "ObeliskChatSession"), [
+            "uint32_t abi_version", "uint32_t struct_size", "uint64_t session_token", "uint64_t process_epoch",
+            "uint64_t flags", "char player_name[257]", "uint32_t player_name_size", "uint32_t reserved0"])
+        self.assertEqual(public_struct_field_declarations(text, "ObeliskCommandWorldInfo"), [
+            "uint32_t abi_version", "uint32_t struct_size", "uint64_t flags", "float x, y, z",
+            "uint32_t native_tribe_id", "float pitch, yaw, roll", "uint32_t reserved0", "uint64_t process_epoch",
+            "uint64_t session_token", "uint32_t mounted_dino_id1, mounted_dino_id2", "uint32_t target_structure_id",
+            "uint32_t reserved1"])
+        for name in ("ObeliskChatSession", "ObeliskCommandWorldInfo"):
+            declarations = public_struct_field_declarations(text, name)
+            self.assertFalse(any("*" in declaration for declaration in declarations), "copied records expose pointers")
+        self.assertIn("not account IDs, authentication or durable handles", text)
+        self.assertIn("Logout/relogin invalidates old destinations", text)
+        self.assertIn("not a membership/permission decision", text)
+        self.assertIn("current command's character", text)
+        api = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        self.assertIn("this owner's currently executing command", api)
+        self.assertIn("same main thread and scope", api)
+        self.assertIn("not an authoritative online", api)
+        self.assertIn("destination token and process epoch must match", api)
+        self.assertIn("not acknowledged by a client", api)
+        for authority in ("ObeliskPlayerLookup", "ObeliskTribeId", "TeleportPlayer", "principal_handle", "steam_id"):
+            self.assertNotIn(authority, strip_c_comments(text))
+        unknown = api + "\ntypedef struct ObeliskWorldMutation { void* native_player; uint64_t principal_handle; } ObeliskWorldMutation;\n"
+        masked = native_prototype_scan_text(unknown)
+        self.assertIn("ObeliskWorldMutation", masked)
+        self.assertIn("native_player", masked)
+        self.assertIn("principal_handle", masked)
+
     def test_native_prototype_exception_requires_complete_shape_and_rejects_unknown_symbols(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
         self.assertTrue(native_prototype_symbols_for_header(header))
         for marker in (*NATIVE_PROTOTYPE_CAPABILITIES, *NATIVE_PROTOTYPE_API_FIELDS,
-                       "ObeliskCommandApi.h", "ObeliskPlayerLifecycleApi.h"):
+                       *NATIVE_PROTOTYPE_HEADER_NAMES):
             with self.subTest(marker=marker):
                 broken = header.replace(marker, "IncompletePrototype")
                 self.assertEqual(native_prototype_symbols_for_header(broken), set())
@@ -6277,6 +6314,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             header.replace("OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 15)",
                            "OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 54)"),
             header.replace("uint64_t matchFlags", "uint32_t matchFlags"),
+            header.replace("OBELISK_API_CAPABILITY_CHAT_SESSIONS (1ull << 16)",
+                           "OBELISK_API_CAPABILITY_CHAT_SESSIONS (1ull << 54)"),
+            header.replace("OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE (1ull << 17)",
+                           "OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE (1ull << 54)"),
+            header.replace("uint64_t destinationProcessEpoch", "uint32_t destinationProcessEpoch"),
+            header.replace("ObeliskChatSession* records", "void* records"),
+            header.replace("ObeliskCommandWorldInfo* out", "void* out"),
+            header.replace("OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT (1ull << 18)",
+                           "OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT (1ull << 54)"),
+            header.replace("const ObeliskCommandWorldInfo* destination", "void* destination"),
         )
         for variant in malformed:
             with self.subTest(variant=variant[-80:]):
@@ -6423,10 +6470,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_public_chat_abi_stays_notification_only_without_command_response_symbols(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        # The old ChatMessageEvent ABI stays notification-only. Exempt only
+        # the separately frozen, complete callback-scoped native extension.
+        self.assertTrue(native_prototype_symbols_for_header(header))
         stripped_header = without_native_prototype_symbols(strip_c_comments(header), header_only=True)
 
         self.assertEqual(
-            [name for name in public_api_capability_defines(header) if "CHAT" in name],
+            [name for name in public_api_capability_defines(stripped_header) if "CHAT" in name],
             ["OBELISK_API_CAPABILITY_CHAT_EVENTS"],
         )
         self.assertEqual(
@@ -6442,7 +6492,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ["ObeliskChatMessageEventCallback"],
         )
         self.assertEqual(
-            [name for name in obelisk_api_field_names(header) if "Chat" in name],
+            [name for name in obelisk_api_field_names(stripped_header) if "Chat" in name],
             [
                 "RegisterChatMessageEventWithOwnerTokenHandle",
                 "UnregisterChatMessageEventWithOwnerToken",
@@ -8163,8 +8213,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(f"add_test(NAME {test_name}", root_cmake)
 
         required_layout_tokens = (
-            "ASSERT_SIZE(ObeliskApi, 272)",
+            "ASSERT_SIZE(ObeliskApi, 312)",
             "ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, 264)",
+            "offsetof(ObeliskApi, GetCommandChatSessionWithOwnerToken) == 272u",
+            "offsetof(ObeliskApi, ListChatSessionsWithOwnerToken) == 280u",
+            "offsetof(ObeliskApi, SendChatToSessionWithOwnerToken) == 288u",
+            "offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) == 296u",
+            "offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) == 304u",
+            "sizeof(ObeliskChatSession) == 304u",
+            "sizeof(ObeliskCommandWorldInfo) == 80u",
             "ASSERT_OFFSET(ObeliskApi, RegisterTimerWithOwnerTokenHandle, 200)",
             "ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208)",
             "ASSERT_SIZE(ObeliskPluginMetadata, 48)",
@@ -8186,8 +8243,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(installed_token, installed_c_consumer)
 
         for token in (
-            "static_assert(sizeof(ObeliskApi) == 272)",
+            "static_assert(sizeof(ObeliskApi) == 312)",
             "static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 264)",
+            "static_assert(offsetof(ObeliskApi, GetCommandChatSessionWithOwnerToken) == 272)",
+            "static_assert(offsetof(ObeliskApi, ListChatSessionsWithOwnerToken) == 280)",
+            "static_assert(offsetof(ObeliskApi, SendChatToSessionWithOwnerToken) == 288)",
+            "static_assert(offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) == 296)",
+            "static_assert(offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) == 304)",
+            "static_assert(sizeof(ObeliskChatSession) == 304)",
+            "static_assert(sizeof(ObeliskCommandWorldInfo) == 80)",
             "static_assert(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) == 200)",
             "static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) == 208)",
             "AssertAbiType<ObeliskGameplayPolicyEvent>()",

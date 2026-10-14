@@ -1,0 +1,769 @@
+{
+  "schema": "obelisk.suite.native-binding-profile.v1",
+  "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+  "runtime_validated": false,
+  "classes": {
+    "ShooterCharacter": {
+      "global": "0x58f0ab0",
+      "static_getter": "0x13af620",
+      "binding_site": "0x13af643",
+      "binding_bytes": "be fc bc 0d 04 ba b0 0a 8f 05 b9 00 f7 3a 01 e8 e9 24 1f 00",
+      "name_utf32": "0x40dbcfc",
+      "getter_prefix_32": "55 48 89 e5 53 50 48 8b 05 4b 14 54 04 48 85 c0 75 52 48 8b 1d 77 14 54 04 48 85 db 75 20 bf 7c"
+    },
+    "PrimalCharacter": {
+      "global": "0x58f0850",
+      "static_getter": "0x1399810",
+      "binding_site": "0x1399833",
+      "binding_bytes": "be e8 b4 0d 04 ba 50 08 8f 05 b9 f0 98 39 01 e8 b9 66 1f 00",
+      "name_utf32": "0x40db4e8",
+      "getter_prefix_32": "55 48 89 e5 53 50 48 8b 05 fb 6f 55 04 48 85 c0 75 52 48 8b 1d 27 70 55 04 48 85 db 75 20 bf 7c"
+    },
+    "SceneComponent": {
+      "global": "0x59a7d18",
+      "static_getter": "0x2d155f0",
+      "binding_site": "0x2d15611",
+      "binding_bytes": "be e4 33 56 04 ba 18 7d 9a 05 b9 70 57 d1 02 e8 bb 37 1d 00",
+      "name_utf32": "0x45633e4",
+      "getter_prefix_32": "55 48 89 e5 48 8b 05 ed 26 c9 02 48 85 c0 75 4d 48 8b 35 11 27 c9 02 48 85 f6 75 20 bf 2c 30 f6"
+    },
+    "ShooterPlayerController": {
+      "global": "0x58eebf0",
+      "static_getter": "0x13623a0",
+      "binding_site": "0x13623c1",
+      "binding_bytes": "be 1c 74 0d 04 ba f0 eb 8e 05 b9 b0 48 36 01 e8 ab ae 1e 00",
+      "name_utf32": "0x40d741c",
+      "getter_prefix_32": "55 48 89 e5 48 8b 05 dd c7 58 04 48 85 c0 75 4d 48 8b 35 39 c8 58 04 48 85 f6 75 20 bf 7c 3b f6"
+    },
+    "ShooterPlayerState": {
+      "global": "0x58eeb80",
+      "static_getter": "0x135c110",
+      "binding_site": "0x135c131",
+      "binding_bytes": "be 34 72 0d 04 ba 80 eb 8e 05 b9 a0 f0 35 01 e8 eb c6 1d 00",
+      "name_utf32": "0x40d7234",
+      "getter_prefix_32": "55 48 89 e5 48 8b 05 15 2a 59 04 48 85 c0 75 4d 48 8b 35 59 2a 59 04 48 85 f6 75 20 bf 7c 3b f6"
+    },
+    "Actor": {
+      "global": "0x59a7d68",
+      "static_getter": "0x2d16590",
+      "binding_site": "0x2d165b1",
+      "binding_bytes": "be a4 34 56 04 ba 68 7d 9a 05 b9 40 8c d1 02 e8 4b 92 1d 00",
+      "name_utf32": "0x45634a4",
+      "getter_prefix_32": "55 48 89 e5 48 8b 05 85 17 c9 02 48 85 c0 75 4d 48 8b 35 c1 17 c9 02 48 85 f6 75 20 bf 2c 30 f6"
+    },
+    "PrimalDinoCharacter": {
+      "global": "0x58f08c8",
+      "static_getter": "0x13a1c90",
+      "binding_site": "0x13a1cb3",
+      "binding_bytes": "be 34 b8 0d 04 ba c8 08 8f 05 b9 80 20 3a 01 e8 79 80 1f 00",
+      "name_utf32": "0x40db834",
+      "getter_prefix_32": "55 48 89 e5 53 50 48 8b 05 bb eb 54 04 48 85 c0 75 52 48 8b 1d 1f ec 54 04 48 85 db 75 20 bf 7c"
+    },
+    "PrimalStructure": {
+      "global": "0x58eff18",
+      "static_getter": "0x1381880",
+      "binding_site": "0x13818a3",
+      "binding_bytes": "be f0 9b 0d 04 ba 18 ff 8e 05 b9 40 1a 38 01 e8 e9 90 1e 00",
+      "name_utf32": "0x40d9bf0",
+      "getter_prefix_32": "55 48 89 e5 53 50 48 8b 05 43 e6 56 04 48 85 c0 75 52 48 8b 1d 7f e6 56 04 48 85 db 75 20 bf 7c"
+    },
+    "PlayerController": {
+      "global": "0x59a86f0",
+      "static_getter": "0x2d32980",
+      "binding_site": "0x2d32995",
+      "binding_bytes": "be 24 4a 56 04 ba f0 86 9a 05 b9 80 29 d3 02 e8 47 8d 1c 00",
+      "name_utf32": "0x4564a24",
+      "getter_prefix_32": "55 48 89 e5 48 8b 3d 65 5d c7 02 48 85 ff 75 20 bf 2c 30 f6 03 be 24 4a 56 04 ba f0 86 9a 05 b9"
+    }
+  },
+  "functions": {
+    "get_player_character": {
+      "address": "0xf440a0",
+      "prototype": "void* (*)(void* controller)",
+      "ownership": "borrowed UObject, callback/mainthread only; native weakref validates index/serial/dead states"
+    },
+    "get_actor_location": {
+      "address": "0x2521760",
+      "prototype": "FloatVector3 (*)(void* actor)",
+      "ownership": "copied float3; X/Y XMM0 and Z XMM1; may call root component virtual update if root flag +0x100 bit0 set"
+    },
+    "get_tribe_id": {
+      "address": "0xfcf050",
+      "prototype": "uint32_t (*)(void* playerState)",
+      "ownership": "copied scalar native group ID; zero means no tribe, not account auth"
+    },
+    "get_actor_rotation": {
+      "address": "0x25217b0",
+      "prototype": "FloatRotation3 (*)(void* actor)",
+      "ownership": "copied float3 nativepitch/yaw/roll semantic order; XMM0 firsttwo floats XMM1 third"
+    },
+    "k2_teleport": {
+      "address": "0x25177f0",
+      "prototype": "bool (*)(void* actor, FloatVector3 location, FloatRotation3 rotation, bool simple)",
+      "ownership": "borrowed actor; mutable gamethread only; false uses ordinary virtual teleport with false/false flags; true alternate virtual; no owned allocations"
+    },
+    "dino_ids": {
+      "address": "0xb03670",
+      "prototype": "void (*)(void* dino, uint32_t* id1, uint32_t* id2)",
+      "ownership": "copied pair; native identity not account auth"
+    },
+    "structure_id": {
+      "address": "0xc25fc0",
+      "prototype": "uint32_t (*)(void* structure)",
+      "ownership": "copy; static helper checks null then reads nativeid"
+    },
+    "get_riding_dino": {
+      "address": "0xd81bb0",
+      "prototype": "void* (*)(void* character)",
+      "ownership": "borrowed weak-resolved dino pointer, callback/mainthread only, validate PrimalDinoCharacter class"
+    },
+    "get_aimed_use_actor": {
+      "address": "0x27871e0",
+      "prototype": "void* (*)(void* controller)",
+      "ownership": "borrowed actor pointer or null, call on class-validated ShooterPlayerController/mainthread; invokes current trace override"
+    },
+    "is_rider": {
+      "address": "0xd87d50",
+      "prototype": "bool (*)(void* character)",
+      "ownership": "copied state; current ShooterCharacter implementation of PrimalCharacter.IsRider"
+    },
+    "is_dead_or_dying": {
+      "address": "0xa43eb0",
+      "prototype": "bool (*)(void* character)",
+      "ownership": "copied state; current ShooterCharacter native implementation delegates virtual dead and health queries"
+    }
+  },
+  "proofs": [
+    {
+      "address": "0xf440a0",
+      "bytes": "55 48 89 e5 53 50 48 89 fb 48 81 c3 54 0a 00 00 be 01 00 00 00 31 d2 48 89 df e8 71 29 e1 00 84 c0 74 4e 8b 03 39 05 39 77 a1 04 7e 44 89 c1 c1 f9 1f c1 e9 10 01 c1 89 ca c1 fa 10 81 e1 00 00 ff ff 29 c8 48 63 ca 48 8b 15 02 77 a1 04 48 98 48 c1 e0 04 48 03 04 ca 74 17 48 8b 00 48 85 c0 74 0f f6 40 09 40 75 09 f6 80 a8 08 00 00 20 74 02 31 c0 48 83 c4 08 5b 5d c3 66 0f 1f 44 00 00",
+      "reason": "GetPlayerCharacter getter weak handle current native implementation"
+    },
+    {
+      "address": "0x1543180",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 fe 0e a0 ff 48 89 03 48 83 c4 08 5b 5d c3",
+      "reason": "GetPlayerCharacter exec single-object pointer return"
+    },
+    {
+      "address": "0x2521760",
+      "bytes": "55 48 89 e5 48 89 f8 48 8b b8 48 02 00 00 48 85 ff 74 14 f6 87 00 01 00 00 01 74 1d 48 8b 07 ff 90 b0 04 00 00 5d c3 f3 0f 7e 80 88 03 00 00 f3 0f 10 88 90 03 00 00 5d c3 0f 28 87 e0 00 00 00 0f 28 c8 0f 12 c9 5d c3",
+      "reason": "Actor current location getter float3 SysV"
+    },
+    {
+      "address": "0x2eebe10",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 2e 59 63 ff 0f 13 03 f3 0f 11 4b 08 48 83 c4 08 5b 5d c3",
+      "reason": "K2_GetActorLocation exec float3 result copy"
+    },
+    {
+      "address": "0xfcf050",
+      "bytes": "8b 87 f4 09 00 00 c3",
+      "reason": "GetTribeId native current scalar getter"
+    },
+    {
+      "address": "0x1536120",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 0e 8f a9 ff 89 03 48 83 c4 08 5b 5d c3",
+      "reason": "GetTribeId exec uint32 result"
+    },
+    {
+      "address": "0xfc1b10",
+      "bytes": "83 bf f4 09 00 00 00 0f 95 c0 c3",
+      "reason": "IsInTribe native current scalar getter"
+    },
+    {
+      "address": "0x13673fe",
+      "bytes": "48 8b 3d eb 77 58 04 be 76 2a 16 04 ba 80 31 54 01 31 c9 e8 2a 4d 96 00",
+      "reason": "GetPlayerCharacter native declaring class registration"
+    },
+    {
+      "address": "0x2d70d90",
+      "bytes": "48 8b 3d b9 a9 c3 02 be 76 2a 16 04 ba 60 67 f2 02 31 c9 e8 98 b3 f5 fe",
+      "reason": "GetPlayerCharacter native declaring class registration"
+    },
+    {
+      "address": "0x2d1a259",
+      "bytes": "48 8b 3d 08 db c8 02 be 17 aa 55 04 ba 10 be ee 02 31 c9 e8 cf 1e fb fe",
+      "reason": "K2_GetActorLocation native declaring class registration"
+    },
+    {
+      "address": "0x135f4da",
+      "bytes": "48 8b 3d 9f f6 58 04 be 68 12 16 04 ba 20 61 53 01 31 c9 e8 4e cc 96 00",
+      "reason": "GetTribeId native declaring class registration"
+    },
+    {
+      "address": "0x135f6c2",
+      "bytes": "48 8b 3d b7 f4 58 04 be e6 12 16 04 ba b0 65 53 01 31 c9 e8 66 ca 96 00",
+      "reason": "IsInTribe native declaring class registration"
+    },
+    {
+      "address": "0x13679b6",
+      "bytes": "48 8b 3d 33 72 58 04 be e6 12 16 04 ba 10 3e 54 01 31 c9 e8 72 47 96 00",
+      "reason": "IsInTribe native declaring class registration"
+    },
+    {
+      "address": "0x13af643",
+      "bytes": "be fc bc 0d 04 ba b0 0a 8f 05 b9 00 f7 3a 01 e8 e9 24 1f 00",
+      "reason": "ShooterCharacter class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x1399833",
+      "bytes": "be e8 b4 0d 04 ba 50 08 8f 05 b9 f0 98 39 01 e8 b9 66 1f 00",
+      "reason": "PrimalCharacter class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x2d15611",
+      "bytes": "be e4 33 56 04 ba 18 7d 9a 05 b9 70 57 d1 02 e8 bb 37 1d 00",
+      "reason": "SceneComponent class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x13623c1",
+      "bytes": "be 1c 74 0d 04 ba f0 eb 8e 05 b9 b0 48 36 01 e8 ab ae 1e 00",
+      "reason": "ShooterPlayerController class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x135c131",
+      "bytes": "be 34 72 0d 04 ba 80 eb 8e 05 b9 a0 f0 35 01 e8 eb c6 1d 00",
+      "reason": "ShooterPlayerState class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x2d165b1",
+      "bytes": "be a4 34 56 04 ba 68 7d 9a 05 b9 40 8c d1 02 e8 4b 92 1d 00",
+      "reason": "Actor class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x13a1cb3",
+      "bytes": "be 34 b8 0d 04 ba c8 08 8f 05 b9 80 20 3a 01 e8 79 80 1f 00",
+      "reason": "PrimalDinoCharacter class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x13818a3",
+      "bytes": "be f0 9b 0d 04 ba 18 ff 8e 05 b9 40 1a 38 01 e8 e9 90 1e 00",
+      "reason": "PrimalStructure class global bound by literal UTF32 name"
+    },
+    {
+      "address": "0x14cdfe3",
+      "bytes": "e8 e8 15 36 00 49 89 c6",
+      "reason": "GetPlayerCharacter ReturnValue Class metadata obtains ShooterCharacter class"
+    },
+    {
+      "address": "0x182f5d0",
+      "bytes": "bf 7c 3b f6 03 e9 e6 21 b8 ff",
+      "reason": "ShooterCharacter type metadata tail jump"
+    },
+    {
+      "address": "0x13b17c0",
+      "bytes": "55 48 89 e5 48 8b 05 e5 f2 53 04 48 85 c0 75 1b be fc bc 0d 04 ba b0 0a 8f 05 b9 00 f7 3a 01 e8 5c 03 1f 00 48 8b 05 c5 f2 53 04 5d c3 0f 1f 00",
+      "reason": "ShooterCharacter type metadata canonical class global"
+    },
+    {
+      "address": "0x1d56a30",
+      "bytes": "44 8b 4f 04 45 85 c9 0f 84 95 00 00 00 8b 3f 31 c0 85 ff 0f 88 96 00 00 00 39 3d b5 4d c0 03 0f 8e 8a 00 00 00 89 f8 c1 f8 1f c1 e8 10 01 f8 89 c1 c1 f9 10 25 00 00 ff ff 29 c7 48 63 c1 48 8b 0d 7b 4d c0 03 4c 8b 04 c1 48 63 c7 48 c1 e0 04 4c 89 c7 48 01 c7 74 4d 45 39 4c 00 08 74 02 31 ff 48 85 ff 0f 95 c0 0f 94 c1 20 d0 84 d2 75 3f 84 c9 75 3b 48 85 ff 74 2f 48 8b 07 48 85 c0 74 2a 8b 48 08 89 c8 25 00 01 00 00 c1 e8 08 75 1d 40 84 f6 75 18 81 e1 00 40 00 00 c1 e9 0e 88 c8 eb 0b 31 c0 c3 31 c0 c3 31 c0 c3 31 c0 34 01 c3",
+      "reason": "GetPlayerCharacter weak index/serial validator exact body"
+    },
+    {
+      "address": "0xf44108",
+      "bytes": "f6 80 a8 08 00 00 20 74 02 31 c0 48 83 c4 08 5b 5d c3 66 0f 1f",
+      "reason": "GetPlayerCharacter dying-character bit and null path"
+    },
+    {
+      "address": "0x25177f0",
+      "bytes": "55 48 89 e5 48 83 ec 20 0f 13 45 f0 f3 0f 11 4d f8 0f 13 55 e0 f3 0f 11 5d e8 40 84 f6 74 13 48 8b 07 48 8d 75 f0 48 8d 55 e0 ff 90 a8 06 00 00 eb 16 48 8b 07 48 8d 75 f0 48 8d 55 e0 31 c9 45 31 c0 ff 90 a0 06 00 00 48 83 c4 20 5d c3",
+      "reason": "K2_TeleportTo native exact float3,float3,bool params and AL return preserved from two virtual paths"
+    },
+    {
+      "address": "0x2eec082",
+      "bytes": "83 7d c4 00 0f 95 c0 48 8b 4b 20 48 85 c9 0f 95 c2 0f b6 d2 48 01 ca 48 89 53 20 f3 0f 7e 45 d8 f3 0f 10 4d e0 f3 0f 7e 55 c8 f3 0f 10 5d d0 0f b6 f0 4c 89 ff e8 34 b7 62 ff 41 88 06 48 83 c4 28 5b 41 5e 41 5f 5d c3",
+      "reason": "K2_TeleportTo exec exact SysV params and bool return"
+    },
+    {
+      "address": "0x25217b0",
+      "bytes": "55 48 89 e5 48 83 ec 10 48 8b 87 48 02 00 00 48 85 c0 74 16 0f 28 80 d0 00 00 00 0f 29 45 f0 48 8d 7d f0 e8 48 b1 66 ff eb 06 0f 57 c9 0f 57 c0 48 83 c4 10 5d c3",
+      "reason": "GetActorRotation native copiedquaternion conversion return float3"
+    },
+    {
+      "address": "0x2eebe50",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 3e 59 63 ff 0f 13 03 f3 0f 11 4b 08 48 83 c4 08 5b 5d c3",
+      "reason": "K2_GetActorRotation exec exact float3 return"
+    },
+    {
+      "address": "0xb03670",
+      "bytes": "8b 87 28 18 00 00 89 06 8b 87 2c 18 00 00 89 02 c3",
+      "reason": "GetDinoIDs copies two uint32 fields"
+    },
+    {
+      "address": "0x15947ee",
+      "bytes": "48 89 4b 20 4c 89 f7 4c 89 fe 48 83 c4 08 5b 41 5e 41 5f 5d e9 69 ee 56 ff",
+      "reason": "GetDinoIDs exec tail jump native inout refs"
+    },
+    {
+      "address": "0xc25fc0",
+      "bytes": "31 c0 48 85 ff 74 06 8b 87 e0 08 00 00 c3",
+      "reason": "BPGetStructureID current scalar getter"
+    },
+    {
+      "address": "0x1566ea4",
+      "bytes": "48 8b 7d e8 e8 13 f1 6b ff 41 89 06",
+      "reason": "BPGetStructureID static helper call and uint32 return"
+    },
+    {
+      "address": "0x2d1a38a",
+      "bytes": "48 8b 3d d7 d9 c8 02 be 73 aa 55 04 ba c0 bf ee 02 31 c9 e8 9e 1d fb fe",
+      "reason": "K2_TeleportTo native declaring class registration"
+    },
+    {
+      "address": "0x2d1a296",
+      "bytes": "48 8b 3d cb da c8 02 be 2b aa 55 04 ba 50 be ee 02 31 c9 e8 92 1e fb fe",
+      "reason": "K2_GetActorRotation native declaring class registration"
+    },
+    {
+      "address": "0x13a39ef",
+      "bytes": "48 8b 3d d2 ce 54 04 be aa a1 16 04 ba 50 47 59 01 31 c9 e8 39 87 92 00",
+      "reason": "GetDinoIDs native declaring class registration"
+    },
+    {
+      "address": "0x1381c92",
+      "bytes": "48 8b 3d 7f e2 56 04 be 97 52 16 04 ba 40 6e 56 01 31 c9 e8 96 a4 94 00",
+      "reason": "BPGetStructureID native declaring class registration"
+    },
+    {
+      "address": "0x2dd888a",
+      "bytes": "be 6c 99 59 04 ba 01 00 00 00 b9 01 00 00 00 e8 32 0a eb fe 4c 8b 75 e8 bf a4 2f f6 03 e8 54 e3 ef fe b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 48 89 de 4c 89 f2 e8 fb 82 f7 fe 48 89 c3 4c 8d b5 a0 fe ff ff 4c 89 f7 e8 69 8f f7 fe 31 d2 b9 01 04 82 04 41 b8 ff ff 00 00 41 b9 1c 00 00 00",
+      "reason": "K2_TeleportTo metadata field K2_TeleportTo"
+    },
+    {
+      "address": "0x2dd8946",
+      "bytes": "be 2c 87 61 04 ba 01 00 00 00 b9 01 00 00 00 e8 76 09 eb fe 48 8b 9d 88 fe ff ff bf a4 2f f6 03 e8 85 cf f4 fe b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 3c 82 f7 fe 48 89 c3 4c 8d b5 40 fd ff ff 4c 89 f7 e8 aa 8e f7 fe 48 8b 8d 98 fe ff ff 49 89 c9 49 c1 e9 20 c7 44",
+      "reason": "K2_TeleportTo metadata field ReturnValue"
+    },
+    {
+      "address": "0x2dd8a10",
+      "bytes": "be a4 99 59 04 ba 01 00 00 00 b9 01 00 00 00 e8 ac 08 eb fe 48 8b 9d 28 fd ff ff bf a4 2f f6 03 e8 bb ce f4 fe b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 72 81 f7 fe 48 89 c3 4c 8d b5 e0 fb ff ff 4c 89 f7 e8 e0 8d f7 fe 48 8b 8d 38 fd ff ff 49 89 c9 49 c1 e9 20 c7 44",
+      "reason": "K2_TeleportTo metadata field bSimpleTeleport"
+    },
+    {
+      "address": "0x2dd8aaa",
+      "bytes": "be e4 99 59 04 ba 01 00 00 00 b9 01 00 00 00 e8 12 08 eb fe 48 8b 9d d8 fb ff ff bf a4 2f f6 03 e8 91 41 f5 fe b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 d8 80 f7 fe 48 89 c3 48 8d bd 90 fa ff ff e8 49 8d f7 fe e8 a4 34 f9 fe 48 8d b5 90 fa ff ff 31 d2 b9 0c 00 00 00",
+      "reason": "K2_TeleportTo metadata field DestRotation"
+    },
+    {
+      "address": "0x2dd8b35",
+      "bytes": "be 18 9a 59 04 ba 01 00 00 00 b9 01 00 00 00 e8 87 07 eb fe 48 8b 9d 88 fa ff ff bf a4 2f f6 03 e8 06 41 f5 fe b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 4d 80 f7 fe 48 89 c3 48 8d bd 40 f9 ff ff e8 be 8c f7 fe e8 f9 ea f8 fe 48 8d b5 40 f9 ff ff 31 d2 31 c9 41 b8 80",
+      "reason": "K2_TeleportTo metadata field DestLocation"
+    },
+    {
+      "address": "0x184e6aa",
+      "bytes": "be e0 ae 1f 04 ba 01 00 00 00 b9 01 00 00 00 e8 12 ac 43 00 4c 8b 75 e8 bf a4 2f f6 03 e8 34 85 48 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 48 89 de 4c 89 f2 e8 db 24 50 00 48 89 c3 4c 8d b5 a0 fe ff ff 4c 89 f7 e8 49 31 50 00 31 d2 b9 01 04 42 04 41 b8 ff ff 00 00 41 b9 08 00 00 00",
+      "reason": "GetDinoIDs metadata field GetDinoIDs"
+    },
+    {
+      "address": "0x184e736",
+      "bytes": "be 0c af 1f 04 ba 01 00 00 00 b9 01 00 00 00 e8 86 ab 43 00 48 8b 9d 98 fe ff ff bf a4 2f f6 03 e8 95 96 4d 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 4c 24 50 00 48 89 c3 4c 8d b5 50 fd ff ff 4c 89 f7 e8 ba 30 50 00 49 b8 80 03 00 40 10 00 00 00 31 d2 b9 04 00 00",
+      "reason": "GetDinoIDs metadata field OutDinoID2"
+    },
+    {
+      "address": "0x184e7ca",
+      "bytes": "be 38 af 1f 04 ba 01 00 00 00 b9 01 00 00 00 e8 f2 aa 43 00 48 8b 9d 48 fd ff ff bf a4 2f f6 03 e8 01 96 4d 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 b8 23 50 00 48 89 c3 4c 8d b5 00 fc ff ff 4c 89 f7 e8 26 30 50 00 49 b8 80 03 00 40 10 00 00 00 31 d2 31 c9 48 89",
+      "reason": "GetDinoIDs metadata field OutDinoID1"
+    },
+    {
+      "address": "0x16bd92a",
+      "bytes": "be 54 99 1a 04 ba 01 00 00 00 b9 01 00 00 00 e8 92 b9 5c 00 4c 8b 75 e8 bf a4 2f f6 03 e8 b4 92 61 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 48 89 de 4c 89 f2 e8 5b 32 69 00 48 89 c3 4c 8d b5 a0 fe ff ff 4c 89 f7 e8 c9 3e 69 00 31 d2 b9 01 24 02 04 41 b8 ff ff 00 00 41 b9 10 00 00 00",
+      "reason": "BPGetStructureID metadata field BPGetStructureID"
+    },
+    {
+      "address": "0x16bd9b6",
+      "bytes": "be 2c 87 61 04 ba 01 00 00 00 b9 01 00 00 00 e8 06 b9 5c 00 48 8b 9d 98 fe ff ff bf a4 2f f6 03 e8 15 a4 66 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 cc 31 69 00 48 89 c3 4c 8d b5 50 fd ff ff 4c 89 f7 e8 3a 3e 69 00 49 b8 80 07 00 40 10 00 00 00 31 d2 b9 08 00 00",
+      "reason": "BPGetStructureID metadata field ReturnValue"
+    },
+    {
+      "address": "0x16bda4a",
+      "bytes": "be f0 9b 0d 04 ba 01 00 00 00 b9 01 00 00 00 e8 72 b8 5c 00 48 8b 9d 48 fd ff ff bf a4 2f f6 03 e8 a1 d3 66 00 b9 45 00 00 00 45 31 c0 45 31 c9 48 89 c7 4c 89 f6 48 89 da e8 38 31 69 00 48 89 c3 48 8d bd 00 fc ff ff e8 a9 3d 69 00 bf 7c 3b f6 03 e8 cf 58 cc ff 49 89 c6 48 8d b5 00 fc ff",
+      "reason": "BPGetStructureID metadata field PrimalStructure"
+    },
+    {
+      "address": "0x2d32995",
+      "bytes": "be 24 4a 56 04 ba f0 86 9a 05 b9 80 29 d3 02 e8 47 8d 1c 00",
+      "reason": "PlayerController canonical class global"
+    },
+    {
+      "address": "0x13b01e6",
+      "bytes": "48 8b 3d c3 08 54 04 be d6 ba 16 04 ba 70 f5 59 01 31 c9 e8 42 bf 91 00",
+      "reason": "GetRidingDino current native declaring class registration"
+    },
+    {
+      "address": "0x2d32a9d",
+      "bytes": "48 8b 3d 4c 5c c7 02 be cb b1 55 04 ba c0 45 ef 02 31 c9 e8 8b 96 f9 fe",
+      "reason": "BPGetAimedUseActor current native declaring class registration"
+    },
+    {
+      "address": "0x139bd18",
+      "bytes": "48 8b 3d 31 4b 55 04 be 5c 90 16 04 ba e0 a3 58 01 31 c9 e8 10 04 93 00",
+      "reason": "IsDeadOrDying current native declaring class registration"
+    },
+    {
+      "address": "0x139c1dc",
+      "bytes": "48 8b 3d 6d 46 55 04 be a8 91 16 04 ba 40 aa 58 01 31 c9 e8 4c ff 92 00",
+      "reason": "IsRider current native declaring class registration"
+    },
+    {
+      "address": "0xd81bb0",
+      "bytes": "55 48 89 e5 41 56 53 48 89 fb 48 81 c3 c0 14 00 00 45 31 f6 be 01 00 00 00 31 d2 48 89 df e8 5d 4e fd 00 84 c0 74 51 8b 03 45 31 f6 39 05 22 9c bd 04 7e 44 89 c1 c1 f9 1f c1 e9 10 01 c1 89 ca c1 fa 10 81 e1 00 00 ff ff 29 c8 48 63 ca 48 8b 15 eb 9b bd 04 48 98 48 c1 e0 04 45 31 f6 48 03 04 ca 74 14 48 8b 00 48 85 c0 74 09 45 31 f6 f6 40 09 40 75 03 49 89 c6 4c 89 f0 5b 41 5e 5d c3",
+      "reason": "GetRidingDino current weakref validation and borrowed pointer return"
+    },
+    {
+      "address": "0x159f570",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 1e 26 7e ff 48 89 03 48 83 c4 08 5b 5d c3",
+      "reason": "GetRidingDino exec single borrowed pointer result"
+    },
+    {
+      "address": "0x2ef45c0",
+      "bytes": "55 48 89 e5 53 50 48 89 d3 48 8b 46 20 48 85 c0 0f 95 c1 0f b6 c9 48 01 c1 48 89 4e 20 e8 fe 2b 89 ff 48 89 03 48 83 c4 08 5b 5d c3",
+      "reason": "BPGetAimedUseActor exec borrowed actor pointer result"
+    },
+    {
+      "address": "0x27871e0",
+      "bytes": "48 8b 07 48 8b 80 58 0e 00 00 31 f6 31 d2 31 c9 45 31 c0 ff e0",
+      "reason": "BPGetAimedUseActor virtual wrapper four null params"
+    },
+    {
+      "address": "0x154d2e5",
+      "bytes": "48 c7 44 24 10 80 ad 62 01",
+      "reason": "ShooterPC native class metadata installs exact native constructor thunk"
+    },
+    {
+      "address": "0x162ad80",
+      "bytes": "48 89 f8 48 8b 38 48 89 c6 e9 12 d0 90 ff",
+      "reason": "ShooterPC native constructor thunk calls constructor"
+    },
+    {
+      "address": "0xf37dbf",
+      "bytes": "49 c7 04 24 b0 bc 07 04",
+      "reason": "ShooterPC constructor installs own vtable"
+    },
+    {
+      "address": "0x407cb08",
+      "bytes": "c0 60 f4 00 00 00 00 00",
+      "reason": "ShooterPC aimed getter virtual slot+0xe58 points to 0xf460c0"
+    },
+    {
+      "address": "0xf460c0",
+      "bytes": "55 48 89 e5 41 57 41 56 41 55 41 54 53 48 81 ec f8 01 00 00 44 89 85 18 fe ff ff 89 8d 1c fe ff ff 49 89 f4 49 89 ff 4d 85 e4 74 08 49 c7 04 24 00 00 00 00 48 85 d2 74 06 c7 02 ff ff ff ff 48",
+      "reason": "ShooterPC current aimed getter native implementation prefix"
+    },
+    {
+      "address": "0x15a1ba5",
+      "bytes": "48 c7 44 24 10 d0 a5 61 01",
+      "reason": "ShooterCharacter native class metadata constructor thunk"
+    },
+    {
+      "address": "0x161a5d0",
+      "bytes": "48 89 f8 48 8b 38 48 89 c6 e9 22 1e 72 ff",
+      "reason": "ShooterCharacter constructor thunk"
+    },
+    {
+      "address": "0xd3c434",
+      "bytes": "48 c7 03 f0 ca 01 04",
+      "reason": "ShooterCharacter constructor installs own vtable"
+    },
+    {
+      "address": "0x401e1c0",
+      "bytes": "50 7d d8 00 00 00 00 00",
+      "reason": "ShooterCharacter IsRider virtual slot"
+    },
+    {
+      "address": "0xd87d50",
+      "bytes": "8a 87 60 12 00 00 24 04 c0 e8 02 c3",
+      "reason": "IsRider bool getter offset+0x1260 mask4"
+    },
+    {
+      "address": "0x158aa5d",
+      "bytes": "48 8b 07 ff 90 d0 16 00 00 88 03",
+      "reason": "IsRider native exec uses virtual bool slot+0x16d0"
+    },
+    {
+      "address": "0x401e2c8",
+      "bytes": "b0 3e a4 00 00 00 00 00",
+      "reason": "ShooterCharacter IsDeadOrDying virtual slot"
+    },
+    {
+      "address": "0xa43eb0",
+      "bytes": "55 48 89 e5 41 56 53 48 89 fb 48 8b 03 ff 90 00 04 00 00 41 b6 01 84 c0 75 17 48 8b 03 48 89 df ff 90 18 14 00 00 0f 57 c9 0f 2e c8 73 03 45 31 f6 44 88 f0 5b 41 5e 5d c3",
+      "reason": "IsDeadOrDying native getter two read-only virtual queries"
+    },
+    {
+      "address": "0x158a3fd",
+      "bytes": "48 8b 07 ff 90 d8 17 00 00 88 03",
+      "reason": "IsDeadOrDying native exec uses virtual bool slot+0x17d8"
+    },
+    {
+      "address": "0x17916b1",
+      "bytes": "e8 6a c8 c0 ff 48 89 05 6b 8e 16 04 48 89 c7 e8 db",
+      "reason": "PrimalCharacter metadata owner getter result and canonical alias"
+    },
+    {
+      "address": "0x139df24",
+      "bytes": "48 8b 05 25 29 55 04 48 85 c0 75 1b be e8 b4 0d 04 ba 50 08 8f 05 b9 f0 98 39 01 e8 bc 1f 1f 00 48 8b 05 05 29 55 04",
+      "reason": "PrimalCharacter metadata owner getter canonical class binding"
+    },
+    {
+      "address": "0x17a30c2",
+      "bytes": "48 c7 85 10 26 fe ff 10 7c 1e 04 48 8d bd 10 26 fe ff be a0 11 00 00 e8 62 cf ea ff",
+      "reason": "bIsSleeping generated offset resolver gets setter vtable and object extent"
+    },
+    {
+      "address": "0x17a30ec",
+      "bytes": "be 10 29 fb 03 ba 01 00 00 00 b9 01 00 00 00 e8 d0 61 4e 00",
+      "reason": "bIsSleeping current property UTF32 name literal"
+    },
+    {
+      "address": "0x17a313c",
+      "bytes": "48 8b 8d 18 26 fe ff 49 89 c9 49 c1 e9 20 c7 44 24 08 00 00 00 00 c7 04 24 01 00 00 00 49 b8 34 20 00 01 01 00 10 00 31 d2 4c 89 f6 48 89 df e8 30 18 58 00",
+      "reason": "bIsSleeping metadata consumes generated offset/mask result and bool constructor"
+    },
+    {
+      "address": "0x41e7c10",
+      "bytes": "40 2c 7e 01 00 00 00 00",
+      "reason": "bIsSleeping setter vtable identifies private metadata setter"
+    },
+    {
+      "address": "0x17e2c40",
+      "bytes": "0f b6 c2 48 8b 8e 94 08 00 00 48 83 e1 fe 48 09 c1 48 89 8e 94 08 00 00 c3",
+      "reason": "bIsSleeping setter sets bit0 at offset0x894; never execute this research setter"
+    },
+    {
+      "address": "0x16500a1",
+      "bytes": "49 8b 06 ba 01 00 00 00 4c 89 f7 48 89 de ff 10 31 c0 4d 85 ff 74 25 31 c9 66 0f 1f 44 00 00 80 3c 03 00 75 0b ff c1 89 c8 4c 39 f8 72 f1 eb 0c 41 89 4e 08 0f b6 04 03 41 89 46 0c 49 8b",
+      "reason": "generated bitfield resolver sets scratch object bool and computes offset/mask"
+    }
+  ],
+  "registrations": {
+    "GetPlayerCharacter": [
+      {
+        "name": "GetPlayerCharacter",
+        "ascii": "0x4162a76",
+        "registration": "0x1367405",
+        "class_global": "0x58eebf0",
+        "exec": "0x1543180",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d eb 77 58 04 be 76 2a 16 04 ba 80 31 54 01 31 c9 e8 2a 4d 96 00",
+        "registered_owner": "ShooterPlayerController",
+        "owner_utf32": "0x40d741c",
+        "owner_binding_address": "0x13673ea",
+        "owner_binding_bytes": "be 1c 74 0d 04 ba f0 eb 8e 05 b9 b0 48 36 01 e8 82 5e 1e 00"
+      },
+      {
+        "name": "GetPlayerCharacter",
+        "ascii": "0x4162a76",
+        "registration": "0x2d70d97",
+        "class_global": "0x59ab750",
+        "exec": "0x2f26760",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d b9 a9 c3 02 be 76 2a 16 04 ba 60 67 f2 02 31 c9 e8 98 b3 f5 fe",
+        "registered_owner": "GameplayStatics",
+        "owner_utf32": "0x456c69c",
+        "owner_binding_address": "0x2d70d7c",
+        "owner_binding_bytes": "be 9c c6 56 04 ba 50 b7 9a 05 b9 10 05 d7 02 e8 d0 83 1b 00"
+      }
+    ],
+    "K2_GetActorLocation": [
+      {
+        "name": "K2_GetActorLocation",
+        "ascii": "0x455aa17",
+        "registration": "0x2d1a260",
+        "class_global": "0x59a7d68",
+        "exec": "0x2eebe10",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 08 db c8 02 be 17 aa 55 04 ba 10 be ee 02 31 c9 e8 cf 1e fb fe",
+        "registered_owner": "Actor",
+        "owner_utf32": "0x45634a4",
+        "owner_binding_address": "0x2d1a245",
+        "owner_binding_bytes": "be a4 34 56 04 ba 68 7d 9a 05 b9 40 8c d1 02 e8 b7 55 1d 00"
+      }
+    ],
+    "GetTribeId": [
+      {
+        "name": "GetTribeId",
+        "ascii": "0x4161268",
+        "registration": "0x135f4e1",
+        "class_global": "0x58eeb80",
+        "exec": "0x1536120",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 9f f6 58 04 be 68 12 16 04 ba 20 61 53 01 31 c9 e8 4e cc 96 00",
+        "registered_owner": "ShooterPlayerState",
+        "owner_utf32": "0x40d7234",
+        "owner_binding_address": "0x135f4c6",
+        "owner_binding_bytes": "be 34 72 0d 04 ba 80 eb 8e 05 b9 a0 f0 35 01 e8 56 93 1d 00"
+      }
+    ],
+    "IsInTribe": [
+      {
+        "name": "IsInTribe",
+        "ascii": "0x41612e6",
+        "registration": "0x135f6c9",
+        "class_global": "0x58eeb80",
+        "exec": "0x15365b0",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d b7 f4 58 04 be e6 12 16 04 ba b0 65 53 01 31 c9 e8 66 ca 96 00",
+        "registered_owner": "ShooterPlayerState",
+        "owner_utf32": "0x40d7234",
+        "owner_binding_address": "0x135f6ae",
+        "owner_binding_bytes": "be 34 72 0d 04 ba 80 eb 8e 05 b9 a0 f0 35 01 e8 6e 91 1d 00"
+      },
+      {
+        "name": "IsInTribe",
+        "ascii": "0x41612e6",
+        "registration": "0x13679bd",
+        "class_global": "0x58eebf0",
+        "exec": "0x1543e10",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 33 72 58 04 be e6 12 16 04 ba 10 3e 54 01 31 c9 e8 72 47 96 00",
+        "registered_owner": "ShooterPlayerController",
+        "owner_utf32": "0x40d741c",
+        "owner_binding_address": "0x13679a2",
+        "owner_binding_bytes": "be 1c 74 0d 04 ba f0 eb 8e 05 b9 b0 48 36 01 e8 ca 58 1e 00"
+      }
+    ],
+    "K2_TeleportTo": [
+      {
+        "name": "K2_TeleportTo",
+        "ascii": "0x455aa73",
+        "registration": "0x2d1a391",
+        "class_global": "0x59a7d68",
+        "exec": "0x2eebfc0",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d d7 d9 c8 02 be 73 aa 55 04 ba c0 bf ee 02 31 c9 e8 9e 1d fb fe",
+        "registered_owner": "Actor",
+        "owner_utf32": "0x45634a4",
+        "owner_binding_address": "0x2d1a376",
+        "owner_binding_bytes": "be a4 34 56 04 ba 68 7d 9a 05 b9 40 8c d1 02 e8 86 54 1d 00"
+      }
+    ],
+    "K2_GetActorRotation": [
+      {
+        "name": "K2_GetActorRotation",
+        "ascii": "0x455aa2b",
+        "registration": "0x2d1a29d",
+        "class_global": "0x59a7d68",
+        "exec": "0x2eebe50",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d cb da c8 02 be 2b aa 55 04 ba 50 be ee 02 31 c9 e8 92 1e fb fe",
+        "registered_owner": "Actor",
+        "owner_utf32": "0x45634a4",
+        "owner_binding_address": "0x2d1a282",
+        "owner_binding_bytes": "be a4 34 56 04 ba 68 7d 9a 05 b9 40 8c d1 02 e8 7a 55 1d 00"
+      }
+    ],
+    "GetDinoIDs": [
+      {
+        "name": "GetDinoIDs",
+        "ascii": "0x416a1aa",
+        "registration": "0x13a39f6",
+        "class_global": "0x58f08c8",
+        "exec": "0x1594750",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d d2 ce 54 04 be aa a1 16 04 ba 50 47 59 01 31 c9 e8 39 87 92 00",
+        "registered_owner": "PrimalDinoCharacter",
+        "owner_utf32": "0x40db834",
+        "owner_binding_address": "0x13a39db",
+        "owner_binding_bytes": "be 34 b8 0d 04 ba c8 08 8f 05 b9 80 20 3a 01 e8 51 63 1f 00"
+      }
+    ],
+    "BPGetStructureID": [
+      {
+        "name": "BPGetStructureID",
+        "ascii": "0x4165297",
+        "registration": "0x1381c99",
+        "class_global": "0x58eff18",
+        "exec": "0x1566e40",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 7f e2 56 04 be 97 52 16 04 ba 40 6e 56 01 31 c9 e8 96 a4 94 00",
+        "registered_owner": "PrimalStructure",
+        "owner_utf32": "0x40d9bf0",
+        "owner_binding_address": "0x1381c7e",
+        "owner_binding_bytes": "be f0 9b 0d 04 ba 18 ff 8e 05 b9 40 1a 38 01 e8 0e 8d 1e 00"
+      }
+    ],
+    "GetRidingDino": [
+      {
+        "name": "GetRidingDino",
+        "ascii": "0x416bad6",
+        "registration": "0x13b01ed",
+        "class_global": "0x58f0ab0",
+        "exec": "0x159f570",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d c3 08 54 04 be d6 ba 16 04 ba 70 f5 59 01 31 c9 e8 42 bf 91 00",
+        "registered_owner": "ShooterCharacter",
+        "owner_utf32": "0x40dbcfc",
+        "owner_binding_address": "0x13b01d2",
+        "owner_binding_bytes": "be fc bc 0d 04 ba b0 0a 8f 05 b9 00 f7 3a 01 e8 5a 19 1f 00"
+      }
+    ],
+    "BPGetAimedUseActor": [
+      {
+        "name": "BPGetAimedUseActor",
+        "ascii": "0x455b1cb",
+        "registration": "0x2d32aa4",
+        "class_global": "0x59a86f0",
+        "exec": "0x2ef45c0",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 4c 5c c7 02 be cb b1 55 04 ba c0 45 ef 02 31 c9 e8 8b 96 f9 fe",
+        "registered_owner": "PlayerController",
+        "owner_utf32": "0x4564a24",
+        "owner_binding_address": "0x2d32a89",
+        "owner_binding_bytes": "be 24 4a 56 04 ba f0 86 9a 05 b9 80 29 d3 02 e8 53 8c 1c 00"
+      }
+    ],
+    "IsDeadOrDying": [
+      {
+        "name": "IsDeadOrDying",
+        "ascii": "0x416905c",
+        "registration": "0x139bd1f",
+        "class_global": "0x58f0850",
+        "exec": "0x158a3e0",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 31 4b 55 04 be 5c 90 16 04 ba e0 a3 58 01 31 c9 e8 10 04 93 00",
+        "registered_owner": "PrimalCharacter",
+        "owner_utf32": "0x40db4e8",
+        "owner_binding_address": "0x139bd04",
+        "owner_binding_bytes": "be e8 b4 0d 04 ba 50 08 8f 05 b9 f0 98 39 01 e8 e8 41 1f 00"
+      }
+    ],
+    "IsRider": [
+      {
+        "name": "IsRider",
+        "ascii": "0x41691a8",
+        "registration": "0x139c1e3",
+        "class_global": "0x58f0850",
+        "exec": "0x158aa40",
+        "registration_helper": "0x1ccc140",
+        "bytes": "48 8b 3d 6d 46 55 04 be a8 91 16 04 ba 40 aa 58 01 31 c9 e8 4c ff 92 00",
+        "registered_owner": "PrimalCharacter",
+        "owner_utf32": "0x40db4e8",
+        "owner_binding_address": "0x139c1c8",
+        "owner_binding_bytes": "be e8 b4 0d 04 ba 50 08 8f 05 b9 f0 98 39 01 e8 24 3d 1f 00"
+      }
+    ]
+  },
+  "fields": {
+    "sleeping": {
+      "owner": "PrimalCharacter",
+      "offset": "0x894",
+      "mask": "0x1",
+      "value_type": "uint8_t copied",
+      "mutation_allowed": false,
+      "proof": "Class metadata -> named bIsSleeping property -> generated resolver setter and concrete bit position"
+    },
+    "rider": {
+      "owner": "ShooterCharacter",
+      "offset": "0x1260",
+      "mask": "0x4",
+      "value_type": "uint8_t copied",
+      "mutation_allowed": false,
+      "proof": "IsRider native registration -> exec virtual slot -> constructor/vtable -> getter"
+    }
+  },
+  "vtables": {
+    "ShooterPlayerController": "0x407bcb0",
+    "ShooterCharacter": "0x401caf0"
+  },
+  "stage": "static_binary_verified_runtime_acceptance_pending"
+}

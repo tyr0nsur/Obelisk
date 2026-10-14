@@ -186,3 +186,16 @@ Las primeras implementaciones deben seguir este orden hasta el primer resultado
 útil, manteniendo mundo/personajes actuales y hooks nativos residentes. El
 catálogo no sustituye evidencias ni obliga a desarrollar toda la suite antes de
 publicar un módulo pequeño verificado.
+
+
+## Actualización de módulos
+
+La tabla actual tiene 312 bytes. oShopKits publica catálogos sin compras/entregas;
+los recibos y reservas son una biblioteca privada probada. oAdvancedChat añade
+mensajes globales del servidor actual y privados entre sesiones observadas;
+no es chat de cluster. oHomes guarda puntos sólo durante la sesión y tiene una
+ruta nativa de desplazamiento del propio emisor; los homes persistentes necesitan
+identidad y mundo duraderos. oWorldTools consulta posición, ID nativo de tribu,
+IDs de montura y estructura apuntada. Ninguna consulta demuestra políticas o
+mutaciones de dinos/estructuras/tribus. Pasan 156 CTests y 32 controles de ciclo
+real de los cuatro plugins nuevos; los efectos requieren aceptación cliente.

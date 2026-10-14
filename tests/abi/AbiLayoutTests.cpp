@@ -577,7 +577,7 @@ int main()
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 272);
+    static_assert(sizeof(ObeliskApi) == 312);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -644,9 +644,71 @@ int main()
         sizeof(ObeliskApi::UnregisterPlayerLifecycleWithOwnerToken) == 264);
     static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 264);
     static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) +
-        sizeof(ObeliskApi::RegisterCommandWithOptionsWithOwnerTokenHandle) == sizeof(ObeliskApi));
+        sizeof(ObeliskApi::RegisterCommandWithOptionsWithOwnerTokenHandle) == 272);
     static_assert(std::is_same_v<decltype(ObeliskApi::RegisterCommandWithOptionsWithOwnerTokenHandle),
         uint64_t (*)(uint64_t, const char*, uint64_t, ObeliskCommandCallback, void*)>);
+    // Append-only scoped native destinations and copied world observations.
+    static_assert(offsetof(ObeliskApi, GetCommandChatSessionWithOwnerToken) == 272);
+    static_assert(offsetof(ObeliskApi, ListChatSessionsWithOwnerToken) == 280);
+    static_assert(offsetof(ObeliskApi, SendChatToSessionWithOwnerToken) == 288);
+    static_assert(offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) == 296);
+    static_assert(offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) +
+        sizeof(ObeliskApi::GetCommandWorldInfoWithOwnerToken) == 304);
+    static_assert(offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) == 304);
+    static_assert(offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) +
+        sizeof(ObeliskApi::TeleportCommandOriginWithOwnerToken) == sizeof(ObeliskApi));
+    static_assert(OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT == (1ull << 18));
+    static_assert(std::is_same_v<decltype(ObeliskApi::TeleportCommandOriginWithOwnerToken),
+        bool (*)(uint64_t, uint64_t, const ObeliskCommandWorldInfo*)>);
+    static_assert(OBELISK_API_CAPABILITY_CHAT_SESSIONS == (1ull << 16));
+    static_assert(OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE == (1ull << 17));
+    static_assert(OBELISK_CHAT_SESSION_ABI_VERSION == 1u);
+    static_assert(OBELISK_COMMAND_WORLD_INFO_ABI_VERSION == 1u);
+    static_assert(OBELISK_CHAT_SESSION_NAME_MAX_BYTES == 256u);
+    static_assert(OBELISK_CHAT_SESSION_LIST_MAX == 64u);
+    static_assert(OBELISK_CHAT_SESSION_FLAG_NAME_AVAILABLE == 1ull);
+    static_assert(OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE == 1ull);
+    static_assert(OBELISK_COMMAND_WORLD_FLAG_TRIBE_ID_AVAILABLE == 2ull);
+    static_assert(OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE == 4ull);
+    static_assert(OBELISK_COMMAND_WORLD_FLAG_MOUNTED_DINO_IDS_AVAILABLE == 8ull);
+    static_assert(OBELISK_COMMAND_WORLD_FLAG_TARGET_STRUCTURE_ID_AVAILABLE == 16ull);
+    AssertAbiType<ObeliskChatSession>();
+    static_assert(sizeof(ObeliskChatSession) == 304);
+    static_assert(alignof(ObeliskChatSession) == 8);
+    static_assert(offsetof(ObeliskChatSession, abi_version) == 0);
+    static_assert(offsetof(ObeliskChatSession, struct_size) == 4);
+    static_assert(offsetof(ObeliskChatSession, session_token) == 8);
+    static_assert(offsetof(ObeliskChatSession, process_epoch) == 16);
+    static_assert(offsetof(ObeliskChatSession, flags) == 24);
+    static_assert(offsetof(ObeliskChatSession, player_name) == 32);
+    static_assert(offsetof(ObeliskChatSession, player_name_size) == 292);
+    static_assert(offsetof(ObeliskChatSession, reserved0) == 296);
+    AssertAbiType<ObeliskCommandWorldInfo>();
+    static_assert(sizeof(ObeliskCommandWorldInfo) == 80);
+    static_assert(alignof(ObeliskCommandWorldInfo) == 8);
+    static_assert(offsetof(ObeliskCommandWorldInfo, abi_version) == 0);
+    static_assert(offsetof(ObeliskCommandWorldInfo, struct_size) == 4);
+    static_assert(offsetof(ObeliskCommandWorldInfo, flags) == 8);
+    static_assert(offsetof(ObeliskCommandWorldInfo, x) == 16);
+    static_assert(offsetof(ObeliskCommandWorldInfo, y) == 20);
+    static_assert(offsetof(ObeliskCommandWorldInfo, z) == 24);
+    static_assert(offsetof(ObeliskCommandWorldInfo, native_tribe_id) == 28);
+    static_assert(offsetof(ObeliskCommandWorldInfo, pitch) == 32);
+    static_assert(offsetof(ObeliskCommandWorldInfo, yaw) == 36);
+    static_assert(offsetof(ObeliskCommandWorldInfo, roll) == 40);
+    static_assert(offsetof(ObeliskCommandWorldInfo, reserved0) == 44);
+    static_assert(offsetof(ObeliskCommandWorldInfo, process_epoch) == 48);
+    static_assert(offsetof(ObeliskCommandWorldInfo, session_token) == 56);
+    static_assert(offsetof(ObeliskCommandWorldInfo, mounted_dino_id1) == 64);
+    static_assert(offsetof(ObeliskCommandWorldInfo, mounted_dino_id2) == 68);
+    static_assert(offsetof(ObeliskCommandWorldInfo, target_structure_id) == 72);
+    static_assert(offsetof(ObeliskCommandWorldInfo, reserved1) == 76);
+    static_assert(sizeof(ObeliskChatSession::player_name) == 257);
+    static_assert(std::is_same_v<decltype(ObeliskApi::GetCommandChatSessionWithOwnerToken), bool (*)(uint64_t, uint64_t, ObeliskChatSession*)>);
+    static_assert(std::is_same_v<decltype(ObeliskApi::ListChatSessionsWithOwnerToken), bool (*)(uint64_t, uint64_t, ObeliskChatSession*, size_t, size_t*, size_t*)>);
+    static_assert(std::is_same_v<decltype(ObeliskApi::SendChatToSessionWithOwnerToken), bool (*)(uint64_t, uint64_t, uint64_t, uint64_t, ObeliskCommandStringView)>);
+    static_assert(std::is_same_v<decltype(ObeliskApi::GetCommandWorldInfoWithOwnerToken), bool (*)(uint64_t, uint64_t, ObeliskCommandWorldInfo*)>);
+
     static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15));
     static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull);
     static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull);

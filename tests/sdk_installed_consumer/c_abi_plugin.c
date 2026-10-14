@@ -114,7 +114,7 @@ ASSERT_OFFSET(ObeliskPluginInitContext, instance_id, 24);
 ASSERT_OFFSET(ObeliskPluginInitContext, plugin_owner_token, 32);
 ASSERT_FIELD_ENDS_STRUCT(ObeliskPluginInitContext, plugin_owner_token);
 
-ASSERT_SIZE(ObeliskApi, 272);
+ASSERT_SIZE(ObeliskApi, 312);
 ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOwnerTokenHandle, 216);
 ASSERT_OFFSET(ObeliskApi, UnregisterCommandWithOwnerToken, 224);
 ASSERT_OFFSET(ObeliskApi, ReplyToCommandWithOwnerToken, 232);
@@ -123,6 +123,77 @@ ASSERT_OFFSET(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle, 248);
 ASSERT_OFFSET(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 256);
 ASSERT_FIELD_END(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 264);
 ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, 264);
+// Append-only scoped destinations/world observation; all older prefixes stay fixed.
+_Static_assert(offsetof(ObeliskApi, GetCommandChatSessionWithOwnerToken) == 272u, "GetCommandChatSessionWithOwnerToken offset changed");
+_Static_assert(offsetof(ObeliskApi, ListChatSessionsWithOwnerToken) == 280u, "ListChatSessionsWithOwnerToken offset changed");
+_Static_assert(offsetof(ObeliskApi, SendChatToSessionWithOwnerToken) == 288u, "SendChatToSessionWithOwnerToken offset changed");
+_Static_assert(offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) == 296u, "GetCommandWorldInfoWithOwnerToken offset changed");
+_Static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) +
+    sizeof(((ObeliskApi*)0)->RegisterCommandWithOptionsWithOwnerTokenHandle) == 272u, "Command options prefix changed");
+_Static_assert(offsetof(ObeliskApi, GetCommandWorldInfoWithOwnerToken) +
+    sizeof(((ObeliskApi*)0)->GetCommandWorldInfoWithOwnerToken) == 304u, "Scoped native API tail changed");
+_Static_assert(offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) == 304u, "Self teleport offset changed");
+_Static_assert(offsetof(ObeliskApi, TeleportCommandOriginWithOwnerToken) +
+    sizeof(((ObeliskApi*)0)->TeleportCommandOriginWithOwnerToken) == 312u, "Self teleport tail changed");
+_Static_assert(OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT == (1ull << 18), "Self teleport bit changed");
+typedef bool (*TeleportCommandOriginWithOwnerTokenSignature)(uint64_t, uint64_t, const ObeliskCommandWorldInfo*);
+_Static_assert(_Generic(((ObeliskApi*)0)->TeleportCommandOriginWithOwnerToken,
+    TeleportCommandOriginWithOwnerTokenSignature: 1, default: 0), "Self teleport function signature changed");
+_Static_assert(OBELISK_API_CAPABILITY_CHAT_SESSIONS == (1ull << 16), "OBELISK_API_CAPABILITY_CHAT_SESSIONS value changed");
+_Static_assert(OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE == (1ull << 17), "OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE value changed");
+_Static_assert(OBELISK_CHAT_SESSION_ABI_VERSION == 1u, "OBELISK_CHAT_SESSION_ABI_VERSION value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_INFO_ABI_VERSION == 1u, "OBELISK_COMMAND_WORLD_INFO_ABI_VERSION value changed");
+_Static_assert(OBELISK_CHAT_SESSION_NAME_MAX_BYTES == 256u, "OBELISK_CHAT_SESSION_NAME_MAX_BYTES value changed");
+_Static_assert(OBELISK_CHAT_SESSION_LIST_MAX == 64u, "OBELISK_CHAT_SESSION_LIST_MAX value changed");
+_Static_assert(OBELISK_CHAT_SESSION_FLAG_NAME_AVAILABLE == 1ull, "OBELISK_CHAT_SESSION_FLAG_NAME_AVAILABLE value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE == 1ull, "OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_FLAG_TRIBE_ID_AVAILABLE == 2ull, "OBELISK_COMMAND_WORLD_FLAG_TRIBE_ID_AVAILABLE value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE == 4ull, "OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_FLAG_MOUNTED_DINO_IDS_AVAILABLE == 8ull, "OBELISK_COMMAND_WORLD_FLAG_MOUNTED_DINO_IDS_AVAILABLE value changed");
+_Static_assert(OBELISK_COMMAND_WORLD_FLAG_TARGET_STRUCTURE_ID_AVAILABLE == 16ull, "OBELISK_COMMAND_WORLD_FLAG_TARGET_STRUCTURE_ID_AVAILABLE value changed");
+_Static_assert(sizeof(ObeliskChatSession) == 304u, "ObeliskChatSession size changed");
+_Static_assert(_Alignof(ObeliskChatSession) == 8u, "ObeliskChatSession alignment changed");
+_Static_assert(offsetof(ObeliskChatSession, abi_version) == 0u, "ObeliskChatSession.abi_version offset changed");
+_Static_assert(offsetof(ObeliskChatSession, struct_size) == 4u, "ObeliskChatSession.struct_size offset changed");
+_Static_assert(offsetof(ObeliskChatSession, session_token) == 8u, "ObeliskChatSession.session_token offset changed");
+_Static_assert(offsetof(ObeliskChatSession, process_epoch) == 16u, "ObeliskChatSession.process_epoch offset changed");
+_Static_assert(offsetof(ObeliskChatSession, flags) == 24u, "ObeliskChatSession.flags offset changed");
+_Static_assert(offsetof(ObeliskChatSession, player_name) == 32u, "ObeliskChatSession.player_name offset changed");
+_Static_assert(offsetof(ObeliskChatSession, player_name_size) == 292u, "ObeliskChatSession.player_name_size offset changed");
+_Static_assert(offsetof(ObeliskChatSession, reserved0) == 296u, "ObeliskChatSession.reserved0 offset changed");
+_Static_assert(sizeof(ObeliskCommandWorldInfo) == 80u, "ObeliskCommandWorldInfo size changed");
+_Static_assert(_Alignof(ObeliskCommandWorldInfo) == 8u, "ObeliskCommandWorldInfo alignment changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, abi_version) == 0u, "ObeliskCommandWorldInfo.abi_version offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, struct_size) == 4u, "ObeliskCommandWorldInfo.struct_size offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, flags) == 8u, "ObeliskCommandWorldInfo.flags offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, x) == 16u, "ObeliskCommandWorldInfo.x offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, y) == 20u, "ObeliskCommandWorldInfo.y offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, z) == 24u, "ObeliskCommandWorldInfo.z offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, native_tribe_id) == 28u, "ObeliskCommandWorldInfo.native_tribe_id offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, pitch) == 32u, "ObeliskCommandWorldInfo.pitch offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, yaw) == 36u, "ObeliskCommandWorldInfo.yaw offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, roll) == 40u, "ObeliskCommandWorldInfo.roll offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, reserved0) == 44u, "ObeliskCommandWorldInfo.reserved0 offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, process_epoch) == 48u, "ObeliskCommandWorldInfo.process_epoch offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, session_token) == 56u, "ObeliskCommandWorldInfo.session_token offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, mounted_dino_id1) == 64u, "ObeliskCommandWorldInfo.mounted_dino_id1 offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, mounted_dino_id2) == 68u, "ObeliskCommandWorldInfo.mounted_dino_id2 offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, target_structure_id) == 72u, "ObeliskCommandWorldInfo.target_structure_id offset changed");
+_Static_assert(offsetof(ObeliskCommandWorldInfo, reserved1) == 76u, "ObeliskCommandWorldInfo.reserved1 offset changed");
+_Static_assert(sizeof(((ObeliskChatSession*)0)->player_name) == 257u, "Copied session name extent changed");
+typedef bool (*GetCommandChatSessionWithOwnerTokenSignature)(uint64_t, uint64_t, ObeliskChatSession*);
+_Static_assert(_Generic(((ObeliskApi*)0)->GetCommandChatSessionWithOwnerToken,
+    GetCommandChatSessionWithOwnerTokenSignature: 1, default: 0), "GetCommandChatSessionWithOwnerToken signature changed");
+typedef bool (*ListChatSessionsWithOwnerTokenSignature)(uint64_t, uint64_t, ObeliskChatSession*, size_t, size_t*, size_t*);
+_Static_assert(_Generic(((ObeliskApi*)0)->ListChatSessionsWithOwnerToken,
+    ListChatSessionsWithOwnerTokenSignature: 1, default: 0), "ListChatSessionsWithOwnerToken signature changed");
+typedef bool (*SendChatToSessionWithOwnerTokenSignature)(uint64_t, uint64_t, uint64_t, uint64_t, ObeliskCommandStringView);
+_Static_assert(_Generic(((ObeliskApi*)0)->SendChatToSessionWithOwnerToken,
+    SendChatToSessionWithOwnerTokenSignature: 1, default: 0), "SendChatToSessionWithOwnerToken signature changed");
+typedef bool (*GetCommandWorldInfoWithOwnerTokenSignature)(uint64_t, uint64_t, ObeliskCommandWorldInfo*);
+_Static_assert(_Generic(((ObeliskApi*)0)->GetCommandWorldInfoWithOwnerToken,
+    GetCommandWorldInfoWithOwnerTokenSignature: 1, default: 0), "GetCommandWorldInfoWithOwnerToken signature changed");
+
 _Static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15), "Command options bit changed");
 _Static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull, "Command verb flag changed");
 _Static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull, "Command case flag changed");
@@ -159,7 +230,7 @@ ASSERT_OFFSET(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle, 184);
 ASSERT_OFFSET(ObeliskApi, UnregisterChatMessageEventWithOwnerToken, 192);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle), 200);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken), 208);
-ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, TeleportCommandOriginWithOwnerToken);
 
 static const char* kDefaultConfig = "{\n"
     "  \"enabled\": false,\n"

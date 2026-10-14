@@ -77,3 +77,16 @@ Antes de aplicar configuración se coordina un guardado y backup del estado
 actual. La etapa HotControl no debe usarse para prometer que todos los INIs,
 hooks o plugins pueden cambiarse sin reiniciar. Los estados de esta tabla tampoco
 modifican los contratos históricos de promoción o estabilidad de módulos.
+
+
+## Current suite increment
+
+The current increment adds copied position/rotation, native tribe ID, mount
+ID pair and aimed structure ID through independently checked current bindings.
+Scoped destination tokens invalidate on logout/relogin; old invocations cannot
+read/send into successor sessions. Thirty-two live requests verified the four
+new plugin lifecycles, following a core upgrade; they do not validate game query,
+message or teleport effects. Shop fulfillment remains disabled because the
+native boolean permits partial delivery. Persistent identity, precise inventory
+receipts and domain mutations remain separate stages. The newer suite audit
+supersedes the older new-plugin-discovery limitation in the table above.

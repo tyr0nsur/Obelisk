@@ -134,6 +134,10 @@ FetchContent_MakeAvailable(subhook)
 
 # Private admission/lifetime barrier shared by runtime and focused fixtures.
 # It is deliberately absent from the installed public SDK interface.
+add_library(obelisk_chat_sessions STATIC core/ChatSessionRegistry.cpp)
+target_include_directories(obelisk_chat_sessions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(obelisk_chat_sessions PRIVATE pthread)
+
 add_library(obelisk_owner_execution_gate STATIC core/OwnerExecutionGate.cpp)
 target_include_directories(obelisk_owner_execution_gate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(obelisk_owner_execution_gate PRIVATE pthread)
@@ -205,6 +209,10 @@ set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 add_subdirectory(plugins/oBaseEvents)
 add_subdirectory(plugins/oPing)
 add_subdirectory(plugins/oEssentials)
+add_subdirectory(plugins/oShopKits)
+add_subdirectory(plugins/oAdvancedChat)
+add_subdirectory(plugins/oWorldTools)
+add_subdirectory(plugins/oHomes)
 add_subdirectory(plugins/oProcessTimer)
 add_subdirectory(plugins/oDescriptorCatalog)
 if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
@@ -347,12 +355,33 @@ add_executable(suite_store_tests tests/core/SuiteStoreTests.cpp)
 target_include_directories(suite_store_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(suite_store_tests PRIVATE obelisk_suite_store SQLite::SQLite3 pthread)
 add_test(NAME SuiteStoreTests COMMAND suite_store_tests)
+add_library(obelisk_homes_store STATIC services/HomesStore.cpp)
+target_include_directories(obelisk_homes_store PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(obelisk_homes_store PRIVATE SQLite::SQLite3 pthread)
+add_executable(homes_store_tests tests/core/HomesStoreTests.cpp)
+target_include_directories(homes_store_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(homes_store_tests PRIVATE obelisk_homes_store SQLite::SQLite3 pthread)
+add_test(NAME HomesStoreTests COMMAND homes_store_tests)
+add_executable(advanced_chat_router_tests tests/core/AdvancedChatRouterTests.cpp core/AdvancedChatRouter.cpp)
+target_include_directories(advanced_chat_router_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(advanced_chat_router_tests PRIVATE pthread)
+add_test(NAME AdvancedChatRouterTests COMMAND advanced_chat_router_tests)
+add_executable(chat_session_registry_tests tests/core/ChatSessionRegistryTests.cpp)
+target_include_directories(chat_session_registry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(chat_session_registry_tests PRIVATE obelisk_chat_sessions pthread)
+add_test(NAME ChatSessionRegistryTests COMMAND chat_session_registry_tests)
+
 set_tests_properties(SuiteStoreTests PROPERTIES TIMEOUT 30)
 
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     tests/core/PingPluginIntegrationTests.cpp
     tests/core/EssentialsPluginIntegrationTests.cpp
+    tests/core/ShopKitsPluginIntegrationTests.cpp
+    tests/core/AdvancedChatPluginIntegrationTests.cpp
+    tests/core/CommandSessionIntegrationTests.cpp
+    tests/core/WorldToolsPluginIntegrationTests.cpp
+    tests/core/HomesPluginIntegrationTests.cpp
     core/ChatEventDispatcher.cpp
     core/CommandDispatcher.cpp
     core/PlayerLifecycleDispatcher.cpp
@@ -368,13 +397,17 @@ add_executable(plugin_manager_tests
     runtime/RuntimeMarkers.cpp
     tests/core/ProcessEventHookStub.cpp
 )
-target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/extern)
 target_compile_definitions(plugin_manager_tests
     PRIVATE OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS=1
     OBELISK_PING_PLUGIN_PATH="$<TARGET_FILE:oPing>"
+    OBELISK_HOMES_PLUGIN_PATH="$<TARGET_FILE:oHomes>"
+    OBELISK_WORLD_TOOLS_PLUGIN_PATH="$<TARGET_FILE:oWorldTools>"
+    OBELISK_SHOP_KITS_PLUGIN_PATH="$<TARGET_FILE:oShopKits>"
+    OBELISK_ADVANCED_CHAT_PLUGIN_PATH="$<TARGET_FILE:oAdvancedChat>"
     OBELISK_ESSENTIALS_PLUGIN_PATH="$<TARGET_FILE:oEssentials>"
 )
-add_dependencies(plugin_manager_tests oPing oEssentials)
+add_dependencies(plugin_manager_tests oPing oEssentials oShopKits oAdvancedChat oWorldTools oHomes)
 target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
 
 add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)
@@ -798,7 +831,7 @@ install(TARGETS obelisk_sdk
 )
 
 install(FILES include/obelisk/ObeliskApi.h include/obelisk/ObeliskCommandApi.h
-    include/obelisk/ObeliskPlayerLifecycleApi.h
+    include/obelisk/ObeliskPlayerLifecycleApi.h include/obelisk/ObeliskChatSessionApi.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/obelisk
     COMPONENT SDK
 )
@@ -954,7 +987,7 @@ foreach(obelisk_private_target IN LISTS obelisk_private_targets)
     get_target_property(obelisk_private_sources ${obelisk_private_target} SOURCES)
     foreach(obelisk_private_source IN LISTS obelisk_private_sources)
         if(obelisk_private_source MATCHES "core/(.*Dispatcher|EventManager|TimerManager)\\.cpp$")
-            target_link_libraries(${obelisk_private_target} PRIVATE obelisk_owner_execution_gate)
+            target_link_libraries(${obelisk_private_target} PRIVATE obelisk_owner_execution_gate obelisk_chat_sessions)
             break()
         endif()
     endforeach()

@@ -14,14 +14,14 @@ observations were consistent across that relogin; this does not establish
 storefront provenance, authentication or a durable player/session contract.
 
 The prototype baseline passed **147 CTest checks** before the latest identity
-and lifecycle extension. The current build now passes **153/153 CTest checks**,
+and lifecycle extension. The current build now passes **156/156 CTest checks**,
 including the new identity and lifecycle fixtures. Those automated checks
 cover runtime and plugin behavior; the real-client observation establishes
 the in-game command/reply path. Steam acceptance, reply separation between two
 real players and the remaining session cases are still pending.
 
 The current source appends copied player observations and typed lifecycle
-notifications to the C API, extending `ObeliskApi` to **272 bytes on Linux
+notifications to the C API, extending `ObeliskApi` to **312 bytes on Linux
 x86_64**. Their build and fixture checks pass. The Epic client also confirmed
 the name and opaque native ID displayed by `/whoami`, and the plugin received
 the new owner-validated login and logout observations. Typed relogin, interrupted
@@ -202,3 +202,19 @@ modules before improving `oPing`.
 
 Use recorded client behavior for gameplay claims, focused build/tests for
 implementation changes and the current prototype document for active status.
+
+
+## Native module suite milestone
+
+Six cooperative plugins are running in the laboratory: oPing, oEssentials,
+oShopKits, oAdvancedChat, oWorldTools and oHomes. Thirty-two live operator requests
+exercised the four new packages without changing the game process. Their command
+and lifecycle fixtures pass; their visible gameplay effects need client checks.
+
+Shop/kits currently expose catalogs with fulfillment disabled, backed by a
+private transactional receipt foundation. Chat adds observed-session list,
+global messages and whispers with rate limits. World tools expose current
+position, native tribe ID, mounted dino IDs and aimed structure ID. Homes are
+session-only points with a guarded current-player teleport binding; reconnect
+or reload clears them. See [suite status](docs/SUITE_STATUS.md) for the exact
+native profile, acceptance state and remaining inventory/identity work.

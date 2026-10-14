@@ -256,6 +256,9 @@ validate_managed_install_layout() {
         "${ROOT}/lib/libsubhook.so" \
         "${ROOT}/lib/libobelisk.so" \
         "${ROOT}/include/obelisk/ObeliskApi.h" \
+        "${ROOT}/include/obelisk/ObeliskChatSessionApi.h" \
+        "${ROOT}/include/obelisk/ObeliskCommandApi.h" \
+        "${ROOT}/include/obelisk/ObeliskPlayerLifecycleApi.h" \
         "${ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake" \
         "${ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake" \
         "${ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
@@ -389,6 +392,9 @@ validate_build_artifacts() {
 sdk_package_files() {
     printf '%s\n' \
         "include/obelisk/ObeliskApi.h" \
+        "include/obelisk/ObeliskChatSessionApi.h" \
+        "include/obelisk/ObeliskCommandApi.h" \
+        "include/obelisk/ObeliskPlayerLifecycleApi.h" \
         "lib/cmake/Obelisk/ObeliskConfig.cmake" \
         "lib/cmake/Obelisk/ObeliskConfigVersion.cmake" \
         "lib/cmake/Obelisk/ObeliskTargets.cmake"

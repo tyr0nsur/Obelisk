@@ -263,7 +263,7 @@ namespace Obelisk::Services
             if (version < 0 || version > SuiteStore::SchemaVersion) return Status::UnsupportedSchema;
             status = ReadPragma(db, "PRAGMA application_id", application);
             if (status != Status::Ok) return status;
-            if ((version == 1 && application != kApplicationId) || (version == 0 && application != 0))
+            if ((version >= 1 && application != kApplicationId) || (version == 0 && application != 0))
                 return Status::UnsupportedSchema;
             if (sqlite3_exec(db, "PRAGMA foreign_keys=ON", nullptr, nullptr, nullptr) != SQLITE_OK) return Status::StorageError;
             if (version == 0)
@@ -317,7 +317,7 @@ PRAGMA user_version=1;
                 {
                     status = ReadPragma(db, "PRAGMA application_id", application);
                     if (status != Status::Ok) return status;
-                    if (version != SuiteStore::SchemaVersion || application != kApplicationId) return Status::UnsupportedSchema;
+                    if ((version != 1 && version != SuiteStore::SchemaVersion) || application != kApplicationId) return Status::UnsupportedSchema;
                 }
                 status = transaction.Commit();
                 if (status != Status::Ok) return status;
@@ -332,6 +332,52 @@ PRAGMA user_version=1;
             for (const auto* sql : checks)
             {
                 Statement query(db, sql);
+                if (query.Step() != SQLITE_DONE) return Status::UnsupportedSchema;
+            }
+            status = ReadPragma(db, "PRAGMA user_version", version);
+            if (status != Status::Ok) return status;
+            if (version == 1)
+            {
+                Transaction transaction(db);
+                if (transaction.Result != SQLITE_OK) return SqlStatus(transaction.Result);
+                status = ReadPragma(db, "PRAGMA user_version", version);
+                if (status != Status::Ok) return status;
+                if (version == 1)
+                {
+                    constexpr const char* schema = R"sql(
+CREATE TABLE fulfillment_receipts(
+ receipt_id TEXT COLLATE BINARY NOT NULL PRIMARY KEY,
+ kind INTEGER NOT NULL CHECK(typeof(kind)='integer' AND kind IN(1,2)),
+ subject_namespace TEXT COLLATE BINARY NOT NULL, opaque_id TEXT COLLATE BINARY NOT NULL,
+ product_id TEXT COLLATE BINARY NOT NULL, catalog_revision TEXT COLLATE BINARY NOT NULL,
+ fulfillment_payload TEXT COLLATE BINARY NOT NULL,
+ quantity INTEGER NOT NULL CHECK(typeof(quantity)='integer' AND quantity>0),
+ unit_price INTEGER NOT NULL CHECK(typeof(unit_price)='integer' AND unit_price>=0),
+ total INTEGER NOT NULL CHECK(typeof(total)='integer' AND total>=0),
+ requested_utc INTEGER NOT NULL CHECK(typeof(requested_utc)='integer' AND requested_utc>=0),
+ kit_max_claims INTEGER NOT NULL CHECK(typeof(kit_max_claims)='integer' AND kit_max_claims>=0),
+ kit_cooldown INTEGER NOT NULL CHECK(typeof(kit_cooldown)='integer' AND kit_cooldown>=0),
+ state INTEGER NOT NULL CHECK(typeof(state)='integer' AND state BETWEEN 1 AND 5),
+ reserved_balance INTEGER NOT NULL CHECK(typeof(reserved_balance)='integer' AND reserved_balance>=0),
+ attempt_id TEXT COLLATE BINARY UNIQUE,
+ refunded_balance INTEGER CHECK(refunded_balance IS NULL OR (typeof(refunded_balance)='integer' AND refunded_balance>=0)),
+ CHECK((state=1 AND attempt_id IS NULL) OR (state IN(2,3,4,5) AND attempt_id IS NOT NULL)),
+ CHECK((state=4 AND refunded_balance IS NOT NULL) OR (state!=4 AND refunded_balance IS NULL)),
+ CHECK((kind=1 AND kit_max_claims=0 AND kit_cooldown=0) OR (kind=2 AND quantity=1 AND unit_price=0 AND total=0)));
+CREATE INDEX fulfillment_kit_history ON fulfillment_receipts(subject_namespace,opaque_id,product_id,kind,state,requested_utc);
+PRAGMA user_version=2;
+)sql";
+                    const int result = sqlite3_exec(db, schema, nullptr, nullptr, nullptr);
+                    if (result != SQLITE_OK) return SqlStatus(result);
+                }
+                else if (version != SuiteStore::SchemaVersion) return Status::UnsupportedSchema;
+                status = transaction.Commit();
+                if (status != Status::Ok) return status;
+            }
+            {
+                Statement query(db, "SELECT receipt_id,kind,subject_namespace,opaque_id,product_id,catalog_revision,"
+                    "fulfillment_payload,quantity,unit_price,total,requested_utc,kit_max_claims,kit_cooldown,state,"
+                    "reserved_balance,attempt_id,refunded_balance FROM fulfillment_receipts LIMIT 0");
                 if (query.Step() != SQLITE_DONE) return Status::UnsupportedSchema;
             }
             {
@@ -362,6 +408,68 @@ PRAGMA user_version=1;
                 "ON CONFLICT(subject_namespace,opaque_id) DO UPDATE SET balance=excluded.balance");
             update.Text(1, subject.Namespace); update.Text(2, subject.OpaqueId); update.Integer(3, balance);
             return SqlStatus(update.Step());
+        }
+        bool ValidReceiptRequest(SuiteReceiptKind kind, const SuiteReceiptRequest& request) noexcept
+        {
+            if (!ValidSubject(request.Subject) || !ValidToken(request.ProductId, 64, false) ||
+                !ValidUtf8(request.CatalogRevision, 128) || !ValidUtf8(request.FulfillmentPayload, 4096) ||
+                request.Quantity <= 0 || request.Quantity > 1000000 || request.UnitPrice < 0 ||
+                request.RequestedUtcSeconds < 0 || request.KitMaxClaims < 0 || request.KitCooldownSeconds < 0) return false;
+            return kind == SuiteReceiptKind::Purchase
+                ? request.KitMaxClaims == 0 && request.KitCooldownSeconds == 0
+                : kind == SuiteReceiptKind::Kit && request.Quantity == 1 && request.UnitPrice == 0;
+        }
+
+        bool SameRequest(const SuiteReceiptRequest& a, const SuiteReceiptRequest& b) noexcept
+        {
+            return a.Subject.Namespace == b.Subject.Namespace && a.Subject.OpaqueId == b.Subject.OpaqueId &&
+                a.ProductId == b.ProductId && a.CatalogRevision == b.CatalogRevision &&
+                a.FulfillmentPayload == b.FulfillmentPayload && a.Quantity == b.Quantity &&
+                a.UnitPrice == b.UnitPrice && a.RequestedUtcSeconds == b.RequestedUtcSeconds &&
+                a.KitMaxClaims == b.KitMaxClaims && a.KitCooldownSeconds == b.KitCooldownSeconds;
+        }
+
+        SuiteReceiptSnapshot ReadReceipt(sqlite3* db, std::string_view id)
+        {
+            SuiteReceiptSnapshot out;
+            Statement query(db, "SELECT kind,subject_namespace,opaque_id,product_id,catalog_revision,fulfillment_payload,"
+                "quantity,unit_price,total,requested_utc,kit_max_claims,kit_cooldown,state,reserved_balance,attempt_id,refunded_balance "
+                "FROM fulfillment_receipts WHERE receipt_id=?1");
+            query.Text(1, id);
+            const int result = query.Step();
+            if (result == SQLITE_DONE) { out.Result.Status = Status::NotFound; return out; }
+            if (result != SQLITE_ROW) { out.Result.Status = SqlStatus(result); return out; }
+            for (int column : {0, 6, 7, 8, 9, 10, 11, 12, 13})
+                if (sqlite3_column_type(query.Value, column) != SQLITE_INTEGER) return out;
+            for (int column : {1, 2, 3, 4, 5})
+                if (sqlite3_column_type(query.Value, column) != SQLITE_TEXT) return out;
+            out.Kind = static_cast<SuiteReceiptKind>(sqlite3_column_int(query.Value, 0));
+            out.Request.Subject = {std::string(query.ColumnText(1)), std::string(query.ColumnText(2))};
+            out.Request.ProductId = query.ColumnText(3);
+            out.Request.CatalogRevision = query.ColumnText(4);
+            out.Request.FulfillmentPayload = query.ColumnText(5);
+            out.Request.Quantity = sqlite3_column_int64(query.Value, 6);
+            out.Request.UnitPrice = sqlite3_column_int64(query.Value, 7);
+            const int64_t total = sqlite3_column_int64(query.Value, 8);
+            out.Request.RequestedUtcSeconds = sqlite3_column_int64(query.Value, 9);
+            out.Request.KitMaxClaims = sqlite3_column_int64(query.Value, 10);
+            out.Request.KitCooldownSeconds = sqlite3_column_int64(query.Value, 11);
+            out.Result.State = static_cast<SuiteReceiptState>(sqlite3_column_int(query.Value, 12));
+            out.Result.ReservedBalance = sqlite3_column_int64(query.Value, 13);
+            if (sqlite3_column_type(query.Value, 14) == SQLITE_TEXT) out.AttemptId = query.ColumnText(14);
+            else if (sqlite3_column_type(query.Value, 14) != SQLITE_NULL) return out;
+            if (sqlite3_column_type(query.Value, 15) == SQLITE_INTEGER)
+                out.Result.RefundedBalance = sqlite3_column_int64(query.Value, 15);
+            else if (sqlite3_column_type(query.Value, 15) != SQLITE_NULL) return out;
+            const int state = static_cast<int>(out.Result.State);
+            if (!ValidReceiptRequest(out.Kind, out.Request) || out.Result.ReservedBalance < 0 ||
+                out.Request.UnitPrice > std::numeric_limits<int64_t>::max() / out.Request.Quantity ||
+                total != out.Request.Quantity * out.Request.UnitPrice || state < 1 || state > 5 ||
+                (state == 1 ? !out.AttemptId.empty() : !ValidUtf8(out.AttemptId, 128)) ||
+                (state == 4 ? !out.Result.RefundedBalance || *out.Result.RefundedBalance < 0
+                            : out.Result.RefundedBalance.has_value())) return out;
+            out.Result.Status = Status::Ok;
+            return out;
         }
     }
 
@@ -555,6 +663,13 @@ PRAGMA user_version=1;
                 }
                 if (result != SQLITE_DONE) return {SqlStatus(result)};
             }
+            {
+                Statement commerce(m_Impl->Db, "SELECT 1 FROM fulfillment_receipts WHERE receipt_id=?1");
+                commerce.Text(1, id);
+                const int result = commerce.Step();
+                if (result == SQLITE_ROW) return {Status::PayloadConflict};
+                if (result != SQLITE_DONE) return {SqlStatus(result)};
+            }
             int64_t balance = 0, target = 0;
             bool exists = false;
             auto status = ReadBalance(m_Impl->Db, source, balance, exists);
@@ -596,4 +711,158 @@ PRAGMA user_version=1;
         }
         catch (...) { return {Status::StorageError}; }
     }
+    SuiteReceiptResult SuiteStore::ReservePurchase(const SuiteReceiptRequest& request, std::string_view id) noexcept
+    { return Reserve(SuiteReceiptKind::Purchase, request, id); }
+    SuiteReceiptResult SuiteStore::ReserveKit(const SuiteReceiptRequest& request, std::string_view id) noexcept
+    { return Reserve(SuiteReceiptKind::Kit, request, id); }
+
+    SuiteReceiptResult SuiteStore::Reserve(SuiteReceiptKind kind, const SuiteReceiptRequest& request, std::string_view id) noexcept
+    {
+        if (!ValidUtf8(id, 128) || !ValidReceiptRequest(kind, request)) return {Status::InvalidArgument};
+        if (request.UnitPrice > std::numeric_limits<int64_t>::max() / request.Quantity) return {Status::Overflow};
+        const int64_t total = request.Quantity * request.UnitPrice;
+        try
+        {
+            std::lock_guard lock(m_Impl->Mutex);
+            Transaction transaction(m_Impl->Db);
+            if (transaction.Result != SQLITE_OK) return {SqlStatus(transaction.Result)};
+            auto previous = ReadReceipt(m_Impl->Db, id);
+            if (previous.Result.Status == Status::Ok)
+            {
+                if (previous.Kind != kind || !SameRequest(previous.Request, request)) return {Status::PayloadConflict};
+                previous.Result.Replayed = true;
+                return previous.Result;
+            }
+            if (previous.Result.Status != Status::NotFound) return previous.Result;
+            {
+                Statement wallet(m_Impl->Db, "SELECT 1 FROM wallet_operations WHERE operation_id=?1");
+                wallet.Text(1, id);
+                const int result = wallet.Step();
+                if (result == SQLITE_ROW) return {Status::PayloadConflict};
+                if (result != SQLITE_DONE) return {SqlStatus(result)};
+            }
+            if (kind == SuiteReceiptKind::Kit)
+            {
+                Statement claims(m_Impl->Db, "SELECT count(*),max(requested_utc) FROM fulfillment_receipts "
+                    "WHERE subject_namespace=?1 AND opaque_id=?2 AND product_id=?3 AND kind=2 AND state!=4");
+                claims.Text(1, request.Subject.Namespace); claims.Text(2, request.Subject.OpaqueId); claims.Text(3, request.ProductId);
+                const int result = claims.Step();
+                if (result != SQLITE_ROW) return {SqlStatus(result)};
+                const int64_t count = sqlite3_column_int64(claims.Value, 0);
+                if (request.KitMaxClaims && count >= request.KitMaxClaims) return {Status::LimitReached};
+                if (count && request.KitCooldownSeconds)
+                {
+                    const int64_t last = sqlite3_column_int64(claims.Value, 1);
+                    if (request.RequestedUtcSeconds < last || request.RequestedUtcSeconds - last < request.KitCooldownSeconds)
+                        return {Status::CooldownActive};
+                }
+            }
+            int64_t balance = 0; bool exists = false;
+            auto status = ReadBalance(m_Impl->Db, request.Subject, balance, exists);
+            if (status != Status::Ok) return {status};
+            if (total > balance) return {Status::InsufficientFunds};
+            balance -= total;
+            status = WriteBalance(m_Impl->Db, request.Subject, balance);
+            if (status != Status::Ok) return {status};
+            Statement insert(m_Impl->Db, "INSERT INTO fulfillment_receipts(receipt_id,kind,subject_namespace,opaque_id,"
+                "product_id,catalog_revision,fulfillment_payload,quantity,unit_price,total,requested_utc,kit_max_claims,"
+                "kit_cooldown,state,reserved_balance) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,1,?14)");
+            insert.Text(1, id); insert.Integer(2, static_cast<int>(kind));
+            insert.Text(3, request.Subject.Namespace); insert.Text(4, request.Subject.OpaqueId);
+            insert.Text(5, request.ProductId); insert.Text(6, request.CatalogRevision); insert.Text(7, request.FulfillmentPayload);
+            insert.Integer(8, request.Quantity); insert.Integer(9, request.UnitPrice); insert.Integer(10, total);
+            insert.Integer(11, request.RequestedUtcSeconds); insert.Integer(12, request.KitMaxClaims);
+            insert.Integer(13, request.KitCooldownSeconds); insert.Integer(14, balance);
+            status = SqlStatus(insert.Step());
+            if (status != Status::Ok) return {status};
+            status = transaction.Commit();
+            return status == Status::Ok ? SuiteReceiptResult{status, false, SuiteReceiptState::Reserved, balance, {}}
+                                       : SuiteReceiptResult{status};
+        }
+        catch (...) { return {Status::StorageError}; }
+    }
+
+    SuiteReceiptSnapshot SuiteStore::Receipt(std::string_view id) noexcept
+    {
+        if (!ValidUtf8(id, 128)) { SuiteReceiptSnapshot result; result.Result.Status = Status::InvalidArgument; return result; }
+        try { std::lock_guard lock(m_Impl->Mutex); return ReadReceipt(m_Impl->Db, id); }
+        catch (...) { return {}; }
+    }
+
+    SuiteReceiptResult SuiteStore::BeginDelivery(std::string_view id, std::string_view attemptId) noexcept
+    {
+        if (!ValidUtf8(id, 128) || !ValidUtf8(attemptId, 128)) return {Status::InvalidArgument};
+        try
+        {
+            std::lock_guard lock(m_Impl->Mutex);
+            Transaction transaction(m_Impl->Db);
+            if (transaction.Result != SQLITE_OK) return {SqlStatus(transaction.Result)};
+            auto receipt = ReadReceipt(m_Impl->Db, id);
+            if (receipt.Result.Status != Status::Ok) return receipt.Result;
+            if (receipt.Result.State == SuiteReceiptState::Attempting && receipt.AttemptId == attemptId)
+            { receipt.Result.Replayed = true; return receipt.Result; }
+            if (receipt.Result.State != SuiteReceiptState::Reserved) return {Status::InvalidState};
+            {
+                Statement other(m_Impl->Db, "SELECT 1 FROM fulfillment_receipts WHERE attempt_id=?1");
+                other.Text(1, attemptId);
+                const int result = other.Step();
+                if (result == SQLITE_ROW) return {Status::PayloadConflict};
+                if (result != SQLITE_DONE) return {SqlStatus(result)};
+            }
+            Statement update(m_Impl->Db, "UPDATE fulfillment_receipts SET state=2,attempt_id=?2 WHERE receipt_id=?1 AND state=1");
+            update.Text(1, id); update.Text(2, attemptId);
+            auto status = SqlStatus(update.Step());
+            if (status != Status::Ok) return {status};
+            if (sqlite3_changes(m_Impl->Db) != 1) return {Status::StorageError};
+            status = transaction.Commit();
+            if (status != Status::Ok) return {status};
+            receipt.Result.State = SuiteReceiptState::Attempting;
+            return receipt.Result;
+        }
+        catch (...) { return {Status::StorageError}; }
+    }
+
+    SuiteReceiptResult SuiteStore::CompleteDelivery(std::string_view id, std::string_view attemptId, SuiteDeliveryOutcome outcome) noexcept
+    {
+        if (!ValidUtf8(id, 128) || !ValidUtf8(attemptId, 128) ||
+            (outcome != SuiteDeliveryOutcome::Delivered && outcome != SuiteDeliveryOutcome::VerifiedNoDelivery &&
+             outcome != SuiteDeliveryOutcome::Uncertain)) return {Status::InvalidArgument};
+        try
+        {
+            std::lock_guard lock(m_Impl->Mutex);
+            Transaction transaction(m_Impl->Db);
+            if (transaction.Result != SQLITE_OK) return {SqlStatus(transaction.Result)};
+            auto receipt = ReadReceipt(m_Impl->Db, id);
+            if (receipt.Result.Status != Status::Ok) return receipt.Result;
+            if (receipt.AttemptId != attemptId) return {Status::PayloadConflict};
+            const auto target = outcome == SuiteDeliveryOutcome::Delivered ? SuiteReceiptState::Delivered
+                : outcome == SuiteDeliveryOutcome::VerifiedNoDelivery ? SuiteReceiptState::NoDelivery : SuiteReceiptState::Uncertain;
+            if (receipt.Result.State == target) { receipt.Result.Replayed = true; return receipt.Result; }
+            if (receipt.Result.State != SuiteReceiptState::Attempting) return {Status::InvalidState};
+            if (target == SuiteReceiptState::NoDelivery)
+            {
+                int64_t balance = 0; bool exists = false;
+                auto status = ReadBalance(m_Impl->Db, receipt.Request.Subject, balance, exists);
+                if (status != Status::Ok) return {status};
+                const int64_t total = receipt.Request.Quantity * receipt.Request.UnitPrice;
+                if (total > std::numeric_limits<int64_t>::max() - balance) return {Status::Overflow};
+                balance += total;
+                status = WriteBalance(m_Impl->Db, receipt.Request.Subject, balance);
+                if (status != Status::Ok) return {status};
+                receipt.Result.RefundedBalance = balance;
+            }
+            Statement update(m_Impl->Db, "UPDATE fulfillment_receipts SET state=?2,refunded_balance=?3 WHERE receipt_id=?1 AND state=2");
+            update.Text(1, id); update.Integer(2, static_cast<int>(target));
+            if (receipt.Result.RefundedBalance) update.Integer(3, *receipt.Result.RefundedBalance); else update.Null(3);
+            auto status = SqlStatus(update.Step());
+            if (status != Status::Ok) return {status};
+            if (sqlite3_changes(m_Impl->Db) != 1) return {Status::StorageError};
+            status = transaction.Commit();
+            if (status != Status::Ok) return {status};
+            receipt.Result.State = target;
+            return receipt.Result;
+        }
+        catch (...) { return {Status::StorageError}; }
+    }
+
 }

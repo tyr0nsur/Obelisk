@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <cmath>
 #include <stdexcept>
 #include <thread>
 
@@ -20,6 +21,7 @@ namespace Obelisk::Core
             void* BackendData;
             std::thread::id Thread;
             const ObeliskCommandPlayer* Player;
+            const CommandRuntimeContext* Runtime;
             const GameplayCallbackScope* CallbackScope = nullptr;
             InvocationScope* Previous;
         };
@@ -261,7 +263,7 @@ namespace Obelisk::Core
     }
 
     size_t CommandDispatcher::Dispatch(void* controller, std::string_view message, uint32_t sendMode,
-                                        ReplyBackend backend, void* backendData, const CommandPlayerSnapshot* player)
+                                        ReplyBackend backend, void* backendData, const CommandPlayerSnapshot* player, const CommandRuntimeContext* runtimeContext)
     {
         if (!IsAvailable() || !controller || !backend || sendMode > 3 ||
             message.empty() || message.size() > 4096 || !ValidUtf8(message))
@@ -318,7 +320,7 @@ namespace Obelisk::Core
                 ++registration->InFlight;
             }
             InvocationScope invocation{this, registration->Owner, token, controller, backend,
-                                       backendData, std::this_thread::get_id(), hasSnapshot ? &copiedPlayer : nullptr,
+                                       backendData, std::this_thread::get_id(), hasSnapshot ? &copiedPlayer : nullptr, runtimeContext,
                                        nullptr, g_CurrentInvocation};
             g_CurrentInvocation = &invocation;
             const ObeliskCommandInvocation event{
@@ -350,6 +352,8 @@ namespace Obelisk::Core
             !invocation->CallbackScope || GameplayCallbackScope::Current() != invocation->CallbackScope ||
             reply.empty() || reply.size() > 1024 || !ValidUtf8(reply))
             return false;
+        if(invocation->Runtime){ObeliskChatSession origin{};origin.struct_size=sizeof(origin);
+            if(!GetChatSession(owner,invocationToken,&origin))return false;}
         return invocation->Backend(invocation->Controller, reply, invocation->BackendData);
     }
 
@@ -366,4 +370,57 @@ namespace Obelisk::Core
         *out = *invocation->Player;
         return true;
     }
+    void CommandDispatcher::SetChatSessionRegistry(ChatSessionRegistry* value) noexcept { m_ChatSessions.store(value); }
+    bool CommandDispatcher::IsChatSessionsAvailable() const noexcept {
+        const auto* value=m_ChatSessions.load(); return IsAvailable() && value && value->Available();
+    }
+    void CommandDispatcher::SetWorldInfoAvailable(bool value) noexcept { m_WorldInfoAvailable.store(value); }
+    bool CommandDispatcher::IsWorldInfoAvailable() const noexcept { return IsAvailable() && m_WorldInfoAvailable.load(); }
+    namespace {
+        const InvocationScope* CurrentFor(CommandDispatcher* dispatcher,void* owner,uint64_t token) noexcept {
+            const auto* value=g_CurrentInvocation;
+            return value && owner && token && value->Dispatcher==dispatcher && value->Owner==owner &&
+                value->Token==token && value->Thread==std::this_thread::get_id() && value->CallbackScope &&
+                GameplayCallbackScope::Current()==value->CallbackScope ? value : nullptr;
+        }
+    }
+    bool CommandDispatcher::GetChatSession(void* owner,uint64_t token,ObeliskChatSession* out) noexcept {
+        const auto* value=CurrentFor(this,owner,token); auto* sessions=m_ChatSessions.load();
+        return IsChatSessionsAvailable() && value && value->Runtime && sessions->Snapshot(value->Runtime->ChatSessionToken,out);
+    }
+    bool CommandDispatcher::ListChatSessions(void* owner,uint64_t token,ObeliskChatSession* records,size_t capacity,size_t* written,size_t* total) noexcept {
+        ObeliskChatSession origin{}; origin.struct_size=sizeof(origin);
+        return GetChatSession(owner,token,&origin) && m_ChatSessions.load()->List(records,capacity,written,total);
+    }
+    bool CommandDispatcher::SendChatToSession(void* owner,uint64_t token,uint64_t destination,uint64_t epoch,std::string_view text) noexcept {
+        ObeliskChatSession origin{}; origin.struct_size=sizeof(origin);
+        return GetChatSession(owner,token,&origin) && m_ChatSessions.load()->Deliver(destination,epoch,text);
+    }
+    bool CommandDispatcher::GetWorldInfo(void* owner,uint64_t token,ObeliskCommandWorldInfo* out) noexcept {
+        const auto* value=CurrentFor(this,owner,token);ObeliskChatSession origin{};origin.struct_size=sizeof(origin);
+        if(!IsWorldInfoAvailable()||!value||!value->Runtime||!value->Runtime->WorldInfo||!out||out->struct_size<sizeof(*out)||!GetChatSession(owner,token,&origin))return false;
+        ObeliskCommandWorldInfo copied{};copied.struct_size=sizeof(copied);
+        if(!value->Runtime->WorldInfo(value->Controller,&copied,value->Runtime->Data)||
+            copied.session_token!=origin.session_token||copied.process_epoch!=origin.process_epoch||
+            copied.abi_version!=OBELISK_COMMAND_WORLD_INFO_ABI_VERSION||copied.struct_size<sizeof(copied)||(copied.flags&~31ull))return false;
+        if((copied.flags&OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE)&&(!std::isfinite(copied.x)||!std::isfinite(copied.y)||!std::isfinite(copied.z)||std::abs(copied.x)>1e8||std::abs(copied.y)>1e8||std::abs(copied.z)>1e8))return false;
+        if((copied.flags&OBELISK_COMMAND_WORLD_FLAG_ROTATION_AVAILABLE)&&(!std::isfinite(copied.pitch)||!std::isfinite(copied.yaw)||!std::isfinite(copied.roll)))return false;
+        ObeliskChatSession after{};after.struct_size=sizeof(after);
+        if(!GetChatSession(owner,token,&after)||after.session_token!=origin.session_token||after.process_epoch!=origin.process_epoch)return false;
+        *out=copied;return true;
+    }
+
+    void CommandDispatcher::SetSelfTeleportAvailable(bool value) noexcept {m_SelfTeleportAvailable.store(value);}
+    bool CommandDispatcher::IsSelfTeleportAvailable()const noexcept{return IsWorldInfoAvailable()&&m_SelfTeleportAvailable.load();}
+    bool CommandDispatcher::TeleportOrigin(void* owner,uint64_t token,const ObeliskCommandWorldInfo* destination) noexcept {
+        const auto* value=CurrentFor(this,owner,token);ObeliskChatSession origin{};origin.struct_size=sizeof(origin);
+        return IsSelfTeleportAvailable()&&value&&value->Runtime&&value->Runtime->Teleport&&destination&&
+            destination->abi_version==OBELISK_COMMAND_WORLD_INFO_ABI_VERSION&&destination->struct_size>=sizeof(*destination)&&
+            (destination->flags&OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE)&&!(destination->flags&~31ull)&&
+            std::isfinite(destination->x)&&std::isfinite(destination->y)&&std::isfinite(destination->z)&&
+            std::abs(destination->x)<=1e8&&std::abs(destination->y)<=1e8&&std::abs(destination->z)<=1e8&&GetChatSession(owner,token,&origin)&&
+            origin.session_token==destination->session_token&&origin.process_epoch==destination->process_epoch&&
+            value->Runtime->Teleport(value->Controller,destination,value->Runtime->Data);
+    }
+
 }

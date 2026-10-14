@@ -320,7 +320,11 @@
         "Kick affects exact active target; duplicate names/expired session reject.",
         "Disconnect during action and revoked permission cannot affect replacement session; homes validate map/position."
       ],
-      "acceptance_evidence": []
+      "acceptance_evidence": [],
+      "implemented_subset": {
+        "plugin": "oHomes",
+        "scope": "session-only homes; real-client movement pending"
+      }
     },
     {
       "id": "oEconomy",
@@ -369,7 +373,7 @@
       "display_name": "Tienda y kits",
       "kind": "plugin",
       "priority": "P2",
-      "implementation_status": "proposed",
+      "implementation_status": "catalog_live_private_receipts_tested_fulfillment_pending",
       "implemented": false,
       "objective": "Own catalog, purchases, sales and kit credits; first delivery is one permitted vanilla item.",
       "reference_source_ids": [
@@ -525,7 +529,11 @@
         "Demolition, restart, load, ownership change and transfer reconcile counts.",
         "Observer-only callback never claims blocking; policy reload reconciles old state before admission."
       ],
-      "acceptance_evidence": []
+      "acceptance_evidence": [],
+      "implemented_subset": {
+        "plugin": "oWorldTools",
+        "scope": "copied scoped observations only; policies/mutations pending"
+      }
     },
     {
       "id": "oDinoPolicies",
@@ -566,7 +574,11 @@
         "Death, untame, tame, cryo/transfer, stasis and restart do not drift counts or leave stale refs.",
         "Unsupported native hook fails closed for activation; decorative changes/spawn are not implied by observer success."
       ],
-      "acceptance_evidence": []
+      "acceptance_evidence": [],
+      "implemented_subset": {
+        "plugin": "oWorldTools",
+        "scope": "copied scoped observations only; policies/mutations pending"
+      }
     },
     {
       "id": "oTribes",
@@ -607,7 +619,11 @@
         "Leave/kick/promote/transfer/restart invalidates stale membership immediately.",
         "Reused tribe IDs and divergent maps cannot merge ownership without reviewed reconciliation."
       ],
-      "acceptance_evidence": []
+      "acceptance_evidence": [],
+      "implemented_subset": {
+        "plugin": "oWorldTools",
+        "scope": "copied scoped observations only; policies/mutations pending"
+      }
     }
   ],
   "migration_policy": {
@@ -619,5 +635,22 @@
     "missing_database": "report unavailable; do not invent balances",
     "live_world_changes": false,
     "details": "docs/research/ARKAPI_PLUGIN_SUITE_PARITY.md"
+  },
+  "current_increment": {
+    "date": "2026-10-14",
+    "api_bytes": 312,
+    "ctest": 156,
+    "native_profile_statements": "static and mapped startup verified; real gameplay pending",
+    "plugins": [
+      "oShopKits",
+      "oAdvancedChat",
+      "oWorldTools",
+      "oHomes"
+    ],
+    "hot_control_requests": 32,
+    "shop_delivery_enabled": false,
+    "session_homes": "process-local current session, fixed TheIsland lab",
+    "world_queries": "current position/native tribe ID/mounted dino IDs/aimed structure ID only",
+    "cross_map_and_domain_mutations": "pending"
   }
 }

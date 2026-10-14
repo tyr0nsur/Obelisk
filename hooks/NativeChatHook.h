@@ -21,6 +21,7 @@ namespace Obelisk::Hooks::NativeChatHook
         uint64_t Flags = 0;
         uint64_t Sequence = 0;
         uint64_t ProcessEpoch = 0;
+        uint64_t ChatSessionToken = 0; // private registry token; no UE pointer
         bool PlayerStateAvailable = false;
         bool PlayerStateClassValidated = false;
         uint8_t FromLoginValue = 0;

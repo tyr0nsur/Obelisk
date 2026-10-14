@@ -285,3 +285,14 @@ library fixture coverage; their in-game UI acceptance is pending. Private SQLite
 permissions/wallets remain an offline library, not a live permission/economy API.
 No source or target bindings are published in the public showcase. See
 [SUITE_STATUS.md](SUITE_STATUS.md).
+
+
+## Native suite extension
+
+The installed full API table is now 312 bytes and includes scoped copied session
+and native-world queries plus a current-origin teleport operation. oPing keeps
+its exact commands and the original public prefixes remain compatible. The
+current build passes 156 CTests. Four new modules passed 32 live lifecycle
+requests without changing the restarted server PID; their gameplay acceptance
+is separate and pending. See [SUITE_STATUS.md](SUITE_STATUS.md) and
+[the native binding audit](research/NATIVE_SUITE_BINDINGS.md).

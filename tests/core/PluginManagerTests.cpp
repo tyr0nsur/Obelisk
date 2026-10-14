@@ -8543,6 +8543,11 @@ namespace
 void TestNativePingPluginIntegration();
 
 void TestNativeEssentialsPluginIntegration();
+void TestNativeShopKitsPluginIntegration();
+void TestNativeAdvancedChatPluginIntegration();
+void TestNativeWorldToolsPluginIntegration();
+void TestCommandSessionIntegration();
+void TestNativeHomesPluginIntegration();
 
 int main()
 {

@@ -51,7 +51,7 @@ El journal de operaciones confirmadas se conserva completo: podarlo sin un contr
 
 ## Schema y fallos
 
-Schema version 1 usa `PRAGMA user_version` y un `application_id` privado. Una base nueva vacía (version 0/application 0) migra a v1 en una transacción. Una segunda apertura reconsulta la versión tras adquirir el write lock, para no migrar dos veces. Se rechazan versiones futuras, application IDs ajenos y bases v0 con objetos preexistentes; no se adopta ni sobrescribe una base de otra aplicación. Se verifican tablas/columnas esperadas al abrir. La biblioteca no ofrece downgrade ni migration de una versión futura.
+Schema version 2 usa `PRAGMA user_version` y un `application_id` privado. Una base nueva vacía (version 0/application 0) migra a v2 en una transacción. Una segunda apertura reconsulta la versión tras adquirir el write lock, para no migrar dos veces. Se rechazan versiones futuras, application IDs ajenos y bases v0 con objetos preexistentes; no se adopta ni sobrescribe una base de otra aplicación. Se verifican tablas/columnas esperadas al abrir. La biblioteca no ofrece downgrade ni migration de una versión futura.
 
 `SuiteStoreStatus` distingue `Ok`, `InvalidArgument`, `InvalidPath`, `NotFound`, `InsufficientFunds`, `Overflow`, `PayloadConflict`, `Busy`, `UnsupportedSchema` y `StorageError`. Métodos públicos `noexcept` convierten excepciones internas en error. No se imprimen ni registran IDs, claves, consultas o secretos. Los parámetros SQL de negocio siempre se enlazan mediante prepared statements; SQL de schema/pragma es constante.
 
@@ -62,3 +62,17 @@ El archivo y directorio privados protegen frente a otros UIDs, no frente al prop
 `tests/core/SuiteStoreTests.cpp` usa bases SQLite reales temporales. Comprueba roles, deny sobre allow, wildcard acotado, expiry y namespaces; UTF-8 y texto con comillas/inyección como datos; reopen y journal idempotente; conflicto de payload; INT64_MAX y sobregiro; rollback después del primer wallet write y después de ambos writes mediante triggers de fallo; busy y retry; dos conexiones haciendo créditos y transferencias concurrentes; IDs duplicados y payloads en conflicto; rechazo de schema futuro/ajeno; separación por instancia y rutas privadas sin symlinks/hardlinks.
 
 Estas pruebas son del almacén offline. No acreditan permisos, autenticación, economía ni otros efectos con jugadores reales. El root coordina CMake, compilación y ejecución; este cambio no instala paquetes, modifica ABI, carga plugins ni toca el servidor.
+
+
+## Commerce schema 2
+
+Schema 1 databases migrate additively to schema 2 in a transaction, retaining
+roles, memberships, balances and operation history. ReservePurchase/ReserveKit
+atomically store an immutable receipt and debit; cross-connection quota and kit
+cooldown checks include pending/uncertain claims. BeginDelivery persists one
+attempt before an adapter acts. Replayed attempts must never invoke delivery a
+second time. CompleteDelivery records Delivered, VerifiedNoDelivery or Uncertain.
+Only verified no-delivery refunds, atomically with its terminal state. Uncertain
+and interrupted attempts require reconciliation and cannot auto-refund/retry.
+These operations remain a private offline foundation without live authenticated
+wallets or inventory delivery.

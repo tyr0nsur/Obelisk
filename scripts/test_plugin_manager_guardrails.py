@@ -376,6 +376,7 @@ def blocked_surface_scan_text(api_header: str, plugin_manager_text: str) -> tupl
     api_header = without_native_prototype_symbols(api_header, header_only=True)
     if allowed:
         plugin_manager_text = without_native_prototype_symbols(plugin_manager_text)
+        plugin_manager_text = re.sub(r"(->\s*)SendChatToSession\b", r"\1ScopedPrototypeDelivery", plugin_manager_text)
         wrappers = "|".join(re.escape(f"Plugin{field}") for field in NATIVE_PROTOTYPE_API_FIELDS)
         plugin_manager_text = re.sub(rf"\b(?:{wrappers})\b", "NativePrototypeWrapper", plugin_manager_text)
     return strip_c_comments(api_header), strip_c_comments(plugin_manager_text)

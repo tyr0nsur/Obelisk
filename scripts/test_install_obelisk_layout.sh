@@ -489,10 +489,14 @@ for path in sorted(package_dir.glob("*.cmake")):
     text = path.read_text(encoding="utf-8")
     text_no_comments = re.sub(r"#.*", "", text)
     identifiers = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", text_no_comments))
+    # Readiness names are declarations; diagnostic prose and the existing
+    # negative blocker value are not additional exported readiness markers.
+    unquoted = re.sub(r'"(?:[^"\\]|\\.)*"', '', text_no_comments, flags=re.S)
+    declared_identifiers = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", unquoted))
     for symbol in sorted(forbidden & identifiers):
         offenders.append(f"{path.name}: blocked public SDK alias {symbol}")
     for identifier in sorted(identifiers):
-        if claim_identifier.search(identifier) and identifier not in allowed_marker_identifiers:
+        if claim_identifier.search(identifier) and identifier not in allowed_marker_identifiers and (identifier.startswith("Obelisk_") or identifier in declared_identifiers):
             offenders.append(f"{path.name}: unreviewed package/readiness marker {identifier}")
     for match in re.finditer(
         r"^\s*set\(\s*(Obelisk_[A-Za-z0-9_]+)\s+([^)\s#]+)",
@@ -1271,7 +1275,7 @@ for managed_dir in \
 done
 
 installed_headers="$(find "${INSTALL_ROOT}/include" -type f -printf '%P\n' | sort)"
-expected_public_headers=$'obelisk/ObeliskApi.h\nobelisk/ObeliskCommandApi.h\nobelisk/ObeliskPlayerLifecycleApi.h'
+expected_public_headers=$'obelisk/ObeliskApi.h\nobelisk/ObeliskChatSessionApi.h\nobelisk/ObeliskCommandApi.h\nobelisk/ObeliskPlayerLifecycleApi.h'
 if [[ "${installed_headers}" != "${expected_public_headers}" ]]; then
     echo "SDK install published unexpected public headers" >&2
     printf '%s\n' "${installed_headers}" >&2
@@ -1280,6 +1284,7 @@ fi
 require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
 require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskCommandApi.h"
 require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskPlayerLifecycleApi.h"
+require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskChatSessionApi.h"
 
 installed_cmake_package_files="$(find "${INSTALL_ROOT}/lib/cmake/Obelisk" -maxdepth 1 -type f -name '*.cmake' -printf '%f\n' | sort)"
 expected_cmake_package_files=$'ObeliskConfig.cmake\nObeliskConfigVersion.cmake\nObeliskTargets.cmake'

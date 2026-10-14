@@ -257,13 +257,13 @@ namespace
         {
             RawDatabase raw(directory.Database());
             Require(raw.Scalar("PRAGMA user_version") == SuiteStore::SchemaVersion, "schema migration not committed");
-            raw.Exec("PRAGMA user_version=2;");
+            raw.Exec("PRAGMA user_version=3;");
         }
         Status status;
         Require(!SuiteStore::Open(directory.Root, "test", status) && status == Status::UnsupportedSchema,
                 "future schema accepted/downgraded");
         RawDatabase raw(directory.Database());
-        Require(raw.Scalar("PRAGMA user_version") == 2 && raw.Scalar("SELECT balance FROM wallets") == 8,
+        Require(raw.Scalar("PRAGMA user_version") == 3 && raw.Scalar("SELECT balance FROM wallets") == 8,
                 "future-version rejection changed stored state");
     }
 
@@ -372,6 +372,191 @@ namespace
                 "busy failure consumed operation ID");
     }
 
+    SuiteReceiptRequest Purchase(const SuiteSubject& subject, int64_t price = 10)
+    {
+        return {subject, "starter", "catalog-v1", "{\"item\":\"starter\",\"amount\":1}", 1, price, 100, 0, 0};
+    }
+
+    void TestReceiptReservationDeliveryAndUncertainty()
+    {
+        Directory directory;
+        const SuiteSubject subject{"external-authority", "opaque-player"};
+        auto store = Open(directory);
+        Require(store->Credit(subject, 100, "seed").Status == Status::Ok, "commerce seed failed");
+        const auto request = Purchase(subject, 12);
+        auto reserved = store->ReservePurchase(request, "purchase");
+        Require(reserved.Status == Status::Ok && !reserved.Replayed && reserved.ReservedBalance == 88 &&
+                reserved.State == SuiteReceiptState::Reserved && Balance(*store, subject) == 88,
+                "purchase did not reserve/debit atomically");
+        store->Credit(subject, 5, "later-credit");
+        const auto replay = store->ReservePurchase(request, "purchase");
+        Require(replay.Status == Status::Ok && replay.Replayed && replay.ReservedBalance == 88 && Balance(*store, subject) == 93,
+                "reservation replay repeated debit or lost original result");
+        auto changed = request; changed.FulfillmentPayload += " ";
+        Require(store->ReservePurchase(changed, "purchase").Status == Status::PayloadConflict &&
+                store->Credit(subject, 1, "purchase").Status == Status::PayloadConflict &&
+                store->ReservePurchase(request, "seed").Status == Status::PayloadConflict,
+                "receipt payload/operation ID collision accepted");
+        Require(store->BeginDelivery("purchase", "attempt-one").Status == Status::Ok, "begin failed");
+        const auto beginReplay = store->BeginDelivery("purchase", "attempt-one");
+        Require(beginReplay.Status == Status::Ok && beginReplay.Replayed &&
+                store->BeginDelivery("purchase", "attempt-two").Status == Status::InvalidState,
+                "delivery admission replay was unsafe");
+        store.reset(); store = Open(directory);
+        auto saved = store->Receipt("purchase");
+        Require(saved.Result.Status == Status::Ok && saved.Result.State == SuiteReceiptState::Attempting &&
+                saved.AttemptId == "attempt-one" && saved.Request.FulfillmentPayload == request.FulfillmentPayload &&
+                Balance(*store, subject) == 93, "crash/reopen lost pending delivery/debit");
+        Require(store->CompleteDelivery("purchase", "wrong-attempt", SuiteDeliveryOutcome::Delivered).Status == Status::PayloadConflict,
+                "wrong attempt completed receipt");
+        Require(store->CompleteDelivery("purchase", "attempt-one", SuiteDeliveryOutcome::Uncertain).Status == Status::Ok &&
+                store->BeginDelivery("purchase", "new-attempt").Status == Status::InvalidState &&
+                store->CompleteDelivery("purchase", "attempt-one", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::InvalidState &&
+                Balance(*store, subject) == 93, "uncertain attempt was retried/refunded");
+        Require(store->CompleteDelivery("purchase", "attempt-one", SuiteDeliveryOutcome::Uncertain).Replayed,
+                "uncertain outcome was not idempotent");
+        store.reset(); store = Open(directory);
+        Require(store->Receipt("purchase").Result.State == SuiteReceiptState::Uncertain && Balance(*store, subject) == 93,
+                "uncertainty did not persist");
+        Require(store->ReservePurchase(request, "delivered").Status == Status::Ok &&
+                store->BeginDelivery("delivered", "delivery-confirmed").Status == Status::Ok &&
+                store->CompleteDelivery("delivered", "delivery-confirmed", SuiteDeliveryOutcome::Delivered).Status == Status::Ok &&
+                store->CompleteDelivery("delivered", "delivery-confirmed", SuiteDeliveryOutcome::Delivered).Replayed &&
+                store->CompleteDelivery("delivered", "delivery-confirmed", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::InvalidState &&
+                Balance(*store, subject) == 81, "delivered purchase mutated or refunded on replay");
+        Require(store->ReservePurchase(request, "failed").Status == Status::Ok &&
+                store->BeginDelivery("failed", "verified-failure").Status == Status::Ok, "failure setup failed");
+        const auto refund = store->CompleteDelivery("failed", "verified-failure", SuiteDeliveryOutcome::VerifiedNoDelivery);
+        Require(refund.Status == Status::Ok && refund.State == SuiteReceiptState::NoDelivery &&
+                refund.RefundedBalance == 81 && Balance(*store, subject) == 81, "verified no-delivery did not refund");
+        store->Credit(subject, 2, "post-refund");
+        const auto refundReplay = store->CompleteDelivery("failed", "verified-failure", SuiteDeliveryOutcome::VerifiedNoDelivery);
+        Require(refundReplay.Status == Status::Ok && refundReplay.Replayed && refundReplay.RefundedBalance == 81 &&
+                Balance(*store, subject) == 83, "refund replay lost result/doubled credit");
+    }
+
+    void TestReceiptRollbackOverflowAndAttemptIdCollision()
+    {
+        Directory directory; auto store = Open(directory);
+        const SuiteSubject subject{"offline", "source"};
+        store->Credit(subject, 100, "seed");
+        RawDatabase raw(directory.Database());
+        raw.Exec("CREATE TRIGGER reject_receipt BEFORE INSERT ON fulfillment_receipts "
+                 "WHEN NEW.receipt_id='failure' BEGIN SELECT RAISE(ABORT,'reject receipt'); END;");
+        auto request = Purchase(subject, 25);
+        Require(store->ReservePurchase(request, "failure").Status == Status::StorageError && Balance(*store, subject) == 100 &&
+                store->Receipt("failure").Result.Status == Status::NotFound, "receipt insert failure did not roll back debit");
+        raw.Exec("DROP TRIGGER reject_receipt;");
+        Require(store->ReservePurchase(request, "failure").Status == Status::Ok &&
+                store->BeginDelivery("failure", "unique-attempt").Status == Status::Ok, "reservation retry failed");
+        Require(store->ReservePurchase(request, "another").Status == Status::Ok &&
+                store->BeginDelivery("another", "unique-attempt").Status == Status::PayloadConflict &&
+                store->Receipt("another").Result.State == SuiteReceiptState::Reserved,
+                "attempt ID collision advanced receipt");
+        raw.Exec("CREATE TRIGGER reject_finalize BEFORE UPDATE OF state ON fulfillment_receipts "
+                 "WHEN NEW.receipt_id='failure' AND NEW.state=4 BEGIN SELECT RAISE(ABORT,'reject finalize'); END;");
+        Require(store->CompleteDelivery("failure", "unique-attempt", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::StorageError &&
+                Balance(*store, subject) == 50 && store->Receipt("failure").Result.State == SuiteReceiptState::Attempting,
+                "receipt finalization failure committed wallet refund");
+        raw.Exec("DROP TRIGGER reject_finalize;");
+        Require(store->CompleteDelivery("failure", "unique-attempt", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::Ok &&
+                Balance(*store, subject) == 75, "refund retry failed");
+        request.Quantity = 2; request.UnitPrice = std::numeric_limits<int64_t>::max();
+        Require(store->ReservePurchase(request, "overflow").Status == Status::Overflow &&
+                store->Receipt("overflow").Result.Status == Status::NotFound, "price multiplication overflow accepted");
+        request = Purchase(subject, 1);
+        store->ReservePurchase(request, "refund-overflow"); store->BeginDelivery("refund-overflow", "overflow-attempt");
+        store->Credit(subject, std::numeric_limits<int64_t>::max() - 74, "fill");
+        Require(store->CompleteDelivery("refund-overflow", "overflow-attempt", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::Overflow &&
+                store->Receipt("refund-overflow").Result.State == SuiteReceiptState::Attempting,
+                "overflow refund changed terminal state");
+        store->Debit(subject, 1, "make-room-refund");
+        Require(store->CompleteDelivery("refund-overflow", "overflow-attempt", SuiteDeliveryOutcome::VerifiedNoDelivery).Status == Status::Ok,
+                "overflow refund could not retry after room");
+    }
+
+    void TestKitsDurableLimitsCooldownsAndConcurrentReservations()
+    {
+        Directory directory; auto first = Open(directory); auto second = Open(directory);
+        const SuiteSubject subject{"realm-A", "player"};
+        auto kit = Purchase(subject, 0); kit.KitMaxClaims = 2; kit.KitCooldownSeconds = 10;
+        Require(first->ReserveKit(kit, "kit-one").Status == Status::Ok &&
+                first->ReserveKit(kit, "kit-too-soon").Status == Status::CooldownActive, "kit cooldown not enforced");
+        kit.RequestedUtcSeconds = 110;
+        Require(first->ReserveKit(kit, "kit-two").Status == Status::Ok, "kit cooldown boundary wrong");
+        first->BeginDelivery("kit-two", "kit-attempt");
+        first->CompleteDelivery("kit-two", "kit-attempt", SuiteDeliveryOutcome::Uncertain);
+        kit.RequestedUtcSeconds = 120;
+        Require(first->ReserveKit(kit, "kit-over-limit").Status == Status::LimitReached, "uncertain kit did not consume quota");
+        first->BeginDelivery("kit-one", "kit-failure");
+        first->CompleteDelivery("kit-one", "kit-failure", SuiteDeliveryOutcome::VerifiedNoDelivery);
+        Require(first->ReserveKit(kit, "kit-retry").Status == Status::Ok, "verified failed kit kept quota");
+        first.reset(); first = Open(directory);
+        Require(first->ReserveKit(kit, "kit-again").Status == Status::LimitReached, "kit quota lost on reopen");
+        kit.Subject.Namespace = "realm-B"; kit.ProductId = "one-claim"; kit.KitMaxClaims = 1; kit.KitCooldownSeconds = 0;
+        std::atomic<int> committed{0}, denied{0};
+        const auto reserve = [&](SuiteStore& store, const char* id) {
+            const auto result = store.ReserveKit(kit, id);
+            if (result.Status == Status::Ok) ++committed;
+            if (result.Status == Status::LimitReached) ++denied;
+        };
+        std::thread one([&] { reserve(*first, "race-one"); });
+        std::thread two([&] { reserve(*second, "race-two"); }); one.join(); two.join();
+        Require(committed == 1 && denied == 1, "concurrent connections exceeded one-claim kit quota");
+        kit.Subject.Namespace = "realm-C";
+        Require(first->ReserveKit(kit, "isolated-kit").Status == Status::Ok, "kit namespaces collapsed");
+        kit.UnitPrice = 1;
+        Require(first->ReserveKit(kit, "paid-kit").Status == Status::InvalidArgument, "free kit admitted paid payload");
+    }
+
+    void TestConcurrentPurchaseReplayAdmitsOneDelivery()
+    {
+        Directory directory; auto first = Open(directory); auto second = Open(directory);
+        const SuiteSubject subject{"offline", "same-purchase"};
+        first->Credit(subject, 100, "seed");
+        auto request = Purchase(subject, 30);
+        std::atomic<int> reserved{0}, replayed{0}, admitted{0}, rejected{0};
+        const auto reserve = [&](SuiteStore& store) {
+            const auto result = store.ReservePurchase(request, "single-receipt");
+            if (result.Status != Status::Ok) ++rejected;
+            else if (result.Replayed) ++replayed; else ++reserved;
+        };
+        std::thread one([&] { reserve(*first); }); std::thread two([&] { reserve(*second); }); one.join(); two.join();
+        Require(reserved == 1 && replayed == 1 && rejected == 0 && Balance(*first, subject) == 70,
+                "concurrent receipt replay charged twice");
+        replayed = 0;
+        const auto begin = [&](SuiteStore& store) {
+            const auto result = store.BeginDelivery("single-receipt", "single-attempt");
+            if (result.Status != Status::Ok) ++rejected;
+            else if (result.Replayed) ++replayed; else ++admitted;
+        };
+        std::thread beginOne([&] { begin(*first); }); std::thread beginTwo([&] { begin(*second); }); beginOne.join(); beginTwo.join();
+        Require(admitted == 1 && replayed == 1 && rejected == 0,
+                "concurrent begin admitted more than one delivery action");
+    }
+
+    void TestSchemaOneUpgradePreservesDataAndRollsBackFailure()
+    {
+        Directory directory;
+        const SuiteSubject subject{"offline", "old-player"};
+        { auto store = Open(directory); store->Credit(subject, 42, "old-credit");
+          store->CreateRole("old-role"); store->PutPermission("old-role", "shop.read", Effect::Allow);
+          store->PutMembership(subject, "old-role"); }
+        { RawDatabase raw(directory.Database()); raw.Exec("DROP TABLE fulfillment_receipts; PRAGMA user_version=1;"); }
+        { auto store = Open(directory); Require(Balance(*store, subject) == 42 &&
+                store->CheckPermission(subject, "shop.read", 0).Allowed && store->Credit(subject, 42, "old-credit").Replayed,
+                "schema one upgrade lost balances/ACL/idempotent journal"); }
+        { RawDatabase raw(directory.Database()); Require(raw.Scalar("PRAGMA user_version") == 2,
+                "schema two version not committed"); raw.Exec("DROP TABLE fulfillment_receipts; PRAGMA user_version=1; "
+                "CREATE TABLE fulfillment_receipts(preserve INTEGER); INSERT INTO fulfillment_receipts VALUES(7);"); }
+        Status status;
+        Require(!SuiteStore::Open(directory.Root, "test", status) && status == Status::StorageError,
+                "conflicting schema migration succeeded");
+        RawDatabase raw(directory.Database());
+        Require(raw.Scalar("PRAGMA user_version") == 1 && raw.Scalar("SELECT preserve FROM fulfillment_receipts") == 7 &&
+                raw.Scalar("SELECT balance FROM wallets") == 42, "failed additive migration changed old data/version");
+    }
+
     void TestPrivatePathsAndSymlinkRejection()
     {
         Directory directory;
@@ -448,6 +633,11 @@ int main()
         TestTwoConnectionsSerializeWritersAndDuplicateIds();
         TestBusyFailureRollsBackAndCanRetry();
         TestPrivatePathsAndSymlinkRejection();
+        TestReceiptReservationDeliveryAndUncertainty();
+        TestReceiptRollbackOverflowAndAttemptIdCollision();
+        TestKitsDurableLimitsCooldownsAndConcurrentReservations();
+        TestSchemaOneUpgradePreservesDataAndRollsBackFailure();
+        TestConcurrentPurchaseReplayAdmitsOneDelivery();
         std::cout << "SuiteStore tests passed\n";
         return 0;
     }
