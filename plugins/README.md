@@ -13,6 +13,8 @@ reference plugins and may use repository-local test/build wiring.
 
 ```text
 plugins/
+  oPing/         Native command and copied-player observation milestone.
+  oEssentials/   Help, rules, MOTD and server info with opt-in argument routing.
   oBaseEvents/    Official example plugin for events, config, ABI checks, and shutdown.
   oProcessTimer/  Official core example plugin for process-local Obelisk timers.
   oDescriptorCatalog/
@@ -42,33 +44,31 @@ HTTP endpoints, resource identities, lookups, mutations, return overrides, or ra
 
 ## Adding Creator-Facing Examples
 
-Plugin Hub work is post-SDK-complete planning only. Do not add new first-party Plugin Hub
-seed examples while the complete-SDK blockers remain open. The parked release-supported
-additions after SDK completion are descriptor readers and process-local timer utilities.
-Passive copied-chat parsers and copied policy auditors are experimental pattern examples
-only. The current tree already has examples for both buckets, so treat new first-party
-work as a promotion review or refinement of the existing examples unless a separate
-copied-data surface has passed the capability-matrix evidence gate.
+The current product scope includes an original native Linux administrative suite
+and a functional migration path for ASE server operators. See the private
+[functional catalog](../docs/research/ARKAPI_PLUGIN_SUITE_PARITY.md) and
+[SDK parity audit](../docs/research/ARKAPI_API_PARITY.md). Each gameplay feature
+still requires its native evidence and acceptance checks; planned parity is not a
+claim of complete SDK support or Windows DLL binary compatibility.
 
-If an example request is motivated by ArkApi, AseApi, NextGenPlugins, or another
-popular-plugin family, treat that input as names and demand signals only. It is not an
-architecture source, ergonomics source, compatibility target, source reference, ABI
-reference, schema, command parser, or implementation pattern.
+`oEssentials` is the first utility package: `/help`, `/help rules`, `/rules`,
+`/motd`, and `/serverinfo`. It uses the public copied command invocation and
+synchronous player-directed reply, with an opt-in case-insensitive verb matcher.
+Original exact command registrations retain their existing behavior. The package
+reads bounded UTF-8 texts during init and supports managed pause, resume, stop,
+start and reload. Its real-library fixture covers owner cleanup, argument routing,
+reply targeting and config reload; in-game client visibility is a separate check.
 
-Do not add a first-party example that implies commands, permissions, economy, homes, RCON,
-storage/database services, webhooks, inventory/item mutation, dino tools, tribe tools,
-transfer handling, structure placement enforcement, identity, lookup, replies, send-chat,
-moderation, or ArkApi portability until the matching public surface is promoted in the
-public ABI, recorded in the capability matrix, and documented with its own evidence gate.
+The private `SuiteStore` library is an offline permission/wallet foundation. It is
+not linked into the live runtime or exposed as a public SDK service. Observed
+native identifiers do not establish trusted Steam/Epic principals, and stored
+credits do not imply verified inventory delivery.
 
-Release-supported seed examples are limited to lifecycle/config/logging, descriptor
-readers, and process-local timer utilities. Those release-supported seeds still must
-keep the shared safe default config posture (`enabled=false`, `allow_all_instances=false`,
-and an empty `instance_allowlist`), fail closed on missing capabilities or callbacks,
-validate instance scoping, unregister owner-token handles on every shutdown or
-partial-init path, treat callback payloads as callback-scope, keep mutable state
-process-local unless a locking model is documented, and log only bounded, sanitized
-output.
+First-party packages keep disabled defaults (`enabled=false`,
+`allow_all_instances=false`, empty `instance_allowlist`), check required
+capabilities and slots, validate instance scoping, unregister handles on every
+shutdown or partial-init path, treat payloads as callback-scoped, and keep mutable
+state process-local unless a locking model is documented.
 
 Passive copied-chat parser or audit examples must add one stricter rule: copied chat text
 is local routing input only. They may count, bucket, redact, or parse text in memory, but

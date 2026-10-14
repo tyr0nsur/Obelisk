@@ -18,6 +18,17 @@ its useful runtime pieces. Historical planning and certificate checks remain
 historical context; they are not prerequisites for developing this prototype.
 Do not use document-only tests or SDK completion ratios as evidence of gameplay.
 
+The operator now requests an ObeliskNative suite with equivalent useful ASE
+ArkApi functionality and fast migration. Build original native implementations,
+compare observable contracts using primary references and preserve license
+notices for any reused component. Windows DLL ABI compatibility is not implied.
+The source stays private; the public repository contains presentation and metrics.
+Historical restrictions on new seed plugins or using ArkApi as a compatibility
+target are superseded by this explicit scope. Preserve exact-command legacy
+behavior; argument matching must be opt-in. Permission/economy storage can be
+developed privately, but must not turn observed IDs into authenticated accounts
+or advertise game actions without a verified native binding.
+
 The sole current test server is in `/servidor/ark/obelisk-lab/server`, public
 Steam build 21241282, native dedicated-server version 361.7. Its actual SHA256 is
 `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.

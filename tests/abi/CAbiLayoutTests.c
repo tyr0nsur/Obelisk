@@ -476,13 +476,23 @@ ASSERT_SIZE(ObeliskGameplayPolicyEventCallback, sizeof(void*));
 ASSERT_SIZE(ObeliskChatMessageEventCallback, sizeof(void*));
 ASSERT_SIZE(ObeliskTimerCallback, sizeof(void*));
 
-ASSERT_SIZE(ObeliskApi, 264);
+ASSERT_SIZE(ObeliskApi, 272);
 ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOwnerTokenHandle, 216);
 ASSERT_OFFSET(ObeliskApi, UnregisterCommandWithOwnerToken, 224);
 ASSERT_OFFSET(ObeliskApi, ReplyToCommandWithOwnerToken, 232);
 ASSERT_OFFSET(ObeliskApi, GetCommandPlayerWithOwnerToken, 240);
 ASSERT_OFFSET(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle, 248);
 ASSERT_OFFSET(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 256);
+ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, 264);
+_Static_assert(offsetof(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken) +
+    sizeof(((ObeliskApi*)0)->UnregisterPlayerLifecycleWithOwnerToken) == 264,
+    "Lifecycle API prefix changed");
+_Static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15), "Command options bit changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull, "Command verb flag changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull, "Command case flag changed");
+typedef uint64_t (*RegisterOptionsSignature)(uint64_t, const char*, uint64_t, ObeliskCommandCallback, void*);
+_Static_assert(_Generic(((ObeliskApi*)0)->RegisterCommandWithOptionsWithOwnerTokenHandle,
+    RegisterOptionsSignature: 1, default: 0), "Command options function signature changed");
 ASSERT_SIZE(ObeliskPlayerLifecycleEvent, 72);
 ASSERT_OFFSET(ObeliskPlayerLifecycleEvent, kind, 8);
 ASSERT_OFFSET(ObeliskPlayerLifecycleEvent, flags, 16);
@@ -538,7 +548,8 @@ ASSERT_FIELD_AFTER(ObeliskApi, ReplyToCommandWithOwnerToken, UnregisterCommandWi
 ASSERT_FIELD_AFTER(ObeliskApi, GetCommandPlayerWithOwnerToken, ReplyToCommandWithOwnerToken);
 ASSERT_FIELD_AFTER(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle, GetCommandPlayerWithOwnerToken);
 ASSERT_FIELD_AFTER(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, RegisterPlayerLifecycleWithOwnerTokenHandle);
-ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken);
+ASSERT_FIELD_AFTER(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, UnregisterPlayerLifecycleWithOwnerToken);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle);
 ASSERT_CAPABILITY_FIELD_FITS(
     ObeliskApi,
     OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS,

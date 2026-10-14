@@ -99,6 +99,103 @@ namespace
         Require(!dispatcher.Reply(&owner, expired, "reconnect"), "address reuse revived expired invocation");
     }
 
+    struct OptionState
+    {
+        CommandDispatcher* Dispatcher;
+        void* Owner;
+        std::vector<std::string> Messages;
+        uint64_t Token = 0;
+        bool Replied = false;
+    };
+
+    void OptionCommand(const ObeliskCommandInvocation* event, void* data)
+    {
+        auto& state = *static_cast<OptionState*>(data);
+        state.Messages.emplace_back(event->command_text.data, event->command_text.size);
+        state.Token = event->invocation_token;
+        state.Replied = state.Dispatcher->Reply(state.Owner, state.Token, "options-pong");
+    }
+
+    void TestCommandOptionsBoundariesCaseAndCopiedArguments()
+    {
+        CommandDispatcher dispatcher;
+        int owner, first, second;
+        OptionState state{&dispatcher, &owner};
+        constexpr auto verb = OBELISK_COMMAND_MATCH_FLAG_VERB;
+        constexpr auto insensitive = OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE;
+        Require(!dispatcher.RegisterWithOptions(&owner, "/help", verb, OptionCommand, &state),
+                "unavailable backend accepted command options");
+        dispatcher.SetAvailable(true);
+        Require(dispatcher.RegisterWithOptions(&owner, "/help", verb | insensitive, OptionCommand, &state),
+                "combined matching options were rejected");
+        std::vector<Delivery> replies;
+        const std::string firstText = "/HELP jugador \xc3\xb1 \xf0\x9f\x98\x80";
+        const std::string secondText = "/help\tsecond player";
+        Require(dispatcher.Dispatch(&first, firstText, 0, Capture, &replies) == 1 && state.Replied,
+                "case-insensitive verb with Unicode arguments did not reply");
+        const auto expired = state.Token;
+        Require(dispatcher.Dispatch(&second, secondText, 3, Capture, &replies) == 1 && state.Replied,
+                "tab-delimited verb did not reply to its origin");
+        Require(state.Messages == std::vector<std::string>{firstText, secondText} && replies.size() == 2 &&
+                replies[0].Controller == &first && replies[1].Controller == &second && state.Token != expired &&
+                !dispatcher.Reply(&owner, expired, "late"), "options changed copied arguments or invocation lifetime");
+        for (const std::string text : {"/helpful", "/help\rargument", "/help\nargument", " /help", "\t/help",
+                                      "/help\vargument", "/help\fargument", "/help\xc2\xa0" "argument"})
+            Require(dispatcher.Dispatch(&first, text, 0, Capture, &replies) == 0,
+                    "verb accepted a prefix, leading whitespace or non-ASCII delimiter");
+        Require(dispatcher.RegisterWithOptions(&owner, "/Rules", insensitive, OptionCommand, &state),
+                "case-only command failed");
+        Require(dispatcher.Dispatch(&first, "/rUlEs", 0, Capture, &replies) == 1 &&
+                dispatcher.Dispatch(&first, "/RULES args", 0, Capture, &replies) == 0,
+                "case-only matching accidentally enabled arguments");
+        Require(dispatcher.RegisterWithOptions(&owner, "/serverinfo", verb, OptionCommand, &state),
+                "verb-only command failed");
+        Require(dispatcher.Dispatch(&first, "/serverinfo args", 0, Capture, &replies) == 1 &&
+                dispatcher.Dispatch(&first, "/SERVERINFO args", 0, Capture, &replies) == 0,
+                "verb-only matching changed case policy");
+        Require(dispatcher.RegisterWithOptions(&owner, "/exact", 0, OptionCommand, &state),
+                "zero options must preserve exact matching");
+        Require(dispatcher.Dispatch(&first, "/exact", 0, Capture, &replies) == 1 &&
+                dispatcher.Dispatch(&first, "/EXACT", 0, Capture, &replies) == 0 &&
+                dispatcher.Dispatch(&first, "/exact args", 0, Capture, &replies) == 0,
+                "zero options did not preserve legacy matching");
+        for (uint64_t flags : {uint64_t{4}, uint64_t{1ull << 63}, ~uint64_t{0}})
+            Require(!dispatcher.RegisterWithOptions(&owner, "/unknown", flags, OptionCommand, &state),
+                    "unknown matching flags were accepted");
+    }
+
+    void TestCommandOptionCollisionsAreGlobalAndCancellationReleasesNames()
+    {
+        CommandDispatcher dispatcher;
+        dispatcher.SetAvailable(true);
+        int owner, other, controller;
+        OptionState state{&dispatcher, &owner};
+        constexpr auto verb = OBELISK_COMMAND_MATCH_FLAG_VERB;
+        constexpr auto insensitive = OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE;
+        Require(dispatcher.Register(&owner, "/legacy", OptionCommand, &state) &&
+                dispatcher.Register(&owner, "/legacy", OptionCommand, &state),
+                "legacy exact duplicates must remain compatible");
+        Require(!dispatcher.RegisterWithOptions(&other, "/legacy", verb, OptionCommand, &state),
+                "opt-in overlapped another owner's exact command");
+        Require(dispatcher.Register(&owner, "/Case", OptionCommand, &state), "case setup failed");
+        const auto lower = dispatcher.RegisterWithOptions(&other, "/case", verb, OptionCommand, &state);
+        Require(lower && !dispatcher.Register(&owner, "/case", OptionCommand, &state),
+                "case-sensitive distinct verb or inverse opt-in collision policy failed");
+        Require(!dispatcher.RegisterWithOptions(&other, "/cAsE", insensitive, OptionCommand, &state),
+                "case-insensitive command overlapped existing case variants");
+        const auto room = dispatcher.RegisterWithOptions(&other, "/Room", insensitive, OptionCommand, &state);
+        Require(room && !dispatcher.Register(&owner, "/ROOM", OptionCommand, &state) &&
+                !dispatcher.RegisterWithOptions(&owner, "/rOoM", 0, OptionCommand, &state) &&
+                dispatcher.Register(&owner, "/room2", OptionCommand, &state),
+                "opt-in collision did not respect ASCII equality and verb boundary");
+        Require(!dispatcher.Unregister(&owner, room) && dispatcher.Unregister(&other, room) &&
+                dispatcher.Register(&owner, "/ROOM", OptionCommand, &state),
+                "only owner cancellation should release an opt-in name");
+        std::vector<Delivery> replies;
+        Require(dispatcher.Dispatch(&controller, "/legacy", 0, Capture, &replies) == 2,
+                "legacy duplicate dispatch changed");
+    }
+
     struct NestedState
     {
         CommandDispatcher* Dispatcher;
@@ -627,7 +724,8 @@ namespace
         auto binding = gate.Bind(&owner, 7301);
         Require(static_cast<bool>(binding), "managed command owner did not bind");
         ManagedCommandState state{&dispatcher, &owner};
-        const auto registration = dispatcher.Register(&owner, "/managed", ManagedCommand, &state);
+        const auto registration = dispatcher.RegisterWithOptions(
+            &owner, "/managed", OBELISK_COMMAND_MATCH_FLAG_VERB, ManagedCommand, &state);
         Require(registration != 0, "Initializing plugin could not register command");
         std::vector<Delivery> deliveries;
         const Obelisk::Core::CommandPlayerSnapshot player{OBELISK_COMMAND_PLAYER_FLAG_NAME_AVAILABLE, "Origin", {}};
@@ -635,7 +733,7 @@ namespace
                 "command executed before Init completed");
         Require(gate.Activate(binding) == Gate::Result::Ok, "managed command activation failed");
         size_t dispatched = 0;
-        std::thread callback([&] { dispatched = dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries, &player); });
+        std::thread callback([&] { dispatched = dispatcher.Dispatch(&controller, "/managed args", 0, Capture, &deliveries, &player); });
         {
             std::unique_lock lock(state.Mutex);
             state.Cv.wait(lock, [&] { return state.Entered; });
@@ -678,6 +776,8 @@ namespace
 int main()
 {
     TestTargetingAndExpiry();
+    TestCommandOptionsBoundariesCaseAndCopiedArguments();
+    TestCommandOptionCollisionsAreGlobalAndCancellationReleasesNames();
     TestNestedInvocations();
     TestCleanupQuiescence();
     TestCleanupDeadlineCancelsAndRetainsActiveInvocation();

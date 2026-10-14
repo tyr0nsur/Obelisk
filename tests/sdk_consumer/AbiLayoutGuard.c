@@ -739,6 +739,15 @@ _Static_assert(OBELISK_FIELD_END(ObeliskApi, ReplyToCommandWithOwnerToken) == 24
 _Static_assert(offsetof(ObeliskApi, GetCommandPlayerWithOwnerToken) == 240u, "Command player getter offset changed");
 _Static_assert(offsetof(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle) == 248u, "Lifecycle register offset changed");
 _Static_assert(offsetof(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken) == 256u, "Lifecycle unregister offset changed");
+_Static_assert(OBELISK_FIELD_END(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken) == 264u, "Lifecycle prefix changed");
+_Static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 264u, "Command options offset changed");
+_Static_assert(OBELISK_FIELD_END(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 272u, "Command options tail changed");
+_Static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15), "Command options capability changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull, "Command verb flag changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull, "Command case flag changed");
+typedef uint64_t (*RegisterOptionsSignature)(uint64_t, const char*, uint64_t, ObeliskCommandCallback, void*);
+_Static_assert(_Generic(((ObeliskApi*)0)->RegisterCommandWithOptionsWithOwnerTokenHandle,
+    RegisterOptionsSignature: 1, default: 0), "Command options function signature changed");
 _Static_assert(sizeof(ObeliskPlayerLifecycleEvent) == 72u, "Lifecycle event layout changed");
 _Static_assert(offsetof(ObeliskPlayerLifecycleEvent, player_name) == 40u, "Lifecycle name offset changed");
 _Static_assert(offsetof(ObeliskPlayerLifecycleEvent, platform_id) == 56u, "Lifecycle ID offset changed");
@@ -752,7 +761,7 @@ _Static_assert(sizeof(ObeliskCommandInvocation) == 40u, "Command event layout ch
 _Static_assert(offsetof(ObeliskCommandInvocation, invocation_token) == 16u, "Invocation token offset changed");
 _Static_assert(offsetof(ObeliskCommandInvocation, command_text) == 24u, "Command text offset changed");
 _Static_assert(_Alignof(ObeliskApi) == 8u, "ObeliskApi alignment changed");
-_Static_assert(sizeof(ObeliskApi) == 264u,
+_Static_assert(sizeof(ObeliskApi) == 272u,
     "ObeliskApi v1 size changed; public ABI additions need an explicit consumer guard update");
 
 _Static_assert(offsetof(ObeliskPluginInitContext, abi_version) == 0u,

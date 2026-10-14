@@ -14,6 +14,7 @@ NATIVE_PROTOTYPE_CAPABILITIES = (
     "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
     "OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT",
     "OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS",
+    "OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS",
 )
 NATIVE_PROTOTYPE_API_FIELDS = (
     "RegisterCommandWithOwnerTokenHandle",
@@ -22,6 +23,7 @@ NATIVE_PROTOTYPE_API_FIELDS = (
     "GetCommandPlayerWithOwnerToken",
     "RegisterPlayerLifecycleWithOwnerTokenHandle",
     "UnregisterPlayerLifecycleWithOwnerToken",
+    "RegisterCommandWithOptionsWithOwnerTokenHandle",
 )
 NATIVE_PROTOTYPE_HEADER_NAMES = ("ObeliskCommandApi.h", "ObeliskPlayerLifecycleApi.h")
 NATIVE_PROTOTYPE_TYPES = (
@@ -35,6 +37,7 @@ NATIVE_PROTOTYPE_MACROS = (
     "OBELISK_COMMAND_PLAYER_FLAG_NAME_AVAILABLE",
     "OBELISK_COMMAND_PLAYER_FLAG_PLATFORM_ID_AVAILABLE",
     "OBELISK_COMMAND_PLAYER_NAME_MAX_BYTES", "OBELISK_COMMAND_PLAYER_PLATFORM_ID_MAX_BYTES",
+    "OBELISK_COMMAND_MATCH_FLAG_VERB", "OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE",
     "OBELISK_PLAYER_LIFECYCLE_EVENT_ABI_VERSION",
     "OBELISK_PLAYER_LIFECYCLE_KIND_LOGIN_OBSERVED",
     "OBELISK_PLAYER_LIFECYCLE_KIND_LOGOUT_OBSERVED",
@@ -59,6 +62,7 @@ _NATIVE_API_SIGNATURES = (
     "bool(*GetCommandPlayerWithOwnerToken)(uint64_townerToken,uint64_tinvocationToken,ObeliskCommandPlayer*out);",
     "uint64_t(*RegisterPlayerLifecycleWithOwnerTokenHandle)(uint64_townerToken,ObeliskPlayerLifecycleCallbackcallback,void*userData);",
     "bool(*UnregisterPlayerLifecycleWithOwnerToken)(uint64_townerToken,uint64_tregistrationId);",
+    "uint64_t(*RegisterCommandWithOptionsWithOwnerTokenHandle)(uint64_townerToken,constchar*commandName,uint64_tmatchFlags,ObeliskCommandCallbackcallback,void*userData);",
 )
 
 
@@ -97,7 +101,7 @@ def without_native_prototype_symbols(text: str, *, header_only: bool = False) ->
         # Historical identity scans also forbid this parameter name. Exempt only
         # the verified command-registration declaration, never another field.
         text = re.sub(
-            r"\(\s*\*\s*RegisterCommandWithOwnerTokenHandle\s*\)[^;]*;",
+            r"\(\s*\*\s*(?:RegisterCommandWithOwnerTokenHandle|RegisterCommandWithOptionsWithOwnerTokenHandle)\s*\)[^;]*;",
             lambda match: re.sub(r"\bcommandName\b", "prototype_input", match.group(0)),
             text,
         )

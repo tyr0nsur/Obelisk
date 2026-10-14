@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+find_package(SQLite3 REQUIRED)
 
 set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")
 set(OBELISK_RELEASE_CHANNEL "dev")
@@ -203,6 +204,7 @@ set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
 add_subdirectory(plugins/oPing)
+add_subdirectory(plugins/oEssentials)
 add_subdirectory(plugins/oProcessTimer)
 add_subdirectory(plugins/oDescriptorCatalog)
 if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
@@ -336,9 +338,21 @@ target_compile_definitions(player_principal_registry_tests
 
 add_test(NAME PlayerPrincipalRegistryTests COMMAND player_principal_registry_tests)
 
+# Offline suite foundations are private and deliberately not linked into the
+# runtime or exported through the SDK until trusted game principals are verified.
+add_library(obelisk_suite_store STATIC services/SuiteStore.cpp)
+target_include_directories(obelisk_suite_store PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(obelisk_suite_store PRIVATE SQLite::SQLite3 pthread)
+add_executable(suite_store_tests tests/core/SuiteStoreTests.cpp)
+target_include_directories(suite_store_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(suite_store_tests PRIVATE obelisk_suite_store SQLite::SQLite3 pthread)
+add_test(NAME SuiteStoreTests COMMAND suite_store_tests)
+set_tests_properties(SuiteStoreTests PROPERTIES TIMEOUT 30)
+
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     tests/core/PingPluginIntegrationTests.cpp
+    tests/core/EssentialsPluginIntegrationTests.cpp
     core/ChatEventDispatcher.cpp
     core/CommandDispatcher.cpp
     core/PlayerLifecycleDispatcher.cpp
@@ -358,8 +372,9 @@ target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_D
 target_compile_definitions(plugin_manager_tests
     PRIVATE OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS=1
     OBELISK_PING_PLUGIN_PATH="$<TARGET_FILE:oPing>"
+    OBELISK_ESSENTIALS_PLUGIN_PATH="$<TARGET_FILE:oEssentials>"
 )
-add_dependencies(plugin_manager_tests oPing)
+add_dependencies(plugin_manager_tests oPing oEssentials)
 target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
 
 add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)

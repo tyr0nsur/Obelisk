@@ -58,6 +58,37 @@ namespace Obelisk::Core
             return true;
         }
 
+        unsigned char FoldAscii(unsigned char ch) noexcept
+        {
+            return ch >= 'A' && ch <= 'Z' ? static_cast<unsigned char>(ch + ('a' - 'A')) : ch;
+        }
+
+        bool EqualCommandName(std::string_view left, std::string_view right, bool insensitive) noexcept
+        {
+            if (left.size() != right.size())
+                return false;
+            for (size_t i = 0; i < left.size(); ++i)
+            {
+                const auto lhs = static_cast<unsigned char>(left[i]);
+                const auto rhs = static_cast<unsigned char>(right[i]);
+                if ((insensitive ? FoldAscii(lhs) : lhs) != (insensitive ? FoldAscii(rhs) : rhs))
+                    return false;
+            }
+            return true;
+        }
+
+        bool MatchesCommand(std::string_view name, uint64_t flags, std::string_view message) noexcept
+        {
+            if (message.size() < name.size() ||
+                !EqualCommandName(name, message.substr(0, name.size()),
+                                  flags & OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE))
+                return false;
+            if (message.size() == name.size())
+                return true;
+            return (flags & OBELISK_COMMAND_MATCH_FLAG_VERB) &&
+                   (message[name.size()] == ' ' || message[name.size()] == '\t');
+        }
+
         bool ValidUtf8(std::string_view text)
         {
             if (!text.data())
@@ -125,7 +156,15 @@ namespace Obelisk::Core
     uint64_t CommandDispatcher::Register(void* owner, std::string_view command,
                                          ObeliskCommandCallback callback, void* userData)
     {
-        if (!IsAvailable() || !owner || !callback || !ValidCommand(command))
+        return RegisterWithOptions(owner, command, 0, callback, userData);
+    }
+
+    uint64_t CommandDispatcher::RegisterWithOptions(void* owner, std::string_view command, uint64_t matchFlags,
+                                                    ObeliskCommandCallback callback, void* userData)
+    {
+        constexpr uint64_t supported = OBELISK_COMMAND_MATCH_FLAG_VERB |
+                                       OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE;
+        if (!IsAvailable() || !owner || !callback || !ValidCommand(command) || (matchFlags & ~supported))
             return 0;
         auto execution = OwnerExecutionGate::Get().Capture(owner);
         auto registrationLease = OwnerExecutionGate::EnterRegistration(execution);
@@ -135,11 +174,17 @@ namespace Obelisk::Core
         registration->Execution = std::move(execution);
         registration->Owner = owner;
         registration->Command = command;
+        registration->MatchFlags = matchFlags;
         registration->Callback = callback;
         registration->UserData = userData;
         std::lock_guard lock(m_Mutex);
         if (!IsAvailable() || m_NextRegistrationId == std::numeric_limits<uint64_t>::max())
             return 0;
+        for (const auto& existing : m_Registrations)
+            if (existing->Active && (matchFlags || existing->MatchFlags) &&
+                EqualCommandName(command, existing->Command,
+                    (matchFlags | existing->MatchFlags) & OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE))
+                return 0;
         registration->Id = m_NextRegistrationId++;
         m_Registrations.push_back(registration);
         return registration->Id;
@@ -225,7 +270,7 @@ namespace Obelisk::Core
         {
             std::lock_guard lock(m_Mutex);
             for (const auto& registration : m_Registrations)
-                if (registration->Active && registration->Command == message)
+                if (registration->Active && MatchesCommand(registration->Command, registration->MatchFlags, message))
                     callbacks.push_back(registration);
         }
         if (callbacks.empty())

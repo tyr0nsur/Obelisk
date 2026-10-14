@@ -24,6 +24,7 @@
 #define OBELISK_API_CAPABILITY_COMMAND_REPLIES (1ull << 12)
 #define OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT (1ull << 13)
 #define OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS (1ull << 14)
+#define OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 15)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
@@ -462,6 +463,20 @@ typedef struct ObeliskApi {
     // Outside callbacks waits for this registration's current delivery. Inside
     // callbacks cancels future delivery; owner cleanup remains the unload barrier.
     bool (*UnregisterPlayerLifecycleWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
+
+    // Opt-in command matching. Check this slot's size/pointer, matching command
+    // unregister/reply slots, and COMMAND_MATCH_OPTIONS plus COMMAND_REPLIES.
+    // Flags=0 preserves exact, case-sensitive complete-message matching.
+    // VERB accepts the name alone or immediately followed by ASCII space/tab;
+    // CR/LF and leading whitespace are not separators. ASCII_CASE_INSENSITIVE
+    // folds only ASCII A-Z in the name. command_text remains the full copied UTF-8
+    // message. Unknown flags reject registration. If either an existing active
+    // registration or this one uses nonzero flags, overlapping names are rejected
+    // across all owners; legacy exact-only duplicates retain their old behavior.
+    // Invocation scope, reply lifetime and cleanup ownership are unchanged.
+    uint64_t (*RegisterCommandWithOptionsWithOwnerTokenHandle)(
+        uint64_t ownerToken, const char* commandName, uint64_t matchFlags,
+        ObeliskCommandCallback callback, void* userData);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.

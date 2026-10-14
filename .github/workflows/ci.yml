@@ -20,6 +20,7 @@ jobs:
       - name: Validate native prototype scripts and contracts
         run: |
           python3 -m unittest discover -s scripts -p test_obelisk_plugin_ctl.py
+          python3 -m unittest discover -s scripts -p test_obelisk_migrate.py
           python3 -m unittest discover -s scripts -p test_plugin_manager_guardrails.py
           python3 -m unittest discover -s scripts -p test_public_sdk_guardrails.py
           bash -n scripts/install_obelisk.sh scripts/install_obelisk_plugin.sh
@@ -42,6 +43,7 @@ jobs:
             cmake \
             git \
             libssl-dev \
+            libsqlite3-dev \
             ninja-build
 
       - name: Configure

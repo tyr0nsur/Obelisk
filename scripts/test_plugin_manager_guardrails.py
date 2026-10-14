@@ -105,6 +105,7 @@ OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
     "RegisterChatMessageEventWithOwnerTokenHandle": "UnregisterChatMessageRegistrationsForOwner(owner)",
     "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner, deadline)",
     "RegisterCommandWithOwnerTokenHandle": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+    "RegisterCommandWithOptionsWithOwnerTokenHandle": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
     "RegisterPlayerLifecycleWithOwnerTokenHandle": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
 }
 

@@ -8542,6 +8542,8 @@ namespace
 
 void TestNativePingPluginIntegration();
 
+void TestNativeEssentialsPluginIntegration();
+
 int main()
 {
     const fs::path logRoot = MakeTempRoot("obelisk_plugin_manager_logs");
@@ -8681,6 +8683,7 @@ int main()
     TestPrepareUnloadFailureRetainsMappingAndDefersShutdown();
     TestReplacementContractAndFailedInitAreNotReportedRunning();
     TestNativePingPluginIntegration();
+    TestNativeEssentialsPluginIntegration();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);

@@ -5296,8 +5296,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "this is not ArkApi source, ABI, behavior, or\n  plugin compatibility"),
             (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "Obelisk-native Linux plugins for common ArkApi-style modding\nneeds"),
             (texts["docs/research/README.md"], "ArkApi/AseApi material remains a names/demand reference only"),
-            (texts["plugins/README.md"], "names and demand signals only"),
-            (texts["plugins/README.md"], "not an\narchitecture source, ergonomics source, compatibility target"),
+            # Historical research/intake files retain their original boundaries.
+            # The operator now authorizes original native suite implementations
+            # and functional migration; this is not DLL or complete-SDK parity.
+            (texts["plugins/README.md"], "original native Linux administrative suite"),
+            (texts["plugins/README.md"], "functional migration path for ASE server operators"),
+            (texts["plugins/README.md"], "planned parity is not a\nclaim of complete SDK support or Windows DLL binary compatibility"),
             (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Use this clone as names/demand evidence only"),
             (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not as architecture guidance or source code\n"
              "to port"),
@@ -5451,12 +5455,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (timer_doc, "non-zero `plugin_owner_token` before any\nregistration"),
             (plugins_readme, "`oProcessTimer` is a current core timer reference for the pre-release `v0.1.x` SDK line"),
             (plugins_readme, "not a stable SDK readiness or complete SDK claim"),
-            (plugins_readme, "Release-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
-            (plugins_readme, "Those release-supported seeds still must\nkeep the shared safe default config posture"),
+            (plugins_readme, "First-party packages keep disabled defaults (`enabled=false`,\n`allow_all_instances=false`, empty `instance_allowlist`)"),
+            (plugins_readme, "check required\ncapabilities and slots, validate instance scoping, unregister handles on every\nshutdown or partial-init path, treat payloads as callback-scoped"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
             (plugins_readme, "`oPolicyAudit` demonstrates the promoted `GameplayPolicyEvent` callback family"),
-            (plugins_readme, "storage/database services, webhooks, inventory/item mutation"),
-            (plugins_readme, "until the matching public surface is promoted in the\npublic ABI, recorded in the capability matrix"),
+            (plugins_readme, "private `SuiteStore` library is an offline permission/wallet foundation"),
+            (plugins_readme, "not linked into the live runtime or exposed as a public SDK service"),
+            (plugins_readme, "Observed\nnative identifiers do not establish trusted Steam/Epic principals"),
+            (plugins_readme, "stored\ncredits do not imply verified inventory delivery"),
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), normalized(text))
@@ -6268,6 +6274,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                            "OBELISK_API_CAPABILITY_COMMAND_REPLIES (1ull << 54)"),
             header.replace("ObeliskCommandPlayer* out", "void* out"),
             header + "\ntypedef void (*ReplyToCommandWithOwnerToken)(void);\n",
+            header.replace("OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 15)",
+                           "OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS (1ull << 54)"),
+            header.replace("uint64_t matchFlags", "uint32_t matchFlags"),
         )
         for variant in malformed:
             with self.subTest(variant=variant[-80:]):
@@ -7963,6 +7972,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
              "terminal_slot": "UnregisterPlayerLifecycleWithOwnerToken",
              "owner_cleanup_token": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
              "bounded_owner_cleanup_callee": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner"},
+            {"trigger": "RegisterCommandWithOptionsWithOwnerTokenHandle",
+             "terminal_slot": "UnregisterCommandWithOwnerToken",
+             "owner_cleanup_token": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+             "bounded_owner_cleanup_callee": "m_CommandDispatcher->UnregisterCallbacksForOwner"},
         )
         for surface in (*PUBLIC_SDK_OPTIONAL_API_SURFACES, *prototype_registrations):
             trigger = str(surface["trigger"])
@@ -8150,7 +8163,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(f"add_test(NAME {test_name}", root_cmake)
 
         required_layout_tokens = (
-            "ASSERT_SIZE(ObeliskApi, 264)",
+            "ASSERT_SIZE(ObeliskApi, 272)",
+            "ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, 264)",
             "ASSERT_OFFSET(ObeliskApi, RegisterTimerWithOwnerTokenHandle, 200)",
             "ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208)",
             "ASSERT_SIZE(ObeliskPluginMetadata, 48)",
@@ -8172,7 +8186,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(installed_token, installed_c_consumer)
 
         for token in (
-            "static_assert(sizeof(ObeliskApi) == 264)",
+            "static_assert(sizeof(ObeliskApi) == 272)",
+            "static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 264)",
             "static_assert(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) == 200)",
             "static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) == 208)",
             "AssertAbiType<ObeliskGameplayPolicyEvent>()",
@@ -10486,11 +10501,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Experimental pattern examples only",
             ),
             REPO_ROOT / "plugins" / "README.md": (
-                "Plugin Hub work is post-SDK-complete planning only",
-                "Do not add new first-party Plugin Hub seed examples while the complete-SDK blockers remain open",
-                "The parked release-supported additions after SDK completion are descriptor readers and process-local timer utilities",
-                "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
-                "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
+                "original native Linux administrative suite",
+                "functional migration path for ASE server operators",
+                "docs/research/ARKAPI_PLUGIN_SUITE_PARITY.md",
+                "docs/research/ARKAPI_API_PARITY.md",
+                "Each gameplay feature still requires its native evidence and acceptance checks",
+                "planned parity is not a claim of complete SDK support or Windows DLL binary compatibility",
+                "First-party packages keep disabled defaults",
+                "check required capabilities and slots, validate instance scoping",
+                "Passive copied-chat parser or audit examples must add one stricter rule",
                 "These examples observe copied data only",
                 "not policy enforcement, command/chat authority, storage/webhook, or public module SDK examples",
             ),

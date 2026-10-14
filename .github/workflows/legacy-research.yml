@@ -35,6 +35,7 @@ jobs:
             cmake \
             git \
             libssl-dev \
+            libsqlite3-dev \
             ninja-build
 
       - name: Configure
@@ -124,6 +125,7 @@ jobs:
             cmake \
             git \
             libssl-dev \
+            libsqlite3-dev \
             ninja-build
 
       - name: Run release-readiness baseline gate

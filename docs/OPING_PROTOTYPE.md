@@ -14,7 +14,7 @@ reversing and startup evidence.
 - Sole server: `/servidor/ark/obelisk-lab/server`, public Steam build 21241282,
   native dedicated-server version 361.7. The available Epic client reports 361.8.
 - Runtime: `/servidor/ark/obelisk-lab/runtime-ping`, instance `obelisk-ping`,
-  with only `oPing.so` in its plugin directory.
+  with `oPing.so` and the new `oEssentials.so` utility package.
 - Exact executable SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
 
@@ -90,7 +90,9 @@ controller and an unchanged NetConnection pointer. UE pointers stay private.
 The old 216-byte ObeliskApi prefix is preserved. Three command slots extend it
 to 240 bytes: register command, unregister command and reply with an owner
 token. The current source appends a copied command-player getter and lifecycle
-register/unregister slots, making the full table 264 bytes on Linux x86_64.
+register/unregister slots, preserving the 264-byte prefix on Linux x86_64.
+The suite extension appends opt-in verb/case command matching at offset 264;
+the current full table is 272 bytes. Original exact registrations stay exact.
 COMMAND_REPLIES is advertised only after the native adapter installs. Plugins
 must check each appended slot's size coverage, capability and non-null pointer;
 the larger table alone does not establish real-client acceptance of its new
@@ -262,3 +264,24 @@ recorded. This shutdown issue remains unresolved; safe hot plugin transitions do
 not establish a clean whole-server stop. The launcher now refuses a second live
 instance and only removes a dead, owned private control socket before a future
 launch. The current Internet test window is bounded to 24 hours.
+
+
+## Suite foundation deployment — 14 October 2026
+
+The 272-byte runtime passed 153/153 CTests, 213 public-SDK guards, 66 manager
+guards and four operator-client tests. The standalone migration inspector passed
+46 tests. These counts describe separate suites, not ArkApi coverage.
+
+The core was upgraded with current saves and configuration backed up. The new
+server process then started with oPing alone. oEssentials was atomically published
+after startup and its previously unknown ID was discovered through local operator
+`start`. Eleven requests exercised start/status, pause/status, resume, reload,
+status, stop/status and start/status. The game process remained unchanged across
+those operations, both plugins finished running and oEssentials completed its
+third load. A2S reports TheIsland, 70 slots and protected access.
+
+The four utility commands, argument routing and UTF-8 configuration have real
+library fixture coverage; their in-game UI acceptance is pending. Private SQLite
+permissions/wallets remain an offline library, not a live permission/economy API.
+No source or target bindings are published in the public showcase. See
+[SUITE_STATUS.md](SUITE_STATUS.md).

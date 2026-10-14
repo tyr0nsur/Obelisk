@@ -14,14 +14,14 @@ observations were consistent across that relogin; this does not establish
 storefront provenance, authentication or a durable player/session contract.
 
 The prototype baseline passed **147 CTest checks** before the latest identity
-and lifecycle extension. The current build now passes **152/152 CTest checks**,
+and lifecycle extension. The current build now passes **153/153 CTest checks**,
 including the new identity and lifecycle fixtures. Those automated checks
 cover runtime and plugin behavior; the real-client observation establishes
 the in-game command/reply path. Steam acceptance, reply separation between two
 real players and the remaining session cases are still pending.
 
 The current source appends copied player observations and typed lifecycle
-notifications to the C API, extending `ObeliskApi` to **264 bytes on Linux
+notifications to the C API, extending `ObeliskApi` to **272 bytes on Linux
 x86_64**. Their build and fixture checks pass. The Epic client also confirmed
 the name and opaque native ID displayed by `/whoami`, and the plugin received
 the new owner-validated login and logout observations. Typed relogin, interrupted
@@ -56,7 +56,8 @@ and smoke-test details are historical, while `OPING_PROTOTYPE.md` tracks the
 active public-branch target.
 
 The runtime loads native `.so` plugins through a versioned C ABI. The current
-command path matches exact text, runs on the invoking game thread and sends a
+command path preserves exact matching and adds opt-in verb matching with
+arguments and ASCII case folding, runs on the invoking game thread and sends a
 synchronous reply to that invocation. Registered commands are consumed;
 ordinary chat continues through the original game implementation. UE pointers
 and target-specific layouts stay in the private Linux adapter.
@@ -69,8 +70,15 @@ Next acceptance work:
 - Corroborate the new copied player snapshot and lifecycle API with real sessions,
   including failed or interrupted connections.
 
-After that, extend administration and gameplay through concrete plugin needs.
-The first milestone does not require completing every historical SDK module.
+The authorized product scope now includes an original administrative suite and
+functional migration from ASE plugin workflows. First-party utility commands,
+private offline permission/wallet foundations and migration inspection are being
+verified separately. See [suite status](docs/SUITE_STATUS.md),
+[functional catalog](docs/research/ARKAPI_PLUGIN_SUITE_PARITY.md),
+[SDK parity requirements](docs/research/ARKAPI_API_PARITY.md),
+[offline storage](docs/SUITE_STORAGE.md) and
+[migration inspection](docs/ARKAPI_MIGRATION.md). Gameplay mutations require their
+own native proof and client acceptance; complete parity has not been established.
 
 ## Build and test
 

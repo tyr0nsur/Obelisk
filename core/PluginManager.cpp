@@ -2544,6 +2544,44 @@ namespace Obelisk::Core
             }
         }
 
+        uint64_t PluginRegisterCommandWithOptionsWithOwnerTokenHandle(
+            uint64_t ownerToken, const char* commandName, uint64_t matchFlags,
+            ObeliskCommandCallback callback, void* userData)
+        {
+            if (!commandName || !callback ||
+                (matchFlags & ~(OBELISK_COMMAND_MATCH_FLAG_VERB |
+                                OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE)))
+                return 0;
+            const size_t commandSize = strnlen(commandName, 65);
+            if (commandSize > 64)
+                return 0;
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterCommandWithOptionsWithOwnerTokenHandle", ownerToken, [&](void* owner) -> uint64_t {
+                        auto* dispatcher = PluginOwnerCommandDispatcher(owner);
+                        if (!dispatcher || !dispatcher->IsAvailable() ||
+                            !PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_COMMAND_REPLIES) ||
+                            !PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS))
+                            return 0;
+                        Dl_info callbackInfo{};
+                        if (!dladdr(reinterpret_cast<void*>(callback), &callbackInfo) || callbackInfo.dli_fbase != owner)
+                        {
+                            SafeLogWarnNoThrow("RegisterCommandWithOptionsWithOwnerTokenHandle",
+                                               "rejected callback outside the owning plugin mapping.");
+                            return 0;
+                        }
+                        return dispatcher->RegisterWithOptions(owner, {commandName, commandSize}, matchFlags,
+                                                               callback, userData);
+                    });
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("RegisterCommandWithOptionsWithOwnerTokenHandle failed after exception.");
+                return 0;
+            }
+        }
+
         bool PluginUnregisterCommandWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
         {
             try
@@ -2930,6 +2968,8 @@ namespace Obelisk::Core
         m_Api.capabilities = BuildApiCapabilities();
         if (m_CommandDispatcher->IsAvailable())
             m_Api.capabilities |= OBELISK_API_CAPABILITY_COMMAND_REPLIES;
+        if (m_CommandDispatcher->IsAvailable())
+            m_Api.capabilities |= OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS;
         if (m_CommandDispatcher->IsPlayerSnapshotsAvailable())
             m_Api.capabilities |= OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT;
         if (m_PlayerLifecycleDispatcher->IsAvailable())
@@ -2952,6 +2992,7 @@ namespace Obelisk::Core
         m_Api.RegisterTimerWithOwnerTokenHandle = PluginRegisterTimerWithOwnerTokenHandle;
         m_Api.UnregisterTimerWithOwnerToken = PluginUnregisterTimerWithOwnerToken;
         m_Api.RegisterCommandWithOwnerTokenHandle = PluginRegisterCommandWithOwnerTokenHandle;
+        m_Api.RegisterCommandWithOptionsWithOwnerTokenHandle = PluginRegisterCommandWithOptionsWithOwnerTokenHandle;
         m_Api.UnregisterCommandWithOwnerToken = PluginUnregisterCommandWithOwnerToken;
         m_Api.ReplyToCommandWithOwnerToken = PluginReplyToCommandWithOwnerToken;
         m_Api.GetCommandPlayerWithOwnerToken = PluginGetCommandPlayerWithOwnerToken;
@@ -3206,6 +3247,12 @@ namespace Obelisk::Core
                 return;
             }
 
+            // The OS operator may later publish a new <plugin-id>.so here.
+            // Preserve the validated startup root rather than accepting paths
+            // supplied by a control request or a plugin callback.
+            if (selectedSource.empty())
+                m_PluginDirectory = pluginDirectory;
+
             std::vector<fs::path> plugins;
             std::error_code directoryIteratorError;
             fs::directory_iterator iterator(pluginDirectory, fs::directory_options::none, directoryIteratorError);
@@ -3368,6 +3415,18 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                // Selected start/reload must not seed another plugin's config.
+                // Bound metadata inspection before any config filesystem writes.
+                if (!expectedPluginId.empty() &&
+                    (metadata.abi_version != OBELISK_PLUGIN_METADATA_ABI_VERSION ||
+                     metadata.struct_size < sizeof(metadata) || !metadata.plugin_id ||
+                     strnlen(metadata.plugin_id, 65) > 64 ||
+                     expectedPluginId != metadata.plugin_id))
+                {
+                    OBELISK_ERROR("Plugin {} replacement identity differs from the selected plugin.", pluginName);
+                    continue;
+                }
+
                 PreparedPluginConfig preparedConfig;
                 std::string configError;
                 std::string pluginConfigRootComponentError;
@@ -3387,11 +3446,6 @@ namespace Obelisk::Core
                     continue;
                 }
 
-                if (!expectedPluginId.empty() && metadata.plugin_id != expectedPluginId)
-                {
-                    OBELISK_ERROR("Plugin {} replacement identity differs from the selected plugin.", pluginName);
-                    continue;
-                }
                 if (!pluginIds.insert(metadata.plugin_id).second)
                 {
                     OBELISK_ERROR("Plugin {} rejected: duplicate plugin_id '{}'. Unloading.", pluginName, metadata.plugin_id);
@@ -3643,6 +3697,12 @@ namespace Obelisk::Core
         using Gate = OwnerExecutionGate;
         nlohmann::json result{{"ok", false}, {"action", action}, {"plugin_id", pluginId},
                               {"state", "unknown"}, {"reason", ""}};
+        if ((!pluginId.empty() && (pluginId.size() > 64 || !IsSafeInstanceId(std::string(pluginId)))) ||
+            (action != "status" && pluginId.empty()))
+        {
+            result["reason"] = "invalid_plugin_id";
+            return result;
+        }
         // Test before locking: waiting here from an admitted callback can deadlock
         // against the controller that is draining that same callback.
         if (g_CurrentPluginOwner || Gate::IsInsideExecution() || GameplayCallbackScope::Current())
@@ -3707,10 +3767,31 @@ namespace Obelisk::Core
             result["reason"] = "unknown_action";
             return result;
         }
-        const auto known = m_KnownPlugins.find(std::string(pluginId));
+        auto known = m_KnownPlugins.find(std::string(pluginId));
         if (known == m_KnownPlugins.end())
         {
-            result["reason"] = "unknown_plugin";
+            if (action != "start" || m_PluginDirectory.empty())
+            {
+                result["reason"] = "unknown_plugin";
+                return result;
+            }
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                result["reason"] = "operation_deadline_expired";
+                return result;
+            }
+            const auto source = m_PluginDirectory / (std::string(pluginId) + ".so");
+            LoadPluginsImpl(m_PluginDirectory.string(), source, pluginId, deadline);
+            const auto started = std::find_if(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const auto& p) {
+                return p.pluginId == pluginId && p.initialized &&
+                       Gate::Get().Inspect(p.execution).phase == Gate::Phase::Running;
+            });
+            result["ok"] = started != m_LoadedPlugins.end();
+            known = m_KnownPlugins.find(std::string(pluginId));
+            if (known != m_KnownPlugins.end())
+                result["state"] = describe(std::string(pluginId), known->second)["state"];
+            if (!result["ok"].get<bool>())
+                result["reason"] = "new_plugin_start_failed_or_disabled";
             return result;
         }
         auto loaded = std::find_if(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const auto& p) { return p.pluginId == pluginId; });

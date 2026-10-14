@@ -80,6 +80,7 @@ namespace Obelisk::Core
 
         std::vector<PluginInfo> m_LoadedPlugins;
         std::unordered_map<std::string, KnownPlugin> m_KnownPlugins;
+        std::filesystem::path m_PluginDirectory;
         std::timed_mutex m_ControlMutex;
         ObeliskApi m_Api{};
         LibraryLoader* m_Loader;

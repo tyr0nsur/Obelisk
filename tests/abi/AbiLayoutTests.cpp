@@ -577,7 +577,7 @@ int main()
 
     AssertAbiType<ObeliskApi>();
     static_assert(alignof(ObeliskApi) == 8);
-    static_assert(sizeof(ObeliskApi) == 264);
+    static_assert(sizeof(ObeliskApi) == 272);
     static_assert(offsetof(ObeliskApi, LogInfo) == 0);
     static_assert(offsetof(ObeliskApi, LogWarn) == 8);
     static_assert(offsetof(ObeliskApi, LogError) == 16);
@@ -640,6 +640,16 @@ int main()
     static_assert(offsetof(ObeliskApi, GetCommandPlayerWithOwnerToken) == 240);
     static_assert(offsetof(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle) == 248);
     static_assert(offsetof(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken) == 256);
+    static_assert(offsetof(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterPlayerLifecycleWithOwnerToken) == 264);
+    static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) == 264);
+    static_assert(offsetof(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle) +
+        sizeof(ObeliskApi::RegisterCommandWithOptionsWithOwnerTokenHandle) == sizeof(ObeliskApi));
+    static_assert(std::is_same_v<decltype(ObeliskApi::RegisterCommandWithOptionsWithOwnerTokenHandle),
+        uint64_t (*)(uint64_t, const char*, uint64_t, ObeliskCommandCallback, void*)>);
+    static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15));
+    static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull);
+    static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull);
     static_assert(sizeof(ObeliskPlayerLifecycleEvent) == 72);
     static_assert(offsetof(ObeliskPlayerLifecycleEvent, kind) == 8);
     static_assert(offsetof(ObeliskPlayerLifecycleEvent, flags) == 16);

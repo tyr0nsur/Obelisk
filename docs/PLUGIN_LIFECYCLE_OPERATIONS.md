@@ -80,7 +80,7 @@ Shutdown and Init and requires the plugin's own persistence for state migration.
 
 Owner-gate and socket transport fixtures pass. These establish generation
 isolation, thread routing, cancellation and admission behavior in tests.
-The full build passes 152 CTests. Thirteen actual server requests covered
+The full build passes 153 CTests. Thirteen actual server requests covered
 status, pause/resume, two reloads and stop/start of oPing without changing the
 server PID; the final plugin generation is running. The private deployment
 artifact records those results separately from fixture success.
@@ -91,3 +91,20 @@ Shutdown or PrepareUnload exceptions are terminal for that generation. Status
 reports retained code and the last failure; another request does not repeat a
 potentially destructive lifecycle call. A false PrepareUnload refusal may be
 retried after the cooperative plugin resolves its own condition.
+
+
+## Adding a new plugin after startup
+
+Publish `<plugin-id>.so` by atomic rename into the validated startup plugin root,
+then issue `start <plugin-id>`. The operator supplies only a bounded safe ID, never
+a path. Selected metadata must match the ID before configuration is seeded, and
+config/instance gates and the managed-only cooperative contract still apply.
+Plugin symlinks and traversal are rejected. Requests for a known stopped ID keep
+the existing start behavior. There is no rescan of unrelated library constructors.
+
+On 14 October the actual server started with oPing only. Publishing oEssentials
+and starting its new ID succeeded without another server restart. Eleven requests
+then exercised status, pause/resume, reload and stop/start with the same game PID;
+both packages ended running. A real-library fixture covers new-ID discovery,
+metadata mismatch before config writes, invalid config rollback and callback
+cleanup before dlclose. Gameplay and client presentation remain separate checks.

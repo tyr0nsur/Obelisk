@@ -114,13 +114,21 @@ ASSERT_OFFSET(ObeliskPluginInitContext, instance_id, 24);
 ASSERT_OFFSET(ObeliskPluginInitContext, plugin_owner_token, 32);
 ASSERT_FIELD_ENDS_STRUCT(ObeliskPluginInitContext, plugin_owner_token);
 
-ASSERT_SIZE(ObeliskApi, 264);
+ASSERT_SIZE(ObeliskApi, 272);
 ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOwnerTokenHandle, 216);
 ASSERT_OFFSET(ObeliskApi, UnregisterCommandWithOwnerToken, 224);
 ASSERT_OFFSET(ObeliskApi, ReplyToCommandWithOwnerToken, 232);
 ASSERT_OFFSET(ObeliskApi, GetCommandPlayerWithOwnerToken, 240);
 ASSERT_OFFSET(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle, 248);
 ASSERT_OFFSET(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 256);
+ASSERT_FIELD_END(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 264);
+ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle, 264);
+_Static_assert(OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS == (1ull << 15), "Command options bit changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_VERB == 1ull, "Command verb flag changed");
+_Static_assert(OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE == 2ull, "Command case flag changed");
+typedef uint64_t (*RegisterOptionsSignature)(uint64_t, const char*, uint64_t, ObeliskCommandCallback, void*);
+_Static_assert(_Generic(((ObeliskApi*)0)->RegisterCommandWithOptionsWithOwnerTokenHandle,
+    RegisterOptionsSignature: 1, default: 0), "Command options function signature changed");
 ASSERT_ALIGN(ObeliskApi, 8);
 ASSERT_OFFSET(ObeliskApi, LogInfo, 0);
 ASSERT_OFFSET(ObeliskApi, LogWarn, 8);
@@ -151,7 +159,7 @@ ASSERT_OFFSET(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle, 184);
 ASSERT_OFFSET(ObeliskApi, UnregisterChatMessageEventWithOwnerToken, 192);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle), 200);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken), 208);
-ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, RegisterCommandWithOptionsWithOwnerTokenHandle);
 
 static const char* kDefaultConfig = "{\n"
     "  \"enabled\": false,\n"

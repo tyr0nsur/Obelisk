@@ -37,6 +37,8 @@ namespace Obelisk::Core
         bool IsPlayerSnapshotsAvailable() const noexcept;
 
         uint64_t Register(void* owner, std::string_view command, ObeliskCommandCallback callback, void* userData);
+        uint64_t RegisterWithOptions(void* owner, std::string_view command, uint64_t matchFlags,
+                                     ObeliskCommandCallback callback, void* userData);
         bool Unregister(void* owner, uint64_t registrationId);
         // A deadline failure cancels future delivery but retains in-flight
         // records. The caller must keep code/data mapped and retry after drain.
@@ -57,6 +59,7 @@ namespace Obelisk::Core
             void* Owner = nullptr;
             OwnerExecutionGate::Binding Execution;
             std::string Command;
+            uint64_t MatchFlags = 0;
             ObeliskCommandCallback Callback = nullptr;
             void* UserData = nullptr;
             bool Active = true;
