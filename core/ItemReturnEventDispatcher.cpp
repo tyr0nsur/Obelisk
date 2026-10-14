@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <exception>
+#include <stdexcept>
 #include <new>
 
 namespace Obelisk::Core
@@ -69,6 +70,11 @@ namespace Obelisk::Core
             if (!subscription.DestroyUserData)
                 return;
 
+            auto executionLease = OwnerExecutionGate::EnterLifecycle(
+                subscription.ExecutionBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
+            if (!executionLease)
+                throw std::runtime_error("Subscription cleanup admission denied; keep plugin mapped");
+
             try
             {
                 DestroyUserDataScope cleanupScope;
@@ -93,11 +99,18 @@ namespace Obelisk::Core
 
         std::vector<ItemReturnEventSubscription> DestroySubscriptionsForOwnerCleanup(
             const std::vector<ItemReturnEventSubscription>& subscriptions,
-            std::exception_ptr& firstFailure)
+            std::exception_ptr& firstFailure, size_t additionalCapacity = 0)
         {
             std::vector<ItemReturnEventSubscription> failed;
+            // Allocate before any deleter succeeds: failures can then be recorded
+            // without an allocation after partially destroying the input batch.
+            if (additionalCapacity > failed.max_size() - subscriptions.size())
+                throw std::length_error("Cleanup failure batch exceeds supported size");
+            failed.reserve(subscriptions.size() + additionalCapacity);
             for (const ItemReturnEventSubscription& subscription : subscriptions)
             {
+                auto cleanupLease = OwnerExecutionGate::EnterLifecycle(
+                    subscription.ExecutionBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
                 try
                 {
                     DestroySubscriptionUserData(subscription, true);
@@ -132,12 +145,20 @@ namespace Obelisk::Core
         if (!owner || !subscription.Callback)
             return 0;
 
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
+            return 0;
+        auto storedSubscription = subscription;
+        storedSubscription.ExecutionBinding = binding;
+        storedSubscription.ExecutionOwner = owner;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         const uint64_t generation = m_NextGeneration++;
         if (m_NextGeneration == 0)
             m_NextGeneration = 1;
-        m_Registrations.push_back({id, generation, owner, subscription});
+        m_Registrations.push_back({id, generation, owner, storedSubscription});
         m_SubscriptionCount.fetch_add(1, std::memory_order_release);
         return id;
     }
@@ -178,6 +199,12 @@ namespace Obelisk::Core
     {
         if (registrationId == 0)
             return false;
+
+        const auto cleanupBinding = CaptureCleanupBinding(nullptr, registrationId);
+        auto cleanupLease = OwnerExecutionGate::EnterLifecycle(
+            cleanupBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
+        if (!cleanupLease)
+            throw std::runtime_error("Dispatcher cleanup admission denied; keep plugin mapped");
 
         std::vector<ItemReturnEventSubscription> removed;
         std::exception_ptr deferredFailure;
@@ -251,10 +278,15 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Item return event unregister failed with an unknown exception.");
             return false;
         }
-        for (const ItemReturnEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        std::exception_ptr cleanupFailure;
+        std::vector<ItemReturnEventSubscription> failed =
+            DestroyRemovedSubscriptionsForOwner(removedOwner, removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(removedOwner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
         return after != before;
     }
 
@@ -262,6 +294,12 @@ namespace Obelisk::Core
     {
         if (!owner || registrationId == 0)
             return false;
+
+        const auto cleanupBinding = CaptureCleanupBinding(owner, registrationId);
+        auto cleanupLease = OwnerExecutionGate::EnterLifecycle(
+            cleanupBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
+        if (!cleanupLease)
+            throw std::runtime_error("Dispatcher cleanup admission denied; keep plugin mapped");
 
         std::vector<ItemReturnEventSubscription> removed;
         std::exception_ptr deferredFailure;
@@ -335,7 +373,7 @@ namespace Obelisk::Core
         }
         std::exception_ptr cleanupFailure;
         std::vector<ItemReturnEventSubscription> failed =
-            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
+            DestroyRemovedSubscriptionsForOwner(owner, removed, cleanupFailure);
         if (deferredFailure)
             cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
         if (!failed.empty())
@@ -345,10 +383,19 @@ namespace Obelisk::Core
         return after != before;
     }
 
-    size_t ItemReturnEventDispatcher::UnregisterCallbacksForOwner(void* owner)
+    size_t ItemReturnEventDispatcher::UnregisterCallbacksForOwner(
+        void* owner, OwnerExecutionGate::Clock::time_point deadline)
     {
         if (!owner)
             return 0;
+
+        const auto cleanupBinding = CaptureCleanupBinding(owner);
+        auto cleanupLease = OwnerExecutionGate::EnterLifecycle(
+            cleanupBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
+        if (!cleanupLease)
+            throw std::runtime_error("Dispatcher cleanup admission denied; keep plugin mapped");
+
+        RequireCleanupRetentionIntact();
 
         std::vector<ItemReturnEventSubscription> removed;
         std::vector<ItemReturnEventSubscription> currentRemoved;
@@ -389,7 +436,8 @@ namespace Obelisk::Core
                     !IsInsideDispatcherCleanup() &&
                     !IsDispatchCleanupComplete())
                 {
-                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                    if (!m_DispatchCv.wait_until(lock, deadline, [this]() { return IsDispatchCleanupComplete(); }))
+                        throw std::runtime_error("Dispatcher owner cleanup timed out; keep plugin mapped");
                     removed = TakeFailedOwnerDestroySubscriptions(owner, retainedFailure);
                     retainedCount = removed.size();
 #ifdef OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
@@ -435,7 +483,8 @@ namespace Obelisk::Core
             const bool queuedForDeferredDestroy = m_DispatchDepth > 0 && !currentRemoved.empty();
             if (QueueOrDestroyRemovedSubscriptions(currentRemoved, lock, cleanupBatchId, owner))
             {
-                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                if (!m_DispatchCv.wait_until(lock, deadline, [this]() { return IsDispatchCleanupComplete(); }))
+                    throw std::runtime_error("Dispatcher owner cleanup timed out; keep plugin mapped");
                 deferredFailures = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
             }
             if (!queuedForDeferredDestroy)
@@ -443,7 +492,10 @@ namespace Obelisk::Core
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
-                m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+            {
+                if (!m_DispatchCv.wait_until(lock, deadline, [this]() { return IsDispatchCleanupComplete(); }))
+                    throw std::runtime_error("Dispatcher owner cleanup timed out; keep plugin mapped");
+            }
         }
         catch (const std::exception& e)
         {
@@ -460,8 +512,17 @@ namespace Obelisk::Core
             throw;
         }
         std::exception_ptr cleanupFailure;
-        std::vector<ItemReturnEventSubscription> failed =
-            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
+        std::vector<ItemReturnEventSubscription> failed;
+        try
+        {
+            failed = DestroyRemovedSubscriptionsForOwner(
+                owner, removed, cleanupFailure, deferredFailures.size());
+        }
+        catch (...)
+        {
+            RetainFailedOwnerDestroySubscriptions(owner, deferredFailures, std::current_exception());
+            throw;
+        }
         if (retainedFailure)
             cleanupFailure = cleanupFailure ? cleanupFailure : retainedFailure;
         if (deferredFailure)
@@ -471,6 +532,7 @@ namespace Obelisk::Core
         }
         if (!failed.empty())
             RetainFailedOwnerDestroySubscriptions(owner, failed);
+        RequireCleanupRetentionIntact();
         if (cleanupFailure)
             std::rethrow_exception(cleanupFailure);
         return retainedCount + (before - after);
@@ -510,6 +572,8 @@ namespace Obelisk::Core
         void* owner,
         std::exception_ptr& firstFailure)
     {
+        if (m_CleanupRetentionFailed)
+            throw std::runtime_error("Dispatcher cleanup retention failed; keep plugin mapped");
         std::vector<ItemReturnEventSubscription> subscriptions;
         const size_t fallbackCount =
             m_HasFallbackFailedOwnerDestroy && m_FallbackFailedOwnerDestroy.Owner == owner ? 1 : 0;
@@ -519,7 +583,12 @@ namespace Obelisk::Core
                           [owner](const FailedOwnerDestroy& item) {
                               return item.Owner == owner;
                           }));
-        subscriptions.reserve(fallbackCount + matchingCount);
+        const size_t deferredFallbackCount = m_HasFallbackDeferredDestroyFailure &&
+            m_FallbackDeferredDestroyFailure.Subscription.ExecutionOwner == owner ? 1 : 0;
+        const size_t deferredCount = static_cast<size_t>(std::count_if(
+            m_DeferredDestroyFailures.begin(), m_DeferredDestroyFailures.end(),
+            [owner](const DeferredDestroyFailure& item) { return item.Subscription.ExecutionOwner == owner; }));
+        subscriptions.reserve(fallbackCount + matchingCount + deferredFallbackCount + deferredCount);
         if (m_HasFallbackFailedOwnerDestroy &&
             m_FallbackFailedOwnerDestroy.Owner == owner)
         {
@@ -542,6 +611,28 @@ namespace Obelisk::Core
                 return true;
             });
         m_FailedOwnerDestroy.erase(keepEnd, m_FailedOwnerDestroy.end());
+        // A deadline can abandon a waiting batch before its deferred deleter
+        // finishes. Owner cleanup must collect that batch's failures too; no
+        // plugin-defined exception or userdata may survive successful drain.
+        if (deferredFallbackCount != 0)
+        {
+            if (!firstFailure)
+                firstFailure = m_FallbackDeferredDestroyFailure.Failure;
+            subscriptions.push_back(m_FallbackDeferredDestroyFailure.Subscription);
+            m_FallbackDeferredDestroyFailure = {};
+            m_HasFallbackDeferredDestroyFailure = false;
+        }
+        auto deferredKeepEnd = std::remove_if(
+            m_DeferredDestroyFailures.begin(), m_DeferredDestroyFailures.end(),
+            [owner, &subscriptions, &firstFailure](const DeferredDestroyFailure& item) {
+                if (item.Subscription.ExecutionOwner != owner)
+                    return false;
+                if (!firstFailure)
+                    firstFailure = item.Failure;
+                subscriptions.push_back(item.Subscription);
+                return true;
+            });
+        m_DeferredDestroyFailures.erase(deferredKeepEnd, m_DeferredDestroyFailures.end());
         return subscriptions;
     }
 
@@ -584,6 +675,11 @@ namespace Obelisk::Core
             }
             catch (...)
             {
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                m_CleanupRetentionFailed = true;
             }
 
             if (Obelisk::Logger::IsInitialized())
@@ -699,6 +795,8 @@ namespace Obelisk::Core
                 return;
             }
 
+            m_CleanupRetentionFailed = true;
+
             if (Obelisk::Logger::IsInitialized())
             {
                 OBELISK_ERROR(
@@ -710,6 +808,56 @@ namespace Obelisk::Core
     bool ItemReturnEventDispatcher::IsDispatchCleanupComplete() const
     {
         return m_DispatchDepth == 0 && m_PendingDestroy.empty() && m_PendingDestroyInProgress == 0;
+    }
+
+    std::vector<ItemReturnEventSubscription> ItemReturnEventDispatcher::DestroyRemovedSubscriptionsForOwner(
+        void* owner, const std::vector<ItemReturnEventSubscription>& subscriptions,
+        std::exception_ptr& firstFailure, size_t additionalCapacity)
+    {
+        try
+        {
+            return DestroySubscriptionsForOwnerCleanup(subscriptions, firstFailure, additionalCapacity);
+        }
+        catch (...)
+        {
+            // Only preparation can throw out of the per-deleter collector. Keep
+            // the untouched userdata reachable for retry, or poison retention
+            // if neither ordinary nor fallback record storage can retain it.
+            RetainFailedOwnerDestroySubscriptions(owner, subscriptions, std::current_exception());
+            throw;
+        }
+    }
+
+    OwnerExecutionGate::Binding ItemReturnEventDispatcher::CaptureCleanupBinding(void* owner, uint64_t registrationId) const
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        for (const auto& item : m_Registrations)
+            if ((!owner || item.Owner == owner) && (!registrationId || item.Id == registrationId))
+                return item.Subscription.ExecutionBinding;
+        if (registrationId != 0)
+            return {};
+        for (const auto& item : m_PendingDestroy)
+            if (item.Owner == owner)
+                return item.Subscription.ExecutionBinding;
+        for (const auto& item : m_FailedOwnerDestroy)
+            if (item.Owner == owner)
+                return item.Subscription.ExecutionBinding;
+        if (m_HasFallbackFailedOwnerDestroy && m_FallbackFailedOwnerDestroy.Owner == owner)
+            return m_FallbackFailedOwnerDestroy.Subscription.ExecutionBinding;
+        for (const auto& item : m_DeferredDestroyFailures)
+            if (item.Subscription.ExecutionOwner == owner)
+                return item.Subscription.ExecutionBinding;
+        if (m_HasFallbackDeferredDestroyFailure &&
+            m_FallbackDeferredDestroyFailure.Subscription.ExecutionOwner == owner)
+            return m_FallbackDeferredDestroyFailure.Subscription.ExecutionBinding;
+        return {};
+    }
+
+    void ItemReturnEventDispatcher::RequireCleanupRetentionIntact() const
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        if (m_CleanupRetentionFailed)
+            throw std::runtime_error("Dispatcher cleanup retention failed; keep plugin mapped");
     }
 
     void ItemReturnEventDispatcher::FinishDispatch()
@@ -730,6 +878,8 @@ namespace Obelisk::Core
 
         for (const PendingDestroy& item : pending)
         {
+            auto cleanupLease = OwnerExecutionGate::EnterLifecycle(
+                item.Subscription.ExecutionBinding, OwnerExecutionGate::LifecycleEntry::Cleanup);
             try
             {
                 const bool retainForOwnerCleanup = item.CleanupBatchId == 0 && item.Owner != nullptr;
@@ -832,6 +982,11 @@ namespace Obelisk::Core
                     if (!IsRegistrationActive(item.Id, item.Generation))
                         continue;
                     if (!item.Subscription.Callback)
+                        continue;
+
+                    auto executionLease = OwnerExecutionGate::EnterCallback(
+                        item.Subscription.ExecutionBinding);
+                    if (!executionLease)
                         continue;
 
                     try

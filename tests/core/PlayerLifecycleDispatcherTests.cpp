@@ -392,6 +392,38 @@ namespace
                 "owner cleanup did not finish after its callback returned");
     }
 
+    void TestOwnerCleanupDeadlineCancelsAndRetainsActiveCallback()
+    {
+        PlayerLifecycleDispatcher dispatcher;
+        dispatcher.SetAvailable(true);
+        int owner = 0;
+        BlockingState state;
+        Require(dispatcher.Register(&owner, BlockingCallback, &state), "deadline callback registration failed");
+        auto delivery = std::async(std::launch::async, [&] { return dispatcher.Dispatch(Login()); });
+        try { WaitForEntry(state); }
+        catch (...) { Release(state); delivery.wait(); throw; }
+        auto cleanup = std::async(std::launch::async, [&] {
+            try
+            {
+                dispatcher.UnregisterCallbacksForOwner(&owner, std::chrono::steady_clock::now() + 30ms);
+                return false;
+            }
+            catch (const std::runtime_error& error)
+            {
+                return std::string_view(error.what()).find("deadline expired") != std::string_view::npos;
+            }
+        });
+        const bool bounded = cleanup.wait_for(2s) == std::future_status::ready;
+        const bool cancelled = dispatcher.SubscriptionCount() == 0 && dispatcher.Dispatch(Login()) == 0;
+        Release(state);
+        const auto delivered = delivery.get();
+        const bool timedOut = cleanup.get();
+        Require(bounded && timedOut && cancelled && delivered == 1 && state.Finished && state.Calls == 1,
+                "owner cleanup deadline did not preserve the active callback and reject new deliveries");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner, std::chrono::steady_clock::now()) == 0,
+                "deadline owner cleanup could not finish after callback return");
+    }
+
     void TestGranularUnregisterDrainsInFlightCallback()
     {
         PlayerLifecycleDispatcher dispatcher;
@@ -517,6 +549,47 @@ namespace
                     dispatcher.UnregisterCallbacksForOwner(&innerOwner) == 1,
                 "owner cleanup could not complete after nested callbacks returned");
     }
+
+    void TestManagedPauseOwnerIsolationAndStaleGeneration()
+    {
+        using Gate = Obelisk::Core::OwnerExecutionGate;
+        auto& gate = Gate::Get();
+        PlayerLifecycleDispatcher dispatcher;
+        dispatcher.SetAvailable(true);
+        int owner, otherOwner;
+        auto binding = gate.Bind(&owner, 9401);
+        auto other = gate.Bind(&otherOwner, 9402);
+        Require(binding && other && gate.Activate(binding) == Gate::Result::Ok && gate.Activate(other) == Gate::Result::Ok,
+                "lifecycle owners did not bind/activate");
+        Capture capture, otherCapture, replacementCapture;
+        const auto oldHandle = dispatcher.Register(&owner, CaptureCallback, &capture);
+        const auto otherHandle = dispatcher.Register(&otherOwner, CaptureCallback, &otherCapture);
+        Require(oldHandle && otherHandle && gate.Pause(binding, Gate::Clock::now()) == Gate::Result::Ok,
+                "lifecycle pause setup failed");
+        Require(dispatcher.Register(&owner, CaptureCallback, &capture) == 0, "paused lifecycle owner registered new work");
+        Require(dispatcher.Dispatch(Login()) == 1 && capture.Records.empty() && otherCapture.Records.size() == 1,
+                "pause delivered an observation or suppressed an unrelated owner");
+        Require(dispatcher.SubscriptionCount() == 2 && gate.Resume(binding) == Gate::Result::Ok,
+                "pause discarded lifecycle subscriptions");
+        Require(dispatcher.Dispatch(Logout()) == 2 && capture.Records.size() == 1 &&
+                capture.Records.front().Kind == OBELISK_PLAYER_LIFECYCLE_KIND_LOGOUT_OBSERVED,
+                "resume replayed a missed login or did not restore the original callback");
+        Require(gate.RetireAndDrain(binding, Gate::Clock::now()) == Gate::Result::Ok && gate.Forget(binding) == Gate::Result::Ok,
+                "lifecycle generation did not retire");
+        auto replacement = gate.Bind(&owner, 9403);
+        Require(replacement && gate.Activate(replacement) == Gate::Result::Ok, "replacement lifecycle owner did not activate");
+        Require(dispatcher.Register(&owner, CaptureCallback, &replacementCapture) != 0, "replacement registration failed");
+        Require(dispatcher.Dispatch(Login("New observation", "new-native-id")) == 2 &&
+                capture.Records.size() == 1 && replacementCapture.Records.size() == 1 &&
+                replacementCapture.Records.front().Name == "New observation",
+                "old callback at a reused owner address borrowed a new generation's admission");
+        Require(gate.RetireAndDrain(replacement, Gate::Clock::now()) == Gate::Result::Ok &&
+                gate.RetireAndDrain(other, Gate::Clock::now()) == Gate::Result::Ok, "lifecycle owners did not drain");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 2 && dispatcher.UnregisterCallbacksForOwner(&otherOwner) == 1,
+                "old/new lifecycle handle cleanup was incomplete");
+        Require(gate.Forget(replacement) == Gate::Result::Ok && gate.Forget(other) == Gate::Result::Ok,
+                "lifecycle gates could not be released after cleanup");
+    }
 }
 
 int main()
@@ -530,9 +603,11 @@ int main()
         TestOwnerIsolationAndHandleRetirement();
         TestSelfUnregisterAndSelfUnloadRefusal();
         TestOwnerCleanupDrainsInFlightCallbacks();
+        TestOwnerCleanupDeadlineCancelsAndRetainsActiveCallback();
         TestGranularUnregisterDrainsInFlightCallback();
         TestNestedSnapshotsAndCallbackFailure();
         TestNestedCallbackCannotUnloadOuterOwner();
+        TestManagedPauseOwnerIsolationAndStaleGeneration();
         std::cout << "PlayerLifecycleDispatcherTests passed\n";
         return 0;
     }

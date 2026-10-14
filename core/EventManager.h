@@ -1,6 +1,7 @@
 #pragma once
 
 #include "api/ObeliskApi.h"
+#include "OwnerExecutionGate.h"
 #include <vector>
 #include <mutex>
 #include <cstddef>
@@ -36,7 +37,8 @@ namespace Obelisk::Core
         uint64_t RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback);
         bool UnregisterCallback(uint64_t registrationId);
         bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
-        size_t UnregisterCallbacksForOwner(void* owner);
+        size_t UnregisterCallbacksForOwner(
+            void* owner, OwnerExecutionGate::Clock::time_point deadline = OwnerExecutionGate::Clock::time_point::max());
 
         bool HasPreProcessEventCallbacks();
         bool HasPostProcessEventCallbacks();
@@ -60,6 +62,7 @@ namespace Obelisk::Core
             OnProcessEventCallback callback;
             void* owner;
             bool allowProcessEventBlocking;
+            OwnerExecutionGate::Binding ExecutionBinding;
         };
 
         struct CallbackSnapshot {
@@ -67,6 +70,7 @@ namespace Obelisk::Core
             uint64_t generation;
             OnProcessEventCallback callback;
             bool allowProcessEventBlocking;
+            OwnerExecutionGate::Binding ExecutionBinding;
         };
 
         uint64_t AllocateRegistrationId();
@@ -77,7 +81,7 @@ namespace Obelisk::Core
         void TriggerPostProcessEvent(void* caller, void* function, void* parms, bool* setupFailed);
 
         std::mutex m_Mutex;
-        std::recursive_mutex m_DispatchMutex;
+        std::recursive_timed_mutex m_DispatchMutex;
         uint64_t m_NextRegistrationId = 1;
         uint64_t m_NextRegistrationGeneration = 1;
         std::vector<CallbackRegistration> m_PreProcessEventCallbacks;

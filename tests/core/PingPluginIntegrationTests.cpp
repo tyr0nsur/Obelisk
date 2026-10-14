@@ -5,6 +5,7 @@
 #include "extern/nlohmann/json.hpp"
 
 #include <dlfcn.h>
+#include <link.h>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -53,6 +54,7 @@ namespace
             : Commands(dispatcher), Lifecycle(lifecycle) {}
         void* Open(const std::filesystem::path& path, std::string& error) override
         {
+            GenerationPaths.push_back(path);
             void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
             if (!handle)
                 error = dlerror();
@@ -72,12 +74,14 @@ namespace
             }
             return result;
         }
-        void* GetSymbolOwner(void*, void* symbol) override
+        void* GetSymbolOwner(void* handle, void* symbol) override
         {
             if (symbol == reinterpret_cast<void*>(InitWithApiView))
                 symbol = reinterpret_cast<void*>(g_LegacyInit);
             Dl_info info{};
-            return dladdr(symbol, &info) ? info.dli_fbase : nullptr;
+            link_map* primary = nullptr;
+            return dlinfo(handle, RTLD_DI_LINKMAP, &primary) == 0 && primary && dladdr(symbol, &info) &&
+                   info.dli_fbase == reinterpret_cast<void*>(primary->l_addr) ? info.dli_fbase : nullptr;
         }
         bool Close(void* handle, std::string& error) override
         {
@@ -94,6 +98,7 @@ namespace
         int CloseCount = 0;
         bool LegacyCommandApi = false;
         std::vector<std::string>* PluginLogs = nullptr;
+        std::vector<std::filesystem::path> GenerationPaths;
     };
 
     struct Reply { void* Controller; std::string Text; };
@@ -303,9 +308,41 @@ void TestNativePingPluginIntegration()
                     "typed plugin changed copied observation or misrepresented its phase");
         }
         Require(lifecycleLogs == 2, "native plugin did not log both typed observations");
+        const auto deadline = [] { return std::chrono::steady_clock::now() + std::chrono::seconds(2); };
+        const auto closeBeforeControl = loader.CloseCount;
+        uint64_t previousGeneration = manager.ExecuteOperation("status", "oPing", deadline())["plugins"][0]["generation"];
+        for (int cycle = 0; cycle != 2; ++cycle)
+        {
+            Require(manager.ExecuteOperation("pause", "oPing", deadline())["ok"], "real oPing pause failed");
+            Require(commands.SubscriptionCount() == 2 && lifecycle.SubscriptionCount() == 1 &&
+                    commands.Dispatch(&playerA, "/ping", 0, Capture, &replies) == 0 && lifecycle.Dispatch(login) == 0 &&
+                    loader.CloseCount == closeBeforeControl + cycle,
+                    "pause dropped registrations, unloaded state or delivered plugin code");
+            Require(manager.ExecuteOperation("resume", "oPing", deadline())["ok"] &&
+                    commands.Dispatch(&playerA, "/ping", 0, Capture, &replies) == 1 && replies.back().Text == "pong" &&
+                    replies.back().Controller == &playerA, "real oPing resume lost targeted reply");
+            const auto oldPath = loader.GenerationPaths.back();
+            const auto reloaded = manager.ExecuteOperation("reload", "oPing", deadline());
+            Require(reloaded["ok"] && reloaded["state"] == "running" && loader.CleanBeforeClose &&
+                    commands.SubscriptionCount() == 2 && lifecycle.SubscriptionCount() == 1,
+                    "real oPing reload failed or accumulated old registrations");
+            const uint64_t generation = manager.ExecuteOperation("status", "oPing", deadline())["plugins"][0]["generation"];
+            Require(generation > previousGeneration && loader.GenerationPaths.back() != oldPath &&
+                    !fs::exists(oldPath) && fs::exists(loader.GenerationPaths.back()), "real reload reused generation or leaked closed copy");
+            previousGeneration = generation;
+            Require(commands.Dispatch(&playerB, "/whoami", 0, Capture, &replies, &second) == 1 &&
+                    replies.back().Controller == &playerB && replies.back().Text == "Nombre: Bruno | ID nativo: opaque-identity-B" &&
+                    lifecycle.Dispatch(login) == 1, "new generation lost copied identity or typed lifecycle callback");
+        }
+        Require(manager.ExecuteOperation("stop", "oPing", deadline())["ok"] && commands.SubscriptionCount() == 0 &&
+                lifecycle.SubscriptionCount() == 0 && lifecycle.Dispatch(login) == 0 &&
+                commands.Dispatch(&playerA, "/ping", 0, Capture, &replies) == 0, "real stop left callable plugin code");
+        Require(manager.ExecuteOperation("start", "oPing", deadline())["ok"] &&
+                commands.Dispatch(&playerA, "/ping", 0, Capture, &replies) == 1 && replies.back().Text == "pong",
+                "real stopped plugin could not start as a new generation");
         manager.UnloadAll();
         Require(commands.SubscriptionCount() == 0 && lifecycle.SubscriptionCount() == 0 &&
-                loader.CloseCount == 3 && loader.CleanBeforeClose,
+                loader.CloseCount == closeBeforeControl + 4 && loader.CleanBeforeClose,
                 "both commands and lifecycle handle must be removed before real plugin dlclose");
         Require(commands.Dispatch(&playerA, "/whoami", 0, Capture, &replies, &first) == 0,
                 "unloaded whoami callback remained callable");

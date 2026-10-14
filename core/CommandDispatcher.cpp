@@ -127,7 +127,12 @@ namespace Obelisk::Core
     {
         if (!IsAvailable() || !owner || !callback || !ValidCommand(command))
             return 0;
+        auto execution = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(execution);
+        if (!registrationLease)
+            return 0;
         auto registration = std::make_shared<Registration>();
+        registration->Execution = std::move(execution);
         registration->Owner = owner;
         registration->Command = command;
         registration->Callback = callback;
@@ -170,7 +175,7 @@ namespace Obelisk::Core
         });
     }
 
-    size_t CommandDispatcher::UnregisterCallbacksForOwner(void* owner)
+    size_t CommandDispatcher::UnregisterCallbacksForOwner(void* owner, std::chrono::steady_clock::time_point deadline)
     {
         if (!owner)
             return 0;
@@ -188,7 +193,8 @@ namespace Obelisk::Core
         // callback: returning successfully would allow dlclose on its own stack.
         if (IsInsideDispatcherCallback(this) && HasOwnerInvocationsLocked(owner))
             throw std::logic_error("command owner cleanup requires returning from the callback before unload");
-        m_Quiescence.wait(lock, [&] { return !HasOwnerInvocationsLocked(owner); });
+        if (!m_Quiescence.wait_until(lock, deadline, [&] { return !HasOwnerInvocationsLocked(owner); }))
+            throw std::runtime_error("command owner cleanup deadline expired; keep plugin mapped");
         PruneInactiveLocked();
         return removed;
     }
@@ -254,6 +260,9 @@ namespace Obelisk::Core
         size_t dispatched = 0;
         for (const auto& registration : callbacks)
         {
+            auto ownerLease = OwnerExecutionGate::EnterCallback(registration->Execution);
+            if (!ownerLease)
+                continue;
             const uint64_t token = AllocateInvocationToken();
             if (!token)
                 break;

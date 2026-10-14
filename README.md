@@ -14,7 +14,7 @@ observations were consistent across that relogin; this does not establish
 storefront provenance, authentication or a durable player/session contract.
 
 The prototype baseline passed **147 CTest checks** before the latest identity
-and lifecycle extension. The current build now passes **149/149 CTest checks**,
+and lifecycle extension. The current build now passes **152/152 CTest checks**,
 including the new identity and lifecycle fixtures. Those automated checks
 cover runtime and plugin behavior; the real-client observation establishes
 the in-game command/reply path. Steam acceptance, reply separation between two
@@ -24,12 +24,28 @@ The current source appends copied player observations and typed lifecycle
 notifications to the C API, extending `ObeliskApi` to **264 bytes on Linux
 x86_64**. Their build and fixture checks pass. The Epic client also confirmed
 the name and opaque native ID displayed by `/whoami`, and the plugin received
-the new owner-validated login observation. Logout/relogin delivery, interrupted
+the new owner-validated login and logout observations. Typed relogin, interrupted
 connections and two-player separation remain pending for this new path.
 
 This is a working prototype, not a production-stable release or a complete
 ArkApi-equivalent SDK. See [oPing implementation and acceptance status](docs/OPING_PROTOTYPE.md)
 for the current target, evidence and remaining checks.
+
+## Plugin lifecycle milestone
+
+The installed native runtime now controls the cooperative `oPing` plugin through
+an OS-local operator socket. Thirteen live requests covered status, pause,
+resume, two reloads, stop and start while the game server PID remained unchanged.
+Four plugin generations loaded; the final generation is running. Cleanup closes
+admission and drains callbacks, registrations and user-data destruction before
+Shutdown. Failed cleanup or lifecycle exceptions retain mapped code.
+
+The directed reply now uses the independently verified private-chat RPC. Startup
+checks its profile; visible chat presentation still needs real-client acceptance.
+TheIsland uses the recovered gameplay configuration with 70 slots and retains the
+current world/profile. No historical player saves were available to restore.
+See [operator lifecycle](docs/PLUGIN_LIFECYCLE_OPERATIONS.md) and
+[function stages](docs/research/NATIVE_LINUX_FUNCTION_STAGES.md).
 
 ## Current development
 
@@ -77,9 +93,12 @@ ctest --test-dir ../build --output-on-failure
 The active source is `/servidor/obelisk/Obelisk` and the sole laboratory build is
 `/servidor/obelisk/build`. Its pinned dependency sources and manifest are retained
 there. Use focused targets while iterating, then the relevant full build/tests.
-Script and packaging checks are available through `scripts/run_script_tests.sh`
-and the installer helpers; their historical release gates are separate from
-real-client acceptance of this prototype.
+Push/PR CI builds the current native prototype, runs CTest, the chat benchmark
+and its operator/SDK/manager guardrails. The unchanged full historical script and
+release checks run through the manual `legacy-research.yml` workflow. Seven old
+planning-fixture failures currently depend on missing external offline artifacts;
+they are still reported as pending, rather than treated as gameplay acceptance.
+The full runner remains available as `scripts/run_script_tests.sh`.
 
 Main outputs:
 

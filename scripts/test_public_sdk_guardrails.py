@@ -1294,7 +1294,8 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
             "UnregisterTimerWithOwnerToken",
         ],
         "terminal_slot_alias": "OBELISK_CONCAT(Unregister, TimerWithOwnerToken)",
-        "owner_cleanup_token": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
+        "owner_cleanup_token": "TimerManager::Get().UnregisterCallbacksForOwner(owner, deadline)",
+        "bounded_owner_cleanup_callee": "TimerManager::Get().UnregisterCallbacksForOwner",
     },
 ]
 
@@ -1653,6 +1654,21 @@ def c_like_function_body(source: str, function_name: str) -> str:
                     return source[open_brace + 1:index]
 
         raise AssertionError(f"{function_name} body is incomplete")
+
+
+def has_bounded_plugin_owner_cleanup(source: str, callee: str) -> bool:
+    # Require the actual teardown body to pass its operation deadline exactly
+    # once. A comment, string, unrelated helper or second unbounded call cannot
+    # stand in for this barrier.
+    code = strip_c_comments(source)
+    code = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', "", code)
+    try:
+        body = c_like_function_body(code, "PluginManager::UnregisterPluginCallbacks")
+    except AssertionError:
+        return False
+    compact = re.sub(r"\s+", "", body)
+    calls = re.findall(rf"{re.escape(callee)}\(([^()]*)\)", compact)
+    return calls == ["owner,deadline"]
 
 
 def sentence_like_segments(text: str) -> list[tuple[int, str]]:
@@ -7941,10 +7957,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         prototype_registrations = (
             {"trigger": "RegisterCommandWithOwnerTokenHandle",
              "terminal_slot": "UnregisterCommandWithOwnerToken",
-             "owner_cleanup_token": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner)"},
+             "owner_cleanup_token": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+             "bounded_owner_cleanup_callee": "m_CommandDispatcher->UnregisterCallbacksForOwner"},
             {"trigger": "RegisterPlayerLifecycleWithOwnerTokenHandle",
              "terminal_slot": "UnregisterPlayerLifecycleWithOwnerToken",
-             "owner_cleanup_token": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner)"},
+             "owner_cleanup_token": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+             "bounded_owner_cleanup_callee": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner"},
         )
         for surface in (*PUBLIC_SDK_OPTIONAL_API_SURFACES, *prototype_registrations):
             trigger = str(surface["trigger"])
@@ -7977,11 +7995,45 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
             cleanup_token = str(surface["owner_cleanup_token"])
             with self.subTest(slot=slot, check="owner-cleanup"):
-                self.assertIn(cleanup_token, plugin_manager)
+                bounded_callee = surface.get("bounded_owner_cleanup_callee")
+                if bounded_callee:
+                    self.assertTrue(
+                        has_bounded_plugin_owner_cleanup(plugin_manager, str(bounded_callee)),
+                        f"{slot} must drain its owner with the operation deadline in PluginManager cleanup",
+                    )
+                else:
+                    self.assertIn(cleanup_token, plugin_manager)
 
         for field in public_unregister_fields:
             with self.subTest(field=field, check="owner-scoped-unregister"):
                 self.assertIn("WithOwnerToken", field)
+
+    def test_bounded_owner_cleanup_guard_rejects_missing_deadline_and_decoys(self) -> None:
+        source = (REPO_ROOT / "core" / "PluginManager.cpp").read_text(encoding="utf-8")
+        callees = (
+            "m_CommandDispatcher->UnregisterCallbacksForOwner",
+            "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner",
+            "TimerManager::Get().UnregisterCallbacksForOwner",
+        )
+        for callee in callees:
+            call = f"{callee}(owner, deadline)"
+            for replacement in (
+                f"{callee}(owner)",
+                f"{callee}(otherOwner, deadline)",
+                f"{callee}(owner, unrelatedDeadline)",
+            ):
+                broken = source.replace(call, replacement)
+                with self.subTest(callee=callee, mutation=replacement):
+                    self.assertNotEqual(broken, source, "fixture did not mutate the real cleanup call")
+                    self.assertFalse(has_bounded_plugin_owner_cleanup(broken, callee))
+            unbounded = source.replace(call, f"{callee}(owner)")
+            for decoy in (
+                f"\n// {call};\n",
+                f'\nconst char* cleanup_note = "{call};";\n',
+                f"\nvoid OtherCleanup() {{ {call}; }}\n",
+            ):
+                with self.subTest(callee=callee, decoy=decoy.strip()):
+                    self.assertFalse(has_bounded_plugin_owner_cleanup(unbounded + decoy, callee))
 
     def test_public_sdk_consumers_keep_owner_token_registrations_owner_scoped(self) -> None:
         owner_token_surfaces = [

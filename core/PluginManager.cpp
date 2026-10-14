@@ -10,14 +10,18 @@
 #include "PluginConfig.h"
 #include "StructureEventDispatcher.h"
 #include "TimerManager.h"
+#include "OwnerExecutionGate.h"
+#include "GameplayCallbackScope.h"
 #include "hooks/ProcessEventHook.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
 #include <dlfcn.h>
+#include <link.h>
 #include <filesystem>
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -32,6 +36,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 
@@ -213,9 +218,12 @@ namespace Obelisk::Core
             void* GetSymbolOwner(void* handle, void* symbol) override
             {
                 Dl_info symbolInfo{};
-                if (dladdr(symbol, &symbolInfo) != 0 && symbolInfo.dli_fbase)
+                link_map* primary = nullptr;
+                if (dlinfo(handle, RTLD_DI_LINKMAP, &primary) == 0 && primary &&
+                    dladdr(symbol, &symbolInfo) != 0 && symbolInfo.dli_fbase &&
+                    symbolInfo.dli_fbase == reinterpret_cast<void*>(primary->l_addr))
                     return symbolInfo.dli_fbase;
-                return handle;
+                return nullptr;
             }
 
             bool Close(void* handle, std::string& error) override
@@ -460,6 +468,27 @@ namespace Obelisk::Core
             return it == PluginOwnerApiStates().end() ? nullptr : it->second.PlayerLifecycle;
         }
 
+        bool PluginOwnerHasCapability(void* owner, uint64_t capability)
+        {
+            std::lock_guard lock(PluginOwnerLifecycleMutex());
+            return PluginOwnerHasCapabilityLocked(owner, capability);
+        }
+        ChatEventDispatcher* PluginOwnerChatDispatcher(void* owner)
+        {
+            std::lock_guard lock(PluginOwnerLifecycleMutex());
+            return PluginOwnerChatDispatcherLocked(owner);
+        }
+        CommandDispatcher* PluginOwnerCommandDispatcher(void* owner)
+        {
+            std::lock_guard lock(PluginOwnerLifecycleMutex());
+            return PluginOwnerCommandDispatcherLocked(owner);
+        }
+        PlayerLifecycleDispatcher* PluginOwnerPlayerLifecycleDispatcher(void* owner)
+        {
+            std::lock_guard lock(PluginOwnerLifecycleMutex());
+            return PluginOwnerPlayerLifecycleDispatcherLocked(owner);
+        }
+
         bool CurrentPluginOwnerHasCapability(uint64_t capability)
         {
             if (!g_CurrentPluginOwner)
@@ -571,11 +600,26 @@ namespace Obelisk::Core
         template <typename RegisterFn>
         uint64_t RegisterProcessEventCallbackForOwnerToken(const char* apiName, uint64_t ownerToken, RegisterFn registerFn)
         {
-            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
-            void* owner = ResolveOwnerTokenForRegistrationLocked(apiName, ownerToken);
-            if (!owner)
+            void* owner = nullptr;
+            OwnerExecutionGate::Binding binding;
+            {
+                std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+                owner = ResolveOwnerTokenForRegistrationLocked(apiName, ownerToken);
+                if (owner) binding = OwnerExecutionGate::Get().Capture(owner);
+            }
+            // A retirement racing this admission denies the lease. Once admitted,
+            // retirement waits for tracking/rollback without holding this mutex.
+            // Deleters may re-enter registration during rollback.
+
+            if (!binding)
                 return 0;
-            return registerFn(owner);
+            auto execution = OwnerExecutionGate::EnterRegistration(binding);
+            if (!execution)
+                return 0;
+            try { return registerFn(owner); }
+            catch (const std::exception& e) { SafeLogErrorNoThrow(apiName, e.what()); }
+            catch (...) { SafeLogErrorNoThrow(apiName, "registration failed with unknown exception"); }
+            return 0;
         }
 
         template <typename RegisterFn>
@@ -583,11 +627,23 @@ namespace Obelisk::Core
                                                               OnProcessEventCallback callback,
                                                               RegisterFn registerFn)
         {
-            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
-            void* owner = ResolveCallbackOwnerForRegistrationLocked(apiName, callback);
-            if (!owner)
+            void* owner = nullptr;
+            OwnerExecutionGate::Binding binding;
+            {
+                std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+                owner = ResolveCallbackOwnerForRegistrationLocked(apiName, callback);
+                if (owner) binding = OwnerExecutionGate::Get().Capture(owner);
+            }
+
+            if (!binding)
                 return 0;
-            return registerFn(owner);
+            auto execution = OwnerExecutionGate::EnterRegistration(binding);
+            if (!execution)
+                return 0;
+            try { return registerFn(owner); }
+            catch (const std::exception& e) { SafeLogErrorNoThrow(apiName, e.what()); }
+            catch (...) { SafeLogErrorNoThrow(apiName, "registration failed with unknown exception"); }
+            return 0;
         }
 
         ShutdownFunc ResolveShutdownFunc(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
@@ -605,15 +661,16 @@ namespace Obelisk::Core
             return shutdownFunc;
         }
 
-        void CallPluginShutdown(const std::string& pluginName, ShutdownFunc shutdownFunc)
+        bool CallPluginShutdown(const std::string& pluginName, ShutdownFunc shutdownFunc)
         {
             if (!shutdownFunc)
-                return;
+                return true;
 
             try
             {
                 shutdownFunc();
                 SafeLogInfoNoThrow("Plugin shutdown completed: ", pluginName);
+                return true;
             }
             catch (const std::exception& e)
             {
@@ -623,6 +680,7 @@ namespace Obelisk::Core
             {
                 SafeLogErrorNoThrow(("Plugin " + pluginName + " threw an unknown exception during shutdown").c_str());
             }
+            return false;
         }
 
         bool SafeCloseLibrary(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
@@ -651,6 +709,62 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow(("Plugin " + pluginName + " threw an unknown exception while closing library handle").c_str());
                 return false;
             }
+        }
+
+        // A reload never writes into an inode that may still be mapped. Keep the
+        // basename for plugins which use it, but give each mapping a private directory.
+        fs::path CopyPluginGeneration(const fs::path& configRoot, const fs::path& source)
+        {
+            const fs::path generations = configRoot / ".native-lifecycle" / "generations";
+            for (const auto& directory : {configRoot / ".native-lifecycle", generations})
+            {
+                std::error_code ec;
+                fs::create_directory(directory, ec);
+                if (ec && ec != std::errc::file_exists)
+                    throw std::system_error(ec, "create plugin generations directory");
+                const auto status = fs::symlink_status(directory);
+                if (!fs::is_directory(status) || fs::is_symlink(status))
+                    throw std::runtime_error("plugin generations directory is unsafe");
+                fs::permissions(directory, fs::perms::owner_all, fs::perm_options::replace);
+            }
+            std::string pattern = (generations / "generation-XXXXXX").string();
+            if (!::mkdtemp(pattern.data()))
+                throw std::system_error(errno, std::generic_category(), "create private plugin generation");
+            const fs::path destination = fs::path(pattern) / source.filename();
+            const fs::path temporary = destination.string() + ".pending";
+            try
+            {
+                fs::copy_file(source, temporary, fs::copy_options::none);
+                fs::permissions(temporary, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+                fs::rename(temporary, destination);
+            }
+            catch (...)
+            {
+                std::error_code ignored;
+                fs::remove(temporary, ignored);
+                fs::remove(destination, ignored);
+                fs::remove(fs::path(pattern), ignored);
+                throw;
+            }
+            return destination;
+        }
+
+        void RemoveClosedGeneration(const fs::path& path) noexcept
+        {
+            try
+            {
+                if (path.empty() || path.parent_path().parent_path().filename() != "generations" ||
+                    path.parent_path().parent_path().parent_path().filename() != ".native-lifecycle" ||
+                    !path.parent_path().filename().string().starts_with("generation-"))
+                    return;
+                std::string error;
+                if (!ValidateExistingPathComponentsNoSymlinks(path, "Closed plugin generation", error))
+                    return;
+                std::error_code ec;
+                fs::remove(path, ec);
+                if (!ec) fs::remove(path.parent_path(), ec); // Only the empty private generation, never its source.
+            }
+            catch (...) { SafeLogWarnNoThrow("Closed plugin generation file cleanup failed."); }
         }
 
         bool AreGlobalProcessEventCallbacksAllowed()
@@ -899,15 +1013,15 @@ namespace Obelisk::Core
             }
         }
 
-        bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked(void* owner)
+        bool IsGlobalProcessEventCallbackCapabilityEnabledForOwner(void* owner)
         {
-            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) &&
+            return PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS) &&
                 AreGlobalProcessEventCallbacksAllowed();
         }
 
-        bool ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(const char* apiName, void* owner)
+        bool ValidateGlobalProcessEventCallbackCapabilityForOwner(const char* apiName, void* owner)
         {
-            if (IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
+            if (IsGlobalProcessEventCallbackCapabilityEnabledForOwner(owner))
                 return true;
 
             SafeLogWarnNoThrow(
@@ -916,15 +1030,15 @@ namespace Obelisk::Core
             return false;
         }
 
-        bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked(void* owner)
+        bool IsFilteredProcessEventCallbackCapabilityEnabledForOwner(void* owner)
         {
-            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) &&
+            return PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) &&
                 AreFilteredProcessEventCallbacksAllowed();
         }
 
-        bool ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(const char* apiName, void* owner)
+        bool ValidateFilteredProcessEventCallbackCapabilityForOwner(const char* apiName, void* owner)
         {
-            if (IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked(owner))
+            if (IsFilteredProcessEventCallbackCapabilityEnabledForOwner(owner))
                 return true;
 
             SafeLogWarnNoThrow(
@@ -933,15 +1047,15 @@ namespace Obelisk::Core
             return false;
         }
 
-        bool IsChatMessageEventCapabilityEnabledForOwnerLocked(void* owner)
+        bool IsChatMessageEventCapabilityEnabledForOwner(void* owner)
         {
-            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS) &&
+            return PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS) &&
                 AreChatMessageEventsAllowed();
         }
 
-        bool IsGameplayPolicyEventCapabilityEnabledForOwnerLocked(void* owner)
+        bool IsGameplayPolicyEventCapabilityEnabledForOwner(void* owner)
         {
-            return PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS);
+            return PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS);
         }
 
         bool ValidateProcessEventCallback(const char* apiName, OnProcessEventCallback callback)
@@ -1367,10 +1481,10 @@ namespace Obelisk::Core
         {
             if (!owner || !callback)
                 return 0;
-            if (!IsChatMessageEventCapabilityEnabledForOwnerLocked(owner))
+            if (!IsChatMessageEventCapabilityEnabledForOwner(owner))
                 return 0;
 
-            ChatEventDispatcher* dispatcher = PluginOwnerChatDispatcherLocked(owner);
+            ChatEventDispatcher* dispatcher = PluginOwnerChatDispatcher(owner);
             if (!dispatcher)
                 return 0;
 
@@ -1479,27 +1593,19 @@ namespace Obelisk::Core
 
         size_t UnregisterChatMessageRegistrationsForOwner(void* owner)
         {
-            if (!owner)
-                return 0;
-
-            std::vector<std::pair<uint64_t, ChatMessageRegistration>> registrations;
-            {
-                std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
-                for (const auto& item : ChatMessageRegistrations())
-                {
-                    if (item.second.Owner == owner)
-                        registrations.push_back(item);
-                }
-            }
-
-            size_t removed = 0;
-            for (const auto& item : registrations)
-            {
-                if (!UnregisterChatMessageRegistrationForOwner(owner, item.first, true))
-                    throw std::runtime_error("public chat unregister failed before tracking cleanup");
-                ++removed;
-            }
-            return removed;
+            // Backing owner cleanup already drained callbacks and deferred userdata.
+            // Only core-owned aliases remain; do not run a foreign deleter twice in a pass.
+            std::lock_guard lock(ChatMessageRegistrationMutex());
+            size_t count = 0;
+            for (const auto& item : ChatMessageRegistrations()) if (item.second.Owner == owner) ++count;
+            if (!count) return 0;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+            if (g_ForcePublicChatMessageInternalUnregisterFailureForTesting.load(std::memory_order_acquire))
+                throw std::runtime_error("injected public chat owner tracking cleanup failure");
+#endif
+            for (auto it = ChatMessageRegistrations().begin(); it != ChatMessageRegistrations().end();)
+                if (it->second.Owner == owner) it = ChatMessageRegistrations().erase(it); else ++it;
+            return count;
         }
 
         void ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup(
@@ -1538,7 +1644,7 @@ namespace Obelisk::Core
         {
             if (!owner)
                 return 0;
-            if (!IsGameplayPolicyEventCapabilityEnabledForOwnerLocked(owner))
+            if (!IsGameplayPolicyEventCapabilityEnabledForOwner(owner))
                 return 0;
 
             uint64_t publicRegistrationId = 0;
@@ -1877,27 +1983,20 @@ namespace Obelisk::Core
 
         size_t UnregisterGameplayPolicyRegistrationsForOwner(void* owner)
         {
-            if (!owner)
-                return 0;
-
-            std::vector<std::pair<uint64_t, GameplayPolicyRegistration>> registrations;
-            {
-                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
-                for (const auto& item : GameplayPolicyRegistrations())
-                {
-                    if (item.second.Owner == owner)
-                        registrations.push_back(item);
-                }
-            }
-
-            size_t removed = 0;
-            for (const auto& item : registrations)
-            {
-                if (!UnregisterGameplayPolicyRegistrationForOwner(owner, item.first))
-                    throw std::runtime_error("gameplay policy unregister failed before tracking cleanup");
-                ++removed;
-            }
-            return removed;
+            std::lock_guard lock(GameplayPolicyRegistrationMutex());
+            size_t count = 0;
+            bool inventory = false;
+            for (const auto& item : GameplayPolicyRegistrations())
+                if (item.second.Owner == owner) { ++count; inventory |= item.second.InventoryRegistrationId != 0; }
+            if (!count) return 0;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+            if (g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.load(std::memory_order_acquire) ||
+                (inventory && g_ForcePublicGameplayPolicyInventoryUnregisterFailureForTesting.load(std::memory_order_acquire)))
+                throw std::runtime_error("injected public gameplay owner tracking cleanup failure");
+#endif
+            for (auto it = GameplayPolicyRegistrations().begin(); it != GameplayPolicyRegistrations().end();)
+                if (it->second.Owner == owner) it = GameplayPolicyRegistrations().erase(it); else ++it;
+            return count;
         }
 
         void ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup(
@@ -2047,12 +2146,12 @@ namespace Obelisk::Core
                     "RegisterPreProcessEvent",
                     callback,
                     [callback](void* owner) {
-                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked("RegisterPreProcessEvent", owner))
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwner("RegisterPreProcessEvent", owner))
                             return uint64_t{0};
                         return EventManager::Get().RegisterPreProcessEventOwned(
                             owner,
                             callback,
-                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
+                            PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -2073,7 +2172,7 @@ namespace Obelisk::Core
                     "RegisterPostProcessEvent",
                     callback,
                     [callback](void* owner) {
-                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked("RegisterPostProcessEvent", owner))
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwner("RegisterPostProcessEvent", owner))
                             return uint64_t{0};
                         return EventManager::Get().RegisterPostProcessEventOwned(owner, callback);
                     });
@@ -2096,7 +2195,7 @@ namespace Obelisk::Core
                     "RegisterPreProcessEventForNameIndex",
                     callback,
                     [nameIndex, callback](void* owner) {
-                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwner(
                                 "RegisterPreProcessEventForNameIndex",
                                 owner))
                         {
@@ -2106,7 +2205,7 @@ namespace Obelisk::Core
                             owner,
                             nameIndex,
                             callback,
-                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
+                            PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -2127,7 +2226,7 @@ namespace Obelisk::Core
                     "RegisterPostProcessEventForNameIndex",
                     callback,
                     [nameIndex, callback](void* owner) {
-                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwner(
                                 "RegisterPostProcessEventForNameIndex",
                                 owner))
                         {
@@ -2154,7 +2253,7 @@ namespace Obelisk::Core
                     "RegisterPreProcessEventWithOwnerToken",
                     ownerToken,
                     [callback](void* owner) {
-                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwner(
                                 "RegisterPreProcessEventWithOwnerToken",
                                 owner))
                         {
@@ -2163,7 +2262,7 @@ namespace Obelisk::Core
                         return EventManager::Get().RegisterPreProcessEventOwned(
                             owner,
                             callback,
-                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
+                            PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -2186,7 +2285,7 @@ namespace Obelisk::Core
                     "RegisterPostProcessEventWithOwnerToken",
                     ownerToken,
                     [callback](void* owner) {
-                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateGlobalProcessEventCallbackCapabilityForOwner(
                                 "RegisterPostProcessEventWithOwnerToken",
                                 owner))
                         {
@@ -2215,7 +2314,7 @@ namespace Obelisk::Core
                     "RegisterPreProcessEventForNameIndexWithOwnerToken",
                     ownerToken,
                     [nameIndex, callback](void* owner) {
-                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwner(
                                 "RegisterPreProcessEventForNameIndexWithOwnerToken",
                                 owner))
                         {
@@ -2225,7 +2324,7 @@ namespace Obelisk::Core
                             owner,
                             nameIndex,
                             callback,
-                            PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
+                            PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING));
                     });
             }
             catch (const std::exception& e)
@@ -2250,7 +2349,7 @@ namespace Obelisk::Core
                     "RegisterPostProcessEventForNameIndexWithOwnerToken",
                     ownerToken,
                     [nameIndex, callback](void* owner) {
-                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwnerLocked(
+                        if (!ValidateFilteredProcessEventCallbackCapabilityForOwner(
                                 "RegisterPostProcessEventForNameIndexWithOwnerToken",
                                 owner))
                         {
@@ -2424,9 +2523,9 @@ namespace Obelisk::Core
             {
                 return RegisterProcessEventCallbackForOwnerToken(
                     "RegisterCommandWithOwnerTokenHandle", ownerToken, [&](void* owner) -> uint64_t {
-                        auto* dispatcher = PluginOwnerCommandDispatcherLocked(owner);
+                        auto* dispatcher = PluginOwnerCommandDispatcher(owner);
                         if (!dispatcher || !dispatcher->IsAvailable() ||
-                            !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_COMMAND_REPLIES))
+                            !PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_COMMAND_REPLIES))
                             return 0;
                         Dl_info callbackInfo{};
                         if (!dladdr(reinterpret_cast<void*>(callback), &callbackInfo) || callbackInfo.dli_fbase != owner)
@@ -2524,9 +2623,9 @@ namespace Obelisk::Core
             {
                 return RegisterProcessEventCallbackForOwnerToken(
                     "RegisterPlayerLifecycleWithOwnerTokenHandle", ownerToken, [&](void* owner) -> uint64_t {
-                        auto* dispatcher = PluginOwnerPlayerLifecycleDispatcherLocked(owner);
+                        auto* dispatcher = PluginOwnerPlayerLifecycleDispatcher(owner);
                         if (!dispatcher || !dispatcher->IsAvailable() ||
-                            !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS))
+                            !PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS))
                             return 0;
                         Dl_info callbackInfo{};
                         if (!dladdr(reinterpret_cast<void*>(callback), &callbackInfo) || callbackInfo.dli_fbase != owner)
@@ -2612,7 +2711,7 @@ namespace Obelisk::Core
                     "RegisterTimerWithOwnerTokenHandle",
                     ownerToken,
                     [delayMs, intervalMs, repeating, callback, userData](void* owner) {
-                        if (!PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_TIMERS))
+                        if (!PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_TIMERS))
                             return uint64_t{0};
                         return TimerManager::Get().Register(owner, delayMs, intervalMs, repeating, callback, userData);
                     });
@@ -2896,7 +2995,8 @@ namespace Obelisk::Core
         }
     }
 
-    bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+    bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason,
+                                                    std::chrono::steady_clock::time_point deadline)
     {
         bool cleanupSucceeded = true;
         const auto cleanupFamily = [&](const char* label, auto cleanup, bool* familySucceeded = nullptr) -> size_t {
@@ -2930,57 +3030,56 @@ namespace Obelisk::Core
             }
         };
 
-        bool gameplayPolicyCleanupSucceeded = true;
-        bool publicChatCleanupSucceeded = true;
-        const size_t gameplayPolicyRemoved = cleanupFamily("gameplay policy", [&]() {
-            return UnregisterGameplayPolicyRegistrationsForOwner(owner);
-        }, &gameplayPolicyCleanupSucceeded);
+        bool gameplayPolicyCleanupSucceeded = true, publicChatCleanupSucceeded = true;
+        bool chatSucceeded = true, structureSucceeded = true, inventorySucceeded = true, itemReturnSucceeded = true;
         const size_t eventRemoved = cleanupFamily("ProcessEvent", [&]() {
-            return EventManager::Get().UnregisterCallbacksForOwner(owner);
+            return EventManager::Get().UnregisterCallbacksForOwner(owner, deadline);
         });
-        const size_t publicChatRemoved = cleanupFamily("public chat", [&]() {
-            return UnregisterChatMessageRegistrationsForOwner(owner);
-        }, &publicChatCleanupSucceeded);
         const size_t timerRemoved = cleanupFamily("timer", [&]() {
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
             if (g_ForcePluginTimerCleanupFailureForTesting.load(std::memory_order_acquire))
                 throw std::runtime_error("injected plugin timer cleanup failure");
 #endif
-            return TimerManager::Get().UnregisterCallbacksForOwner(owner);
+            return TimerManager::Get().UnregisterCallbacksForOwner(owner, deadline);
         });
         const size_t chatRemoved = cleanupFamily("chat", [&]() {
-            return m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
-        });
+            return m_ChatDispatcher->UnregisterCallbacksForOwner(owner, deadline);
+        }, &chatSucceeded);
         const size_t commandRemoved = cleanupFamily("command", [&]() {
-            return m_CommandDispatcher->UnregisterCallbacksForOwner(owner);
+            return m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline);
         });
         const size_t playerLifecycleRemoved = cleanupFamily("player lifecycle", [&]() {
-            return m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner);
+            return m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner, deadline);
         });
         const size_t structureRemoved = cleanupFamily("structure", [&]() {
-            return StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-        });
+            return StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline);
+        }, &structureSucceeded);
         const size_t inventoryRemoved = cleanupFamily("inventory policy", [&]() {
-            return InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-        });
+            return InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline);
+        }, &inventorySucceeded);
         const size_t itemReturnRemoved = cleanupFamily("item return", [&]() {
-            return ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-        });
+            return ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline);
+        }, &itemReturnSucceeded);
         const size_t playerPrincipalRemoved = cleanupFamily("player principal", [&]() {
-            return PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+            return PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline);
         });
-
-        if (!publicChatCleanupSucceeded && chatRemoved != 0)
+        // Erase wrapper aliases only after their backing owner barriers completed.
+        // Native cleanup runs exactly once per family in this pass, with the deadline.
+        const size_t publicChatRemoved = cleanupFamily("public chat tracking", [&]() -> size_t {
+            if (!chatSucceeded) throw std::runtime_error("chat backing cleanup incomplete");
+            return UnregisterChatMessageRegistrationsForOwner(owner);
+        }, &publicChatCleanupSucceeded);
+        const size_t gameplayPolicyRemoved = cleanupFamily("gameplay policy tracking", [&]() -> size_t {
+            if (!structureSucceeded || !inventorySucceeded || !itemReturnSucceeded)
+                throw std::runtime_error("gameplay backing cleanup incomplete");
+            return UnregisterGameplayPolicyRegistrationsForOwner(owner);
+        }, &gameplayPolicyCleanupSucceeded);
+        if (!publicChatCleanupSucceeded && chatSucceeded && chatRemoved != 0)
             ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup(owner, m_ChatDispatcher);
-        if (!gameplayPolicyCleanupSucceeded &&
-            (structureRemoved != 0 || inventoryRemoved != 0 || itemReturnRemoved != 0))
-        {
+        if (!gameplayPolicyCleanupSucceeded)
             ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup(
-                owner,
-                structureRemoved != 0,
-                inventoryRemoved != 0,
-                itemReturnRemoved != 0);
-        }
+                owner, structureSucceeded && structureRemoved != 0, inventorySucceeded && inventoryRemoved != 0,
+                itemReturnSucceeded && itemReturnRemoved != 0);
 
         const auto logRemoved = [&](size_t count, const char* label) {
             if (count == 0)
@@ -3013,6 +3112,18 @@ namespace Obelisk::Core
     }
 
     void PluginManager::LoadPlugins(const std::string& directory)
+    {
+        if (g_CurrentPluginOwner || OwnerExecutionGate::IsInsideExecution() || GameplayCallbackScope::Current())
+        {
+            SafeLogWarnNoThrow("Plugin loading rejected inside plugin execution.");
+            return;
+        }
+        std::lock_guard<std::timed_mutex> control(m_ControlMutex);
+        LoadPluginsImpl(directory);
+    }
+
+    void PluginManager::LoadPluginsImpl(const std::string& directory, const fs::path& selectedSource,
+                                         std::string_view expectedPluginId, std::chrono::steady_clock::time_point deadline)
     {
         try
         {
@@ -3136,7 +3247,7 @@ namespace Obelisk::Core
                     continue;
                 }
 
-                if (fs::is_regular_file(entryStatus))
+                if (fs::is_regular_file(entryStatus) && (selectedSource.empty() || entry.path() == selectedSource))
                     plugins.push_back(entry.path());
             }
             if (directoryIteratorError)
@@ -3155,6 +3266,10 @@ namespace Obelisk::Core
             {
                 std::string pluginName = path.filename().string();
 
+                if (std::any_of(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const PluginInfo& loaded) {
+                        return loaded.sourcePath == path;
+                    }))
+                    continue; // Do not run constructors/GetInfo while this source is still active or retained.
                 OBELISK_INFO("Loading plugin: {}", pluginName);
 
                 std::error_code candidateStatusError;
@@ -3182,15 +3297,37 @@ namespace Obelisk::Core
                 }
 
                 std::string loaderError;
-                void* handle = m_Loader->Open(path, loaderError);
+                std::string generationRootError;
+                if (!ValidateExistingPathComponentsNoSymlinks(configRoot, "OBELISK_CONFIG_DIR", generationRootError))
+                {
+                    OBELISK_ERROR("Plugin {} generation copy rejected: {}", pluginName, generationRootError);
+                    continue;
+                }
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return;
+                const fs::path generationPath = CopyPluginGeneration(configRoot, path);
+                if (std::chrono::steady_clock::now() >= deadline)
+                {
+                    RemoveClosedGeneration(generationPath);
+                    return;
+                }
+                void* handle = nullptr;
+                {
+                    auto execution = OwnerExecutionGate::EnterLifecycle({}, OwnerExecutionGate::LifecycleEntry::Cleanup);
+                    try { handle = m_Loader->Open(generationPath, loaderError); }
+                    catch (const std::exception& e) { loaderError = e.what(); }
+                    catch (...) { loaderError = "library open threw"; }
+                }
                 if (!handle)
                 {
                     OBELISK_ERROR("Failed to load plugin {}: {}", pluginName, loaderError);
+                    RemoveClosedGeneration(generationPath);
                     continue;
                 }
 
                 auto handleCleanup = MakeScopeExit([&]() {
-                    SafeCloseLibrary(*m_Loader, handle, pluginName);
+                    auto execution = OwnerExecutionGate::EnterLifecycle({}, OwnerExecutionGate::LifecycleEntry::Cleanup);
+                    if (SafeCloseLibrary(*m_Loader, handle, pluginName)) RemoveClosedGeneration(generationPath);
                 });
 
                 std::string symbolError;
@@ -3201,19 +3338,28 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                symbolError.clear();
+                InitFunc initFunc = reinterpret_cast<InitFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_Init", symbolError));
+                void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(getInfoFunc));
+                if (!pluginOwner || (initFunc && m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc)) != pluginOwner))
+                {
+                    OBELISK_ERROR("Plugin {} Init/GetInfo must belong to the same mapped library.", pluginName);
+                    continue;
+                }
+                if (OwnerExecutionGate::Get().Capture(pluginOwner))
+                {
+                    OBELISK_ERROR("Plugin {} owning mapping is already bound; leaving existing generation active.", pluginName);
+                    continue;
+                }
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return;
                 ObeliskPluginMetadata metadata{};
                 bool metadataLoaded = false;
-                try
                 {
-                    metadataLoaded = getInfoFunc(&metadata);
-                }
-                catch (const std::exception& e)
-                {
-                    OBELISK_ERROR("Plugin {} threw while reporting metadata: {}", pluginName, e.what());
-                }
-                catch (...)
-                {
-                    OBELISK_ERROR("Plugin {} threw an unknown exception while reporting metadata.", pluginName);
+                    auto execution = OwnerExecutionGate::EnterLifecycle({}, OwnerExecutionGate::LifecycleEntry::Cleanup);
+                    try { metadataLoaded = getInfoFunc(&metadata); }
+                    catch (const std::exception& e) { OBELISK_ERROR("Plugin {} threw while reporting metadata: {}", pluginName, e.what()); }
+                    catch (...) { OBELISK_ERROR("Plugin {} threw an unknown exception while reporting metadata.", pluginName); }
                 }
 
                 if (!metadataLoaded)
@@ -3241,6 +3387,11 @@ namespace Obelisk::Core
                     continue;
                 }
 
+                if (!expectedPluginId.empty() && metadata.plugin_id != expectedPluginId)
+                {
+                    OBELISK_ERROR("Plugin {} replacement identity differs from the selected plugin.", pluginName);
+                    continue;
+                }
                 if (!pluginIds.insert(metadata.plugin_id).second)
                 {
                     OBELISK_ERROR("Plugin {} rejected: duplicate plugin_id '{}'. Unloading.", pluginName, metadata.plugin_id);
@@ -3265,8 +3416,8 @@ namespace Obelisk::Core
                     continue;
                 }
 
-                symbolError.clear();
-                InitFunc initFunc = reinterpret_cast<InitFunc>(m_Loader->Resolve(handle, "ObeliskPlugin_Init", symbolError));
+                // Metadata-only disabled plugins still prepare their config. A
+                // matching primary-mapping Init is required before activation.
                 if (!initFunc)
                 {
                     OBELISK_ERROR("Plugin {} is missing ObeliskPlugin_Init: {}. Unloading.", pluginName, symbolError);
@@ -3274,227 +3425,108 @@ namespace Obelisk::Core
                 }
 
                 ShutdownFunc shutdownFunc = ResolveShutdownFunc(*m_Loader, handle, pluginName);
-
-                const std::string configDir = preparedConfig.directory.string();
-                const std::string configPath = preparedConfig.path.string();
-                void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
-                if (!pluginOwner)
-                    pluginOwner = handle;
+                symbolError.clear();
+                auto prepareUnload = reinterpret_cast<bool (*)()>(m_Loader->Resolve(handle, "ObeliskPlugin_PrepareUnload", symbolError));
+                symbolError.clear();
+                auto lifecycleCapabilities = reinterpret_cast<uint32_t (*)()>(m_Loader->Resolve(handle, "ObeliskPlugin_LifecycleCapabilities", symbolError));
+                const auto ownSymbol = [&](auto symbol) {
+                    return !symbol || m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(symbol)) == pluginOwner;
+                };
+                if (!ownSymbol(shutdownFunc) || !ownSymbol(prepareUnload) || !ownSymbol(lifecycleCapabilities))
+                {
+                    OBELISK_ERROR("Plugin {} lifecycle exports must belong to its Init mapping.", pluginName);
+                    continue;
+                }
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return;
+                uint32_t lifecycleFlags = 0;
+                if (lifecycleCapabilities)
+                {
+                    auto execution = OwnerExecutionGate::EnterLifecycle({}, OwnerExecutionGate::LifecycleEntry::Cleanup);
+                    try { lifecycleFlags = lifecycleCapabilities(); }
+                    catch (...) { OBELISK_ERROR("Plugin {} lifecycle declaration threw.", pluginName); continue; }
+                }
+                // This is a cooperative declaration, not a proof about arbitrary plugin code.
+                if (lifecycleFlags != 0 && lifecycleFlags != 1u)
+                {
+                    OBELISK_ERROR("Plugin {} declares unsupported lifecycle capability bits.", pluginName);
+                    continue;
+                }
+                if (!expectedPluginId.empty() && (lifecycleFlags != 1u || !prepareUnload))
+                {
+                    OBELISK_ERROR("Plugin {} replacement does not declare cooperative managed callbacks.", pluginName);
+                    continue;
+                }
+                m_KnownPlugins[metadata.plugin_id] = {path, lifecycleFlags == 1u && prepareUnload};
+                m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1);
                 const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher,
                                                                      m_CommandDispatcher, m_PlayerLifecycleDispatcher);
-                auto ownerTokenCleanup = MakeScopeExit([&]() {
-                    RemovePluginOwnerToken(pluginOwnerToken);
+                auto tokenRollback = MakeScopeExit([&]() { RemovePluginOwnerToken(pluginOwnerToken); });
+                auto binding = OwnerExecutionGate::Get().Bind(pluginOwner, pluginOwnerToken);
+                if (!binding)
+                    throw std::runtime_error("plugin execution binding could not be created");
+                auto bindingRollback = MakeScopeExit([&]() {
+                    if (OwnerExecutionGate::Get().RetireAndDrain(binding, std::chrono::steady_clock::now()) == OwnerExecutionGate::Result::Ok)
+                        OwnerExecutionGate::Get().Forget(binding);
                 });
+                PluginInfo plugin{pluginName, metadata.plugin_id, handle, pluginOwner, pluginOwnerToken, shutdownFunc};
+                plugin.sourcePath = path;
+                plugin.generationPath = generationPath;
+                plugin.execution = binding;
+                plugin.prepareUnload = prepareUnload;
+                plugin.lifecycleCapabilities = lifecycleFlags;
+                tokenRollback.Dismiss();
+                handleCleanup.Dismiss();
+                auto initializationRollback = MakeScopeExit([&]() {
+                    std::string reason;
+                    const auto rollbackDeadline = deadline == std::chrono::steady_clock::time_point::max()
+                        ? std::chrono::steady_clock::now() + std::chrono::seconds(30) : deadline;
+                    if (!RetirePlugin(plugin, rollbackDeadline, false, reason))
+                    {
+                        m_LoadedPlugins.push_back(std::move(plugin)); // Storage was reserved before plugin execution.
+                        SafeLogErrorNoThrow("Retaining failed plugin generation mapped", reason.c_str());
+                    }
+                });
+                bindingRollback.Dismiss();
                 AddInitializingPluginOwner(pluginOwner);
-                auto initializingOwnerCleanup = MakeScopeExit([&]() {
-                    RemoveInitializingPluginOwner(pluginOwner);
-                });
+                const std::string configDir = preparedConfig.directory.string();
+                const std::string configPath = preparedConfig.path.string();
                 ObeliskPluginInitContext initContext{
-                    OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION,
-                    sizeof(ObeliskPluginInitContext),
-                    configDir.c_str(),
-                    configPath.c_str(),
-                    instanceId.c_str(),
-                    pluginOwnerToken
+                    OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION, sizeof(ObeliskPluginInitContext),
+                    configDir.c_str(), configPath.c_str(), instanceId.c_str(), pluginOwnerToken
                 };
-                m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1);
-                PluginInfo initFailureRetryPlugin{
-                    pluginName,
-                    metadata.plugin_id,
-                    handle,
-                    pluginOwner,
-                    pluginOwnerToken,
-                    shutdownFunc,
-                    true,
-                };
-                static_assert(std::is_nothrow_move_constructible_v<PluginInfo>,
-                              "init-failure retry state must move into pre-reserved storage without throwing");
-
-                bool initialized = false;
-                bool initAttempted = false;
-                auto initCleanup = MakeScopeExit([&]() {
-                    if (!initAttempted)
-                        return;
-                    try
-                    {
-                        MarkPluginOwnerUnloading(pluginOwner);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to mark plugin owner unloading after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to mark plugin owner unloading after init failure with unknown exception");
-                    }
-
-                    try
-                    {
-                        CallPluginShutdown(pluginName, shutdownFunc);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to call plugin shutdown after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to call plugin shutdown after init failure with unknown exception");
-                    }
-
-                    try
-                    {
-                        RemoveInitializingPluginOwner(pluginOwner);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to remove initializing plugin owner after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to remove initializing plugin owner after init failure with unknown exception");
-                    }
-
-                    bool callbacksCleaned = false;
-                    try
-                    {
-                        callbacksCleaned =
-                            UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose");
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to unregister plugin callbacks after init failure with unknown exception");
-                    }
-
-                    if (!callbacksCleaned)
-                    {
-                        handleCleanup.Dismiss();
-                        ownerTokenCleanup.Dismiss();
-                        initializingOwnerCleanup.Dismiss();
-                        try
-                        {
-                            m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin));
-                        }
-                        catch (const std::exception& e)
-                        {
-                            SafeLogErrorNoThrow(
-                                "Plugin callback cleanup failed after init failure and retention tracking failed; leaving library mapped without dlclose",
-                                e.what());
-                            return;
-                        }
-                        catch (...)
-                        {
-                            SafeLogErrorNoThrow(
-                                "Plugin callback cleanup failed after init failure and retention tracking failed with unknown exception; leaving library mapped without dlclose");
-                            return;
-                        }
-                        SafeLogErrorNoThrow(
-                            "Plugin callback cleanup failed after init failure; retaining library mapped for retry",
-                            pluginName.c_str());
-                        return;
-                    }
-
-                    if (!SafeCloseLibrary(*m_Loader, handle, pluginName))
-                    {
-                        handleCleanup.Dismiss();
-                        ownerTokenCleanup.Dismiss();
-                        initializingOwnerCleanup.Dismiss();
-                        try
-                        {
-                            m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin));
-                        }
-                        catch (const std::exception& e)
-                        {
-                            SafeLogErrorNoThrow(
-                                "Plugin library close failed after init failure and retention tracking failed; leaving library mapped without dlclose",
-                                e.what());
-                            return;
-                        }
-                        catch (...)
-                        {
-                            SafeLogErrorNoThrow(
-                                "Plugin library close failed after init failure and retention tracking failed with unknown exception; leaving library mapped without dlclose");
-                            return;
-                        }
-                        SafeLogErrorNoThrow(
-                            "Plugin library close failed after init failure; retaining plugin for retry",
-                            pluginName.c_str());
-                        return;
-                    }
-                    handleCleanup.Dismiss();
-
-                    try
-                    {
-                        RemovePluginOwnerToken(pluginOwnerToken);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to remove plugin owner token after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to remove plugin owner token after init failure with unknown exception");
-                    }
-
-                    try
-                    {
-                        ClearPluginOwnerUnloading(pluginOwner);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        SafeLogErrorNoThrow("Failed to clear plugin owner unloading after init failure", e.what());
-                    }
-                    catch (...)
-                    {
-                        SafeLogErrorNoThrow("Failed to clear plugin owner unloading after init failure with unknown exception");
-                    }
-                });
-
-                void* previousOwner = g_CurrentPluginOwner;
-                g_CurrentPluginOwner = pluginOwner;
-                auto ownerRestore = MakeScopeExit([&]() {
-                    g_CurrentPluginOwner = previousOwner;
-                });
-
-                initAttempted = true;
-                try
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return;
                 {
-                    ObeliskApi pluginApi = m_Api;
-                    initialized = initFunc(&pluginApi, &initContext);
+                    auto execution = OwnerExecutionGate::EnterLifecycle(binding, OwnerExecutionGate::LifecycleEntry::Init);
+                    if (!execution)
+                        throw std::runtime_error("plugin initialization execution denied");
+                    void* previousOwner = g_CurrentPluginOwner;
+                    g_CurrentPluginOwner = pluginOwner;
+                    auto ownerRestore = MakeScopeExit([&]() { g_CurrentPluginOwner = previousOwner; });
+                    plugin.initAttempted = true;
+                    try
+                    {
+                        ObeliskApi pluginApi = m_Api;
+                        plugin.initialized = initFunc(&pluginApi, &initContext);
+                    }
+                    catch (const std::exception& e) { OBELISK_ERROR("Plugin {} threw during initialization: {}", pluginName, e.what()); }
+                    catch (...) { OBELISK_ERROR("Plugin {} threw an unknown exception during initialization.", pluginName); }
                 }
-                catch (const std::exception& e)
-                {
-                    OBELISK_ERROR("Plugin {} threw during initialization: {}", pluginName, e.what());
-                }
-                catch (...)
-                {
-                    OBELISK_ERROR("Plugin {} threw an unknown exception during initialization.", pluginName);
-                }
-                ownerRestore.Dismiss();
-                g_CurrentPluginOwner = previousOwner;
-
-                if (initialized)
-                {
-                    OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
-                    AddLoadedPluginOwner(pluginOwner);
-                    auto loadedOwnerCleanup = MakeScopeExit([&]() {
-                        RemoveLoadedPluginOwner(pluginOwner);
-                    });
-                    m_LoadedPlugins.push_back({pluginName, metadata.plugin_id, handle, pluginOwner, pluginOwnerToken, shutdownFunc});
-                    loadedOwnerCleanup.Dismiss();
-                    ownerTokenCleanup.Dismiss();
-                    initializingOwnerCleanup.Dismiss();
-                    RemoveInitializingPluginOwner(pluginOwner);
-                    initCleanup.Dismiss();
-                    handleCleanup.Dismiss();
-                }
-                else
+                if (!plugin.initialized)
                 {
                     OBELISK_ERROR("Plugin {} failed to initialize.", pluginName);
+                    continue;
                 }
+                if (std::chrono::steady_clock::now() >= deadline)
+                    return;
+                AddLoadedPluginOwner(pluginOwner);
+                if (OwnerExecutionGate::Get().Activate(binding) != OwnerExecutionGate::Result::Ok)
+                    throw std::runtime_error("plugin activation failed");
+                RemoveInitializingPluginOwner(pluginOwner);
+                m_LoadedPlugins.push_back(std::move(plugin));
+                initializationRollback.Dismiss();
+                OBELISK_INFO("Plugin {} initialized successfully.", pluginName);
             }
         }
         catch (const std::exception& e)
@@ -3507,8 +3539,234 @@ namespace Obelisk::Core
         }
     }
 
+    bool PluginManager::RetirePlugin(PluginInfo& plugin, std::chrono::steady_clock::time_point deadline,
+                                     bool requireCooperative, std::string& reason)
+    {
+        const auto fail = [&](const char* value) { plugin.lastFailure = value; reason = value; return false; };
+        if (plugin.shutdownFailed)
+            return fail("shutdown_failed_retained_mapping");
+        if (plugin.prepareUnloadFailed)
+            return fail("prepare_unload_failed_retained_mapping");
+        if (requireCooperative && (plugin.lifecycleCapabilities != 1u || !plugin.prepareUnload))
+            return fail("cooperative_unload_not_declared");
+        auto& gate = OwnerExecutionGate::Get();
+        if (gate.RetireAndDrain(plugin.execution, deadline) != OwnerExecutionGate::Result::Ok)
+            return fail("execution_drain_incomplete");
+        if (std::chrono::steady_clock::now() >= deadline)
+            return fail("operation_deadline_expired");
+        // Unknown legacy workers cannot be made safe by callback cleanup. Keep
+        // their mapping and userdata resident even when the runtime is stopping.
+        if (plugin.lifecycleCapabilities != 1u || !plugin.prepareUnload)
+            return fail("cooperative_unload_not_declared_retained_mapping");
+        // Retirement closes callback and registration admission before token changes.
+        try { MarkPluginOwnerUnloading(plugin.owner); }
+        catch (...) { return fail("owner_retirement_failed"); }
+        {
+            auto execution = OwnerExecutionGate::EnterLifecycle(plugin.execution, OwnerExecutionGate::LifecycleEntry::Cleanup);
+            if (!execution)
+                return fail("cleanup_execution_denied");
+            bool cleaned = false;
+            try { cleaned = UnregisterPluginCallbacks(plugin.name, plugin.owner, "retired; before Shutdown and dlclose", deadline); }
+            catch (...) { cleaned = false; }
+            if (!cleaned)
+                return fail("registration_cleanup_incomplete");
+        }
+        if (gate.RetireAndDrain(plugin.execution, deadline) != OwnerExecutionGate::Result::Ok)
+            return fail("cleanup_drain_incomplete");
+        if (std::chrono::steady_clock::now() >= deadline)
+            return fail("operation_deadline_expired");
+        if (plugin.initialized && plugin.lifecycleCapabilities == 1u && plugin.prepareUnload && !plugin.shutdownCalled)
+        {
+            auto execution = OwnerExecutionGate::EnterLifecycle(plugin.execution, OwnerExecutionGate::LifecycleEntry::Cleanup);
+            if (!execution)
+                return fail("prepare_unload_execution_denied");
+            void* previousOwner = g_CurrentPluginOwner;
+            g_CurrentPluginOwner = plugin.owner;
+            auto restore = MakeScopeExit([&]() { g_CurrentPluginOwner = previousOwner; });
+            try
+            {
+                if (!plugin.prepareUnload())
+                    return fail("prepare_unload_refused");
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("Plugin PrepareUnload threw; retaining mapping", e.what());
+                plugin.prepareUnloadFailed = true;
+                return fail("prepare_unload_threw");
+            }
+            catch (...) { plugin.prepareUnloadFailed = true; return fail("prepare_unload_threw"); }
+        }
+        if (std::chrono::steady_clock::now() >= deadline)
+            return fail("operation_deadline_expired");
+        if (!plugin.shutdownCalled && plugin.initAttempted)
+        {
+            auto execution = OwnerExecutionGate::EnterLifecycle(plugin.execution, OwnerExecutionGate::LifecycleEntry::Shutdown);
+            if (!execution)
+                return fail("shutdown_execution_denied");
+            void* previousOwner = g_CurrentPluginOwner;
+            g_CurrentPluginOwner = plugin.owner;
+            auto restore = MakeScopeExit([&]() { g_CurrentPluginOwner = previousOwner; });
+            plugin.shutdownAttempted = true;
+            if (!CallPluginShutdown(plugin.name, plugin.shutdown))
+            {
+                plugin.shutdownFailed = true;
+                return fail("shutdown_threw");
+            }
+            plugin.shutdownCalled = true;
+        }
+        if (std::chrono::steady_clock::now() >= deadline)
+            return fail("operation_deadline_expired");
+        {
+            auto execution = OwnerExecutionGate::EnterLifecycle(plugin.execution, OwnerExecutionGate::LifecycleEntry::Cleanup);
+            if (!execution || !SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name))
+                return fail("library_close_failed");
+        }
+        plugin.handle = nullptr;
+        // A successful close makes this generation permanently stale. No address
+        // reuse can revive captured subscriptions from its old Binding.
+        if (gate.Forget(plugin.execution) != OwnerExecutionGate::Result::Ok)
+        {
+            reason = "closed_generation_forget_failed";
+            SafeLogErrorNoThrow("Closed plugin generation could not be forgotten", plugin.name.c_str());
+        }
+        RemoveLoadedPluginOwner(plugin.owner);
+        RemoveInitializingPluginOwner(plugin.owner);
+        RemovePluginOwnerToken(plugin.ownerToken);
+        ClearPluginOwnerUnloading(plugin.owner);
+        RemoveClosedGeneration(plugin.generationPath);
+        return true;
+    }
+
+    nlohmann::json PluginManager::ExecuteOperation(std::string_view action, std::string_view pluginId,
+                                                   std::chrono::steady_clock::time_point deadline)
+    {
+        using Gate = OwnerExecutionGate;
+        nlohmann::json result{{"ok", false}, {"action", action}, {"plugin_id", pluginId},
+                              {"state", "unknown"}, {"reason", ""}};
+        // Test before locking: waiting here from an admitted callback can deadlock
+        // against the controller that is draining that same callback.
+        if (g_CurrentPluginOwner || Gate::IsInsideExecution() || GameplayCallbackScope::Current())
+        {
+            result["reason"] = "control_inside_plugin_execution";
+            return result;
+        }
+        std::unique_lock<std::timed_mutex> control(m_ControlMutex, std::defer_lock);
+        if (!control.try_lock_until(deadline))
+        {
+            result["reason"] = "control_busy_or_deadline_expired";
+            return result;
+        }
+        if (std::chrono::steady_clock::now() >= deadline)
+        {
+            result["reason"] = "operation_deadline_expired";
+            return result;
+        }
+        const auto phaseName = [](Gate::Phase phase) {
+            switch (phase) {
+                case Gate::Phase::Initializing: return "initializing";
+                case Gate::Phase::Running: return "running";
+                case Gate::Phase::Pausing: return "pausing";
+                case Gate::Phase::Paused: return "paused";
+                case Gate::Phase::Retiring: return "retiring";
+                case Gate::Phase::Retired: return "retired";
+                default: return "missing";
+            }
+        };
+        const auto describe = [&](const std::string& id, const KnownPlugin& known) {
+            nlohmann::json value{{"plugin_id", id}, {"state", "stopped"}, {"cooperative", known.managedCallbacksOnly}};
+            const auto loaded = std::find_if(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const auto& p) { return p.pluginId == id; });
+            if (loaded != m_LoadedPlugins.end()) {
+                const auto state = Gate::Get().Inspect(loaded->execution);
+                value["state"] = phaseName(state.phase);
+                value["in_flight"] = state.inFlight;
+                value["generation"] = state.generation;
+                value["faulted"] = state.faulted;
+                value["retained"] = state.phase == Gate::Phase::Retiring || state.phase == Gate::Phase::Retired;
+                value["shutdown_failed"] = loaded->shutdownFailed;
+                value["prepare_unload_failed"] = loaded->prepareUnloadFailed;
+                value["last_failure"] = loaded->lastFailure;
+            }
+            return value;
+        };
+        if (action == "status")
+        {
+            result["plugins"] = nlohmann::json::array();
+            std::vector<std::string> ids;
+            for (const auto& item : m_KnownPlugins) ids.push_back(item.first);
+            std::sort(ids.begin(), ids.end());
+            for (const auto& id : ids)
+                if (pluginId.empty() || pluginId == id)
+                    result["plugins"].push_back(describe(id, m_KnownPlugins.at(id)));
+            result["ok"] = pluginId.empty() || m_KnownPlugins.count(std::string(pluginId));
+            result["state"] = "status";
+            if (!result["ok"].get<bool>()) result["reason"] = "unknown_plugin";
+            return result;
+        }
+        if (action != "start" && action != "pause" && action != "resume" && action != "stop" && action != "reload")
+        {
+            result["reason"] = "unknown_action";
+            return result;
+        }
+        const auto known = m_KnownPlugins.find(std::string(pluginId));
+        if (known == m_KnownPlugins.end())
+        {
+            result["reason"] = "unknown_plugin";
+            return result;
+        }
+        auto loaded = std::find_if(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const auto& p) { return p.pluginId == pluginId; });
+        if (action == "pause" || action == "resume")
+        {
+            if (loaded == m_LoadedPlugins.end()) result["reason"] = "plugin_stopped";
+            else if (loaded->lifecycleCapabilities != 1u || !loaded->prepareUnload)
+                result["reason"] = "cooperative_lifecycle_not_declared";
+            else {
+                const auto outcome = action == "pause" ? Gate::Get().Pause(loaded->execution, deadline) : Gate::Get().Resume(loaded->execution);
+                result["ok"] = outcome == Gate::Result::Ok;
+                if (outcome != Gate::Result::Ok) result["reason"] = "transition_or_drain_incomplete";
+                // Timer admission resumes without replacing registrations or deadlines.
+                if (outcome == Gate::Result::Ok && action == "resume") TimerManager::Get().NotifyOwnerResumed(loaded->owner);
+            }
+        }
+        else if (action == "stop" || action == "reload")
+        {
+            if (loaded == m_LoadedPlugins.end()) result["reason"] = "plugin_stopped";
+            else {
+                std::string reason;
+                if (RetirePlugin(*loaded, deadline, true, reason)) {
+                    m_LoadedPlugins.erase(loaded);
+                    result["ok"] = true;
+                } else result["reason"] = reason;
+            }
+        }
+        if (action == "start" || (action == "reload" && result["ok"].get<bool>()))
+        {
+            result["ok"] = false;
+            if (IsPluginIdLoaded(std::string(pluginId))) result["reason"] = "plugin_already_mapped";
+            else if (!known->second.managedCallbacksOnly) result["reason"] = "cooperative_unload_not_declared";
+            else if (std::chrono::steady_clock::now() >= deadline) result["reason"] = "operation_deadline_expired";
+            else {
+                const fs::path source = known->second.sourcePath;
+                LoadPluginsImpl(source.parent_path().string(), source, pluginId, deadline);
+                const auto started = std::find_if(m_LoadedPlugins.begin(), m_LoadedPlugins.end(), [&](const auto& p) {
+                    return p.pluginId == pluginId && p.initialized &&
+                           Gate::Get().Inspect(p.execution).phase == Gate::Phase::Running;
+                });
+                result["ok"] = started != m_LoadedPlugins.end();
+                if (!result["ok"].get<bool>()) result["reason"] = "plugin_start_failed";
+            }
+        }
+        result["state"] = describe(std::string(pluginId), m_KnownPlugins.at(std::string(pluginId)))["state"];
+        return result;
+    }
+
     void PluginManager::UnloadAll()
     {
+        if (g_CurrentPluginOwner || OwnerExecutionGate::IsInsideExecution() || GameplayCallbackScope::Current())
+        {
+            SafeLogWarnNoThrow("Plugin unload rejected inside plugin execution.");
+            return;
+        }
+        std::lock_guard<std::timed_mutex> control(m_ControlMutex);
         std::vector<PluginInfo> retainedPlugins;
         try
         {
@@ -3584,132 +3842,15 @@ namespace Obelisk::Core
                 }
             };
             SafeLogInfoNoThrow("Unloading plugin: ", plugin.name);
-            try
+            std::string reason;
+            if (!RetirePlugin(plugin, std::chrono::steady_clock::now() + std::chrono::seconds(30), false, reason))
             {
-                MarkPluginOwnerUnloading(plugin.owner);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to mark plugin owner unloading", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to mark plugin owner unloading with unknown exception");
-            }
-
-            if (!plugin.shutdownCalled)
-            {
-                try
-                {
-                    CallPluginShutdown(plugin.name, plugin.shutdown);
-                    plugin.shutdownCalled = true;
-                }
-                catch (const std::exception& e)
-                {
-                    plugin.shutdownCalled = true;
-                    SafeLogErrorNoThrow("Failed to call plugin shutdown during unload", e.what());
-                }
-                catch (...)
-                {
-                    plugin.shutdownCalled = true;
-                    SafeLogErrorNoThrow("Failed to call plugin shutdown during unload with unknown exception");
-                }
-            }
-
-            bool callbacksCleaned = false;
-            try
-            {
-                callbacksCleaned = UnregisterPluginCallbacks(plugin.name, plugin.owner, "before dlclose");
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to unregister plugin callbacks before dlclose with unknown exception");
-            }
-
-            if (!callbacksCleaned)
-            {
-                SafeLogErrorNoThrow(
-                    "Plugin callback cleanup failed during unload; skipping dlclose and retaining plugin for retry",
-                    plugin.name.c_str());
-                if (!retainPluginForUnloadRetry(
-                        plugin,
-                        "Plugin retention tracking failed after callback cleanup failure; aborting unload pass"))
+                SafeLogErrorNoThrow("Plugin unload incomplete; retaining mapping", reason.c_str());
+                if (!retainPluginForUnloadRetry(plugin, "Plugin retention tracking failed; aborting unload pass"))
                 {
                     publishPartialUnloadStateAndAbort();
                     return;
                 }
-                continue;
-            }
-
-            if (!SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name))
-            {
-                SafeLogErrorNoThrow(
-                    "Plugin library close failed during unload; retaining plugin for retry",
-                    plugin.name.c_str());
-                if (!retainPluginForUnloadRetry(
-                        plugin,
-                        "Plugin retention tracking failed after library close failure; aborting unload pass"))
-                {
-                    publishPartialUnloadStateAndAbort();
-                    return;
-                }
-                continue;
-            }
-
-            try
-            {
-                RemoveLoadedPluginOwner(plugin.owner);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to remove loaded plugin owner", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to remove loaded plugin owner with unknown exception");
-            }
-
-            try
-            {
-                RemoveInitializingPluginOwner(plugin.owner);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to remove initializing plugin owner", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to remove initializing plugin owner with unknown exception");
-            }
-
-            try
-            {
-                RemovePluginOwnerToken(plugin.ownerToken);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to remove plugin owner token", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to remove plugin owner token with unknown exception");
-            }
-
-            try
-            {
-                ClearPluginOwnerUnloading(plugin.owner);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to clear plugin owner unloading", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to clear plugin owner unloading with unknown exception");
             }
         }
         std::reverse(retainedPlugins.begin(), retainedPlugins.end());

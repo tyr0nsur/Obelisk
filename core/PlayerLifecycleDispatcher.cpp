@@ -110,7 +110,12 @@ namespace Obelisk::Core
     {
         if (!IsAvailable() || !owner || !callback)
             return 0;
+        auto execution = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(execution);
+        if (!registrationLease)
+            return 0;
         auto registration = std::make_shared<Registration>();
+        registration->Execution = std::move(execution);
         registration->Owner = owner;
         registration->Callback = callback;
         registration->UserData = userData;
@@ -154,7 +159,8 @@ namespace Obelisk::Core
         return true;
     }
 
-    size_t PlayerLifecycleDispatcher::UnregisterCallbacksForOwner(void* owner)
+    size_t PlayerLifecycleDispatcher::UnregisterCallbacksForOwner(
+        void* owner, std::chrono::steady_clock::time_point deadline)
     {
         if (!owner)
             return 0;
@@ -172,7 +178,8 @@ namespace Obelisk::Core
         // here or below a nested callback. A caller must retain the mapping.
         if (IsInsideOwnerCallback(this, owner))
             throw std::logic_error("player lifecycle owner cleanup requires returning from its callback before unload");
-        m_Quiescence.wait(lock, [&] { return !HasOwnerInvocationsLocked(owner); });
+        if (!m_Quiescence.wait_until(lock, deadline, [&] { return !HasOwnerInvocationsLocked(owner); }))
+            throw std::runtime_error("player lifecycle owner cleanup deadline expired; keep plugin mapped");
         PruneInactiveLocked();
         return removed;
     }
@@ -231,6 +238,9 @@ namespace Obelisk::Core
                 {(flags & OBELISK_PLAYER_LIFECYCLE_FLAG_PLATFORM_ID_AVAILABLE) ? copiedId.data() : nullptr, copiedId.size()}};
             for (const auto& registration : callbacks)
             {
+                auto ownerLease = OwnerExecutionGate::EnterCallback(registration->Execution);
+                if (!ownerLease)
+                    continue;
                 {
                     std::lock_guard lock(m_Mutex);
                     if (!registration->Active || !IsAvailable())

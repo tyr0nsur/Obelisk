@@ -190,6 +190,55 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "owner subscriptions survived cleanup");
     }
 
+    void TestCleanupDeadlineCancelsAndRetainsActiveInvocation()
+    {
+        CommandDispatcher dispatcher;
+        dispatcher.SetAvailable(true);
+        int owner, controller;
+        BlockingState state;
+        Require(dispatcher.Register(&owner, "/wait", Block, &state), "deadline registration failed");
+        std::vector<Delivery> deliveries;
+        auto delivery = std::async(std::launch::async, [&] {
+            return dispatcher.Dispatch(&controller, "/wait", 0, Capture, &deliveries);
+        });
+        {
+            std::unique_lock lock(state.Mutex);
+            if (!state.Cv.wait_for(lock, 2s, [&] { return state.Entered; }))
+            {
+                state.Release = true;
+                lock.unlock();
+                state.Cv.notify_all();
+                delivery.wait();
+                Require(false, "deadline callback did not enter");
+            }
+        }
+        auto cleanup = std::async(std::launch::async, [&] {
+            try
+            {
+                dispatcher.UnregisterCallbacksForOwner(&owner, std::chrono::steady_clock::now() + 30ms);
+                return false;
+            }
+            catch (const std::runtime_error& error)
+            {
+                return std::string_view(error.what()).find("deadline expired") != std::string_view::npos;
+            }
+        });
+        const bool bounded = cleanup.wait_for(2s) == std::future_status::ready;
+        const bool cancelled = dispatcher.SubscriptionCount() == 0 &&
+            dispatcher.Dispatch(&controller, "/wait", 0, Capture, &deliveries) == 0;
+        {
+            std::lock_guard lock(state.Mutex);
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+        const auto delivered = delivery.get();
+        const bool timedOut = cleanup.get();
+        Require(bounded && timedOut && cancelled && delivered == 1,
+                "owner deadline did not fail promptly while preserving its active callback");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner, std::chrono::steady_clock::now()) == 0,
+                "cancelled owner cleanup could not complete after callback return");
+    }
+
     struct SelfState
     {
         CommandDispatcher* Dispatcher;
@@ -532,6 +581,98 @@ namespace
         Require(!Obelisk::Core::GameplayCallbackScope::Current() &&
                 !Obelisk::Core::GameplayCallbackScope::IsInsideAnyCallback(), "gameplay scope leaked after callback");
     }
+
+    struct ManagedCommandState
+    {
+        CommandDispatcher* Dispatcher;
+        void* Owner;
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool Block = true;
+        bool Entered = false;
+        bool Release = false;
+        uint64_t Token = 0;
+        size_t Calls = 0;
+        bool Replied = false;
+        std::string Name;
+    };
+
+    void ManagedCommand(const ObeliskCommandInvocation* event, void* data)
+    {
+        auto& state = *static_cast<ManagedCommandState*>(data);
+        {
+            std::unique_lock lock(state.Mutex);
+            ++state.Calls;
+            state.Token = event->invocation_token;
+            state.Entered = true;
+            state.Cv.notify_all();
+            if (state.Block)
+                state.Cv.wait(lock, [&] { return state.Release; });
+        }
+        ObeliskCommandPlayer player{};
+        player.struct_size = sizeof(player);
+        if (state.Dispatcher->GetPlayer(state.Owner, event->invocation_token, &player) && player.player_name.data)
+            state.Name.assign(player.player_name.data, player.player_name.size);
+        state.Replied = state.Dispatcher->Reply(state.Owner, event->invocation_token, "managed-pong");
+    }
+
+    void TestManagedPausePreservesStateAndFinishesExistingReply()
+    {
+        using Gate = Obelisk::Core::OwnerExecutionGate;
+        auto& gate = Gate::Get();
+        CommandDispatcher dispatcher;
+        dispatcher.SetAvailable(true);
+        dispatcher.SetPlayerSnapshotsAvailable(true);
+        int owner, controller;
+        auto binding = gate.Bind(&owner, 7301);
+        Require(static_cast<bool>(binding), "managed command owner did not bind");
+        ManagedCommandState state{&dispatcher, &owner};
+        const auto registration = dispatcher.Register(&owner, "/managed", ManagedCommand, &state);
+        Require(registration != 0, "Initializing plugin could not register command");
+        std::vector<Delivery> deliveries;
+        const Obelisk::Core::CommandPlayerSnapshot player{OBELISK_COMMAND_PLAYER_FLAG_NAME_AVAILABLE, "Origin", {}};
+        Require(dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries, &player) == 0,
+                "command executed before Init completed");
+        Require(gate.Activate(binding) == Gate::Result::Ok, "managed command activation failed");
+        size_t dispatched = 0;
+        std::thread callback([&] { dispatched = dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries, &player); });
+        {
+            std::unique_lock lock(state.Mutex);
+            state.Cv.wait(lock, [&] { return state.Entered; });
+        }
+        const auto timeout = gate.Pause(binding, Gate::Clock::now());
+        const auto blockedRegistration = dispatcher.Register(&owner, "/paused", ManagedCommand, &state);
+        {
+            std::lock_guard lock(state.Mutex);
+            state.Release = true;
+            state.Cv.notify_all();
+        }
+        callback.join();
+        Require(timeout == Gate::Result::TimedOut && blockedRegistration == 0, "pausing owner admitted fresh work");
+        Require(dispatched == 1 && state.Replied && state.Name == "Origin" && deliveries.size() == 1,
+                "already admitted callback lost its origin snapshot/reply during drain");
+        const auto expired = state.Token;
+        Require(gate.Pause(binding, Gate::Clock::now() + 2s) == Gate::Result::Ok, "callback did not drain pause");
+        Require(dispatcher.SubscriptionCount() == 1 && dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries) == 0,
+                "pause discarded subscriptions or still delivered commands");
+        Require(!dispatcher.Reply(&owner, expired, "after-pause"), "pause preserved an expired invocation token");
+        state.Block = false;
+        Require(gate.Resume(binding) == Gate::Result::Ok &&
+                dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries, &player) == 1 && state.Calls == 2,
+                "resume did not preserve the command's callback/userdata");
+        Require(state.Token != expired && !dispatcher.Reply(&owner, expired, "old"), "resume revived a previous invocation");
+        Require(gate.RetireAndDrain(binding, Gate::Clock::now()) == Gate::Result::Ok && gate.Forget(binding) == Gate::Result::Ok,
+                "idle command generation did not retire");
+        // Retain the old registration deliberately: a stale snapshot must not
+        // attach to a new binding merely because dlopen reused the owner address.
+        auto replacement = gate.Bind(&owner, 7302);
+        Require(replacement && gate.Activate(replacement) == Gate::Result::Ok, "replacement did not bind");
+        Require(dispatcher.Dispatch(&controller, "/managed", 0, Capture, &deliveries) == 0 && state.Calls == 2,
+                "retired registration borrowed its replacement's gate");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1, "retired handle cleanup failed");
+        Require(gate.RetireAndDrain(replacement, Gate::Clock::now()) == Gate::Result::Ok &&
+                gate.Forget(replacement) == Gate::Result::Ok, "replacement gate cleanup failed");
+    }
 }
 
 int main()
@@ -539,11 +680,13 @@ int main()
     TestTargetingAndExpiry();
     TestNestedInvocations();
     TestCleanupQuiescence();
+    TestCleanupDeadlineCancelsAndRetainsActiveInvocation();
     TestSelfRemovalAndException();
     TestPayloadAndBackendRevocation();
     TestPlayerSnapshotsAndCopyLifetime();
     TestNestedPlayerScope();
     TestPlayerPayloadLimitsAndCleanup();
     TestExactGameplayCallbackScope();
+    TestManagedPausePreservesStateAndFinishesExistingReply();
     std::cout << "CommandDispatcherTests passed\n";
 }

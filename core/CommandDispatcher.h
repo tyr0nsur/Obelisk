@@ -1,8 +1,10 @@
 #pragma once
 
 #include "obelisk/ObeliskCommandApi.h"
+#include "OwnerExecutionGate.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -36,7 +38,10 @@ namespace Obelisk::Core
 
         uint64_t Register(void* owner, std::string_view command, ObeliskCommandCallback callback, void* userData);
         bool Unregister(void* owner, uint64_t registrationId);
-        size_t UnregisterCallbacksForOwner(void* owner);
+        // A deadline failure cancels future delivery but retains in-flight
+        // records. The caller must keep code/data mapped and retry after drain.
+        size_t UnregisterCallbacksForOwner(
+            void* owner, std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max());
         size_t SubscriptionCount() const;
 
         size_t Dispatch(void* controller, std::string_view message, uint32_t sendMode,
@@ -50,6 +55,7 @@ namespace Obelisk::Core
         {
             uint64_t Id = 0;
             void* Owner = nullptr;
+            OwnerExecutionGate::Binding Execution;
             std::string Command;
             ObeliskCommandCallback Callback = nullptr;
             void* UserData = nullptr;

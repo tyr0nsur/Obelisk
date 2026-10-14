@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <atomic>
 #include <exception>
+#include <stdexcept>
 #include <new>
 
 namespace Obelisk::Core
@@ -165,6 +166,11 @@ namespace Obelisk::Core
         if (!callback)
             return 0;
 
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_PreProcessEventCallbacks.push_back({
@@ -174,6 +180,7 @@ namespace Obelisk::Core
             callback,
             owner,
             allowProcessEventBlocking,
+            binding,
         });
         return id;
     }
@@ -183,9 +190,14 @@ namespace Obelisk::Core
         if (!callback)
             return 0;
 
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner, false});
+        m_PostProcessEventCallbacks.push_back({id, AllocateRegistrationGeneration(), -1, callback, owner, false, binding});
         return id;
     }
 
@@ -197,6 +209,11 @@ namespace Obelisk::Core
         if (!callback)
             return 0;
 
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
+            return 0;
+
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
         m_FilteredPreProcessEventCallbacks.push_back({
@@ -206,6 +223,7 @@ namespace Obelisk::Core
             callback,
             owner,
             allowProcessEventBlocking,
+            binding,
         });
         return id;
     }
@@ -213,6 +231,11 @@ namespace Obelisk::Core
     uint64_t EventManager::RegisterPostProcessEventForNameIndexOwned(void* owner, int32_t nameIndex, OnProcessEventCallback callback)
     {
         if (!callback)
+            return 0;
+
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
             return 0;
 
         std::lock_guard<std::mutex> lock(m_Mutex);
@@ -224,6 +247,7 @@ namespace Obelisk::Core
             callback,
             owner,
             false,
+            binding,
         });
         return id;
     }
@@ -274,12 +298,15 @@ namespace Obelisk::Core
                removeForOwnerAndId(m_FilteredPostProcessEventCallbacks);
     }
 
-    size_t EventManager::UnregisterCallbacksForOwner(void* owner)
+    size_t EventManager::UnregisterCallbacksForOwner(
+        void* owner, OwnerExecutionGate::Clock::time_point deadline)
     {
         if (!owner)
             return 0;
 
-        std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+        std::unique_lock<std::recursive_timed_mutex> dispatchLock(m_DispatchMutex, std::defer_lock);
+        if (!dispatchLock.try_lock_until(deadline))
+            throw std::runtime_error("ProcessEvent owner cleanup timed out; keep plugin mapped");
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         auto removeForOwner = [owner](auto& callbacks) -> size_t {
@@ -330,7 +357,7 @@ namespace Obelisk::Core
             if (setupFailed)
                 *setupFailed = false;
             std::vector<CallbackSnapshot> callbacks;
-            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            std::lock_guard<std::recursive_timed_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
                 return snapshot.id != 0 &&
                     std::any_of(m_PreProcessEventCallbacks.begin(),
@@ -346,7 +373,7 @@ namespace Obelisk::Core
                 MaybeForceSnapshotFailureForTesting();
                 callbacks.reserve(m_PreProcessEventCallbacks.size());
                 for (const auto& item : m_PreProcessEventCallbacks)
-                    callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
+                    callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking, item.ExecutionBinding});
             }
 
             for (const auto& snapshot : callbacks)
@@ -358,6 +385,10 @@ namespace Obelisk::Core
                     if (!isSnapshotActive(snapshot))
                         continue;
                 }
+
+                auto executionLease = OwnerExecutionGate::EnterCallback(snapshot.ExecutionBinding);
+                if (!executionLease)
+                    continue;
 
                 try
                 {
@@ -409,7 +440,7 @@ namespace Obelisk::Core
         try
         {
             std::vector<CallbackSnapshot> callbacks;
-            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            std::lock_guard<std::recursive_timed_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
                 return snapshot.id != 0 &&
                     std::any_of(m_FilteredPreProcessEventCallbacks.begin(),
@@ -427,7 +458,7 @@ namespace Obelisk::Core
                 for (const auto& item : m_FilteredPreProcessEventCallbacks)
                 {
                     if (item.nameIndex == nameIndex)
-                        callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking});
+                        callbacks.push_back({item.id, item.generation, item.callback, item.allowProcessEventBlocking, item.ExecutionBinding});
                 }
             }
 
@@ -440,6 +471,10 @@ namespace Obelisk::Core
                     if (!isSnapshotActive(snapshot))
                         continue;
                 }
+
+                auto executionLease = OwnerExecutionGate::EnterCallback(snapshot.ExecutionBinding);
+                if (!executionLease)
+                    continue;
 
                 try
                 {
@@ -489,7 +524,7 @@ namespace Obelisk::Core
             if (setupFailed)
                 *setupFailed = false;
             std::vector<CallbackSnapshot> callbacks;
-            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            std::lock_guard<std::recursive_timed_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
                 return snapshot.id != 0 &&
                     std::any_of(m_PostProcessEventCallbacks.begin(),
@@ -505,7 +540,7 @@ namespace Obelisk::Core
                 MaybeForceSnapshotFailureForTesting();
                 callbacks.reserve(m_PostProcessEventCallbacks.size());
                 for (const auto& item : m_PostProcessEventCallbacks)
-                    callbacks.push_back({item.id, item.generation, item.callback, false});
+                    callbacks.push_back({item.id, item.generation, item.callback, false, item.ExecutionBinding});
             }
 
             for (const auto& snapshot : callbacks)
@@ -517,6 +552,10 @@ namespace Obelisk::Core
                     if (!isSnapshotActive(snapshot))
                         continue;
                 }
+
+                auto executionLease = OwnerExecutionGate::EnterCallback(snapshot.ExecutionBinding);
+                if (!executionLease)
+                    continue;
 
                 try
                 {
@@ -558,7 +597,7 @@ namespace Obelisk::Core
         try
         {
             std::vector<CallbackSnapshot> callbacks;
-            std::lock_guard<std::recursive_mutex> dispatchLock(m_DispatchMutex);
+            std::lock_guard<std::recursive_timed_mutex> dispatchLock(m_DispatchMutex);
             const auto isSnapshotActive = [this](const CallbackSnapshot& snapshot) {
                 return snapshot.id != 0 &&
                     std::any_of(m_FilteredPostProcessEventCallbacks.begin(),
@@ -576,7 +615,7 @@ namespace Obelisk::Core
                 for (const auto& item : m_FilteredPostProcessEventCallbacks)
                 {
                     if (item.nameIndex == nameIndex)
-                        callbacks.push_back({item.id, item.generation, item.callback, false});
+                        callbacks.push_back({item.id, item.generation, item.callback, false, item.ExecutionBinding});
                 }
             }
 
@@ -589,6 +628,10 @@ namespace Obelisk::Core
                     if (!isSnapshotActive(snapshot))
                         continue;
                 }
+
+                auto executionLease = OwnerExecutionGate::EnterCallback(snapshot.ExecutionBinding);
+                if (!executionLease)
+                    continue;
 
                 try
                 {

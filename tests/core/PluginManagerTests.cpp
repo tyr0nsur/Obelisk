@@ -191,6 +191,15 @@ namespace
         uint32_t chatMessageEventStructSize = 0;
         size_t structureSubscriptionsAtShutdown = 0;
         size_t structureSubscriptionsAtClose = 0;
+        // The mock only executes through framework callbacks; no surviving workers.
+        bool hasLifecycleContract = true;
+        uint32_t lifecycleCapabilities = 1u;
+        bool prepareUnloadResult = true;
+        bool throwOnPrepareUnload = false;
+        int prepareUnloadCalls = 0;
+        std::string foreignExport;
+        std::function<void()> duringInit;
+        std::function<void()> duringPrepareUnload;
     };
 
     FakePlugin* g_CurrentFakePlugin = nullptr;
@@ -939,6 +948,8 @@ namespace
         Require((api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0,
                 "plugin init received API without timer capability");
         Require(context->plugin_owner_token != 0, "plugin init received empty owner token");
+        if (g_CurrentFakePlugin->duringInit)
+            g_CurrentFakePlugin->duringInit();
 
         if (g_CurrentFakePlugin->captureApi)
             g_CurrentFakePlugin->capturedApi = *api;
@@ -1063,12 +1074,9 @@ namespace
                     std::memory_order_release);
             });
 
-            std::unique_lock<std::mutex> lock(g_CurrentFakePlugin->initPlayerPrincipalFence->Mutex);
-            Require(g_CurrentFakePlugin->initPlayerPrincipalFence->Cv.wait_for(
-                        lock,
-                        std::chrono::seconds(2),
-                        [&]() { return g_CurrentFakePlugin->initPlayerPrincipalFence->Entered; }),
-                    "fake init player-principal callback did not enter during init");
+            g_CurrentFakePlugin->initPlayerPrincipalDispatchThread.join();
+            Require(g_CurrentFakePlugin->initPlayerPrincipalDispatches.load() == 0,
+                    "Initializing plugin received player-principal callback");
         }
 
         if (g_CurrentFakePlugin->startCopiedDispatchesDuringInit)
@@ -1174,18 +1182,11 @@ namespace
                     std::memory_order_release);
             });
 
-            std::unique_lock<std::mutex> lock(fence->Mutex);
-            Require(fence->Cv.wait_for(
-                        lock,
-                        std::chrono::seconds(2),
-                        [fence]() {
-                            return fence->ChatEntered &&
-                                fence->StructureEntered &&
-                                fence->InventoryEntered &&
-                                fence->ItemReturnEntered &&
-                                fence->PlayerPrincipalEntered;
-                        }),
-                    "fake init copied dispatcher callbacks did not all enter during init");
+            for (auto& thread : plugin->initCopiedDispatchThreads) thread.join();
+            Require(plugin->initChatDispatches.load() == 0 && plugin->initStructureDispatches.load() == 0 &&
+                    plugin->initInventoryDispatches.load() == 0 && plugin->initItemReturnDispatches.load() == 0 &&
+                    plugin->initCopiedPlayerPrincipalDispatches.load() == 0,
+                    "Initializing plugin received copied callback");
         }
 
         if (g_CurrentFakePlugin->registerStructureCallback)
@@ -1261,11 +1262,10 @@ namespace
                     "fake blocking timer callback registration failed");
 
             std::unique_lock<std::mutex> lock(g_CurrentFakePlugin->timerFence->Mutex);
-            Require(g_CurrentFakePlugin->timerFence->Cv.wait_for(
-                        lock,
-                        std::chrono::seconds(2),
-                        [&]() { return g_CurrentFakePlugin->timerFence->Calls == 1; }),
-                    "fake blocking timer callback did not enter during init");
+            Require(!g_CurrentFakePlugin->timerFence->Cv.wait_for(
+                        lock, std::chrono::milliseconds(20),
+                        [&]() { return g_CurrentFakePlugin->timerFence->Calls != 0; }),
+                    "Initializing plugin received timer callback");
         }
 
         if (g_CurrentFakePlugin->callProcessEventInInit)
@@ -1378,6 +1378,15 @@ namespace
             throw std::runtime_error("fake shutdown failure");
     }
 
+    uint32_t FakeLifecycleCapabilities() { return g_CurrentFakePlugin->lifecycleCapabilities; }
+    bool FakePrepareUnload()
+    {
+        ++g_CurrentFakePlugin->prepareUnloadCalls;
+        if (g_CurrentFakePlugin->duringPrepareUnload) g_CurrentFakePlugin->duringPrepareUnload();
+        if (g_CurrentFakePlugin->throwOnPrepareUnload) throw std::runtime_error("prepare unload failure");
+        return g_CurrentFakePlugin->prepareUnloadResult;
+    }
+
     class FakeLoader final : public Obelisk::Core::PluginManager::LibraryLoader
     {
     public:
@@ -1388,6 +1397,7 @@ namespace
 
         void* Open(const fs::path& path, std::string& error) override
         {
+            OpenedPaths.push_back(path);
             if (BeforeOpen)
                 BeforeOpen(path);
             const auto it = m_Plugins.find(path.filename().string());
@@ -1413,14 +1423,25 @@ namespace
                 return reinterpret_cast<void*>(&FakeInit);
             if (symbol == "ObeliskPlugin_Shutdown" && plugin->hasShutdown)
                 return reinterpret_cast<void*>(&FakeShutdown);
+            if (symbol == "ObeliskPlugin_LifecycleCapabilities" && plugin->hasLifecycleContract)
+                return reinterpret_cast<void*>(&FakeLifecycleCapabilities);
+            if (symbol == "ObeliskPlugin_PrepareUnload" && plugin->hasLifecycleContract)
+                return reinterpret_cast<void*>(&FakePrepareUnload);
 
             error = "missing fake symbol " + symbol;
             return nullptr;
         }
 
-        void* GetSymbolOwner(void* handle, void*) override
+        void* GetSymbolOwner(void* handle, void* symbol) override
         {
-            return static_cast<FakePlugin*>(handle)->owner;
+            auto* plugin = static_cast<FakePlugin*>(handle);
+            const auto foreign = [&](const char* name, auto address) {
+                return plugin->foreignExport == name && symbol == reinterpret_cast<void*>(address);
+            };
+            if (foreign("GetInfo", &FakeGetInfo) || foreign("Shutdown", &FakeShutdown) ||
+                foreign("PrepareUnload", &FakePrepareUnload) || foreign("LifecycleCapabilities", &FakeLifecycleCapabilities))
+                return nullptr;
+            return plugin->owner;
         }
 
         bool Close(void* handle, std::string&) override
@@ -1467,6 +1488,7 @@ namespace
 
         std::function<void(const fs::path&)> BeforeOpen;
         std::function<void(FakePlugin&)> AfterClose;
+        std::vector<fs::path> OpenedPaths;
 
     private:
         std::unordered_map<std::string, FakePlugin*> m_Plugins;
@@ -1822,18 +1844,12 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "valid plugin shutdown was not called during unload");
-        Require(plugin.eventCallbacksAtShutdown,
-                "ProcessEvent callbacks were removed before plugin shutdown");
-        Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "chat callback was removed before plugin shutdown");
-        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
-                "inventory policy callback was removed before plugin shutdown");
-        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
-                "item-return callback was removed before plugin shutdown");
-        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 1,
-                "player-principal callback was removed before plugin shutdown");
-        Require(plugin.structureSubscriptionsAtShutdown == 1,
-                "structure callback was removed before plugin shutdown");
+        Require(!plugin.eventCallbacksAtShutdown, "ProcessEvent callbacks must be removed before Shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
         Require(plugin.closeCalls == 1, "valid plugin was not closed during unload");
         Require(plugin.chatSubscriptionsAtClose == 0, "chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
@@ -2972,8 +2988,7 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "gameplay-policy shutdown-unregister plugin shutdown was not called");
-        Require(plugin.shutdownGameplayPolicyUnregisterResult,
-                "owner-token gameplay policy unregister was rejected while plugin was unloading");
+        Require(!plugin.shutdownGameplayPolicyUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-unregistered gameplay policy structure callback survived unload");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
@@ -3047,8 +3062,7 @@ namespace
                 "gameplay-policy init-failure shutdown-unregister plugin shutdown was not called");
         Require(plugin.gameplayPolicyRegistrationId != 0,
                 "gameplay-policy init-failure shutdown-unregister plugin did not register before failing");
-        Require(plugin.shutdownGameplayPolicyUnregisterResult,
-                "owner-token gameplay policy unregister was rejected during init-failure shutdown");
+        Require(!plugin.shutdownGameplayPolicyUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "init-failure shutdown-unregistered gameplay policy structure callback survived load failure");
         Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
@@ -3307,8 +3321,7 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "chat shutdown-unregister plugin shutdown was not called");
-        Require(plugin.shutdownChatMessageUnregisterResult,
-                "owner-token chat unregister was rejected while plugin was unloading");
+        Require(!plugin.shutdownChatMessageUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "shutdown-unregistered owner-token chat callback survived unload");
 
@@ -3375,8 +3388,7 @@ namespace
         Require(plugin.shutdownCalls == 1, "chat init-failure shutdown-unregister plugin shutdown was not called");
         Require(plugin.chatMessageRegistrationId != 0,
                 "chat init-failure shutdown-unregister plugin did not register before failing");
-        Require(plugin.shutdownChatMessageUnregisterResult,
-                "owner-token chat unregister was rejected during init-failure shutdown");
+        Require(!plugin.shutdownChatMessageUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "init-failure shutdown-unregistered owner-token chat callback survived load failure");
 
@@ -3448,32 +3460,12 @@ namespace
             state.Cv.notify_all();
         });
 
-        bool shutdownEntered = false;
+        bool shutdownOrCloseWhileCallbackInFlight = false;
         {
             std::unique_lock<std::mutex> lock(state.Mutex);
-            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.ShutdownEntered;
-            });
-        }
-
-        if (!shutdownEntered)
-        {
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.Release = true;
-            }
-            state.Cv.notify_all();
-            dispatchThread.join();
-            unloadThread.join();
-            Require(false, "UnloadAll did not reach plugin shutdown while chat callback was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            closedWhileCallbackInFlight =
+            shutdownOrCloseWhileCallbackInFlight =
                 state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
-                    return state.CloseEntered || state.UnloadReturned;
+                    return state.ShutdownEntered || state.CloseEntered || state.UnloadReturned;
                 });
             state.Release = true;
         }
@@ -3490,8 +3482,10 @@ namespace
         dispatchThread.join();
         unloadThread.join();
 
-        Require(!closedWhileCallbackInFlight,
-                "UnloadAll closed plugin while public chat callback was in flight");
+        Require(!shutdownOrCloseWhileCallbackInFlight,
+                "Shutdown or dlclose ran while public chat callback still used plugin state");
+        Require(state.ShutdownEntered && plugin.shutdownCalls == 1,
+                "Shutdown did not run after the public chat callback drained");
         Require(callbackCompleted, "public chat callback did not complete after release");
         Require(dispatches.load(std::memory_order_acquire) == 1,
                 "public chat dispatch did not complete exactly one callback");
@@ -3710,306 +3704,111 @@ namespace
 
     void TestUnloadAllWaitsForInFlightPluginTimerBeforeClose()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_unload_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_timer_shutdown_after_drain");
         ConfigureEnvironment(root);
-
         TimerFenceState state;
-        FakePlugin plugin{
-            .filename = "timer_unload_in_flight.so",
-            .pluginId = "timer_unload_in_flight",
-            .captureApi = true,
-            .timerFence = &state,
-        };
+        FakePlugin plugin{.filename = "timer_fence.so", .captureApi = true, .timerFence = &state};
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
-
-        Require(plugin.initCalls == 1, "timer unload fence plugin was not initialized");
-        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle != nullptr,
-                "timer registration function was not exposed");
-
-        const uint64_t timerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
-            plugin.initOwnerToken,
-            1,
-            0,
-            0,
-            BlockingTimerCallback,
-            &state);
-        Require(timerId != 0, "blocking plugin-owned timer registration returned zero");
-
+        plugin.timerRegistrationId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken, 1, 0, 0, BlockingTimerCallback, &state);
+        Require(plugin.timerRegistrationId != 0, "timer fence registration failed");
         {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                        return state.Calls == 1;
-                    }),
-                    "blocking plugin-owned timer callback did not enter");
-            Require(state.LastTimerId == timerId,
-                    "blocking plugin-owned timer callback received wrong timer handle");
+            std::unique_lock lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&] { return state.Calls == 1; }), "timer did not enter");
         }
-
-        std::thread unloadThread([&]() {
-            manager.UnloadAll();
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.UnloadReturned = true;
-            }
-            state.Cv.notify_all();
-        });
-
-        bool shutdownEntered = false;
+        std::thread unload([&] { manager.UnloadAll(); std::lock_guard lock(state.Mutex); state.UnloadReturned = true; state.Cv.notify_all(); });
+        bool premature;
         {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.ShutdownEntered;
-            });
-        }
-
-        if (!shutdownEntered)
-        {
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.Release = true;
-            }
-            state.Cv.notify_all();
-            unloadThread.join();
-            Require(false, "UnloadAll did not reach plugin shutdown while timer callback was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            closedWhileCallbackInFlight =
-                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
-                    return state.CloseEntered || state.UnloadReturned;
-                });
+            std::unique_lock lock(state.Mutex);
+            premature = state.Cv.wait_for(lock, std::chrono::milliseconds(80), [&] { return state.ShutdownEntered || state.CloseEntered || state.UnloadReturned; });
             state.Release = true;
         }
         state.Cv.notify_all();
-
-        bool callbackCompleted = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.Completed == 1;
-            });
-        }
-
-        unloadThread.join();
-
-        Require(!closedWhileCallbackInFlight,
-                "UnloadAll closed plugin while plugin-owned timer callback was in flight");
-        Require(callbackCompleted, "plugin-owned timer callback did not complete after release");
-        Require(plugin.closeCalls == 1, "timer unload fence plugin was not closed once");
-        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
-                "plugin-owned timer survived unload after in-flight callback completed");
-
+        unload.join();
+        Require(!premature, "Shutdown or dlclose ran while timer callback used plugin state");
+        Require(state.Completed == 1 && state.ShutdownEntered && state.CloseEntered && plugin.shutdownCalls == 1 && plugin.closeCalls == 1,
+                "retired timer did not complete before shutdown and close");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0, "timer survived unload");
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
 
     void TestUnloadAllWaitsForShutdownUnregisteredInFlightPluginTimerBeforeClose()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_shutdown_unregister_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_timer_shutdown_after_drain");
         ConfigureEnvironment(root);
-
         TimerFenceState state;
-        FakePlugin plugin{
-            .filename = "timer_shutdown_unregister_in_flight.so",
-            .pluginId = "timer_shutdown_unregister_in_flight",
-            .registerBlockingTimerCallback = true,
-            .unregisterTimerInShutdown = true,
-            .timerFence = &state,
-        };
+        FakePlugin plugin{.filename = "timer_fence.so", .captureApi = true, .timerFence = &state};
+        plugin.unregisterTimerInShutdown = true;
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
-
-        Require(plugin.initCalls == 1, "shutdown-unregister in-flight timer plugin was not initialized");
-        Require(plugin.timerRegistrationId != 0,
-                "shutdown-unregister in-flight timer was not registered before unload");
-
-        std::thread unloadThread([&]() {
-            manager.UnloadAll();
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.UnloadReturned = true;
-            }
-            state.Cv.notify_all();
-        });
-
-        bool shutdownEntered = false;
+        plugin.timerRegistrationId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken, 1, 0, 0, BlockingTimerCallback, &state);
+        Require(plugin.timerRegistrationId != 0, "timer fence registration failed");
         {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.ShutdownEntered;
-            });
+            std::unique_lock lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&] { return state.Calls == 1; }), "timer did not enter");
         }
-
-        if (!shutdownEntered)
+        std::thread unload([&] { manager.UnloadAll(); std::lock_guard lock(state.Mutex); state.UnloadReturned = true; state.Cv.notify_all(); });
+        bool premature;
         {
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.Release = true;
-            }
-            state.Cv.notify_all();
-            unloadThread.join();
-            Require(false, "UnloadAll did not reach plugin shutdown while shutdown-unregistered timer was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            closedWhileCallbackInFlight =
-                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
-                    return state.CloseEntered || state.UnloadReturned;
-                });
+            std::unique_lock lock(state.Mutex);
+            premature = state.Cv.wait_for(lock, std::chrono::milliseconds(80), [&] { return state.ShutdownEntered || state.CloseEntered || state.UnloadReturned; });
             state.Release = true;
         }
         state.Cv.notify_all();
-
-        bool callbackCompleted = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.Completed == 1;
-            });
-        }
-
-        unloadThread.join();
-
-        Require(plugin.shutdownCalls == 1,
-                "shutdown-unregister in-flight timer plugin shutdown was not called");
-        Require(plugin.shutdownTimerUnregisterResult,
-                "shutdown unregister rejected the in-flight plugin timer");
-        Require(!closedWhileCallbackInFlight,
-                "UnloadAll closed plugin while shutdown-unregistered timer callback was in flight");
-        Require(callbackCompleted,
-                "shutdown-unregistered timer callback did not complete after release");
-        Require(plugin.closeCalls == 1,
-                "shutdown-unregister in-flight timer plugin was not closed once");
-        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
-                "shutdown-unregistered in-flight timer survived unload cleanup");
-
+        unload.join();
+        Require(!premature, "Shutdown or dlclose ran while timer callback used plugin state");
+        Require(state.Completed == 1 && state.ShutdownEntered && state.CloseEntered && plugin.shutdownCalls == 1 && plugin.closeCalls == 1,
+                "retired timer did not complete before shutdown and close");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0, "timer survived unload");
+        Require(!plugin.shutdownTimerUnregisterResult, "Shutdown observed a timer that manager should have removed");
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
 
     void TestUnloadAllWaitsForInFlightRepeatingPluginTimerBeforeCloseAndDoesNotReschedule()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_repeating_timer_unload_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_timer_shutdown_after_drain");
         ConfigureEnvironment(root);
-
         TimerFenceState state;
-        FakePlugin plugin{
-            .filename = "repeating_timer_unload_in_flight.so",
-            .pluginId = "repeating_timer_unload_in_flight",
-            .captureApi = true,
-            .timerFence = &state,
-        };
+        FakePlugin plugin{.filename = "timer_fence.so", .captureApi = true, .timerFence = &state};
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
-
-        Require(plugin.initCalls == 1, "repeating timer unload fence plugin was not initialized");
-        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle != nullptr,
-                "timer registration function was not exposed");
-
-        const uint64_t timerId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
-            plugin.initOwnerToken,
-            1,
-            1,
-            OBELISK_TIMER_FLAG_REPEATING,
-            BlockingTimerCallback,
-            &state);
-        Require(timerId != 0, "blocking repeating plugin-owned timer registration returned zero");
-
+        plugin.timerRegistrationId = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+            plugin.initOwnerToken, 1, 1, OBELISK_TIMER_FLAG_REPEATING, BlockingTimerCallback, &state);
+        Require(plugin.timerRegistrationId != 0, "timer fence registration failed");
         {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                        return state.Calls == 1;
-                    }),
-                    "blocking repeating plugin-owned timer callback did not enter");
-            Require(state.LastTimerId == timerId,
-                    "blocking repeating plugin-owned timer callback received wrong timer handle");
+            std::unique_lock lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&] { return state.Calls == 1; }), "timer did not enter");
         }
-
-        std::thread unloadThread([&]() {
-            manager.UnloadAll();
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.UnloadReturned = true;
-            }
-            state.Cv.notify_all();
-        });
-
-        bool shutdownEntered = false;
+        std::thread unload([&] { manager.UnloadAll(); std::lock_guard lock(state.Mutex); state.UnloadReturned = true; state.Cv.notify_all(); });
+        bool premature;
         {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.ShutdownEntered;
-            });
-        }
-
-        if (!shutdownEntered)
-        {
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.Release = true;
-            }
-            state.Cv.notify_all();
-            unloadThread.join();
-            Require(false, "UnloadAll did not reach plugin shutdown while repeating timer callback was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            closedWhileCallbackInFlight =
-                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
-                    return state.CloseEntered || state.UnloadReturned;
-                });
+            std::unique_lock lock(state.Mutex);
+            premature = state.Cv.wait_for(lock, std::chrono::milliseconds(80), [&] { return state.ShutdownEntered || state.CloseEntered || state.UnloadReturned; });
             state.Release = true;
         }
         state.Cv.notify_all();
-
-        bool callbackCompleted = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.Completed == 1;
-            });
-        }
-
-        unloadThread.join();
-
-        bool repeatedAfterCleanup = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            repeatedAfterCleanup = state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
-                return state.Calls > 1;
-            });
-        }
-
-        Require(!closedWhileCallbackInFlight,
-                "UnloadAll closed plugin while plugin-owned repeating timer callback was in flight");
-        Require(callbackCompleted, "plugin-owned repeating timer callback did not complete after release");
-        Require(!repeatedAfterCleanup, "plugin-owned repeating timer fired again after unload cleanup");
-        Require(plugin.closeCalls == 1, "repeating timer unload fence plugin was not closed once");
-        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
-                "plugin-owned repeating timer survived unload after in-flight callback completed");
-
+        unload.join();
+        Require(!premature, "Shutdown or dlclose ran while timer callback used plugin state");
+        Require(state.Completed == 1 && state.ShutdownEntered && state.CloseEntered && plugin.shutdownCalls == 1 && plugin.closeCalls == 1,
+                "retired timer did not complete before shutdown and close");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0, "timer survived unload");
+        { std::unique_lock lock(state.Mutex); Require(!state.Cv.wait_for(lock, std::chrono::milliseconds(40), [&] { return state.Calls > 1; }), "retired repeating timer rescheduled"); }
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
@@ -4044,336 +3843,59 @@ namespace
         fs::remove_all(root);
     }
 
-    void TestInitFailureWaitsForInFlightPluginTimerBeforeClose()
+    void TestInitialisingPluginTimerDeliveryIsDenied()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_init_fail_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_init_denies_timer");
         ConfigureEnvironment(root);
-
         TimerFenceState state;
-        FakePlugin plugin{
-            .filename = "timer_init_fail_in_flight.so",
-            .pluginId = "timer_init_fail_in_flight",
-            .initResult = false,
-            .registerBlockingTimerCallback = true,
-            .timerFence = &state,
-        };
-        FakeLoader loader;
-        loader.Add(plugin);
-        TouchPlugin(root, plugin.filename);
+        FakePlugin plugin{.filename = "init_timer.so", .initResult = false, .registerBlockingTimerCallback = true, .timerFence = &state};
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
         Obelisk::Core::PluginManager manager(loader);
-        std::atomic<bool> loadReturned{false};
-        std::thread loadThread([&]() {
-            manager.LoadPlugins((root / "plugins").string());
-            loadReturned.store(true, std::memory_order_release);
-            state.Cv.notify_all();
-        });
-
-        bool shutdownEntered = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.ShutdownEntered;
-            });
-        }
-
-        if (!shutdownEntered)
-        {
-            {
-                std::lock_guard<std::mutex> lock(state.Mutex);
-                state.Release = true;
-            }
-            state.Cv.notify_all();
-            loadThread.join();
-            Require(false, "init-failure cleanup did not call plugin shutdown while timer callback was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            closedWhileCallbackInFlight =
-                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
-                    return state.CloseEntered || loadReturned.load(std::memory_order_acquire);
-                });
-            state.Release = true;
-        }
-        state.Cv.notify_all();
-
-        bool callbackCompleted = false;
-        {
-            std::unique_lock<std::mutex> lock(state.Mutex);
-            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
-                return state.Completed == 1;
-            });
-        }
-
-        loadThread.join();
-
-        Require(plugin.initCalls == 1, "in-flight timer init-fail plugin Init was not called");
-        Require(plugin.shutdownCalls == 1, "in-flight timer init-fail plugin shutdown was not called");
-        Require(!closedWhileCallbackInFlight,
-                "init-failure cleanup closed plugin while plugin-owned timer callback was in flight");
-        Require(callbackCompleted, "plugin-owned timer callback did not complete after release");
-        Require(plugin.closeCalls == 1, "in-flight timer init-fail plugin was not closed once");
-        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
-                "in-flight timer survived init-failure cleanup");
-
-        CleanupPlugin(plugin);
-        fs::remove_all(root);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.timerRegistrationId && state.Calls == 0 && plugin.shutdownCalls == 1 && plugin.closeCalls == 1,
+                "Initializing timer delivered plugin code or failed cleanup");
+        Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0, "Init-failed timer retained subscription");
+        CleanupPlugin(plugin); fs::remove_all(root);
     }
 
-    void TestInitFailureWaitsForInFlightDirectPlayerPrincipalDispatchBeforeClose()
+    void TestInitialisingPrincipalDeliveryIsDenied()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_player_principal_init_fail_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_init_denies_principal");
         ConfigureEnvironment(root);
-
-        TimerFenceState lifecycleState;
-        PlayerPrincipalUnloadFenceState callbackState;
-        FakePlugin plugin{
-            .filename = "player_principal_init_fail_in_flight.so",
-            .pluginId = "player_principal_init_fail_in_flight",
-            .initResult = false,
-            .timerFence = &lifecycleState,
-        };
-        plugin.startPlayerPrincipalDispatchDuringInit = true;
-        plugin.initPlayerPrincipalFence = &callbackState;
-
-        FakeLoader loader;
-        loader.Add(plugin);
-        TouchPlugin(root, plugin.filename);
+        PlayerPrincipalUnloadFenceState state;
+        FakePlugin plugin{.filename = "init_principal.so", .initResult = false};
+        plugin.startPlayerPrincipalDispatchDuringInit = true; plugin.initPlayerPrincipalFence = &state;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
         Obelisk::Core::PluginManager manager(loader);
-        std::atomic<bool> loadReturned{false};
-        std::thread loadThread([&]() {
-            manager.LoadPlugins((root / "plugins").string());
-            loadReturned.store(true, std::memory_order_release);
-            lifecycleState.Cv.notify_all();
-        });
-
-        {
-            std::unique_lock<std::mutex> lock(callbackState.Mutex);
-            Require(callbackState.Cv.wait_for(lock, std::chrono::seconds(2), [&callbackState]() {
-                        return callbackState.Entered;
-                    }),
-                    "init-failure player-principal callback did not enter");
-        }
-
-        bool shutdownEntered = false;
-        {
-            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
-            shutdownEntered = lifecycleState.Cv.wait_for(lock, std::chrono::seconds(2), [&lifecycleState]() {
-                return lifecycleState.ShutdownEntered;
-            });
-        }
-
-        if (!shutdownEntered)
-        {
-            {
-                std::lock_guard<std::mutex> lock(callbackState.Mutex);
-                callbackState.Release = true;
-            }
-            callbackState.Cv.notify_all();
-            loadThread.join();
-            CleanupPlugin(plugin);
-            fs::remove_all(root);
-            Require(false, "init-failure cleanup did not call plugin shutdown while player-principal callback was in flight");
-        }
-
-        bool closedWhileCallbackInFlight = false;
-        {
-            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
-            closedWhileCallbackInFlight =
-                lifecycleState.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
-                    return lifecycleState.CloseEntered || loadReturned.load(std::memory_order_acquire);
-                });
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.Release = true;
-        }
-        callbackState.Cv.notify_all();
-
-        loadThread.join();
-        CleanupPlugin(plugin);
-
-        Require(plugin.initCalls == 1, "in-flight player-principal init-fail plugin Init was not called");
-        Require(plugin.shutdownCalls == 1,
-                "in-flight player-principal init-fail plugin shutdown was not called");
-        Require(!closedWhileCallbackInFlight,
-                "init-failure cleanup closed plugin while direct player-principal callback was in flight");
-        Require(plugin.initPlayerPrincipalDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure player-principal dispatch did not complete exactly one callback");
-        Require(callbackState.Calls == 1,
-                "init-failure player-principal callback call count mismatch");
-        Require(plugin.closeCalls == 1,
-                "in-flight player-principal init-fail plugin was not closed once");
-        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
-                "in-flight player-principal callback survived init-failure cleanup");
-
-        fs::remove_all(root);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initPlayerPrincipalDispatches == 0 && state.Calls == 0 && plugin.shutdownCalls == 1 && plugin.closeCalls == 1,
+                "Initializing principal callback delivered or failed cleanup");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0, "Init-failed principal subscription retained");
+        CleanupPlugin(plugin); fs::remove_all(root);
     }
 
-    void TestInitFailureWaitsForInFlightCopiedDispatchersBeforeClose()
+    void TestInitialisingCopiedDispatcherDeliveryIsDenied()
     {
-        const fs::path root = MakeTempRoot("obelisk_plugin_manager_copied_dispatch_init_fail_in_flight");
+        const fs::path root = MakeTempRoot("obelisk_init_denies_copied");
         ConfigureEnvironment(root);
-
-        TimerFenceState lifecycleState;
-        CopiedDispatcherInitFailureFenceState callbackState;
-        Obelisk::Core::ChatEventDispatcher chatDispatcher;
-        FakePlugin plugin{
-            .filename = "copied_dispatch_init_fail_in_flight.so",
-            .pluginId = "copied_dispatch_init_fail_in_flight",
-            .initResult = false,
-            .timerFence = &lifecycleState,
-        };
-        plugin.chatDispatcher = &chatDispatcher;
-        plugin.startCopiedDispatchesDuringInit = true;
-        plugin.initCopiedDispatchFence = &callbackState;
-
-        FakeLoader loader;
-        loader.Add(plugin);
-        TouchPlugin(root, plugin.filename);
+        CopiedDispatcherInitFailureFenceState state;
+        Obelisk::Core::ChatEventDispatcher chat;
+        FakePlugin plugin{.filename = "init_copied.so", .initResult = false};
+        plugin.chatDispatcher = &chat; plugin.startCopiedDispatchesDuringInit = true; plugin.initCopiedDispatchFence = &state;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
-
-        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
-        std::atomic<bool> loadReturned{false};
-        std::thread loadThread([&]() {
-            manager.LoadPlugins((root / "plugins").string());
-            loadReturned.store(true, std::memory_order_release);
-            lifecycleState.Cv.notify_all();
-        });
-
-        {
-            std::unique_lock<std::mutex> lock(callbackState.Mutex);
-            Require(callbackState.Cv.wait_for(
-                        lock,
-                        std::chrono::seconds(2),
-                        [&callbackState]() {
-                            return callbackState.ChatEntered &&
-                                callbackState.StructureEntered &&
-                                callbackState.InventoryEntered &&
-                                callbackState.ItemReturnEntered &&
-                                callbackState.PlayerPrincipalEntered;
-                        }),
-                    "init-failure copied dispatcher callbacks did not all enter");
-        }
-
-        bool shutdownEntered = false;
-        {
-            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
-            shutdownEntered = lifecycleState.Cv.wait_for(lock, std::chrono::seconds(2), [&lifecycleState]() {
-                return lifecycleState.ShutdownEntered;
-            });
-        }
-
-        auto releaseAllAndJoin = [&]() {
-            {
-                std::lock_guard<std::mutex> lock(callbackState.Mutex);
-                callbackState.ReleaseChat = true;
-                callbackState.ReleaseStructure = true;
-                callbackState.ReleaseInventory = true;
-                callbackState.ReleaseItemReturn = true;
-                callbackState.ReleasePlayerPrincipal = true;
-            }
-            callbackState.Cv.notify_all();
-            if (loadThread.joinable())
-                loadThread.join();
-            CleanupPlugin(plugin);
-            fs::remove_all(root);
-        };
-
-        if (!shutdownEntered)
-        {
-            releaseAllAndJoin();
-            Require(false, "init-failure cleanup did not call plugin shutdown while copied callbacks were in flight");
-        }
-
-        auto requireNotClosed = [&](const char* message) {
-            bool closedOrReturned = false;
-            {
-                std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
-                closedOrReturned =
-                    lifecycleState.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
-                        return lifecycleState.CloseEntered || loadReturned.load(std::memory_order_acquire);
-                    });
-            }
-            Require(!closedOrReturned, message);
-        };
-
-        requireNotClosed("init-failure cleanup closed plugin while copied dispatcher callbacks were in flight");
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.ReleaseChat = true;
-        }
-        callbackState.Cv.notify_all();
-        requireNotClosed("init-failure cleanup closed plugin before non-chat copied callbacks completed");
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.ReleaseStructure = true;
-        }
-        callbackState.Cv.notify_all();
-        requireNotClosed("init-failure cleanup closed plugin before inventory/item-return/player-principal callbacks completed");
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.ReleaseInventory = true;
-        }
-        callbackState.Cv.notify_all();
-        requireNotClosed("init-failure cleanup closed plugin before item-return/player-principal callbacks completed");
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.ReleaseItemReturn = true;
-        }
-        callbackState.Cv.notify_all();
-        requireNotClosed("init-failure cleanup closed plugin before player-principal callback completed");
-
-        {
-            std::lock_guard<std::mutex> lock(callbackState.Mutex);
-            callbackState.ReleasePlayerPrincipal = true;
-        }
-        callbackState.Cv.notify_all();
-
-        loadThread.join();
-
-        Require(plugin.initCalls == 1, "copied-dispatch init-fail plugin Init was not called");
-        Require(plugin.shutdownCalls == 1, "copied-dispatch init-fail plugin shutdown was not called");
-        Require(plugin.closeCalls == 1, "copied-dispatch init-fail plugin was not closed once");
-        Require(plugin.initChatDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure copied chat dispatch did not complete exactly one callback");
-        Require(plugin.initStructureDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure copied structure dispatch did not complete exactly one callback");
-        Require(plugin.initInventoryDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure copied inventory dispatch did not complete exactly one callback");
-        Require(plugin.initItemReturnDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure copied item-return dispatch did not complete exactly one callback");
-        Require(plugin.initCopiedPlayerPrincipalDispatches.load(std::memory_order_acquire) == 1,
-                "init-failure copied player-principal dispatch did not complete exactly one callback");
-        Require(callbackState.ChatCalls == 1, "init-failure copied chat call count mismatch");
-        Require(callbackState.StructureCalls == 1, "init-failure copied structure call count mismatch");
-        Require(callbackState.InventoryCalls == 1, "init-failure copied inventory call count mismatch");
-        Require(callbackState.ItemReturnCalls == 1, "init-failure copied item-return call count mismatch");
-        Require(callbackState.PlayerPrincipalCalls == 1,
-                "init-failure copied player-principal call count mismatch");
-        Require(chatDispatcher.SubscriptionCount() == 0,
-                "init-failure copied chat callback survived cleanup");
-        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
-                "init-failure copied structure callback survived cleanup");
-        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
-                "init-failure copied inventory callback survived cleanup");
-        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
-                "init-failure copied item-return callback survived cleanup");
-        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
-                "init-failure copied player-principal callback survived cleanup");
-
-        CleanupPlugin(plugin);
-        fs::remove_all(root);
+        Obelisk::Core::PluginManager manager(loader, chat);
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initChatDispatches == 0 && plugin.initStructureDispatches == 0 && plugin.initInventoryDispatches == 0 &&
+                plugin.initItemReturnDispatches == 0 && plugin.initCopiedPlayerPrincipalDispatches == 0 &&
+                plugin.shutdownCalls == 1 && plugin.closeCalls == 1, "Initializing copied families delivered or failed cleanup");
+        Require(chat.SubscriptionCount() == 0 && Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0 &&
+                Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0 &&
+                Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0 &&
+                Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0, "Init-failed copied subscriptions retained");
+        CleanupPlugin(plugin); fs::remove_all(root);
     }
 
     void TestOwnerTokenTimerRegistrationRejectedDuringShutdown()
@@ -4460,8 +3982,7 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "timer shutdown-unregister plugin shutdown was not called");
-        Require(plugin.shutdownTimerUnregisterResult,
-                "owner-token timer unregister was rejected while plugin was unloading");
+        Require(!plugin.shutdownTimerUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "shutdown-unregistered owner-token timer survived unload");
         Require(plugin.timerEventCalls == 0, "long-delay timer fired before shutdown unregister");
@@ -4494,8 +4015,7 @@ namespace
         Require(plugin.shutdownCalls == 1, "timer init-failure shutdown-unregister plugin shutdown was not called");
         Require(plugin.timerRegistrationId != 0,
                 "timer init-failure shutdown-unregister plugin did not register a timer before failing");
-        Require(plugin.shutdownTimerUnregisterResult,
-                "owner-token timer unregister was rejected during init-failure shutdown");
+        Require(!plugin.shutdownTimerUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "init-failure shutdown-unregistered owner-token timer survived load failure");
         Require(plugin.timerEventCalls == 0, "long-delay timer fired before init-failure shutdown unregister");
@@ -4582,8 +4102,7 @@ namespace
             Require(plugin.initOwnerToken != 0, "chat message failing plugin did not receive an owner token");
             Require(plugin.chatMessageRegistrationId != 0,
                     "chat message callback was not registered before init failure");
-            Require(plugin.chatSubscriptionsAtShutdown == 1,
-                    "chat message callback was removed before failing-plugin shutdown");
+            Require(plugin.chatSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
             Require(plugin.chatSubscriptionsAtClose == 0,
                     "chat message callback survived until failing-plugin close");
             Require(chatDispatcher.SubscriptionCount() == 0,
@@ -6207,8 +5726,7 @@ namespace
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "shutdown-unregister plugin shutdown was not called");
-        Require(plugin.shutdownUnregisterResult,
-                "owner-token callback unregister was rejected while plugin was unloading");
+        Require(!plugin.shutdownUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "shutdown-unregistered owner-token callback survived unload");
 
@@ -6240,8 +5758,7 @@ namespace
         Require(plugin.shutdownCalls == 1, "init-failure shutdown-unregister plugin shutdown was not called");
         Require(plugin.initThreadRegistrationId != 0,
                 "init-failure shutdown-unregister plugin did not register a callback before failing");
-        Require(plugin.shutdownUnregisterResult,
-                "owner-token callback unregister was rejected during init-failure shutdown");
+        Require(!plugin.shutdownUnregisterResult, "Shutdown unregister observes an already removed handle");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "init-failure shutdown-unregistered owner-token callback survived load failure");
 
@@ -6764,9 +6281,13 @@ namespace
         ConfigureEnvironment(root);
 
         FakePlugin plugin{.filename = "disabled.so", .hasInit = false};
+        FakePlugin foreign{.filename = "disabled_foreign.so", .pluginId = "disabled_foreign", .hasInit = false};
+        foreign.foreignExport = "GetInfo";
         FakeLoader loader;
         loader.Add(plugin);
+        loader.Add(foreign);
         TouchPlugin(root, plugin.filename);
+        TouchPlugin(root, foreign.filename);
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -6777,8 +6298,12 @@ namespace
         Require(plugin.closeCalls == 1, "disabled plugin was not closed after skip");
         Require(fs::exists(root / "config" / plugin.pluginId / "config.json"),
                 "disabled plugin default config was not prepared");
+        Require(foreign.getInfoCalls == 0 && foreign.initCalls == 0 && foreign.closeCalls == 1 &&
+                !fs::exists(root / "config" / foreign.pluginId / "config.json"),
+                "metadata-only plugin accepted GetInfo from a foreign mapping");
 
         CleanupPlugin(plugin);
+        CleanupPlugin(foreign);
         fs::remove_all(root);
     }
 
@@ -7048,9 +6573,9 @@ namespace
 
         Require(first.getInfoCalls == 1, "config-root replacement first plugin metadata was not read");
         Require(first.closeCalls == 1, "config-root replacement first plugin was not closed");
-        Require(second.getInfoCalls == 1, "config-root replacement second plugin metadata was not read");
+        Require(second.getInfoCalls == 0, "unsafe replaced config root reached generation copy or metadata");
         Require(second.initCalls == 0, "config-root replacement initialized second plugin");
-        Require(second.closeCalls == 1, "config-root replacement second plugin handle was not closed");
+        Require(second.closeCalls == 0, "unsafe replaced config root opened a second plugin mapping");
         Require(!fs::exists(externalParent / "config" / second.pluginId / "config.json"),
                 "default plugin config was created through a replaced symlink config ancestor");
 
@@ -7073,7 +6598,7 @@ namespace
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
 
-        Require(plugin.getInfoCalls == 1, "plugin without Init did not report metadata before rejection");
+        Require(plugin.getInfoCalls == 1, "primary-owned plugin metadata was not read before enabled missing-Init rejection");
         Require(plugin.closeCalls == 1, "plugin without Init was not closed");
 
         CleanupPlugin(plugin);
@@ -7126,18 +6651,12 @@ namespace
         Require(plugin.getInfoCalls == 1, "init-failing plugin did not report metadata");
         Require(plugin.initCalls == 1, "init-failing plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-failing plugin shutdown was not called");
-        Require(plugin.eventCallbacksAtShutdown,
-                "init-failing plugin ProcessEvent callback was not present during shutdown");
-        Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "init-failing plugin chat callback was not present during shutdown");
-        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
-                "init-failing plugin inventory policy callback was not present during shutdown");
-        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
-                "init-failing plugin item-return callback was not present during shutdown");
-        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 1,
-                "init-failing plugin player-principal callback was not present during shutdown");
-        Require(plugin.structureSubscriptionsAtShutdown == 1,
-                "init-failing plugin structure callback was not present during shutdown");
+        Require(!plugin.eventCallbacksAtShutdown, "ProcessEvent callbacks must be removed before Shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
         Require(plugin.closeCalls == 1, "init-failing plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "failed plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
@@ -7194,18 +6713,12 @@ namespace
         Require(plugin.getInfoCalls == 1, "init-throw plugin did not report metadata");
         Require(plugin.initCalls == 1, "init-throw plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "init-throw plugin shutdown was not called");
-        Require(plugin.eventCallbacksAtShutdown,
-                "init-throw plugin ProcessEvent callback was not present during shutdown");
-        Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "init-throw plugin chat callback was not present during shutdown");
-        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
-                "init-throw plugin inventory policy callback was not present during shutdown");
-        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
-                "init-throw plugin item-return callback was not present during shutdown");
-        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 1,
-                "init-throw plugin player-principal callback was not present during shutdown");
-        Require(plugin.structureSubscriptionsAtShutdown == 1,
-                "init-throw plugin structure callback was not present during shutdown");
+        Require(!plugin.eventCallbacksAtShutdown, "ProcessEvent callbacks must be removed before Shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
         Require(plugin.closeCalls == 1, "init-throw plugin was not closed");
         Require(plugin.chatSubscriptionsAtClose == 0, "init-throw plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
@@ -7628,7 +7141,7 @@ namespace
         fs::remove_all(root);
     }
 
-    void TestUnloadAllCleansAfterShutdownException()
+    void TestShutdownExceptionPermanentlyRetainsMapping()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_shutdown_throw");
         ConfigureEnvironment(root);
@@ -7646,6 +7159,8 @@ namespace
             .throwOnShutdown = true,
         };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        static int terminalShutdownOwner;
+        plugin.owner = &terminalShutdownOwner;
         plugin.chatDispatcher = &chatDispatcher;
         FakeLoader loader;
         loader.Add(plugin);
@@ -7672,20 +7187,14 @@ namespace
         manager.UnloadAll();
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "shutdown-throw plugin shutdown was not called once");
-        Require(plugin.eventCallbacksAtShutdown,
-                "shutdown-throw plugin ProcessEvent callbacks were not present during shutdown");
-        Require(plugin.chatSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin chat callback was not present during shutdown");
-        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin inventory policy callback was not present during shutdown");
-        Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin item-return callback was not present during shutdown");
-        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin player-principal callback was not present during shutdown");
-        Require(plugin.structureSubscriptionsAtShutdown == 1,
-                "shutdown-throw plugin structure callback was not present during shutdown");
-        Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
+        Require(plugin.shutdownCalls == 1, "throwing Shutdown must be attempted only once");
+        Require(!plugin.eventCallbacksAtShutdown, "ProcessEvent callbacks must be removed before Shutdown");
+        Require(plugin.chatSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.inventoryPolicySubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.itemReturnSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.structureSubscriptionsAtShutdown == 0, "subscriptions must be removed before Shutdown");
+        Require(plugin.closeCalls == 0, "Shutdown exception must retain mapped code");
         Require(plugin.chatSubscriptionsAtClose == 0,
                 "shutdown-throw plugin chat callback was still registered at dlclose");
         Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
@@ -7709,6 +7218,13 @@ namespace
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin structure callback survived unload");
 
+        plugin.throwOnShutdown = false;
+        manager.UnloadAll();
+        Require(plugin.shutdownCalls == 1 && plugin.closeCalls == 0, "terminal Shutdown failure was retried or forcibly closed");
+        const auto status = manager.ExecuteOperation("status", plugin.pluginId, std::chrono::steady_clock::now() + std::chrono::seconds(2));
+        Require(status["plugins"][0]["shutdown_failed"] && status["plugins"][0]["retained"] &&
+                status["plugins"][0]["last_failure"] == "shutdown_failed_retained_mapping",
+                "operator status hid terminal Shutdown failure");
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
@@ -7755,7 +7271,7 @@ namespace
         Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "cleanup-fail plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "cleanup-fail plugin was closed despite failed callback cleanup");
         Require(chatDispatcher.SubscriptionCount() == 2,
                 "cleanup-fail plugin callback was removed despite injected cleanup failure");
@@ -7781,7 +7297,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "cleanup-fail plugin shutdown repeated during a failed retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "cleanup-fail plugin was closed during a failed retry");
         Require(chatDispatcher.SubscriptionCount() == 2,
                 "cleanup-fail plugin callback was removed during failed retry");
@@ -7849,7 +7365,7 @@ namespace
         Obelisk::Core::SetPluginTimerCleanupFailureForTesting(true);
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "timer-cleanup-fail plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "timer-cleanup-fail plugin was closed despite timer cleanup failure");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
@@ -7863,7 +7379,7 @@ namespace
                 "timer-cleanup-fail retained plugin owner-token timer unregister failed while unloading");
 
         manager.UnloadAll();
-        Require(plugin.shutdownCalls == 1, "timer-cleanup-fail plugin shutdown repeated during failed retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "timer-cleanup-fail plugin was closed during failed timer cleanup retry");
 
         Obelisk::Core::SetPluginTimerCleanupFailureForTesting(false);
@@ -7901,7 +7417,7 @@ namespace
         manager.LoadPlugins((root / "plugins").string());
 
         Require(plugin.initCalls == 1, "init timer-cleanup-fail plugin was not initialized");
-        Require(plugin.shutdownCalls == 1, "init timer-cleanup-fail plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "init timer-cleanup-fail plugin was closed despite timer cleanup failure");
         Require(plugin.timerRegistrationId != 0,
@@ -7920,8 +7436,7 @@ namespace
                 "init timer-cleanup-fail retained plugin owner-token timer unregister failed while unloading");
 
         manager.UnloadAll();
-        Require(plugin.shutdownCalls == 1,
-                "init timer-cleanup-fail plugin shutdown repeated during failed retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "init timer-cleanup-fail plugin was closed during failed timer cleanup retry");
 
@@ -7971,7 +7486,7 @@ namespace
         Obelisk::Core::SetPublicChatMessageInternalUnregisterFailureForTesting(true);
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "public-chat retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "public-chat retry plugin was closed despite failed public tracking cleanup");
         Require(chatDispatcher.SubscriptionCount() == 0,
@@ -8024,7 +7539,7 @@ namespace
         Obelisk::Core::SetPublicGameplayPolicyInternalUnregisterFailureForTesting(true);
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "gameplay-policy retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "gameplay-policy retry plugin was closed despite failed public tracking cleanup");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
@@ -8082,8 +7597,7 @@ namespace
         Obelisk::Core::SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(true);
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "gameplay-policy partial retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "gameplay-policy partial retry plugin was closed despite partial public cleanup failure");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
@@ -8156,7 +7670,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "destroy-userdata retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "destroy-userdata retry plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 5,
@@ -8217,8 +7731,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "copied destroy owner-token retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "copied destroy owner-token retry plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8324,8 +7837,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "chat retry setup plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "chat retry setup plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8336,8 +7848,7 @@ namespace
         chatDispatcher.FailNextFailedOwnerDestroyRetrySetupForTesting();
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "chat retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "chat retry setup plugin was closed after retry setup failure");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8383,8 +7894,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "structure retry setup plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "structure retry setup plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8395,8 +7905,7 @@ namespace
         Obelisk::Core::StructureEventDispatcher::Get().FailNextFailedOwnerDestroyRetrySetupForTesting();
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "structure retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "structure retry setup plugin was closed after retry setup failure");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8442,8 +7951,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "player-principal destroy-userdata retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "player-principal destroy-userdata retry plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8492,8 +8000,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "player-principal retry setup plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "player-principal retry setup plugin was closed despite failed DestroyUserData cleanup");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8504,8 +8011,7 @@ namespace
         Obelisk::Core::PlayerPrincipalEventDispatcher::Get().FailNextFailedOwnerDestroyRetrySetupForTesting();
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "player-principal retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0,
                 "player-principal retry setup plugin was closed after retry setup failure");
         Require(plugin.destroyUserDataCalls == 1,
@@ -8587,8 +8093,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1,
-                "self-unregister destroy retry plugin shutdown was not called");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(state.DestroyCalls == 2,
                 "self-unregister destroy retry owner cleanup was not attempted during unload");
         Require(plugin.closeCalls == 0,
@@ -8641,7 +8146,7 @@ namespace
         manager.LoadPlugins((root / "plugins").string());
 
         Require(plugin.initCalls == 1, "init-cleanup-fail plugin was not initialized");
-        Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown was not called after init failure");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "init-cleanup-fail plugin was closed despite failed callback cleanup");
         Require(plugin.initThreadRegistrationId != 0,
                 "init-cleanup-fail owner-token ProcessEvent callback was not registered before failure");
@@ -8660,7 +8165,7 @@ namespace
 
         manager.UnloadAll();
 
-        Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown repeated during a failed retry");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.closeCalls == 0, "init-cleanup-fail plugin was closed during a failed retry");
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "init-cleanup-fail ProcessEvent callback was removed during failed retry");
@@ -8753,7 +8258,7 @@ namespace
         Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
 
         Require(plugin.initCalls == 1, "retention-fail plugin was not initialized");
-        Require(plugin.shutdownCalls == 1, "retention-fail plugin shutdown was not called after init failure");
+        Require(plugin.shutdownCalls == 0, "Shutdown must wait for successful cleanup and drain");
         Require(plugin.timerRegistrationId != 0, "retention-fail plugin timer was not registered");
         Require(plugin.closeCalls == 0,
                 "retention-fail plugin was closed after cleanup failed and retention tracking failed");
@@ -8829,21 +8334,209 @@ namespace
         manager.LoadPlugins((root / "plugins").string());
         manager.LoadPlugins((root / "plugins").string());
 
-        Require(plugin.getInfoCalls == 2, "already-loaded plugin metadata was not checked on reload");
+        Require(plugin.getInfoCalls == 1, "already-active source ran GetInfo again");
         Require(plugin.initCalls == 1, "already-loaded plugin was initialized more than once");
-        Require(plugin.closeCalls == 1, "already-loaded duplicate handle was not closed during reload");
+        Require(plugin.closeCalls == 0, "already-active source opened a duplicate handle");
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "callback from first loaded plugin was removed during reload");
 
         manager.UnloadAll();
 
         Require(plugin.shutdownCalls == 1, "idempotent plugin shutdown was not called once");
-        Require(plugin.closeCalls == 2, "loaded plugin handle was not closed during unload");
+        Require(plugin.closeCalls == 1, "loaded plugin handle was not closed during unload");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "callback from idempotent plugin survived unload");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
+    }
+
+    auto ControlDeadline() { return std::chrono::steady_clock::now() + std::chrono::seconds(2); }
+
+    void TestCooperativeControlPreservesPausedStateAndReloadsFreshGeneration()
+    {
+        const fs::path root = MakeTempRoot("obelisk_cooperative_control");
+        ConfigureEnvironment(root); EnableChatMessageEvents(root);
+        Obelisk::Core::ChatEventDispatcher chat;
+        FakePlugin plugin{.filename = "hot.so", .registerChatMessageCallback = true, .captureApi = true};
+        plugin.chatDispatcher = &chat; plugin.hasLifecycleContract = true;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        Obelisk::Core::PluginManager manager(loader, chat);
+        nlohmann::json insideInit;
+        plugin.duringInit = [&] { insideInit = manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline()); };
+        manager.LoadPlugins((root / "plugins").string());
+        Require(!insideInit["ok"] && insideInit["reason"] == "control_inside_plugin_execution", "Init self-control waited on manager lock");
+        Require(loader.OpenedPaths.size() == 1 && loader.OpenedPaths.front() != root / "plugins" / plugin.filename &&
+                loader.OpenedPaths.front().filename() == plugin.filename, "loader did not use private generation copy");
+        const auto originalBinding = Obelisk::Core::OwnerExecutionGate::Get().Capture(plugin.owner);
+        const auto firstGeneration = Obelisk::Core::OwnerExecutionGate::Get().Inspect(originalBinding).generation;
+        const auto firstToken = plugin.initOwnerToken;
+        const auto firstHandle = plugin.chatMessageRegistrationId;
+        Obelisk::Core::ChatMessageView message{.Message = "hello", .SenderName = "user", .SenderPlatformId = "opaque", .SendMode = Obelisk::Core::ChatSendMode::Global};
+        Require(chat.Dispatch(message) == 1 && plugin.chatMessageEventCalls == 1, "running callback did not deliver");
+        Require(manager.ExecuteOperation("pause", plugin.pluginId, ControlDeadline())["ok"], "pause failed");
+        Require(chat.SubscriptionCount() == 1 && chat.Dispatch(message) == 0 && plugin.chatMessageEventCalls == 1 &&
+                plugin.shutdownCalls == 0 && plugin.closeCalls == 0, "pause changed state or delivered callback");
+        Require(!plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(firstToken, FakeChatMessageEventCallback, &plugin),
+                "paused owner registered a new callback");
+        Require(manager.ExecuteOperation("resume", plugin.pluginId, ControlDeadline())["ok"] && chat.Dispatch(message) == 1 &&
+                plugin.chatMessageRegistrationId == firstHandle && plugin.initOwnerToken == firstToken,
+                "resume replaced callback registration or owner token");
+        const auto reload = manager.ExecuteOperation("reload", plugin.pluginId, ControlDeadline());
+        Require(reload["ok"] && reload["state"] == "running" && plugin.initCalls == 2 && plugin.shutdownCalls == 1 &&
+                plugin.prepareUnloadCalls == 1 && plugin.closeCalls == 1, "cooperative reload sequence failed");
+        Require(loader.OpenedPaths.size() == 2 && loader.OpenedPaths[0] != loader.OpenedPaths[1] &&
+                !fs::exists(loader.OpenedPaths[0]) && fs::exists(loader.OpenedPaths[1]) &&
+                fs::exists(root / "plugins" / plugin.filename), "reload reused a mapped inode or removed source");
+        const auto currentBinding = Obelisk::Core::OwnerExecutionGate::Get().Capture(plugin.owner);
+        Require(currentBinding != originalBinding && Obelisk::Core::OwnerExecutionGate::Get().Inspect(currentBinding).generation > firstGeneration &&
+                plugin.initOwnerToken != firstToken && plugin.chatMessageRegistrationId != firstHandle,
+                "reload did not replace generation, owner token and handles");
+        { auto old = Obelisk::Core::OwnerExecutionGate::EnterCallback(originalBinding); Require(!old, "stale generation callback revived after address reuse"); }
+        Require(!plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(firstToken, FakeChatMessageEventCallback, &plugin), "old token revived");
+        Require(manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline())["ok"] && chat.SubscriptionCount() == 0, "hot stop failed");
+        Require(manager.ExecuteOperation("start", plugin.pluginId, ControlDeadline())["ok"] && plugin.initCalls == 3, "stopped plugin start failed");
+        Require(manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline())["ok"], "final hot stop failed");
+        CleanupPlugin(plugin); fs::remove_all(root);
+    }
+
+    struct ResumedTimerState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        uint64_t DeliveredId = 0;
+        size_t Calls = 0;
+    };
+    void ResumedTimerCallback(uint64_t timerId, void* data)
+    {
+        auto& state = *static_cast<ResumedTimerState*>(data);
+        std::lock_guard lock(state.Mutex);
+        state.DeliveredId = timerId; ++state.Calls; state.Cv.notify_all();
+    }
+    void TestPausePreservesDueOneShotTimerUntilResume()
+    {
+        const fs::path root = MakeTempRoot("obelisk_paused_due_timer"); ConfigureEnvironment(root);
+        FakePlugin plugin{.filename = "due_timer.so", .captureApi = true}; plugin.hasLifecycleContract = true;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        Obelisk::Core::PluginManager manager(loader); manager.LoadPlugins((root / "plugins").string());
+        ResumedTimerState state;
+        const auto timer = plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(plugin.initOwnerToken, 80, 0, 0, ResumedTimerCallback, &state);
+        Require(timer && manager.ExecuteOperation("pause", plugin.pluginId, ControlDeadline())["ok"], "timer pause setup failed");
+        bool deliveredPaused;
+        { std::unique_lock lock(state.Mutex); deliveredPaused = state.Cv.wait_for(lock, std::chrono::milliseconds(140), [&] { return state.Calls != 0; }); }
+        Require(!deliveredPaused && plugin.shutdownCalls == 0 && plugin.closeCalls == 0, "paused timer delivered plugin code");
+        Require(manager.ExecuteOperation("resume", plugin.pluginId, ControlDeadline())["ok"], "timer resume failed");
+        bool delivered;
+        { std::unique_lock lock(state.Mutex); delivered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&] { return state.Calls == 1; }); }
+        Require(delivered && state.DeliveredId == timer, "paused due one-shot was consumed or replaced instead of resumed");
+        Require(manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline())["ok"], "resumed timer stop failed");
+        { std::unique_lock lock(state.Mutex); Require(!state.Cv.wait_for(lock, std::chrono::milliseconds(40), [&] { return state.Calls > 1; }), "one-shot repeated after resume"); }
+        CleanupPlugin(plugin); fs::remove_all(root);
+    }
+
+    void TestControlTimeoutRetainsMappingAndReentrantControlRejects()
+    {
+        const fs::path root = MakeTempRoot("obelisk_control_timeout"); ConfigureEnvironment(root);
+        FakePlugin plugin{.filename = "busy.so"}; plugin.hasLifecycleContract = true;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        Obelisk::Core::PluginManager manager(loader); manager.LoadPlugins((root / "plugins").string());
+        const auto binding = Obelisk::Core::OwnerExecutionGate::Get().Capture(plugin.owner);
+        std::mutex mutex; std::condition_variable cv; bool entered = false, release = false;
+        nlohmann::json inside;
+        std::thread callback([&] {
+            auto execution = Obelisk::Core::OwnerExecutionGate::EnterCallback(binding);
+            inside = manager.ExecuteOperation("reload", plugin.pluginId, ControlDeadline());
+            std::unique_lock lock(mutex); entered = true; cv.notify_all(); cv.wait(lock, [&] { return release; });
+        });
+        { std::unique_lock lock(mutex); cv.wait(lock, [&] { return entered; }); }
+        const auto outcome = manager.ExecuteOperation("stop", plugin.pluginId, std::chrono::steady_clock::now() + std::chrono::milliseconds(30));
+        const bool mapped = plugin.closeCalls == 0 && plugin.shutdownCalls == 0 && plugin.prepareUnloadCalls == 0 && fs::exists(loader.OpenedPaths[0]);
+        { std::lock_guard lock(mutex); release = true; } cv.notify_all(); callback.join();
+        Require(!inside["ok"] && inside["reason"] == "control_inside_plugin_execution", "callback self-control waited on itself");
+        Require(!outcome["ok"] && outcome["state"] == "retiring" && mapped, "deadline failure unloaded or ran shutdown before drain");
+        Require(!manager.ExecuteOperation("resume", plugin.pluginId, ControlDeadline())["ok"], "retirement was incorrectly reversible");
+        Require(manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline())["ok"] && plugin.closeCalls == 1, "drained retirement could not retry");
+        CleanupPlugin(plugin); fs::remove_all(root);
+    }
+
+    void TestCooperativeDeclarationAndForeignExportFailClosed()
+    {
+        for (const std::string symbol : {"", "GetInfo", "Shutdown", "PrepareUnload", "LifecycleCapabilities"})
+        {
+            const fs::path root = MakeTempRoot("obelisk_control_contract"); ConfigureEnvironment(root);
+            FakePlugin plugin{.filename = "contract.so"}; plugin.hasLifecycleContract = !symbol.empty(); plugin.foreignExport = symbol;
+            static int retainedLegacyOwner;
+            if (symbol.empty()) plugin.owner = &retainedLegacyOwner;
+            FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+            Obelisk::Core::PluginManager manager(loader); manager.LoadPlugins((root / "plugins").string());
+            if (symbol.empty()) {
+                Require(plugin.initCalls == 1, "legacy cold load should remain supported");
+                const auto denied = manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline());
+                Require(!denied["ok"] && denied["reason"] == "cooperative_unload_not_declared" &&
+                        denied["state"] == "running" && plugin.closeCalls == 0 && plugin.shutdownCalls == 0,
+                        "undeclared hot unload changed mapping or owner state");
+                Require(!manager.ExecuteOperation("pause", plugin.pluginId, ControlDeadline())["ok"], "legacy owner falsely reported paused");
+                manager.UnloadAll();
+                const auto retained = manager.ExecuteOperation("status", plugin.pluginId, ControlDeadline());
+                Require(retained["plugins"][0]["state"] == "retired" && retained["plugins"][0]["retained"] &&
+                        plugin.shutdownCalls == 0 && plugin.closeCalls == 0, "runtime closure forced legacy plugin unload");
+            } else Require(plugin.initCalls == 0 && plugin.closeCalls == 1, "foreign lifecycle export was allowed into Init");
+            CleanupPlugin(plugin); fs::remove_all(root);
+        }
+    }
+
+    void TestPrepareUnloadFailureRetainsMappingAndDefersShutdown()
+    {
+        for (const bool throwing : {false, true})
+        {
+            const fs::path root = MakeTempRoot("obelisk_prepare_failure"); ConfigureEnvironment(root);
+            FakePlugin plugin{.filename = "prepare.so"}; plugin.hasLifecycleContract = true;
+            plugin.prepareUnloadResult = false; plugin.throwOnPrepareUnload = throwing;
+            static int terminalPrepareOwner;
+            if (throwing) plugin.owner = &terminalPrepareOwner;
+            FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+            Obelisk::Core::PluginManager manager(loader); manager.LoadPlugins((root / "plugins").string());
+            const auto denied = manager.ExecuteOperation("reload", plugin.pluginId, ControlDeadline());
+            Require(!denied["ok"] && denied["state"] == "retired" && plugin.prepareUnloadCalls == 1 && plugin.shutdownCalls == 0 &&
+                    plugin.closeCalls == 0 && plugin.initCalls == 1 && loader.OpenedPaths.size() == 1,
+                    "PrepareUnload failure unloaded mapping or constructed new generation");
+            plugin.prepareUnloadResult = true; plugin.throwOnPrepareUnload = false;
+            const auto retry = manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline());
+            if (throwing) {
+                Require(!retry["ok"] && retry["reason"] == "prepare_unload_failed_retained_mapping" &&
+                        plugin.prepareUnloadCalls == 1 && plugin.closeCalls == 0 && plugin.shutdownCalls == 0,
+                        "PrepareUnload exception was retried or forcibly closed");
+                const auto status = manager.ExecuteOperation("status", plugin.pluginId, ControlDeadline());
+                Require(status["plugins"][0]["prepare_unload_failed"] && status["plugins"][0]["retained"], "status hid terminal PrepareUnload exception");
+            } else Require(retry["ok"] && plugin.closeCalls == 1 && plugin.shutdownCalls == 1,
+                           "PrepareUnload false refusal could not be retried safely");
+            CleanupPlugin(plugin); fs::remove_all(root);
+        }
+    }
+
+    void TestReplacementContractAndFailedInitAreNotReportedRunning()
+    {
+        const fs::path root = MakeTempRoot("obelisk_replacement_contract"); ConfigureEnvironment(root);
+        FakePlugin plugin{.filename = "replacement.so"}; plugin.hasLifecycleContract = true;
+        FakeLoader loader; loader.Add(plugin); TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        Obelisk::Core::PluginManager manager(loader); manager.LoadPlugins((root / "plugins").string());
+        plugin.hasLifecycleContract = false;
+        Require(!manager.ExecuteOperation("reload", plugin.pluginId, ControlDeadline())["ok"] && plugin.initCalls == 1 && plugin.closeCalls == 2,
+                "replacement missing opt-in entered Init");
+        plugin.hasLifecycleContract = true; plugin.initResult = false;
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(true);
+        const auto start = manager.ExecuteOperation("start", plugin.pluginId, ControlDeadline());
+        Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
+        Require(!start["ok"] && start["state"] == "retired" && plugin.initCalls == 2 && plugin.closeCalls == 2,
+                "failed Init retained mapping was reported running");
+        Require(manager.ExecuteOperation("stop", plugin.pluginId, ControlDeadline())["ok"], "failed Init cleanup could not retry");
+        CleanupPlugin(plugin); fs::remove_all(root);
     }
 }
 
@@ -8895,9 +8588,9 @@ int main()
     TestUnloadAllWaitsForShutdownUnregisteredInFlightPluginTimerBeforeClose();
     TestUnloadAllWaitsForInFlightRepeatingPluginTimerBeforeCloseAndDoesNotReschedule();
     TestTimerCallbackCleansOnInitFailure();
-    TestInitFailureWaitsForInFlightPluginTimerBeforeClose();
-    TestInitFailureWaitsForInFlightDirectPlayerPrincipalDispatchBeforeClose();
-    TestInitFailureWaitsForInFlightCopiedDispatchersBeforeClose();
+    TestInitialisingPluginTimerDeliveryIsDenied();
+    TestInitialisingPrincipalDeliveryIsDenied();
+    TestInitialisingCopiedDispatcherDeliveryIsDenied();
     TestOwnerTokenTimerRegistrationRejectedDuringShutdown();
     TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenTimerUnregisterAllowedDuringShutdown();
@@ -8962,7 +8655,7 @@ int main()
     TestUnloadAllContinuesAfterCloseException();
     TestUnloadAllStopsWhenCloseRetentionTrackingFails();
     TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails();
-    TestUnloadAllCleansAfterShutdownException();
+    TestShutdownExceptionPermanentlyRetainsMapping();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
     TestUnloadAllRetainsOwnerTokenTimerStateWhenTimerCleanupFails();
     TestInitFailureRetainsOwnerTokenTimerStateWhenTimerCleanupFails();
@@ -8981,6 +8674,12 @@ int main()
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
 
+    TestCooperativeControlPreservesPausedStateAndReloadsFreshGeneration();
+    TestPausePreservesDueOneShotTimerUntilResume();
+    TestControlTimeoutRetainsMappingAndReentrantControlRejects();
+    TestCooperativeDeclarationAndForeignExportFailClosed();
+    TestPrepareUnloadFailureRetainsMappingAndDefersShutdown();
+    TestReplacementContractAndFailedInitAreNotReportedRunning();
     TestNativePingPluginIntegration();
 
     Obelisk::Logger::Shutdown();

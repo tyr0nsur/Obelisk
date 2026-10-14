@@ -36,7 +36,10 @@ namespace Obelisk::Hooks::NativeChatHook
             "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520";
         constexpr uintptr_t kElfImageBase = 0x400000;
         constexpr uintptr_t kReceiveAddress = 0xf76840;
-        constexpr uintptr_t kReplyAddress = 0x136ed90;
+        // ClientServerChatDirectMessage RPC: the current Linux client path
+        // submits a server line to ChatBoxUI. Visible placement and peer
+        // isolation still need real-client acceptance after deployment.
+        constexpr uintptr_t kReplyAddress = 0x136ec60;
         constexpr uintptr_t kUniqueIdAddress = 0xfcf060;
         constexpr uintptr_t kFreeAddress = 0x1af8e30;
         constexpr std::array<uint8_t, 20> kReceivePrologue = {
@@ -54,7 +57,7 @@ namespace Obelisk::Hooks::NativeChatHook
             0x89,0xfc,0x0f,0x57,0xd2,0x0f,0x29,0x55
         };
         constexpr std::array<uint8_t, 7> kReplyFNameBinding = {
-            0x48,0x8b,0x35,0xd1,0xbd,0x57,0x04
+            0x48,0x8b,0x35,0xf9,0xbe,0x57,0x04
         };
 
         // Bounded owner/layout proofs independently checked against this exact
@@ -115,9 +118,33 @@ namespace Obelisk::Hooks::NativeChatHook
             {0x263288f, "ff d0"}, // Calls virtual K2_PostLogin wrapper
         }};
 
-        bool ValidateMappedLifecycleProfile(uintptr_t imageBase) noexcept
+        // Additional proofs from private-chat-public-profile.json. The Direct
+        // prefix is shared with the notification RPC, so its FName binding is
+        // checked separately below. Protect the outgoing ABI/owner and the
+        // client-to-ChatBox route without importing the richer ChatMessage type.
+        constexpr std::array<ProfileProof, 16> kDirectReplyProfileProofs{{
+            {0x1366037, "48 8b 3d b2 8b 58 04 be d1 22 16 04 ba 80 f8 53 01 31 c9 e8 f1 60 96 00"}, // ShooterPlayerController registration and exec153f880
+            {0x14c32ee, "e8 ad 4c fe ff"}, // Declaring ShooterPlayerController metadata
+            {0x14c3359, "b9 c0 0c 82 01 41 b8 ff ff 00 00 41 b9 28 00 00 00"}, // RPC flags, no-return sentinel, storage40
+            {0x14c34bb, "b9 10 00 00 00"}, // Reflected MessageColor offset16
+            {0x14c353d, "31 c9"}, // Reflected MessageText offset0
+            {0x14c3550, "c7 43 34 10 00 00 00"}, // MessageText FString size16
+            {0x136ece1, "0f 13 45 c0 0f 13 4d c8 44 88 7d d0"}, // Color at16/24 and byte bold at32
+            {0x136ecf1, "48 8b 98 e8 01 00 00"}, // This actor's ProcessEvent slot1e8
+            {0x136ed07, "48 8d 55 b0 4c 89 e7 48 89 c6 ff d3"}, // ProcessEvent(this,function,local parameters)
+            {0x153f962, "48 8b 89 90 17 00 00"}, // Native exec virtual slot1790
+            {0x407d440, "f0 80 f7 00 00 00 00 00"}, // Direct vtable slot -> client implementation f780f0
+            {0x153f969, "f3 0f 7e 45 d0 f3 0f 7e 4d d8 0f b6 d0"}, // XMM0/XMM1 color and EDX bool ABI
+            {0xf78132, "e8 79 0d fa ff"}, // Direct client implementation -> chat HUD f18eb0
+            {0xf18f80, "49 8b 9d d8 05 00 00"}, // ChatBoxUI +5d8
+            {0xf18fad, "e8 7e b2 15 00"}, // HUD -> native chat-box server line
+            {0x1468e3c, "b9 d8 05 00 00"}, // Named ShooterHUD.ChatBoxUI metadata offset
+        }};
+
+        template<size_t ProofCount>
+        bool ValidateMappedProfile(uintptr_t imageBase, const std::array<ProfileProof, ProofCount>& proofs) noexcept
         {
-            for (const auto& proof : kLifecycleProfileProofs)
+            for (const auto& proof : proofs)
             {
                 const auto offset = proof.Address - kElfImageBase;
                 if (proof.Address < kElfImageBase || imageBase > UINTPTR_MAX - offset)
@@ -385,11 +412,12 @@ namespace Obelisk::Hooks::NativeChatHook
                     return false;
                 const FString payload{text.data(), static_cast<int32_t>(text.size()),
                                       static_cast<int32_t>(text.size())};
-                // The RPC wrapper copies the borrowed UTF-32 FString, creates its
-                // UFunction parameters and routes through this actor's ProcessEvent.
+                // ClientServerChatDirectMessage copies the borrowed UTF-32
+                // FString and routes through this controller's ProcessEvent.
+                // Client HUD implementations are never called by the server.
                 state.Send(controller, &payload, LinearColor{1, 1, 1, 1}, false);
                 dispatched = true;
-                OBELISK_INFO("Native command directed reply dispatched. utf8_bytes={}", message.size());
+                OBELISK_INFO("Native command directed reply dispatched. channel=chat utf8_bytes={}", message.size());
                 return true; // Dispatch observed; client delivery is tested separately.
             }
             catch (...)
@@ -459,9 +487,14 @@ namespace Obelisk::Hooks::NativeChatHook
         const auto module = Memory::GetMainModuleInfo();
         if (!module.found)
             return false;
-        if (!ValidateMappedLifecycleProfile(module.imageBase))
+        if (!ValidateMappedProfile(module.imageBase, kLifecycleProfileProofs))
         {
             OBELISK_ERROR("Native player backend disabled: mapped owner/layout proofs differ from the exact binary profile.");
+            return false;
+        }
+        if (!ValidateMappedProfile(module.imageBase, kDirectReplyProfileProofs))
+        {
+            OBELISK_ERROR("Native commands disabled: mapped Direct chat RPC owner/ABI/route differs from the exact binary profile.");
             return false;
         }
         auto* receive = reinterpret_cast<void*>(module.imageBase + kReceiveAddress - kElfImageBase);

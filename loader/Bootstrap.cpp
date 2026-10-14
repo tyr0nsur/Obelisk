@@ -17,6 +17,7 @@
 #include <sys/prctl.h>
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
+#include "runtime/PluginControl.h"
 #include "hooks/HookManager.h"
 #include "hooks/ProcessEventHook.h"
 #include "hooks/NativeChatHook.h"
@@ -77,6 +78,53 @@ static std::filesystem::path GetDebugControlDirectory()
     const std::filesystem::path base = root && root[0] != '\0' ? std::filesystem::path(root) : std::filesystem::path(".");
     const std::string instance = SanitizePathComponent(std::getenv("OBELISK_INSTANCE_ID"), "default");
     return base / "state" / "instances" / instance;
+}
+
+static nlohmann::json ExecutePluginControl(const Obelisk::Runtime::PluginControl::Request& request, void*)
+{
+    auto response = Obelisk::Core::PluginManager::Get().ExecuteOperation(
+        request.Action, request.PluginId, request.OperationDeadline);
+    OBELISK_INFO("Plugin operator action={} plugin={} ok={}", request.Action,
+                 request.PluginId, response.value("ok", false));
+    return response;
+}
+
+static void StartPluginControl()
+{
+    if (!Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_PLUGIN_CONTROL", "enable-plugin-control"))
+        return;
+
+    // Keep the transport private to this OS operator, separate from game chat.
+    const auto directory = GetDebugControlDirectory() / "control";
+    std::error_code ec;
+    std::filesystem::create_directory(directory, ec);
+    if (ec)
+    {
+        OBELISK_ERROR("Plugin control directory creation failed: {}", ec.message());
+        return;
+    }
+    const auto status = std::filesystem::symlink_status(directory, ec);
+    if (ec || !std::filesystem::is_directory(status) || std::filesystem::is_symlink(status))
+    {
+        OBELISK_ERROR("Plugin control requires a real private directory.");
+        return;
+    }
+    std::filesystem::permissions(directory, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace, ec);
+    if (ec)
+    {
+        OBELISK_ERROR("Plugin control directory permissions failed: {}", ec.message());
+        return;
+    }
+    auto& control = Obelisk::Runtime::PluginControl::Get();
+    std::string error;
+    if (!control.BindExecutorThread() ||
+        !control.Start(directory / "operator.sock", ExecutePluginControl, nullptr, &error))
+    {
+        OBELISK_ERROR("Plugin control startup failed: {}", error);
+        return;
+    }
+    OBELISK_INFO("Local plugin operator control enabled; actions execute on the game thread.");
 }
 
 static std::vector<uintptr_t> ParseAddressList(const std::string& contents)
@@ -216,6 +264,7 @@ static bool RemoveHookBeforePluginUnload()
 
 static bool ShutdownRuntimeAfterHookRemoval()
 {
+    Obelisk::Runtime::PluginControl::Get().Stop();
     StopDebugControlThread();
     if (!RemoveHookBeforePluginUnload())
         return false;
@@ -276,6 +325,7 @@ void Obelisk_Init()
         {
             Obelisk::Core::PluginManager::Get().LoadPlugins(GetPluginDirectory());
         }
+        StartPluginControl();
     }
     catch (const std::exception& e)
     {

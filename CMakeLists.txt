@@ -131,12 +131,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(subhook)
 
+# Private admission/lifetime barrier shared by runtime and focused fixtures.
+# It is deliberately absent from the installed public SDK interface.
+add_library(obelisk_owner_execution_gate STATIC core/OwnerExecutionGate.cpp)
+target_include_directories(obelisk_owner_execution_gate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(obelisk_owner_execution_gate PRIVATE pthread)
+set_target_properties(obelisk_owner_execution_gate PROPERTIES
+    CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN 1)
+
 # Create the Obelisk shared library
 add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
     runtime/RuntimeMarkers.cpp
     runtime/BinaryIdentity.cpp
+    runtime/PluginControl.cpp
     ue/Memory.cpp
     ue/SafeMemoryRead.cpp
     ue/NativeChatText.cpp
@@ -182,6 +191,7 @@ add_library(obelisk SHARED
 
 # Includes and linking
 target_include_directories(obelisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(obelisk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern)
 target_link_libraries(obelisk PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs OpenSSL::Crypto)
 
 # Ensure visibility is hidden by default, and we only export what we want
@@ -353,6 +363,38 @@ add_dependencies(plugin_manager_tests oPing)
 target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
 
 add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)
+
+add_executable(owner_execution_gate_tests tests/core/OwnerExecutionGateTests.cpp)
+target_include_directories(owner_execution_gate_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(owner_execution_gate_tests PRIVATE obelisk_owner_execution_gate pthread)
+add_test(NAME OwnerExecutionGateTests COMMAND owner_execution_gate_tests)
+
+add_executable(plugin_control_tests
+    tests/core/PluginControlTests.cpp
+    runtime/PluginControl.cpp)
+target_include_directories(plugin_control_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/extern)
+target_link_libraries(plugin_control_tests PRIVATE obelisk_owner_execution_gate pthread)
+add_test(NAME PluginControlTests COMMAND plugin_control_tests)
+set_tests_properties(PluginControlTests PROPERTIES TIMEOUT 30)
+
+add_executable(owner_execution_callback_gate_tests
+    tests/core/OwnerExecutionCallbackGateTests.cpp
+    core/ChatEventDispatcher.cpp
+    core/InventoryPolicyEventDispatcher.cpp
+    core/ItemReturnEventDispatcher.cpp
+    core/MissionCopiedBoolEventDispatcher.cpp
+    core/PlayerPrincipalEventDispatcher.cpp
+    core/StructureEventDispatcher.cpp
+    core/EventManager.cpp
+    core/TimerManager.cpp
+    runtime/Logger.cpp
+    runtime/RuntimeMarkers.cpp)
+target_include_directories(owner_execution_callback_gate_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(owner_execution_callback_gate_tests PRIVATE
+    obelisk_sdk fmt::fmt spdlog::spdlog pthread)
+add_test(NAME OwnerExecutionCallbackGateTests COMMAND owner_execution_callback_gate_tests)
+set_tests_properties(OwnerExecutionCallbackGateTests PROPERTIES TIMEOUT 30)
 
 add_executable(command_dispatcher_tests
     tests/core/CommandDispatcherTests.cpp
@@ -888,3 +930,17 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Obelisk
     COMPONENT SDK
 )
+
+# Every private dispatcher fixture uses the same generation-aware gate. This
+# source-based wiring also covers opt-in benchmark targets without exposing it
+# through obelisk_sdk or duplicating the registry in a single executable.
+get_property(obelisk_private_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(obelisk_private_target IN LISTS obelisk_private_targets)
+    get_target_property(obelisk_private_sources ${obelisk_private_target} SOURCES)
+    foreach(obelisk_private_source IN LISTS obelisk_private_sources)
+        if(obelisk_private_source MATCHES "core/(.*Dispatcher|EventManager|TimerManager)\\.cpp$")
+            target_link_libraries(${obelisk_private_target} PRIVATE obelisk_owner_execution_gate)
+            break()
+        endif()
+    endforeach()
+endforeach()

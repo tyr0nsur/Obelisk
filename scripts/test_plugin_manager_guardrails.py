@@ -81,31 +81,31 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
 }
 
 COPIED_DISPATCHER_PLUGIN_MANAGER_CLEANUP_TOKENS = {
-    "ChatEventDispatcher": "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)",
-    "StructureEventDispatcher": "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+    "ChatEventDispatcher": "m_ChatDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+    "StructureEventDispatcher": "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
     "InventoryPolicyEventDispatcher": (
-        "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"
+        "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"
     ),
-    "ItemReturnEventDispatcher": "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+    "ItemReturnEventDispatcher": "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
     "PlayerPrincipalEventDispatcher": (
-        "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"
+        "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"
     ),
 }
 
 OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
-    "RegisterPreProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
-    "RegisterPostProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
+    "RegisterPreProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner, deadline)",
+    "RegisterPostProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner, deadline)",
     "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle": (
-        "EventManager::Get().UnregisterCallbacksForOwner(owner)"
+        "EventManager::Get().UnregisterCallbacksForOwner(owner, deadline)"
     ),
     "RegisterPostProcessEventForNameIndexWithOwnerTokenHandle": (
-        "EventManager::Get().UnregisterCallbacksForOwner(owner)"
+        "EventManager::Get().UnregisterCallbacksForOwner(owner, deadline)"
     ),
     "RegisterGameplayPolicyEventWithOwnerTokenHandle": "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
     "RegisterChatMessageEventWithOwnerTokenHandle": "UnregisterChatMessageRegistrationsForOwner(owner)",
-    "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
-    "RegisterCommandWithOwnerTokenHandle": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner)",
-    "RegisterPlayerLifecycleWithOwnerTokenHandle": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner)",
+    "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner, deadline)",
+    "RegisterCommandWithOwnerTokenHandle": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+    "RegisterPlayerLifecycleWithOwnerTokenHandle": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
 }
 
 LEGACY_VOID_OWNER_TOKEN_REGISTRATION_WRAPPERS = {
@@ -358,12 +358,12 @@ def owner_cleanup_registry_classes() -> set[str]:
 def cleaned_owner_registry_classes(cleanup_body: str) -> set[str]:
     registries = set(
         re.findall(
-            r"\b(\w+)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
+            r"\b(\w+)::Get\(\)\.UnregisterCallbacksForOwner\(owner,\s*deadline\)",
             cleanup_body,
         )
     )
     for member, registry in INJECTED_OWNER_REGISTRIES.items():
-        if f"{member}->UnregisterCallbacksForOwner(owner)" in cleanup_body:
+        if f"{member}->UnregisterCallbacksForOwner(owner, deadline)" in cleanup_body:
             registries.add(registry)
     return registries
 
@@ -435,7 +435,109 @@ def public_plugin_surface_tokens_for_dispatcher(
     }
 
 
+def validate_retirement_protocol(text: str) -> None:
+    body = extract_function_body(text, r"bool PluginManager::RetirePlugin\(.*?\)")
+    tokens = (
+        "gate.RetireAndDrain(plugin.execution, deadline)",
+        "MarkPluginOwnerUnloading(plugin.owner)",
+        "UnregisterPluginCallbacks(plugin.name, plugin.owner",
+        "plugin.prepareUnload()",
+        "CallPluginShutdown(plugin.name, plugin.shutdown)",
+        "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)",
+        "gate.Forget(plugin.execution)",
+        "RemovePluginOwnerToken(plugin.ownerToken)",
+    )
+    try:
+        positions = [body.index(token) for token in tokens]
+    except ValueError as error:
+        raise AssertionError("retirement operation is missing") from error
+    if positions != sorted(positions):
+        raise AssertionError("retirement, cleanup, plugin shutdown and close order is unsafe")
+    if not re.search(r"UnregisterPluginCallbacks\(plugin.name, plugin.owner,\s*\"[^\"]*\", deadline\)", body):
+        raise AssertionError("owner cleanup lost the operation deadline")
+    if 'return fail("registration_cleanup_incomplete")' not in body[:positions[3]]:
+        raise AssertionError("incomplete cleanup can enter plugin lifecycle code")
+    if "if (plugin.shutdownFailed)" not in body[:positions[4]]:
+        raise AssertionError("throwing Shutdown may be retried")
+    if "if (plugin.prepareUnloadFailed)" not in body[:positions[3]]:
+        raise AssertionError("throwing PrepareUnload may be retried")
+
+
 class PluginManagerGuardrailTests(unittest.TestCase):
+    def test_hot_plugin_retirement_protocol_rejects_unsafe_mutations(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        validate_retirement_protocol(text)
+        mutations = (
+            text.replace("UnregisterPluginCallbacks(plugin.name, plugin.owner", "RemovedCleanup(plugin.name, plugin.owner", 1),
+            text.replace('"retired; before Shutdown and dlclose", deadline)', '"retired; before Shutdown and dlclose")', 1),
+            text.replace("if (plugin.shutdownFailed)", "if (false)", 1),
+            text.replace("if (plugin.prepareUnloadFailed)", "if (false)", 1),
+            text.replace("CallPluginShutdown(plugin.name, plugin.shutdown)", "RemovedShutdown(plugin.name, plugin.shutdown)", 1),
+        )
+        for index, mutated in enumerate(mutations):
+            with self.subTest(mutation=index):
+                self.assertNotEqual(mutated, text)
+                with self.assertRaises(AssertionError):
+                    validate_retirement_protocol(mutated)
+
+    def test_operator_control_rejects_reentry_before_mutex_and_requires_fresh_running_init(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        control = extract_function_body(text, r"nlohmann::json PluginManager::ExecuteOperation\(.*?\)")
+        for token in ("g_CurrentPluginOwner", "Gate::IsInsideExecution()", "GameplayCallbackScope::Current()"):
+            self.assertLess(control.index(token), control.index("control.try_lock_until(deadline)"))
+        self.assertIn("loaded->lifecycleCapabilities != 1u || !loaded->prepareUnload", control)
+        self.assertIn("RetirePlugin(*loaded, deadline, true, reason)", control)
+        self.assertIn("LoadPluginsImpl(source.parent_path().string(), source, pluginId, deadline)", control)
+        self.assertIn("p.pluginId == pluginId && p.initialized", control)
+        self.assertIn("Gate::Get().Inspect(p.execution).phase == Gate::Phase::Running", control)
+        for field in ("retained", "shutdown_failed", "prepare_unload_failed", "last_failure"):
+            self.assertIn(f'value["{field}"]', control)
+        self.assertIn("TimerManager::Get().NotifyOwnerResumed(loaded->owner)", control)
+
+    def test_registration_gate_does_not_hold_owner_registry_mutex_while_plugin_cleanup_runs(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        for helper in ("RegisterProcessEventCallbackForOwnerToken", "RegisterProcessEventCallbackForCallbackOwner"):
+            body = extract_function_body(text, rf"uint64_t {helper}\(.*?\)")
+            locked_scope = re.search(r"(?=\{\s*std::lock_guard<std::mutex> lock\(PluginOwnerLifecycleMutex\(\)\))", body)
+            self.assertIsNotNone(locked_scope)
+            locked = extract_braced_body(body, locked_scope)
+            self.assertIn("OwnerExecutionGate::Get().Capture(owner)", locked)
+            self.assertNotIn("registerFn(owner)", locked)
+            self.assertLess(locked_scope.start() + len(locked) + 2, body.index("OwnerExecutionGate::EnterRegistration(binding)"))
+            self.assertLess(body.index("OwnerExecutionGate::EnterRegistration(binding)"), body.index("try { return registerFn(owner); }"))
+            self.assertIn("catch (const std::exception& e)", body)
+            self.assertIn("catch (...)", body)
+
+    def test_generation_copy_and_lifecycle_symbols_are_mapping_specific(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        owner = extract_function_body(text, r"void\* GetSymbolOwner\(void\* handle, void\* symbol\) override")
+        self.assertIn("dlinfo(handle, RTLD_DI_LINKMAP, &primary)", owner)
+        self.assertIn("symbolInfo.dli_fbase == reinterpret_cast<void*>(primary->l_addr)", owner)
+        self.assertIn("return nullptr", owner)
+        copy = extract_function_body(text, r"fs::path CopyPluginGeneration\(.*?\)")
+        for token in ('".native-lifecycle"', '"generations"', '"generation-XXXXXX"', "::mkdtemp(pattern.data())",
+                      "source.filename()", "fs::copy_options::none", "fs::rename(temporary, destination)", "catch (...)"):
+            self.assertIn(token, copy)
+        load = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
+        self.assertLess(load.index("loaded.sourcePath == path"), load.index("m_Loader->Open(generationPath, loaderError)"))
+        self.assertIn("!ownSymbol(shutdownFunc) || !ownSymbol(prepareUnload) || !ownSymbol(lifecycleCapabilities)", load)
+        self.assertIn("!expectedPluginId.empty() && (lifecycleFlags != 1u || !prepareUnload)", load)
+        self.assertLess(load.index("!expectedPluginId.empty() && (lifecycleFlags != 1u || !prepareUnload)"), load.index("initFunc(&pluginApi"))
+
+    def test_alias_owner_cleanup_waits_for_bounded_backing_barriers_without_granular_retry(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup = extract_function_body(text, r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)")
+        for member in INJECTED_OWNER_REGISTRIES:
+            self.assertEqual(cleanup.count(f"{member}->UnregisterCallbacksForOwner(owner, deadline)"), 1)
+        for helper in ("UnregisterChatMessageRegistrationsForOwner", "UnregisterGameplayPolicyRegistrationsForOwner"):
+            aliases = extract_function_body(text, rf"size_t {helper}\(.*?\)")
+            self.assertNotIn("UnregisterCallbackForOwner(", aliases)
+            self.assertNotIn("UnregisterCallbacksForOwner(", aliases)
+        self.assertLess(cleanup.index("m_ChatDispatcher->UnregisterCallbacksForOwner(owner, deadline)"), cleanup.index("UnregisterChatMessageRegistrationsForOwner(owner)"))
+        self.assertLess(cleanup.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"), cleanup.index("UnregisterGameplayPolicyRegistrationsForOwner(owner)"))
+        self.assertIn("if (!chatSucceeded) throw", cleanup)
+        self.assertIn("if (!structureSucceeded || !inventorySucceeded || !itemReturnSucceeded)", cleanup)
+
     def test_raw_process_event_public_abi_comments_keep_debug_window_default_deny(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
 
@@ -474,19 +576,19 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
         for pattern, capability, live_gate in (
             (
-                r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)",
+                r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwner\(.*?\)",
                 "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
                 "AreGlobalProcessEventCallbacksAllowed()",
             ),
             (
-                r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)",
+                r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwner\(.*?\)",
                 "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
                 "AreFilteredProcessEventCallbacksAllowed()",
             ),
         ):
             with self.subTest(pattern=pattern):
                 body = extract_function_body(text, pattern)
-                self.assertIn("PluginOwnerHasCapabilityLocked(owner", body)
+                self.assertIn("PluginOwnerHasCapability(owner", body)
                 self.assertIn(capability, body)
                 self.assertIn(live_gate, body)
 
@@ -516,23 +618,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
     def test_current_plugin_owner_is_scoped_to_init_window(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
-
-        previous_owner_index = load_body.index("void* previousOwner = g_CurrentPluginOwner")
-        set_current_index = load_body.index("g_CurrentPluginOwner = pluginOwner")
-        restore_guard_index = load_body.index("auto ownerRestore = MakeScopeExit")
-        init_call_index = load_body.index("initialized = initFunc(&pluginApi, &initContext)")
-        dismiss_index = load_body.index("ownerRestore.Dismiss()")
-        restore_index = load_body.index("g_CurrentPluginOwner = previousOwner", dismiss_index)
-        loaded_owner_index = load_body.index("AddLoadedPluginOwner(pluginOwner)")
-
-        self.assertLess(previous_owner_index, set_current_index)
-        self.assertLess(set_current_index, restore_guard_index)
-        self.assertLess(restore_guard_index, init_call_index)
-        self.assertLess(init_call_index, dismiss_index)
-        self.assertLess(dismiss_index, restore_index)
-        self.assertLess(restore_index, loaded_owner_index)
-        self.assertIn("g_CurrentPluginOwner = previousOwner", load_body[restore_guard_index:init_call_index])
+        body = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
+        scope = re.search(r"(?=\{\s*auto execution = OwnerExecutionGate::EnterLifecycle\(binding, OwnerExecutionGate::LifecycleEntry::Init\))", body)
+        self.assertIsNotNone(scope)
+        init_scope = extract_braced_body(body, scope)
+        for token in ("void* previousOwner = g_CurrentPluginOwner", "g_CurrentPluginOwner = pluginOwner",
+                      "auto ownerRestore = MakeScopeExit", "g_CurrentPluginOwner = previousOwner",
+                      "plugin.initialized = initFunc(&pluginApi, &initContext)", "catch (...)"):
+            self.assertIn(token, init_scope)
+        self.assertLess(init_scope.index("auto ownerRestore"), init_scope.index("initFunc(&pluginApi"))
+        self.assertNotIn("ownerRestore.Dismiss()", init_scope)
+        self.assertLess(body.index("OwnerExecutionGate::Get().Bind(pluginOwner, pluginOwnerToken)"), scope.start())
+        scope_end = scope.start() + len(init_scope) + 2
+        self.assertLess(scope_end, body.index("OwnerExecutionGate::Get().Activate(binding)"))
+        self.assertIn("plugin.initAttempted = true", init_scope)
 
     def test_obelisk_api_table_is_zero_initialized_and_fully_assigned(self) -> None:
         plugin_manager_header = PLUGIN_MANAGER_HEADER.read_text(encoding="utf-8")
@@ -604,7 +703,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("fs::is_symlink(status)", component_body)
         self.assertIn("path component must not be a symlink", component_body)
 
-        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+        load_body = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
         config_validation_token = (
             'ValidateExistingPathComponentsNoSymlinks(configRoot, "OBELISK_CONFIG_DIR", '
             "configRootComponentError)"
@@ -648,11 +747,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
         self.assertLess(
             load_body.index("fs::symlink_status(path, candidateStatusError)"),
-            load_body.index("m_Loader->Open(path, loaderError)"),
+            load_body.index("m_Loader->Open(generationPath, loaderError)"),
         )
         self.assertLess(
             candidate_component_validation.start(),
-            load_body.index("m_Loader->Open(path, loaderError)"),
+            load_body.index("m_Loader->Open(generationPath, loaderError)"),
         )
 
         per_plugin_config_revalidation = re.search(
@@ -671,7 +770,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
     def test_plugin_loading_requires_safe_instance_id_before_config_or_discovery(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+        load_body = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
 
         instance_env_token = 'std::getenv("OBELISK_INSTANCE_ID")'
         safe_instance_token = "IsSafeInstanceId(instanceId)"
@@ -680,7 +779,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "fs::directory_iterator iterator(pluginDirectory, "
             "fs::directory_options::none, directoryIteratorError)"
         )
-        open_token = "m_Loader->Open(path, loaderError)"
+        open_token = "m_Loader->Open(generationPath, loaderError)"
 
         for token in (instance_env_token, safe_instance_token, config_env_token, iterator_token, open_token):
             with self.subTest(token=token):
@@ -775,145 +874,80 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
     def test_init_failure_cleanup_keeps_each_cleanup_step_isolated(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        match = re.search(
-            r"auto initCleanup = MakeScopeExit\(\[\&\]\(\)",
-            text,
-        )
-        self.assertIsNotNone(match)
-        body = extract_braced_body(text, match)
-
-        for token in (
-            "MarkPluginOwnerUnloading(pluginOwner)",
-            "CallPluginShutdown(pluginName, shutdownFunc)",
-            "RemoveInitializingPluginOwner(pluginOwner)",
-            "RemovePluginOwnerToken(pluginOwnerToken)",
-            'UnregisterPluginCallbacks(pluginName, pluginOwner, "after init failure and before dlclose")',
-            "ClearPluginOwnerUnloading(pluginOwner)",
-        ):
-            with self.subTest(token=token):
-                self.assertIn(token, body)
-        self.assertGreaterEqual(body.count("try"), 6)
-        self.assertGreaterEqual(body.count("SafeLogErrorNoThrow"), 6)
+        rollback = extract_function_body(text, r"auto initializationRollback = MakeScopeExit\(\[&\]\(\)")
+        self.assertIn("RetirePlugin(plugin, rollbackDeadline, false, reason)", rollback)
+        retirement = extract_function_body(text, r"bool PluginManager::RetirePlugin\(.*?\)")
+        tokens = ("gate.RetireAndDrain(plugin.execution, deadline)", "MarkPluginOwnerUnloading(plugin.owner)",
+                  "UnregisterPluginCallbacks(plugin.name, plugin.owner", "CallPluginShutdown(plugin.name, plugin.shutdown)",
+                  "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)", "RemovePluginOwnerToken(plugin.ownerToken)")
+        positions = [retirement.index(token) for token in tokens]
+        self.assertEqual(positions, sorted(positions), "Admission/drain and all cleanup must precede Shutdown and dlclose")
+        self.assertIn('if (!cleaned)\n                return fail("registration_cleanup_incomplete")', retirement)
+        cleanup = extract_function_body(text, r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)")
+        self.assertIn("catch (const std::exception& e)", cleanup)
+        self.assertIn("catch (...)", cleanup)
+        self.assertGreaterEqual(cleanup.count("cleanupFamily("), 10)
+        self.assertIn("cleanupSucceeded = false", cleanup)
+        self.assertIn("return cleanupSucceeded", cleanup)
 
     def test_init_failure_cleanup_failure_retains_unloading_owner_for_retry(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        match = re.search(
-            r"auto initCleanup = MakeScopeExit\(\[\&\]\(\)",
-            text,
-        )
-        self.assertIsNotNone(match)
-        body = extract_braced_body(text, match)
-        self.assertIn("m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1)", text)
-        self.assertIn("PluginInfo initFailureRetryPlugin", text)
-        self.assertIn("shutdownFunc,\n                    true,", text)
-        retry_state_match = re.search(
-            r"PluginInfo initFailureRetryPlugin\s*\{(?P<body>.*?)\n\s*\};",
-            text,
-            re.S,
-        )
-        self.assertIsNotNone(retry_state_match)
-        retry_state_body = retry_state_match.group("body")
-        self.assertIn("pluginOwnerToken", retry_state_body)
-        self.assertIn("shutdownFunc", retry_state_body)
-        self.assertIn("true", retry_state_body)
-        self.assertLess(
-            retry_state_body.index("shutdownFunc"),
-            retry_state_body.index("true"),
-            "Init-failure retry state must remember shutdown was already called.",
-        )
-        failure_match = re.search(
-            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
-            body,
-            re.S,
-        )
-        self.assertIsNotNone(failure_match)
-        failure_body = failure_match.group("body")
-
-        for token in (
-            "handleCleanup.Dismiss()",
-            "ownerTokenCleanup.Dismiss()",
-            "initializingOwnerCleanup.Dismiss()",
-            "m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin))",
-            "retaining library mapped for retry",
-        ):
-            with self.subTest(token=token):
-                self.assertIn(token, failure_body)
-
-        for forbidden in (
-            "RemovePluginOwnerToken(pluginOwnerToken)",
-            "ClearPluginOwnerUnloading(pluginOwner)",
-            "SafeCloseLibrary",
-        ):
-            with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, failure_body)
+        load = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
+        rollback = extract_function_body(load, r"auto initializationRollback = MakeScopeExit\(\[&\]\(\)")
+        self.assertLess(load.index("m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1)"), load.index("initFunc(&pluginApi"))
+        for token in ("PluginInfo plugin", "plugin.execution = binding", "plugin.prepareUnload = prepareUnload",
+                      "plugin.lifecycleCapabilities = lifecycleFlags", "tokenRollback.Dismiss()", "handleCleanup.Dismiss()"):
+            self.assertIn(token, load)
+            self.assertLess(load.index(token), load.index("initFunc(&pluginApi"))
+        self.assertIn("if (!RetirePlugin(plugin, rollbackDeadline, false, reason))", rollback)
+        self.assertIn("m_LoadedPlugins.push_back(std::move(plugin))", rollback)
+        self.assertIn("Retaining failed plugin generation mapped", rollback)
+        self.assertIn("deadline == std::chrono::steady_clock::time_point::max()", rollback)
+        self.assertIn("std::chrono::seconds(30) : deadline", rollback)
+        for forbidden in ("SafeCloseLibrary", "RemovePluginOwnerToken", "ClearPluginOwnerUnloading"):
+            self.assertNotIn(forbidden, rollback)
 
     def test_unload_all_wraps_shutdown_and_library_close(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        match = re.search(r"void PluginManager::UnloadAll\(\)\s*\{(?P<body>.*?)\n\s*\}\n\}", text, re.S)
-        self.assertIsNotNone(match)
-        body = match.group("body")
-
-        shutdown_token = "CallPluginShutdown(plugin.name, plugin.shutdown)"
-        shutdown_index = body.find(shutdown_token)
-        self.assertNotEqual(shutdown_index, -1)
-        shutdown_preceding = body[max(0, shutdown_index - 120):shutdown_index]
-        shutdown_following = body[shutdown_index:shutdown_index + 420]
-        self.assertIn("try", shutdown_preceding)
-        self.assertIn("catch", shutdown_following)
-        self.assertIn("SafeLogErrorNoThrow", shutdown_following)
-
-        close_token = "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)"
-        close_index = body.find(close_token)
-        self.assertNotEqual(close_index, -1)
-        self.assertIn("if (!", body[max(0, close_index - 16):close_index])
-        self.assertLess(close_index, body.index("RemoveLoadedPluginOwner(plugin.owner)"))
-        close_following = body[close_index:close_index + 620]
-        self.assertIn("retainPluginForUnloadRetry", close_following)
-        self.assertIn("return", close_following)
-        self.assertIn("continue", close_following)
+        unload = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
+        self.assertIn("RetirePlugin(plugin,", unload)
+        self.assertIn("retainPluginForUnloadRetry(plugin,", unload)
+        self.assertNotIn("CallPluginShutdown(", unload)
+        self.assertNotIn("SafeCloseLibrary(", unload)
+        retirement = extract_function_body(text, r"bool PluginManager::RetirePlugin\(.*?\)")
+        shutdown_scope = re.search(r"(?=\{\s*auto execution = OwnerExecutionGate::EnterLifecycle\(plugin.execution, OwnerExecutionGate::LifecycleEntry::Shutdown\))", retirement)
+        self.assertIsNotNone(shutdown_scope)
+        body = extract_braced_body(retirement, shutdown_scope)
+        self.assertIn("CallPluginShutdown(plugin.name, plugin.shutdown)", body)
+        self.assertIn("plugin.shutdownAttempted = true", body)
+        self.assertIn("plugin.shutdownFailed = true", body)
+        self.assertIn('return fail("shutdown_threw")', body)
+        close = "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)"
+        self.assertLess(retirement.index("CallPluginShutdown("), retirement.index(close))
+        close_scope = re.search(r"(?=\{\s*auto execution = OwnerExecutionGate::EnterLifecycle\(plugin.execution, OwnerExecutionGate::LifecycleEntry::Cleanup\);\s*if \(!execution \|\| !SafeCloseLibrary)", retirement)
+        self.assertIsNotNone(close_scope)
+        self.assertIn('return fail("library_close_failed")', extract_braced_body(retirement, close_scope))
+        self.assertLess(retirement.index(close), retirement.index("RemoveLoadedPluginOwner(plugin.owner)"))
 
     def test_unload_cleanup_failure_retains_plugin_without_dlclose(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
-        body = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
-        shutdown_match = re.search(
-            r"if \(!plugin\.shutdownCalled\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*bool callbacksCleaned",
-            body,
-            re.S,
-        )
-        self.assertIsNotNone(shutdown_match)
-        shutdown_body = shutdown_match.group("body")
-        self.assertIn("CallPluginShutdown(plugin.name, plugin.shutdown)", shutdown_body)
-        self.assertEqual(
-            shutdown_body.count("plugin.shutdownCalled = true"),
-            3,
-            "Unload retry state must mark shutdown as called on success and both exception paths.",
-        )
-
-        failure_match = re.search(
-            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
-            body,
-            re.S,
-        )
-        self.assertIsNotNone(failure_match)
-        failure_body = failure_match.group("body")
-
-        self.assertIn("retaining plugin for retry", failure_body)
-        self.assertIn("retainPluginForUnloadRetry", failure_body)
-        self.assertIn("return", failure_body)
-        self.assertIn("continue", failure_body)
-        self.assertLess(
-            failure_body.index("retaining plugin for retry"),
-            failure_body.index("retainPluginForUnloadRetry"),
-            "Cleanup retry visibility must be logged before retaining the mapped plugin.",
-        )
-        for forbidden in (
-            "RemoveLoadedPluginOwner(plugin.owner)",
-            "RemovePluginOwnerToken(plugin.ownerToken)",
-            "ClearPluginOwnerUnloading(plugin.owner)",
-            "SafeCloseLibrary",
-        ):
-            with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, failure_body)
+        retirement = extract_function_body(text, r"bool PluginManager::RetirePlugin\(.*?\)")
+        failure = re.search(r"if \(!cleaned\)\s*return fail\(\"registration_cleanup_incomplete\"\)", retirement)
+        self.assertIsNotNone(failure)
+        self.assertLess(failure.start(), retirement.index("CallPluginShutdown("))
+        self.assertLess(failure.start(), retirement.index("SafeCloseLibrary("))
+        self.assertIn("if (plugin.shutdownFailed)", retirement)
+        self.assertIn('return fail("shutdown_failed_retained_mapping")', retirement)
+        self.assertLess(retirement.index("if (plugin.shutdownFailed)"), retirement.index("CallPluginShutdown("))
+        self.assertEqual(retirement.count("plugin.shutdownCalled = true"), 1)
+        unload = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
+        failure_scope = re.search(r"if \(!RetirePlugin\(plugin,.*?\)\)", unload, re.S)
+        self.assertIsNotNone(failure_scope)
+        body = extract_braced_body(unload, failure_scope)
+        self.assertIn("retainPluginForUnloadRetry", body)
+        self.assertIn("publishPartialUnloadStateAndAbort()", body)
+        for forbidden in ("SafeCloseLibrary", "RemoveLoadedPluginOwner", "RemovePluginOwnerToken", "ClearPluginOwnerUnloading"):
+            self.assertNotIn(forbidden, body)
 
     def test_partial_unload_progress_publication_does_not_allocate_retry_vector(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -1004,7 +1038,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("PluginOwnerTokens()[token] = owner", body)
         self.assertIn(".Capabilities = capabilities", body)
 
-        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+        load_body = extract_function_body(text, r"void PluginManager::LoadPluginsImpl\(.*?\)")
         self.assertRegex(
             load_body,
             r"AddPluginOwnerToken\(pluginOwner, m_Api\.capabilities, m_ChatDispatcher,\s*"
@@ -1063,20 +1097,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
 
         capability_helpers = {
-            r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)": (
-                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS)",
+            r"bool IsGlobalProcessEventCallbackCapabilityEnabledForOwner\(.*?\)": (
+                "PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS)",
                 "AreGlobalProcessEventCallbacksAllowed()",
             ),
-            r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwnerLocked\(.*?\)": (
-                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS)",
+            r"bool IsFilteredProcessEventCallbackCapabilityEnabledForOwner\(.*?\)": (
+                "PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS)",
                 "AreFilteredProcessEventCallbacksAllowed()",
             ),
-            r"bool IsChatMessageEventCapabilityEnabledForOwnerLocked\(.*?\)": (
-                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS)",
+            r"bool IsChatMessageEventCapabilityEnabledForOwner\(.*?\)": (
+                "PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_CHAT_EVENTS)",
                 "AreChatMessageEventsAllowed()",
             ),
-            r"bool IsGameplayPolicyEventCapabilityEnabledForOwnerLocked\(.*?\)": (
-                "PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS)",
+            r"bool IsGameplayPolicyEventCapabilityEnabledForOwner\(.*?\)": (
+                "PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS)",
             ),
         }
         for pattern, tokens in capability_helpers.items():
@@ -1088,7 +1122,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertNotIn("m_Api.capabilities", body)
 
         timer_body = extract_function_body(text, r"uint64_t PluginRegisterTimerWithOwnerTokenHandle\(")
-        self.assertIn("PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_TIMERS)", timer_body)
+        self.assertIn("PluginOwnerHasCapability(owner, OBELISK_API_CAPABILITY_TIMERS)", timer_body)
         self.assertNotIn("BuildApiCapabilities()", timer_body)
         self.assertNotIn("m_Api.capabilities", timer_body)
 
@@ -1146,7 +1180,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "timer->Cancelled = true",
             "timer->InFlight == 0",
             "t_CurrentTimerOwner == owner",
-            "state.Cv.wait(lock",
+            "state.Cv.wait_until(lock, deadline",
             "item.second->Owner == owner && item.second->InFlight != 0",
         ):
             with self.subTest(token=token):
@@ -1154,12 +1188,12 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
         self.assertLess(
             cleanup_body.index("timer->Cancelled = true"),
-            cleanup_body.index("state.Cv.wait(lock"),
+            cleanup_body.index("state.Cv.wait_until(lock, deadline"),
             "Owner cleanup must cancel plugin timers before waiting for in-flight callbacks.",
         )
         self.assertLess(
             cleanup_body.index("t_CurrentTimerOwner == owner"),
-            cleanup_body.index("state.Cv.wait(lock"),
+            cleanup_body.index("state.Cv.wait_until(lock, deadline"),
             "Timer self-cleanup must bypass the cross-thread wait to avoid deadlock.",
         )
 
@@ -1182,8 +1216,8 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
 
         self.assertIn("cleanupFamily", body)
-        self.assertIn("TimerManager::Get().UnregisterCallbacksForOwner(owner)", body)
-        self.assertIn("EventManager::Get().UnregisterCallbacksForOwner(owner)", body)
+        self.assertIn("TimerManager::Get().UnregisterCallbacksForOwner(owner, deadline)", body)
+        self.assertIn("EventManager::Get().UnregisterCallbacksForOwner(owner, deadline)", body)
         self.assertIn("SafeLogErrorNoThrow", body)
         self.assertNotIn("OBELISK_ERROR", body)
         self.assertGreaterEqual(body.count("cleanupFamily("), 5)
@@ -1204,16 +1238,16 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn(token, body)
 
         direct_dispatcher_cleanup_tokens = (
-            "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)",
-            "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
-            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
-            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "m_ChatDispatcher->UnregisterCallbacksForOwner(owner, deadline)",
+            "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
+            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
+            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
         )
         for public_token in public_cleanup_tokens:
             with self.subTest(public_token=public_token):
                 public_index = body.index(public_token)
                 for direct_token in direct_dispatcher_cleanup_tokens:
-                    self.assertLess(public_index, body.index(direct_token))
+                    self.assertGreater(public_index, body.index(direct_token))
 
         chat_unregister_body = extract_function_body(
             text,
@@ -1270,11 +1304,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
         )
         self.assertIn("bool gameplayPolicyCleanupSucceeded = true", cleanup_body)
-        self.assertIn("bool publicChatCleanupSucceeded = true", cleanup_body)
+        self.assertRegex(cleanup_body, r"\bpublicChatCleanupSucceeded\s*=\s*true")
         self.assertIn("&gameplayPolicyCleanupSucceeded", cleanup_body)
         self.assertIn("&publicChatCleanupSucceeded", cleanup_body)
         self.assertIn(
-            "if (!publicChatCleanupSucceeded && chatRemoved != 0)",
+            "if (!publicChatCleanupSucceeded && chatSucceeded && chatRemoved != 0)",
             cleanup_body,
         )
         self.assertIn(
@@ -1282,8 +1316,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             cleanup_body,
         )
         self.assertIn(
-            "if (!gameplayPolicyCleanupSucceeded &&\n"
-            "            (structureRemoved != 0 || inventoryRemoved != 0 || itemReturnRemoved != 0))",
+            "if (!gameplayPolicyCleanupSucceeded)",
             cleanup_body,
         )
         self.assertIn(
@@ -1291,11 +1324,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             cleanup_body,
         )
         self.assertLess(
-            cleanup_body.index("m_ChatDispatcher->UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("m_ChatDispatcher->UnregisterCallbacksForOwner(owner, deadline)"),
             cleanup_body.index("ReconcileChatMessageRegistrationsForOwnerAfterDispatcherCleanup"),
         )
         self.assertLess(
-            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"),
             cleanup_body.index("ReconcileGameplayPolicyRegistrationsForOwnerAfterDispatcherCleanup"),
         )
 
@@ -1571,7 +1604,9 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             plugin_manager_text,
             r"size_t UnregisterGameplayPolicyRegistrationsForOwner\(.*?\)",
         )
-        self.assertIn("UnregisterGameplayPolicyRegistrationForOwner(owner, item.first)", unregister_owner_body)
+        self.assertIn("GameplayPolicyRegistrations().erase(it)", unregister_owner_body)
+        self.assertNotIn("UnregisterGameplayPolicyRegistrationForOwner(", unregister_owner_body)
+        self.assertNotIn("UnregisterCallbackForOwner(", unregister_owner_body)
         self.assertIn("throw std::runtime_error", unregister_owner_body)
         self.assertLess(
             unregister_body.index("registration.InventoryRegistrationId"),
@@ -1588,20 +1623,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
         for token in (
             "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
-            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
-            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
-            "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
+            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
+            "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)",
         ):
             with self.subTest(owner_cleanup_token=token):
                 self.assertIn(token, cleanup_body)
         public_cleanup_index = cleanup_body.index("UnregisterGameplayPolicyRegistrationsForOwner(owner)")
-        self.assertLess(
+        self.assertGreater(
             public_cleanup_index,
-            cleanup_body.index("InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"),
         )
-        self.assertLess(
+        self.assertGreater(
             public_cleanup_index,
-            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"),
+            cleanup_body.index("ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner, deadline)"),
         )
 
     def test_plugin_owner_cleanup_covers_each_plugin_facing_owner_registry(self) -> None:
@@ -1699,7 +1734,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 assert_cleanup_token_uses_cleanup_family(self, cleanup_body, cleanup_token)
 
         for dispatcher in sorted(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS):
-            cleanup_token = f"{dispatcher}::Get().UnregisterCallbacksForOwner(owner)"
+            cleanup_token = f"{dispatcher}::Get().UnregisterCallbacksForOwner(owner, deadline)"
             with self.subTest(dispatcher=dispatcher, decision="internal/test-only exception"):
                 self.assertIn(dispatcher, dispatcher_classes)
                 self.assertNotIn(cleanup_token, cleanup_body)
@@ -2024,7 +2059,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 continue
             body = extract_function_body(
                 text,
-                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(\s*void\* owner,\s*(?:OwnerExecutionGate::Clock|std::chrono::steady_clock)::time_point deadline\)",
             )
             for catch_body in re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", body, re.S):
                 with self.subTest(source=source.name, catch_body=catch_body.strip()[:80]):
@@ -2035,7 +2070,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         text = (CORE_DIR / "PlayerPrincipalEventDispatcher.cpp").read_text(encoding="utf-8")
         body = extract_function_body(
             text,
-            r"size_t PlayerPrincipalEventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+            r"size_t PlayerPrincipalEventDispatcher::UnregisterCallbacksForOwner\(\s*void\* owner,\s*(?:OwnerExecutionGate::Clock|std::chrono::steady_clock)::time_point deadline\)",
         )
 
         self.assertIn(
@@ -2061,7 +2096,12 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertTrue(catch_bodies, "owner cleanup must keep visible catch blocks.")
         for catch_body in catch_bodies:
             with self.subTest(catch_body=catch_body.strip()[:80]):
-                self.assertIn("retainPendingOwnerCleanupFailures();", catch_body)
+                self.assertRegex(
+                    catch_body,
+                    r"retainPendingOwnerCleanupFailures\(\);|"
+                    r"RetainFailedOwnerDestroySubscriptions\(owner, deferredFailures, std::current_exception\(\)\);",
+                    "Every cleanup catch must retain its own pending/deferred records before rethrowing.",
+                )
                 self.assertIn("throw", catch_body)
 
     def test_plugin_manager_player_principal_retry_setup_failure_test_has_test_hooks(self) -> None:
@@ -2113,7 +2153,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 header = (CORE_DIR / f"{dispatcher}.h").read_text(encoding="utf-8")
                 body = extract_function_body(
                     text,
-                    rf"size_t {dispatcher}::UnregisterCallbacksForOwner\(void\* owner\)",
+                    rf"size_t {dispatcher}::UnregisterCallbacksForOwner\(\s*void\* owner,\s*(?:OwnerExecutionGate::Clock|std::chrono::steady_clock)::time_point deadline\)",
                 )
 
                 self.assertIn("FailNextFailedOwnerDestroyRetrySetupForTesting", header)
@@ -2127,7 +2167,12 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 catch_bodies = re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", body, re.S)
                 self.assertTrue(catch_bodies, "owner cleanup must keep visible catch blocks.")
                 for catch_body in catch_bodies:
-                    self.assertIn("retainPendingOwnerCleanupFailures();", catch_body)
+                    self.assertRegex(
+                    catch_body,
+                    r"retainPendingOwnerCleanupFailures\(\);|"
+                    r"RetainFailedOwnerDestroySubscriptions\(owner, deferredFailures, std::current_exception\(\)\);",
+                    "Every cleanup catch must retain its own pending/deferred records before rethrowing.",
+                )
                     self.assertIn("throw", catch_body)
 
     def test_deferred_event_dispatchers_use_fallback_failure_recording(self) -> None:
@@ -2162,7 +2207,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 continue
             body = extract_function_body(
                 text,
-                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(\s*void\* owner,\s*(?:OwnerExecutionGate::Clock|std::chrono::steady_clock)::time_point deadline\)",
             )
             with self.subTest(source=source.name):
                 self.assertIn("std::exception_ptr deferredFailure", body)
@@ -2226,7 +2271,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             )
             with self.subTest(source=source.name):
                 self.assertIn("std::exception_ptr cleanupFailure", body)
-                self.assertIn("DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure)", body)
+                self.assertIn("DestroyRemovedSubscriptionsForOwner(owner, removed, cleanupFailure)", body)
                 self.assertIn("RetainFailedOwnerDestroySubscriptions(owner, failed)", body)
                 self.assertIn("std::rethrow_exception(cleanupFailure)", body)
 

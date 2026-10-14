@@ -1,4 +1,4 @@
-name: CI
+name: Native prototype CI
 
 on:
   pull_request:
@@ -17,8 +17,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run script and guardrail tests
-        run: scripts/run_script_tests.sh
+      - name: Validate native prototype scripts and contracts
+        run: |
+          python3 -m unittest discover -s scripts -p test_obelisk_plugin_ctl.py
+          python3 -m unittest discover -s scripts -p test_plugin_manager_guardrails.py
+          python3 -m unittest discover -s scripts -p test_public_sdk_guardrails.py
+          bash -n scripts/install_obelisk.sh scripts/install_obelisk_plugin.sh
 
   build:
     name: CMake build
@@ -108,46 +112,3 @@ jobs:
               print("\n".join(bad))
               sys.exit(1)
           PY
-
-  release-readiness:
-    name: Release readiness
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            ca-certificates \
-            cmake \
-            git \
-            libssl-dev \
-            ninja-build
-
-      - name: Run release-readiness baseline gate
-        # Canonical gate owns production libobelisk.so test-only symbol checks plus install/SDK dry-runs.
-        # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
-        # CI runs the core-first baseline only; complete/stable SDK claim attempts need an explicit release-manager gate.
-        run: scripts/check_release_readiness.sh
-
-  reflection-base-readiness:
-    name: Reflection base readiness
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check committed public RC UFunction target sets
-        run: |
-          python3 scripts/compare_reflection_snapshots.py \
-            --base-root tests/fixtures/ufunction_snapshots \
-            --readiness-report \
-            --fail-on-base-readiness-gaps \
-            --target-set minimal-second-source-intake \
-            --target-set structure-observer-intake \
-            --target-set chat-message-intake

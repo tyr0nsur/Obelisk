@@ -17,6 +17,9 @@
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
 #include "core/EventManager.h"
+#include "core/GameplayCallbackScope.h"
+#include "core/OwnerExecutionGate.h"
+#include "runtime/PluginControl.h"
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -28,6 +31,7 @@
 #include <string>
 #include <string_view>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <thread>
 #include <unistd.h>
 
@@ -115,6 +119,7 @@ namespace Obelisk::Hooks
     }
 
     static std::atomic<uint32_t> s_ActiveProcessEventFrames{0};
+    static thread_local uint32_t s_ThreadProcessEventDepth = 0;
     static std::atomic<bool> s_RemovingProcessEventHook{false};
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
     static std::atomic<uint64_t> s_ReflectedBuffCalls{0};
@@ -288,12 +293,14 @@ namespace Obelisk::Hooks
 
     ActiveProcessEventFrame::ActiveProcessEventFrame()
     {
+        ++s_ThreadProcessEventDepth;
         s_ActiveProcessEventFrames.fetch_add(1, std::memory_order_acq_rel);
     }
 
     ActiveProcessEventFrame::~ActiveProcessEventFrame()
     {
         s_ActiveProcessEventFrames.fetch_sub(1, std::memory_order_acq_rel);
+        --s_ThreadProcessEventDepth;
     }
 
     static bool WaitForActiveProcessEventFramesToDrain()
@@ -2387,6 +2394,14 @@ namespace Obelisk::Hooks
     void ProcessEvent_Detour(void* object, void* function, void* params)
     {
         ActiveProcessEventFrame activeFrame;
+        // Transport workers only enqueue. Apply bounded operator work at an
+        // outer main-thread event, before this frame's original-call tracking.
+        // Lifecycle entry leases prevent recursive pumping from Init/Shutdown.
+        if (s_ThreadProcessEventDepth == 1 && Runtime::PluginControl::Get().HasPending() &&
+            ::syscall(SYS_gettid) == ::getpid() &&
+            !Core::GameplayCallbackScope::Current() &&
+            !Core::OwnerExecutionGate::IsInsideExecution())
+            Runtime::PluginControl::Get().PumpPending(1);
         bool originalWasCalled = false;
         bool originalReturnedNormally = false;
         OriginalProcessEventCallFlagScope originalCallFlag(originalWasCalled, originalReturnedNormally,

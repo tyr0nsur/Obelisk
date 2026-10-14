@@ -244,3 +244,16 @@ extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
     g_OwnerToken = 0;
     g_Api = {};
 }
+
+// Private cooperative lifecycle contract. oPing owns no background workers,
+// sockets or deferred plugin work; all callbacks belong to managed registries.
+extern "C" __attribute__((visibility("default"))) uint32_t ObeliskPlugin_LifecycleCapabilities()
+{
+    return 1u; // Managed callbacks only; no unmanaged background execution.
+}
+
+extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_PrepareUnload()
+{
+    // PluginManager has already retired and drained every managed registration.
+    return true;
+}

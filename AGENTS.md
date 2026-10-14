@@ -27,8 +27,11 @@ scanners/layouts remain disabled despite the archive/public hash coincidence;
 verify each feature from the executable and specific runtime observations.
 
 Keep UE pointers and layouts in the private Linux adapter. Public plugin data
-should have documented lifetimes. Do not introduce hot reload in the first
-milestone. Worker-thread timers must not call UE gameplay functions.
+should have documented lifetimes. The initial command milestone is demonstrated;
+the operator now explicitly requests safe plugin start/pause/resume/stop/reload.
+Keep native hooks resident. Plugin unloading requires cooperative opt-in,
+closed admission, drained callbacks/cleanup and a fresh load generation; retain
+the library on failure. Worker-thread timers must not call UE gameplay functions.
 
 Use focused build/tests and recorded runtime evidence. The first required
 gameplay acceptance test needs a real client: command, targeted reply,

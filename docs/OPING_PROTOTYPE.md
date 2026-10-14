@@ -38,8 +38,10 @@ focused Ghidra decompilations establish:
 | Private field/function | Public-branch value |
 | --- | --- |
 | ServerSendChatMessage implementation | `0xf76840` |
-| Directed ClientServerChatMessage RPC wrapper | `0x136ed90` |
-| Wrapper FName binding offset/global | `0x98` / `0x58eac00` |
+| Accepted notification ClientServerChatMessage RPC wrapper | `0x136ed90` |
+| Notification FName binding offset/global | `0x98` / `0x58eac00` |
+| New private-chat ClientServerChatDirectMessage RPC wrapper | `0x136ec60` |
+| Direct FName binding offset/global | `0x98` / `0x58eabf8` |
 | ShooterPlayerState UID getter | `0xfcf060` |
 | UE free | `0x1af8e30` |
 | UObject ProcessEvent | `0x1d34e20` |
@@ -63,6 +65,14 @@ trampoline, exact-byte validation and single-thread startup installation.
 The adapter lives until process exit; no hot removal is supported. The RPC
 wrapper is verified by both its prefix and its FName binding; its client-local
 HUD implementation is not called.
+
+The user requested chat presentation after confirming the notification reply.
+The Direct wrapper is independently checked against this same executable;
+focused decompilation follows its client RPC to the chat box rather than the
+notification UI. Sixteen extra mapped instruction proofs are added to the
+51-proof identity/lifecycle profile. The new build and live deployment are
+recorded separately; the original notification acceptance does not establish
+the Direct message's visible location or two-player isolation.
 
 The receive signature is unique in this SHA-pinned ELF. Startup verifies its
 mapped address directly; it does not depend on the inherited scanner's final
@@ -130,11 +140,12 @@ changed by the original game call.
 ## Validation and real-client acceptance
 
 The prototype baseline build and 147 CTest checks passed before the 264-byte
-identity/lifecycle extension. The current sole build passes 149/149 CTest
-checks, including the new identity/lifecycle fixtures. Its build and CTest
+identity/lifecycle extension. That extension passed 149/149 CTest checks; its
 logs are `logs/identity-lifecycle-build.log` and
-`logs/identity-lifecycle-ctest.log`. Real-client `/whoami` display and typed
-login delivery are also recorded. Baseline coverage includes real dlopen of oPing with
+`logs/identity-lifecycle-ctest.log`. The current lifecycle/direct-chat build
+passes 152/152 checks, recorded in `logs/plugin-lifecycle-build.log` and
+`logs/plugin-lifecycle-ctest.log`. Real-client `/whoami` display and typed
+login/logout delivery are also recorded. Baseline coverage includes real dlopen of oPing with
 two mock controllers, targeted replies, token expiry, wrong thread/owner,
 nested dispatch, owner cleanup, native detours, Unicode/unreadable memory and
 bounded class ancestry including address reuse. Fixtures do not prove gameplay.
@@ -192,7 +203,7 @@ runtime instance logs. Current target is in `config/current-target.json`.
 
 ## Latest extension startup and shutdown observation
 
-The API-264 runtime and updated oPing were installed after 149/149 CTest checks
+The API-264 runtime and updated oPing were installed after 152/152 CTest checks
 and the existing chat-reflection benchmark passed. A loopback-bound server
 with normal host networking completed engine startup, loaded `/ping`,
 `/whoami` and the lifecycle registration, and returned A2S_INFO with TheIsland,
@@ -214,3 +225,40 @@ build/runtime and npm download cache have been removed. Public was moved to
 `server`; there is no alternate `server-public` installation. The original
 project ZIP remains the single recovery copy of historical work. Cleanup
 reclaimed about 22 GiB and is recorded in `logs/cleanup-result.json`.
+
+At 00:06:13 UTC on 14 October, oPing also received `logout_observed` with
+flags 31 and sequence 2 after the real Epic session. The previous typed login
+had flags 127 and sequence 1. No subsequent typed relogin is recorded yet.
+
+Safe local plugin lifecycle operations are described in
+[PLUGIN_LIFECYCLE_OPERATIONS.md](PLUGIN_LIFECYCLE_OPERATIONS.md). They require
+cooperative managed-only plugins and retain code on failed cleanup.
+
+## Installed lifecycle and configuration milestone
+
+The final build passes 152/152 CTest cases; private manager guards pass 66/66,
+public SDK guards pass 213/213 and the operator client passes four Python tests.
+The chat reflection benchmark gate passes. The runtime still exposes the same
+264-byte public table; operator lifecycle control adds no public table slots.
+
+The updated runtime is installed on the sole server. Its Direct reply address is
+`0x136ec60`, and all 67 mapped instruction checks passed before activation. The
+new local operator transport accepts OS-authorized requests and pumps them on the
+outer game thread. Thirteen real-server requests exercised pause/resume, two
+reloads, stop/start and status. The server PID stayed unchanged across those
+requests and oPing is running on generation 4. The private evidence is
+`logs/native-plugin-control-deployment.json`; this runtime test does not replace
+real-client chat UI, Steam or two-player acceptance.
+
+The staged legacy Game.ini and access-preserving GameUserSettings.ini are now
+installed. TheIsland's current world and character were backed up before the
+change. The character profile hash remains identical; A2S confirms TheIsland,
+70 slots and password protection. Historical world/player saves were not found.
+Gameplay effects of the restored rates and the character's in-game appearance
+still require the operator's client check.
+
+Stopping the preceding runtime again ended with SIGABRT (signal 6), as previously
+recorded. This shutdown issue remains unresolved; safe hot plugin transitions do
+not establish a clean whole-server stop. The launcher now refuses a second live
+instance and only removes a dead, owned private control socket before a future
+launch. The current Internet test window is bounded to 24 hours.

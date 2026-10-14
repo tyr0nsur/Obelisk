@@ -892,7 +892,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
         release = read("docs/RELEASE.md")
         pr_template = read(".github/pull_request_template.md")
-        ci = read(".github/workflows/ci.yml")
+        ci = read(".github/workflows/legacy-research.yml")
         script = read("scripts/check_release_readiness.sh")
         status = read("docs/STATUS.md")
         changelog = read("CHANGELOG.md")

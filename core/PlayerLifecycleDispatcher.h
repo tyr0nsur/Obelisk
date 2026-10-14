@@ -1,8 +1,10 @@
 #pragma once
 
 #include "obelisk/ObeliskPlayerLifecycleApi.h"
+#include "OwnerExecutionGate.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -37,7 +39,9 @@ namespace Obelisk::Core
         bool Unregister(void* owner, uint64_t registrationId);
         // Cancels and drains this owner's callbacks. Throws when invoked from
         // an active callback belonging to the owner, so unload retains its code.
-        size_t UnregisterCallbacksForOwner(void* owner);
+        // On deadline failure, in-flight records remain until callback return.
+        size_t UnregisterCallbacksForOwner(
+            void* owner, std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max());
         size_t SubscriptionCount() const;
 
         // Copies text once before plugin entry; unknown flags, missing required
@@ -51,6 +55,7 @@ namespace Obelisk::Core
         {
             uint64_t Id = 0;
             void* Owner = nullptr;
+            OwnerExecutionGate::Binding Execution;
             ObeliskPlayerLifecycleCallback Callback = nullptr;
             void* UserData = nullptr;
             bool Active = true;

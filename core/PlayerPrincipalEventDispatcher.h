@@ -1,5 +1,7 @@
 #pragma once
 
+#include "OwnerExecutionGate.h"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -54,6 +56,9 @@ namespace Obelisk::Core
         PlayerPrincipalEventCallback Callback = nullptr;
         void* UserData = nullptr;
         void (*DestroyUserData)(void*) = nullptr;
+        // Private captured load generation; copied through snapshots and cleanup.
+        OwnerExecutionGate::Binding ExecutionBinding;
+        void* ExecutionOwner = nullptr;
     };
 
     // Internal-only copied event dispatcher. There is no public ABI registration path for this family yet.
@@ -65,7 +70,8 @@ namespace Obelisk::Core
         uint64_t Register(void* owner, const PlayerPrincipalEventSubscription& subscription);
         bool Unregister(uint64_t registrationId);
         bool UnregisterCallbackForOwner(void* owner, uint64_t registrationId);
-        size_t UnregisterCallbacksForOwner(void* owner);
+        size_t UnregisterCallbacksForOwner(
+            void* owner, OwnerExecutionGate::Clock::time_point deadline = OwnerExecutionGate::Clock::time_point::max());
 #ifdef OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
         void SetNextGenerationForTesting(uint64_t nextGeneration);
@@ -136,6 +142,11 @@ namespace Obelisk::Core
             uint64_t cleanupBatchId,
             const PlayerPrincipalEventSubscription& subscription,
             std::exception_ptr failure);
+        std::vector<PlayerPrincipalEventSubscription> DestroyRemovedSubscriptionsForOwner(
+            void* owner, const std::vector<PlayerPrincipalEventSubscription>& subscriptions,
+            std::exception_ptr& firstFailure, size_t additionalCapacity = 0);
+        OwnerExecutionGate::Binding CaptureCleanupBinding(void* owner, uint64_t registrationId = 0) const;
+        void RequireCleanupRetentionIntact() const;
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -153,12 +164,13 @@ namespace Obelisk::Core
         std::vector<FailedOwnerDestroy> m_FailedOwnerDestroy;
         bool m_HasFallbackFailedOwnerDestroy = false;
         FailedOwnerDestroy m_FallbackFailedOwnerDestroy;
+        // A lost cleanup record is irreversible: retain all affected mappings.
+        bool m_CleanupRetentionFailed = false;
         size_t m_PendingDestroyInProgress = 0;
         size_t m_ReservedDeferredDestroyFailureSlots = 0;
         uint64_t m_NextCleanupBatchId = 1;
-#ifdef OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+        // Storage exists in every TU; only test entry points are conditional.
         bool m_FailNextDeferredDestroyFailureRecordForTesting = false;
         bool m_FailNextFailedOwnerDestroyRetrySetupForTesting = false;
-#endif
     };
 }

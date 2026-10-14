@@ -4,6 +4,7 @@
 
 #include "TimerManager.h"
 #include "GameplayCallbackScope.h"
+#include "OwnerExecutionGate.h"
 
 #include "runtime/Logger.h"
 
@@ -11,6 +12,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <exception>
+#include <stdexcept>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -27,6 +29,7 @@ namespace Obelisk::Core
         {
             uint64_t Id = 0;
             void* Owner = nullptr;
+            OwnerExecutionGate::Binding ExecutionBinding;
             uint64_t IntervalMs = 0;
             TimerCallback Callback = nullptr;
             void* UserData = nullptr;
@@ -108,18 +111,30 @@ namespace Obelisk::Core
                         it = state.Timers.erase(it);
                         continue;
                     }
-                    if (!timer->Cancelled && (next == state.Timers.end() || timer->NextFire < next->second->NextFire))
+                    // Closed/initializing owners retain their deadlines and handles.
+                    // Skip them rather than letting a due paused timer starve others.
+                    const auto gateState = OwnerExecutionGate::Get().Inspect(timer->ExecutionBinding);
+                    const bool runnable = !timer->ExecutionBinding ||
+                        (gateState.phase == OwnerExecutionGate::Phase::Running && !gateState.faulted);
+                    if (!timer->Cancelled && runnable &&
+                        (next == state.Timers.end() || timer->NextFire < next->second->NextFire))
                         next = it;
                     ++it;
                 }
 
                 if (next == state.Timers.end())
+                {
+                    // Activation may occur without a timer-specific notification.
+                    // Bounded sleeping also preserves paused one-shot timers.
+                    state.Cv.wait_for(lock, std::chrono::milliseconds(50));
                     continue;
+                }
 
                 const auto now = Clock::now();
                 if (now < next->second->NextFire)
                 {
-                    state.Cv.wait_until(lock, next->second->NextFire);
+                    state.Cv.wait_until(lock, std::min(next->second->NextFire,
+                        now + std::chrono::milliseconds(50)));
                     continue;
                 }
 
@@ -127,6 +142,16 @@ namespace Obelisk::Core
                 if (timer->Cancelled || !timer->Callback)
                 {
                     EraseCancelledTimerIfIdleLocked(state, timer);
+                    continue;
+                }
+
+                // Acquire before consuming the occurrence. A concurrent pause
+                // leaves this timer due, including a one-shot registration.
+                // The lease spans callback catches and timer completion bookkeeping.
+                auto executionLease = OwnerExecutionGate::EnterCallback(timer->ExecutionBinding);
+                if (!executionLease)
+                {
+                    state.Cv.wait_for(lock, std::chrono::milliseconds(50));
                     continue;
                 }
 
@@ -211,6 +236,11 @@ namespace Obelisk::Core
             (!repeating && intervalMs != 0))
             return 0;
 
+        const auto binding = OwnerExecutionGate::Get().Capture(owner);
+        auto registrationLease = OwnerExecutionGate::EnterRegistration(binding);
+        if (!registrationLease)
+            return 0;
+
         TimerState& state = State();
         std::lock_guard<std::mutex> lock(state.Mutex);
         EnsureWorkerStartedLocked(state);
@@ -218,6 +248,7 @@ namespace Obelisk::Core
         state.Timers[id] = std::make_shared<TimerEntry>(TimerEntry{
             .Id = id,
             .Owner = owner,
+            .ExecutionBinding = binding,
             .IntervalMs = repeating ? intervalMs : 0,
             .Callback = callback,
             .UserData = userData,
@@ -227,6 +258,20 @@ namespace Obelisk::Core
         });
         state.Cv.notify_all();
         return id;
+    }
+
+    void TimerManager::NotifyOwnerResumed(void* owner) noexcept
+    {
+        // Wake only: preserved timers fire at most once before normal rescheduling.
+        // A plugin with no timers need not have initialized the lazy timer state.
+        (void)owner;
+        try
+        {
+            State().Cv.notify_all();
+        }
+        catch (...)
+        {
+        }
     }
 
     bool TimerManager::Unregister(void* owner, uint64_t timerId)
@@ -249,7 +294,8 @@ namespace Obelisk::Core
         return wasActive;
     }
 
-    size_t TimerManager::UnregisterCallbacksForOwner(void* owner)
+    size_t TimerManager::UnregisterCallbacksForOwner(
+        void* owner, OwnerExecutionGate::Clock::time_point deadline)
     {
         if (!owner)
             return 0;
@@ -282,11 +328,12 @@ namespace Obelisk::Core
         }
 
         state.Cv.notify_all();
-        state.Cv.wait(lock, [&state, owner]() {
+        if (!state.Cv.wait_until(lock, deadline, [&state, owner]() {
             return std::none_of(state.Timers.begin(), state.Timers.end(), [owner](const auto& item) {
                 return item.second->Owner == owner && item.second->InFlight != 0;
             });
-        });
+        }))
+            throw std::runtime_error("Timer owner cleanup timed out; keep plugin mapped");
         return removed;
     }
 
