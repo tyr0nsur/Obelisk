@@ -69,6 +69,37 @@ OBELISK_PE_TRACE_LIMIT=0
 EOF
 }
 
+write_diagnostic_observer_env() {
+    local path="$1"
+    local sha="$2"
+    write_observer_env "${path}" "${sha}"
+    printf 'OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES=1\n' >> "${path}"
+}
+
+make_fake_preflight_script_dir() {
+    local script_dir="$1"
+
+    mkdir -p "${script_dir}"
+    cp "${CHECK}" "${script_dir}/check_player_principal_lifecycle_preflight.sh"
+    chmod +x "${script_dir}/check_player_principal_lifecycle_preflight.sh"
+    cat > "${script_dir}/check_linuxgsm_wrapper_drift.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    cat > "${script_dir}/check_obelisk_server_posture.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${FAKE_POSTURE_ARGS_FILE:?missing FAKE_POSTURE_ARGS_FILE}"
+for arg in "$@"; do
+    printf '%s\n' "$arg"
+done > "${FAKE_POSTURE_ARGS_FILE}"
+EOF
+    chmod +x \
+        "${script_dir}/check_linuxgsm_wrapper_drift.sh" \
+        "${script_dir}/check_obelisk_server_posture.sh"
+}
+
 wrapper="${TMP_DIR}/ObeliskRun.sh"
 cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh" "${wrapper}"
 server_binary="${TMP_DIR}/ShooterGameServer"
@@ -120,7 +151,13 @@ required_false_flags = (
     "observer_env_counts_as_approved_runtime_evidence",
     "operator_request_counts_as_approved_runtime_evidence",
     "copied_log_metadata_counts_as_approved_runtime_evidence",
+    "copied_log_presence_counts_as_approved_runtime_evidence",
     "bundle_output_counts_as_approved_runtime_evidence",
+    "dry_run_success_counts_as_approved_runtime_evidence",
+    "historical_target_names_authorize_runtime",
+    "marker_env_readiness_counts_as_approved_runtime_evidence",
+    "player_notice_counts_as_approved_runtime_evidence",
+    "public_reachability_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
     "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
@@ -136,9 +173,15 @@ required_false_flags = (
     "route_ready",
     "sdk_accounting_counts_as_completed_surface",
     "p0_accounting_counts_as_promoted_surface",
+    "current_turn_authorized",
+    "current_turn_approval_recorded",
 )
 assert payload["schema"] == "obelisk.player-principal-lifecycle-preflight.v1"
+assert payload["status"] == "preflight_passed_no_runtime_approval_or_evidence"
 assert payload["ready"] is True
+assert payload["ready_scope"] == "offline_preflight_checks_only"
+assert payload["preflight_passed"] is True
+assert payload["current_turn_operator_approval_required"] is True
 for flag in required_false_flags:
     assert payload[flag] is False, flag
 assert payload["mode"] == "stable"
@@ -153,10 +196,65 @@ assert payload["server_binary"]["sha256"] == server_sha
 assert payload["env_file"] is None
 assert payload["authorization_source"] == "none_preflight_sidecar_only"
 assert payload["approved_runtime_evidence_source"] == "none_preflight_sidecar_only"
+assert payload["preflight_records_current_turn_approval"] is False
+assert payload["current_turn_approval_scope_status"] == "requires_exact_current_turn_operator_approval"
+assert payload["current_turn_approval_required_fields"] == [
+    "target",
+    "marker_env_gates",
+    "restart_window",
+    "rollback",
+    "evidence_paths",
+    "final_posture",
+]
+assert payload["deployment_intent"]["intent_type"] == "lifecycle_anchor_drift_fix_deploy_request_only"
+assert payload["deployment_intent"]["request_only"] is True
+assert payload["deployment_intent"]["deployment_authorized"] is False
+assert payload["deployment_intent"]["restart_authorized"] is False
+assert payload["deployment_intent"]["runtime_capture_authorized"] is False
+assert payload["deployment_intent"]["counts_as_approved_runtime_evidence"] is False
+assert "does not authorize deployment" in payload["deployment_intent"]["non_authorization"]
 assert datetime.fromisoformat(payload["checked_at_utc"].removesuffix("Z") + "+00:00").tzinfo == timezone.utc
 assert "not runtime approval" in payload["non_claim"]
 assert "not approved runtime evidence" in payload["non_claim"]
+assert "preflight does not count as approved runtime evidence" in payload["non_claims"][2]
+assert payload["live_procfs_read_acknowledged"] is False
+assert payload["protected_root_validation_acknowledged"] is False
+assert payload["live_read_acknowledgement_counts_as_authorization"] is False
 PY
+
+assert_fail protected-root-without-ack "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F -- 'Obelisk root must not read from protected server root /servidor/ark without --allow-protected-root' \
+    "${TMP_DIR}/protected-root-without-ack.err" >/dev/null
+
+assert_fail live-procfs-read-without-ack "${CHECK}" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F -- 'must not read the live /proc tree without --allow-live-procfs-read' \
+    "${TMP_DIR}/live-procfs-read-without-ack.err" >/dev/null
+
+assert_fail protected-proc-root-rejected "${CHECK}" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --proc-root /servidor/ark/workspace-offline/proc \
+    --allow-live-procfs-read \
+    --allow-stopped
+grep -F -- '--proc-root must not read from protected server root /servidor/ark' \
+    "${TMP_DIR}/protected-proc-root-rejected.err" >/dev/null
 
 proc_root="${TMP_DIR}/proc"
 write_proc_fixture "${proc_root}" 4242 "${root_stable}" "TheIsland"
@@ -170,6 +268,40 @@ write_proc_fixture "${proc_root}" 4242 "${root_stable}" "TheIsland"
     --expected-binary-sha256 "${server_sha}" \
     --proc-root "${proc_root}" \
     | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
+
+fake_script_dir="${TMP_DIR}/fake-preflight-script-dir"
+make_fake_preflight_script_dir "${fake_script_dir}"
+stable_posture_args="${TMP_DIR}/stable-posture-args.txt"
+env FAKE_POSTURE_ARGS_FILE="${stable_posture_args}" \
+    "${fake_script_dir}/check_player_principal_lifecycle_preflight.sh" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --proc-root "${proc_root}" \
+    --allow-live-procfs-read \
+    --allow-protected-root \
+    | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
+python3 - "${stable_posture_args}" "${proc_root}" <<'PY'
+import sys
+
+path, proc_root = sys.argv[1:]
+args = open(path, encoding="utf-8").read().splitlines()
+assert args == [
+    "--expect-stable",
+    "--pid",
+    "4242",
+    "--instance",
+    "arkserver2",
+    "--proc-root",
+    proc_root,
+    "--allow-live-procfs-read",
+    "--allow-protected-root",
+]
+PY
 
 root_window="${TMP_DIR}/root-window"
 observer_env="${TMP_DIR}/observer-window.env"
@@ -218,7 +350,13 @@ required_false_flags = (
     "observer_env_counts_as_approved_runtime_evidence",
     "operator_request_counts_as_approved_runtime_evidence",
     "copied_log_metadata_counts_as_approved_runtime_evidence",
+    "copied_log_presence_counts_as_approved_runtime_evidence",
     "bundle_output_counts_as_approved_runtime_evidence",
+    "dry_run_success_counts_as_approved_runtime_evidence",
+    "historical_target_names_authorize_runtime",
+    "marker_env_readiness_counts_as_approved_runtime_evidence",
+    "player_notice_counts_as_approved_runtime_evidence",
+    "public_reachability_counts_as_approved_runtime_evidence",
     "preflight_counts_as_approved_runtime_evidence",
     "window_manifest_counts_as_approved_runtime_evidence",
     "completed_receipt_counts_as_approved_runtime_evidence",
@@ -234,8 +372,13 @@ required_false_flags = (
     "route_ready",
     "sdk_accounting_counts_as_completed_surface",
     "p0_accounting_counts_as_promoted_surface",
+    "current_turn_authorized",
+    "current_turn_approval_recorded",
 )
 assert payload["ready"] is True
+assert payload["ready_scope"] == "offline_preflight_checks_only"
+assert payload["preflight_passed"] is True
+assert payload["current_turn_operator_approval_required"] is True
 for flag in required_false_flags:
     assert payload[flag] is False, flag
 assert payload["mode"] == "observer-window"
@@ -246,7 +389,125 @@ assert payload["env_file"]["sha256"] == hashlib.sha256(open(env_path, "rb").read
 assert payload["posture_check"] == "accepted"
 assert payload["authorization_source"] == "none_preflight_sidecar_only"
 assert payload["approved_runtime_evidence_source"] == "none_preflight_sidecar_only"
+assert payload["preflight_records_current_turn_approval"] is False
+assert payload["diagnostic_candidates_enabled"] is False
+assert payload["current_turn_approval_scope_status"] == "requires_exact_current_turn_operator_approval"
+assert payload["deployment_intent"]["intent_type"] == "lifecycle_anchor_drift_fix_deploy_request_only"
+assert payload["deployment_intent"]["request_only"] is True
+assert payload["deployment_intent"]["deployment_authorized"] is False
+assert payload["deployment_intent"]["counts_as_approved_runtime_evidence"] is False
+assert "preflight does not authorize deployment" in payload["non_claims"][1]
+assert payload["live_procfs_read_acknowledged"] is False
+assert payload["protected_root_validation_acknowledged"] is False
+assert payload["live_read_acknowledgement_counts_as_authorization"] is False
 PY
+
+observer_posture_args="${TMP_DIR}/observer-posture-args.txt"
+env FAKE_POSTURE_ARGS_FILE="${observer_posture_args}" \
+    "${fake_script_dir}/check_player_principal_lifecycle_preflight.sh" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${observer_env}" \
+    --proc-root "${proc_root}" \
+    --allow-live-procfs-read \
+    --allow-protected-root \
+    | grep -F 'player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2' >/dev/null
+python3 - "${observer_posture_args}" "${proc_root}" <<'PY'
+import sys
+
+path, proc_root = sys.argv[1:]
+args = open(path, encoding="utf-8").read().splitlines()
+assert args == [
+    "--expect-observer-debug",
+    "--pid",
+    "4242",
+    "--instance",
+    "arkserver2",
+    "--proc-root",
+    proc_root,
+    "--allow-live-procfs-read",
+    "--allow-protected-root",
+]
+PY
+
+diagnostic_observer_env="${TMP_DIR}/observer-window-diagnostic.env"
+write_diagnostic_observer_env "${diagnostic_observer_env}" "${server_sha}"
+"${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${diagnostic_observer_env}" \
+    --run-id "${run_id}" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${evidence_dir}" \
+    --allow-stopped \
+    --allow-diagnostic-candidates \
+    --json > "${TMP_DIR}/diagnostic-observer-preflight.json"
+python3 - "${TMP_DIR}/diagnostic-observer-preflight.json" <<'PY'
+import json
+import sys
+
+payload = json.loads(open(sys.argv[1], encoding="utf-8").read())
+assert payload["ready"] is True
+assert payload["ready_scope"] == "offline_preflight_checks_only"
+assert payload["preflight_passed"] is True
+assert payload["mode"] == "observer-window"
+assert payload["diagnostic_candidates_enabled"] is True
+assert payload["approved_runtime_evidence_present"] is False
+assert payload["runtime_ready"] is False
+assert payload["public_sdk_ready"] is False
+assert payload["deployment_intent"]["request_only"] is True
+assert payload["deployment_intent"]["deployment_authorized"] is False
+assert payload["deployment_intent"]["counts_as_approved_runtime_evidence"] is False
+assert payload["live_read_acknowledgement_counts_as_authorization"] is False
+PY
+
+assert_fail observer-window-diagnostic-env-without-allow "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${diagnostic_observer_env}" \
+    --allow-stopped
+grep -F 'Forbidden env exists for player-principal preflight: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES' \
+    "${TMP_DIR}/observer-window-diagnostic-env-without-allow.err" >/dev/null
+
+assert_fail observer-window-missing-diagnostic-env-with-allow "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${observer_env}" \
+    --allow-stopped \
+    --allow-diagnostic-candidates
+grep -F 'Required env is missing from' \
+    "${TMP_DIR}/observer-window-missing-diagnostic-env-with-allow.err" >/dev/null
+
+assert_fail stable-diagnostic-allow-invalid "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped \
+    --allow-diagnostic-candidates
+grep -F -- '--allow-diagnostic-candidates is only valid with --mode observer-window' \
+    "${TMP_DIR}/stable-diagnostic-allow-invalid.err" >/dev/null
 
 assert_fail observer-window-missing-env "${CHECK}" \
     --instance arkserver2 \
@@ -439,7 +700,8 @@ assert_fail stopped-without-allow "${CHECK}" \
     --obelisk-root "${root_stable}" \
     --installed-wrapper "${wrapper}" \
     --server-binary "${server_binary}" \
-    --expected-binary-sha256 "${server_sha}"
+    --expected-binary-sha256 "${server_sha}" \
+    --proc-root "${TMP_DIR}/empty-proc"
 grep -F 'pass --allow-stopped' "${TMP_DIR}/stopped-without-allow.err" >/dev/null
 
 assert_fail unsafe-map "${CHECK}" \

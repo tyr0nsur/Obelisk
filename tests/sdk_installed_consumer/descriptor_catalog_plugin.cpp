@@ -184,11 +184,13 @@ namespace
     bool HasDescriptorApi(const ObeliskApi* api)
     {
         if (!api ||
-            api->abi_version != OBELISK_API_ABI_VERSION ||
             api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
         {
             return false;
         }
+
+        if (api->abi_version != OBELISK_API_ABI_VERSION)
+            return false;
 
         return api->struct_size >= offsetof(ObeliskApi, DescribeResourceKind) +
                 sizeof(api->DescribeResourceKind) &&
@@ -202,6 +204,9 @@ namespace
 
     bool ValidateResourceKindDescriptor(const ObeliskApi* api, const ExpectedResourceKindDescriptor& expected)
     {
+        if (!HasDescriptorApi(api))
+            return false;
+
         ObeliskResourceKindDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
         if (!api->DescribeResourceKind(expected.resourceKind, &descriptor))
@@ -225,6 +230,9 @@ namespace
     bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
                                                const ExpectedGameplayPolicyEventDescriptor& expected)
     {
+        if (!HasDescriptorApi(api))
+            return false;
+
         ObeliskGameplayPolicyEventDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
         if (!api->DescribeGameplayPolicyEventKind(expected.eventKind, &descriptor))

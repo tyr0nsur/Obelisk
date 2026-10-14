@@ -1,5 +1,7 @@
 #define OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+#define OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
 #define OBELISK_ITEM_RETURN_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+#define OBELISK_STRUCTURE_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
 
 #include "core/ChatEventDispatcher.h"
 #include "core/EventManager.h"
@@ -11,17 +13,13 @@
 #include "core/TimerManager.h"
 #include "runtime/Logger.h"
 
-// The plugin-manager test target compiles PluginManager.cpp directly instead of linking
-// the full core object list, so keep the private item-return dispatcher implementation
-// available here without changing build-system scope.
-#include "core/ItemReturnEventDispatcher.cpp"
-
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -44,6 +42,7 @@ namespace Obelisk::Hooks
 namespace Obelisk::Core
 {
     void SetPluginCallbackCleanupFailureForTesting(bool enabled);
+    void SetPluginTimerCleanupFailureForTesting(bool enabled);
     void SetPluginRetentionFailureForTesting(bool enabled);
     void SetPluginRetentionFailureAfterForTesting(int successfulRetentionsBeforeFailure);
     void SetPublicChatMessageTrackingFailureForTesting(bool enabled);
@@ -51,8 +50,10 @@ namespace Obelisk::Core
     void SetPublicChatMessageRollbackUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyTrackingFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled);
+    void SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled);
+    void SetPluginOwnerApiStateFailureForTesting(bool enabled);
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token);
 }
 
@@ -572,6 +573,37 @@ namespace
         state->Entered = true;
         state->Cv.notify_all();
         state->Cv.wait(lock, [state]() { return state->Release; });
+    }
+
+    struct PlayerPrincipalSelfUnregisterDestroyRetryState
+    {
+        uint64_t RegistrationId = 0;
+        int Calls = 0;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 0;
+    };
+
+    void SelfUnregisterPlayerPrincipalForPluginManagerCallback(
+        const Obelisk::Core::PlayerPrincipalEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                "self-unregister player-principal callback received unexpected event kind");
+        auto* state = static_cast<PlayerPrincipalSelfUnregisterDestroyRetryState*>(userData);
+        ++state->Calls;
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Unregister(state->RegistrationId),
+                "self-unregister player-principal callback could not unregister itself");
+    }
+
+    void FailingPlayerPrincipalDestroyForPluginManager(void* userData)
+    {
+        auto* state = static_cast<PlayerPrincipalSelfUnregisterDestroyRetryState*>(userData);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected plugin-manager player-principal destroy failure");
+        }
     }
 
     void InitFailureCopiedChatFenceCallback(
@@ -1356,6 +1388,8 @@ namespace
 
         void* Open(const fs::path& path, std::string& error) override
         {
+            if (BeforeOpen)
+                BeforeOpen(path);
             const auto it = m_Plugins.find(path.filename().string());
             if (it == m_Plugins.end())
             {
@@ -1424,10 +1458,15 @@ namespace
             }
             if (plugin->orderLog)
                 plugin->orderLog->push_back("close:" + plugin->filename);
+            if (AfterClose)
+                AfterClose(*plugin);
             if (plugin->throwOnClose)
                 throw std::runtime_error("fake close failure");
             return true;
         }
+
+        std::function<void(const fs::path&)> BeforeOpen;
+        std::function<void(FakePlugin&)> AfterClose;
 
     private:
         std::unordered_map<std::string, FakePlugin*> m_Plugins;
@@ -1875,6 +1914,50 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestOwnerTokenStateSetupFailureDoesNotLeakToken()
+    {
+        constexpr uint64_t expectedToken = 700;
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_state_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "owner_token_state_fail.so",
+            .pluginId = "owner_token_state_fail",
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::PluginManager::SetNextPluginOwnerTokenForTesting(expectedToken);
+        Obelisk::Core::SetPluginOwnerApiStateFailureForTesting(true);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 1,
+                "owner-token state failure did not scan plugin metadata");
+        Require(plugin.initCalls == 0,
+                "owner-token state failure initialized plugin after token setup failed");
+        Require(plugin.closeCalls == 1,
+                "owner-token state failure did not close the unopened plugin init handle");
+
+        Obelisk::Core::SetPluginOwnerApiStateFailureForTesting(false);
+        Obelisk::Core::PluginManager::SetNextPluginOwnerTokenForTesting(expectedToken);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1,
+                "owner-token state failure retry did not initialize plugin");
+        Require(plugin.initOwnerToken == expectedToken,
+                "failed owner-token API state setup leaked the candidate owner token");
+
+        manager.UnloadAll();
+        Require(plugin.closeCalls == 2,
+                "owner-token state failure retry did not unload the initialized plugin");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestGlobalProcessEventCallbackRejectedByDefault()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_global_denied");
@@ -2044,6 +2127,7 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_post_init_unowned");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
 
         FakePlugin plugin{.filename = "post_init_unowned.so", .captureApi = true};
         FakeLoader loader;
@@ -2052,6 +2136,8 @@ namespace
         WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0,
+                "post-init unowned test did not enable filtered callback capability");
         manager.LoadPlugins((root / "plugins").string());
 
         Require(plugin.initCalls == 1, "post-init plugin was not initialized");
@@ -6696,6 +6782,33 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestDefaultConfigCreationRejectsSymlinkPluginConfigDirectory()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_symlink_plugin_config_dir");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{.filename = "symlink_plugin_config_dir.so"};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+
+        const fs::path externalConfigDir = root / "external-plugin-config";
+        fs::create_directories(externalConfigDir);
+        fs::create_directory_symlink(externalConfigDir, root / "config" / plugin.pluginId);
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.getInfoCalls == 1, "symlink config-dir plugin metadata was not read");
+        Require(plugin.initCalls == 0, "symlink config-dir plugin was initialized");
+        Require(plugin.closeCalls == 1, "symlink config-dir plugin handle was not closed");
+        Require(!fs::exists(externalConfigDir / "config.json"),
+                "default plugin config was created through a symlinked plugin config directory");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestInstanceDisallowedPluginDoesNotInit()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_instance_disallowed");
@@ -6818,6 +6931,54 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestPluginDirectorySymlinkReplacementAfterValidationIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_plugin_dir_symlink_replacement");
+        ConfigureEnvironment(root);
+
+        FakePlugin first{
+            .filename = "aaa_plugin_dir_replacer.so",
+            .pluginId = "aaa_plugin_dir_replacer",
+        };
+        FakePlugin second{
+            .filename = "zzz_plugin_dir_replaced.so",
+            .pluginId = "zzz_plugin_dir_replaced",
+        };
+        FakeLoader loader;
+        loader.Add(first);
+        loader.Add(second);
+        TouchPlugin(root, first.filename);
+        TouchPlugin(root, second.filename);
+        WritePluginConfig(root, second.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        const fs::path externalPlugins = root / "external-plugins";
+        fs::create_directories(externalPlugins);
+        {
+            std::ofstream out(externalPlugins / second.filename);
+            Require(out.is_open(), "failed to create fake plugin behind replaced plugin directory");
+        }
+
+        loader.AfterClose = [&](FakePlugin& plugin) {
+            if (plugin.filename != first.filename)
+                return;
+            fs::remove_all(root / "plugins");
+            fs::create_directory_symlink(externalPlugins, root / "plugins");
+        };
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(first.getInfoCalls == 1, "plugin-dir replacement first plugin metadata was not read");
+        Require(first.closeCalls == 1, "plugin-dir replacement first plugin was not closed");
+        Require(second.getInfoCalls == 0, "plugin-dir replacement allowed second plugin metadata read");
+        Require(second.initCalls == 0, "plugin-dir replacement initialized second plugin");
+        Require(second.closeCalls == 0, "plugin-dir replacement opened second plugin handle");
+
+        CleanupPlugin(first);
+        CleanupPlugin(second);
+        fs::remove_all(root);
+    }
+
     void TestPluginDirectorySymlinkAncestorIsRejected()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_plugin_dir_symlink_ancestor");
@@ -6845,6 +7006,56 @@ namespace
                 "plugin behind symlinked plugin directory ancestor reached loader close path");
 
         CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestConfigRootSymlinkAncestorReplacementBeforeDefaultCreationIsRejected()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_config_root_symlink_replacement");
+        ConfigureEnvironment(root);
+
+        const fs::path managedParent = root / "config-parent";
+        const fs::path managedConfig = managedParent / "config";
+        fs::create_directories(managedConfig);
+        setenv("OBELISK_CONFIG_DIR", managedConfig.string().c_str(), 1);
+
+        FakePlugin first{
+            .filename = "aaa_config_root_replacer.so",
+            .pluginId = "aaa_config_root_replacer",
+        };
+        FakePlugin second{
+            .filename = "zzz_config_root_replaced.so",
+            .pluginId = "zzz_config_root_replaced",
+        };
+        FakeLoader loader;
+        loader.Add(first);
+        loader.Add(second);
+        TouchPlugin(root, first.filename);
+        TouchPlugin(root, second.filename);
+
+        const fs::path externalParent = root / "external-config-parent";
+        fs::create_directories(externalParent / "config");
+
+        loader.AfterClose = [&](FakePlugin& plugin) {
+            if (plugin.filename != first.filename)
+                return;
+            fs::remove_all(managedParent);
+            fs::create_directory_symlink(externalParent, managedParent);
+        };
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(first.getInfoCalls == 1, "config-root replacement first plugin metadata was not read");
+        Require(first.closeCalls == 1, "config-root replacement first plugin was not closed");
+        Require(second.getInfoCalls == 1, "config-root replacement second plugin metadata was not read");
+        Require(second.initCalls == 0, "config-root replacement initialized second plugin");
+        Require(second.closeCalls == 1, "config-root replacement second plugin handle was not closed");
+        Require(!fs::exists(externalParent / "config" / second.pluginId / "config.json"),
+                "default plugin config was created through a replaced symlink config ancestor");
+
+        CleanupPlugin(first);
+        CleanupPlugin(second);
         fs::remove_all(root);
     }
 
@@ -7058,6 +7269,8 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_fail_close_throw");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
+        EnableChatMessageEvents(root);
 
         FakePlugin plugin{
             .filename = "init_fail_close_throw.so",
@@ -7073,6 +7286,22 @@ namespace
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "close-throw init-fail plugin accepted a new owner-token ProcessEvent callback while retained unloading");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin accepted a new owner-token gameplay policy callback while retained unloading");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin accepted a new owner-token chat callback while retained unloading");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     1000,
@@ -7087,6 +7316,22 @@ namespace
         Require(plugin.initCalls == 1, "close-throw init-fail plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "close-throw init-fail plugin shutdown was not called once");
         Require(plugin.closeCalls == 2, "init-failure close error was not retained for retry");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "close-throw init-fail plugin owner token remained valid for ProcessEvent after close retry");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin owner token remained valid for gameplay policy after close retry");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin owner token remained valid for chat after close retry");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     1000,
@@ -7214,6 +7459,8 @@ namespace
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_close_throw");
         ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
+        EnableChatMessageEvents(root);
 
         FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
         FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
@@ -7229,6 +7476,22 @@ namespace
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
         manager.UnloadAll();
+        Require(pluginB.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "close-throw retained plugin accepted a new owner-token ProcessEvent callback while unloading");
+        Require(pluginB.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &pluginB) == 0,
+                "close-throw retained plugin accepted a new owner-token gameplay policy callback while unloading");
+        Require(pluginB.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &pluginB) == 0,
+                "close-throw retained plugin accepted a new owner-token chat callback while unloading");
         Require(pluginB.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     pluginB.initOwnerToken,
                     1000,
@@ -7242,6 +7505,22 @@ namespace
 
         Require(pluginA.closeCalls == 1, "unload did not continue after later plugin close threw");
         Require(pluginB.closeCalls == 2, "throwing plugin close was not retained for retry");
+        Require(pluginB.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "close-throw plugin owner token remained valid for ProcessEvent after retained close retry");
+        Require(pluginB.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &pluginB) == 0,
+                "close-throw plugin owner token remained valid for gameplay policy after retained close retry");
+        Require(pluginB.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &pluginB) == 0,
+                "close-throw plugin owner token remained valid for chat after retained close retry");
         Require(pluginB.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     pluginB.initOwnerToken,
                     1000,
@@ -7530,6 +7809,138 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetainsOwnerTokenTimerStateWhenTimerCleanupFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_timer_cleanup_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "timer_cleanup_fail.so",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "timer-cleanup-fail plugin was not initialized");
+        const uint64_t timerToUnregister =
+            plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                60000,
+                0,
+                0,
+                FakeTimerCallback,
+                &plugin);
+        const uint64_t retainedTimer =
+            plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                60000,
+                0,
+                0,
+                FakeTimerCallback,
+                &plugin);
+        Require(timerToUnregister != 0, "timer-cleanup-fail unregister timer was not registered");
+        Require(retainedTimer != 0, "timer-cleanup-fail retained timer was not registered");
+
+        Obelisk::Core::SetPluginTimerCleanupFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "timer-cleanup-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 0, "timer-cleanup-fail plugin was closed despite timer cleanup failure");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "timer-cleanup-fail retained plugin accepted a new owner-token timer while unloading");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, timerToUnregister),
+                "timer-cleanup-fail retained plugin owner-token timer unregister failed while unloading");
+
+        manager.UnloadAll();
+        Require(plugin.shutdownCalls == 1, "timer-cleanup-fail plugin shutdown repeated during failed retry");
+        Require(plugin.closeCalls == 0, "timer-cleanup-fail plugin was closed during failed timer cleanup retry");
+
+        Obelisk::Core::SetPluginTimerCleanupFailureForTesting(false);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "timer-cleanup-fail plugin shutdown repeated after cleanup retry");
+        Require(plugin.closeCalls == 1, "timer-cleanup-fail plugin was not closed after timer cleanup retry");
+        Require(!Obelisk::Core::TimerManager::Get().Unregister(plugin.owner, retainedTimer),
+                "timer-cleanup-fail retained timer survived successful cleanup retry");
+        Require(!plugin.capturedApi.UnregisterTimerWithOwnerToken(plugin.initOwnerToken, retainedTimer),
+                "timer-cleanup-fail owner token remained valid after cleanup retry");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureRetainsOwnerTokenTimerStateWhenTimerCleanupFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_timer_cleanup_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_timer_cleanup_fail.so",
+            .initResult = false,
+            .registerTimerCallback = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Obelisk::Core::SetPluginTimerCleanupFailureForTesting(true);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "init timer-cleanup-fail plugin was not initialized");
+        Require(plugin.shutdownCalls == 1, "init timer-cleanup-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "init timer-cleanup-fail plugin was closed despite timer cleanup failure");
+        Require(plugin.timerRegistrationId != 0,
+                "init timer-cleanup-fail plugin timer was not registered before failure");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "init timer-cleanup-fail retained plugin accepted a new owner-token timer while unloading");
+        Require(plugin.capturedApi.UnregisterTimerWithOwnerToken(
+                    plugin.initOwnerToken,
+                    plugin.timerRegistrationId),
+                "init timer-cleanup-fail retained plugin owner-token timer unregister failed while unloading");
+
+        manager.UnloadAll();
+        Require(plugin.shutdownCalls == 1,
+                "init timer-cleanup-fail plugin shutdown repeated during failed retry");
+        Require(plugin.closeCalls == 0,
+                "init timer-cleanup-fail plugin was closed during failed timer cleanup retry");
+
+        Obelisk::Core::SetPluginTimerCleanupFailureForTesting(false);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "init timer-cleanup-fail plugin shutdown repeated after cleanup retry");
+        Require(plugin.closeCalls == 1,
+                "init timer-cleanup-fail plugin was not closed after timer cleanup retry");
+        Require(!plugin.capturedApi.UnregisterTimerWithOwnerToken(
+                    plugin.initOwnerToken,
+                    plugin.timerRegistrationId),
+                "init timer-cleanup-fail owner token remained valid after cleanup retry");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllRetriesPublicChatCleanupAfterBackingDispatcherCleanup()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_public_chat_retry");
@@ -7640,6 +8051,72 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetriesGameplayPolicyCleanupAfterPartialPublicBackingFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_partial_retry");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_partial_retry.so",
+            .registerGameplayPolicyCallback = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy partial retry plugin was not initialized");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "gameplay-policy partial retry plugin did not register a public callback");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy partial retry structure callback was not bridged");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy partial retry inventory callback was not bridged");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay-policy partial retry item-return callback was not bridged");
+
+        Obelisk::Core::SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "gameplay-policy partial retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "gameplay-policy partial retry plugin was closed despite partial public cleanup failure");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy partial retry structure backing callback remained dispatchable");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy partial retry inventory backing cleanup did not run");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "gameplay-policy partial retry item-return backing cleanup did not run");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "gameplay-policy partial retry accepted a new owner-token callback while unloading");
+
+        manager.UnloadAll();
+        Obelisk::Core::SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(false);
+
+        Require(plugin.shutdownCalls == 1,
+                "gameplay-policy partial retry plugin shutdown repeated during retry");
+        Require(plugin.closeCalls == 1,
+                "gameplay-policy partial retry plugin was not closed after cleanup retry");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "gameplay-policy partial retry owner token remained valid after unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_destroy_userdata_retry");
@@ -7706,6 +8183,240 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRejectsOwnerTokenRegistrationDuringCopiedDestroyUserDataRetry()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_copied_destroy_owner_token_retry");
+        ConfigureEnvironment(root);
+        EnableFilteredProcessEventCallbacks(root);
+        EnableChatMessageEvents(root);
+
+        FakePlugin plugin{
+            .filename = "copied_destroy_owner_token_retry.so",
+            .registerStructureCallback = true,
+            .registerGameplayPolicyCallback = true,
+            .failDestroyUserDataOnce = true,
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "copied destroy owner-token retry plugin was not initialized");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "copied destroy owner-token retry plugin did not register public gameplay callback");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 2,
+                "copied destroy owner-token retry structure callbacks were not registered");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "copied destroy owner-token retry inventory callback was not registered");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "copied destroy owner-token retry item-return callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "copied destroy owner-token retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "copied destroy owner-token retry plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 1,
+                "copied destroy owner-token retry did not attempt direct copied DestroyUserData");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "copied destroy owner-token retry left structure callbacks dispatchable after failed cleanup");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "copied destroy owner-token retry left inventory callbacks dispatchable after failed cleanup");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "copied destroy owner-token retry left item-return callbacks dispatchable after failed cleanup");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "copied destroy owner-token retry accepted a new owner-token ProcessEvent callback while unloading");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry accepted a new owner-token gameplay policy callback while unloading");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry accepted a new owner-token chat callback while unloading");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry accepted a new owner-token timer while unloading");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "copied destroy owner-token retry plugin shutdown repeated during cleanup retry");
+        Require(plugin.destroyUserDataCalls == 2,
+                "copied destroy owner-token retry did not retry retained DestroyUserData before close");
+        Require(plugin.closeCalls == 1,
+                "copied destroy owner-token retry plugin was not closed after cleanup retry");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "copied destroy owner-token retry structure callback was still registered at close");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "copied destroy owner-token retry inventory callback was still registered at close");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "copied destroy owner-token retry item-return callback was still registered at close");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "copied destroy owner-token retry owner token remained valid for ProcessEvent after close");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                    FakeGameplayPolicyEventCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry owner token remained valid for gameplay policy after close");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry owner token remained valid for chat after close");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "copied destroy owner-token retry owner token remained valid for timer after close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllRetainsChatDestroyRetryAfterOwnerCleanupSetupFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_destroy_retry_setup_failure");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "chat_destroy_retry_setup_failure.so",
+            .registerChatCallback = true,
+            .failDestroyUserDataOnce = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "chat retry setup plugin was not initialized");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "chat retry setup callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "chat retry setup plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "chat retry setup plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 1,
+                "chat retry setup first unload did not attempt DestroyUserData once");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "chat retry setup callback remained dispatchable after failed cleanup");
+
+        chatDispatcher.FailNextFailedOwnerDestroyRetrySetupForTesting();
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "chat retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.closeCalls == 0,
+                "chat retry setup plugin was closed after retry setup failure");
+        Require(plugin.destroyUserDataCalls == 1,
+                "chat retry setup failure reran DestroyUserData before setup completed");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "chat retry setup plugin shutdown repeated after cleanup retry");
+        Require(plugin.destroyUserDataCalls == 2,
+                "chat retry setup did not retry retained DestroyUserData before close");
+        Require(plugin.closeCalls == 1,
+                "chat retry setup plugin was not closed after cleanup retry");
+        Require(plugin.chatSubscriptionsAtClose == 0,
+                "chat retry setup callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllRetainsStructureDestroyRetryAfterOwnerCleanupSetupFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_structure_destroy_retry_setup_failure");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "structure_destroy_retry_setup_failure.so",
+            .registerStructureCallback = true,
+            .failDestroyUserDataOnce = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "structure retry setup plugin was not initialized");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "structure retry setup callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "structure retry setup plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "structure retry setup plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 1,
+                "structure retry setup first unload did not attempt DestroyUserData once");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "structure retry setup callback remained dispatchable after failed cleanup");
+
+        Obelisk::Core::StructureEventDispatcher::Get().FailNextFailedOwnerDestroyRetrySetupForTesting();
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "structure retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.closeCalls == 0,
+                "structure retry setup plugin was closed after retry setup failure");
+        Require(plugin.destroyUserDataCalls == 1,
+                "structure retry setup failure reran DestroyUserData before setup completed");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "structure retry setup plugin shutdown repeated after cleanup retry");
+        Require(plugin.destroyUserDataCalls == 2,
+                "structure retry setup did not retry retained DestroyUserData before close");
+        Require(plugin.closeCalls == 1,
+                "structure retry setup plugin was not closed after cleanup retry");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "structure retry setup callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllRetriesPlayerPrincipalDestroyUserDataBeforeClose()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_player_principal_destroy_userdata_retry");
@@ -7750,6 +8461,149 @@ namespace
                 "player-principal destroy-userdata retry plugin was not closed after cleanup retry");
         Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
                 "player-principal destroy-userdata retry callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllRetainsPlayerPrincipalDestroyRetryAfterOwnerCleanupSetupFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_player_principal_destroy_retry_setup_failure");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "player_principal_destroy_retry_setup_failure.so",
+            .registerPlayerPrincipalCallback = true,
+            .failDestroyUserDataOnce = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1,
+                "player-principal retry setup plugin was not initialized");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "player-principal retry setup callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "player-principal retry setup plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "player-principal retry setup plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 1,
+                "player-principal retry setup first unload did not attempt DestroyUserData once");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "player-principal retry setup callback remained dispatchable after failed cleanup");
+
+        Obelisk::Core::PlayerPrincipalEventDispatcher::Get().FailNextFailedOwnerDestroyRetrySetupForTesting();
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "player-principal retry setup plugin shutdown repeated during setup-failure retry");
+        Require(plugin.closeCalls == 0,
+                "player-principal retry setup plugin was closed after retry setup failure");
+        Require(plugin.destroyUserDataCalls == 1,
+                "player-principal retry setup failure reran DestroyUserData before setup completed");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "player-principal retry setup plugin shutdown repeated after cleanup retry");
+        Require(plugin.destroyUserDataCalls == 2,
+                "player-principal retry setup did not retry retained DestroyUserData before close");
+        Require(plugin.closeCalls == 1,
+                "player-principal retry setup plugin was not closed after cleanup retry");
+        Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
+                "player-principal retry setup callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllBlocksCloseAfterSelfUnregisterDestroyUserDataFailure()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_self_unregister_destroy_retry");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "self_unregister_destroy_retry.so",
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "self-unregister destroy retry plugin was not initialized");
+
+        PlayerPrincipalSelfUnregisterDestroyRetryState state{
+            .RegistrationId = 0,
+            .Calls = 0,
+            .DestroyCalls = 0,
+            .FailuresRemaining = 1,
+        };
+        state.RegistrationId = Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Register(
+            plugin.owner,
+            Obelisk::Core::PlayerPrincipalEventSubscription{
+                SelfUnregisterPlayerPrincipalForPluginManagerCallback,
+                &state,
+                FailingPlayerPrincipalDestroyForPluginManager});
+        Require(state.RegistrationId != 0,
+                "self-unregister destroy retry callback registration failed");
+
+        const std::vector<Obelisk::Core::PlayerPrincipalBoolValue> bools{
+            {
+                .Field = Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin,
+                .Value = true,
+            },
+            {
+                .Field = Obelisk::Core::PlayerPrincipalBoolField::ReturnValue,
+                .Value = true,
+            },
+        };
+        const Obelisk::Core::PlayerPrincipalEventView event{
+            .Kind = Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+            .Action = Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+            .EventSequence = 11,
+            .ServerProcessEpoch = 22,
+            .Bools = bools,
+        };
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Dispatch(event) == 1,
+                "self-unregister destroy retry callback did not dispatch");
+        Require(state.Calls == 1, "self-unregister destroy retry callback ran wrong count");
+        Require(state.DestroyCalls == 1,
+                "self-unregister destroy retry did not attempt deferred DestroyUserData");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "self-unregister destroy retry callback remained dispatchable before unload");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "self-unregister destroy retry plugin shutdown was not called");
+        Require(state.DestroyCalls == 2,
+                "self-unregister destroy retry owner cleanup was not attempted during unload");
+        Require(plugin.closeCalls == 0,
+                "self-unregister destroy retry plugin was closed despite unreported retained cleanup failure");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1,
+                "self-unregister destroy retry plugin shutdown repeated during retry");
+        Require(state.DestroyCalls == 2,
+                "self-unregister destroy retry repeated already completed retained cleanup");
+        Require(plugin.closeCalls == 1,
+                "self-unregister destroy retry plugin was not closed after cleanup retry");
+        Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
+                "self-unregister destroy retry callback was still registered at close");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -7993,6 +8847,8 @@ namespace
     }
 }
 
+void TestNativePingPluginIntegration();
+
 int main()
 {
     const fs::path logRoot = MakeTempRoot("obelisk_plugin_manager_logs");
@@ -8004,6 +8860,7 @@ int main()
     TestPluginDirectoryAliasComponentsAreRejected();
     TestValidPluginLoadsAndUnloadCleansCallbacks();
     TestPluginOwnerTokensSkipZeroAndLiveTokensAfterWrap();
+    TestOwnerTokenStateSetupFailureDoesNotLeakToken();
     TestGlobalProcessEventCallbackRejectedByDefault();
     TestCallbackHandleCapabilityImpliesOwnerTokenCapability();
     TestProcessEventBlockingCapabilityRejectedByDefault();
@@ -8084,12 +8941,15 @@ int main()
     TestCallProcessEventUsesCapturedPluginInitCapability();
     TestCallProcessEventSuppressesOriginalException();
     TestDisabledPluginPreparesConfigButDoesNotInit();
+    TestDefaultConfigCreationRejectsSymlinkPluginConfigDirectory();
     TestInstanceDisallowedPluginDoesNotInit();
     TestMissingGetInfoRejectsAndCloses();
     TestResolveExceptionAfterOpenClosesHandle();
     TestPluginSymlinkCandidateIsRejected();
     TestPluginSymlinkDirectoryIsRejected();
+    TestPluginDirectorySymlinkReplacementAfterValidationIsRejected();
     TestPluginDirectorySymlinkAncestorIsRejected();
+    TestConfigRootSymlinkAncestorReplacementBeforeDefaultCreationIsRejected();
     TestMissingInitRejectsAndCloses();
     TestInvalidMetadataRejectsAndCloses();
     TestInitFailureCleansCallbacksAndCloses();
@@ -8104,14 +8964,24 @@ int main()
     TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails();
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
+    TestUnloadAllRetainsOwnerTokenTimerStateWhenTimerCleanupFails();
+    TestInitFailureRetainsOwnerTokenTimerStateWhenTimerCleanupFails();
     TestUnloadAllRetriesPublicChatCleanupAfterBackingDispatcherCleanup();
     TestUnloadAllRetriesGameplayPolicyCleanupAfterBackingDispatcherCleanup();
+    TestUnloadAllRetriesGameplayPolicyCleanupAfterPartialPublicBackingFailure();
     TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose();
+    TestUnloadAllRejectsOwnerTokenRegistrationDuringCopiedDestroyUserDataRetry();
+    TestUnloadAllRetainsChatDestroyRetryAfterOwnerCleanupSetupFailure();
+    TestUnloadAllRetainsStructureDestroyRetryAfterOwnerCleanupSetupFailure();
     TestUnloadAllRetriesPlayerPrincipalDestroyUserDataBeforeClose();
+    TestUnloadAllRetainsPlayerPrincipalDestroyRetryAfterOwnerCleanupSetupFailure();
+    TestUnloadAllBlocksCloseAfterSelfUnregisterDestroyUserDataFailure();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
     TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails();
     TestDuplicatePluginIdRejectsSecondPlugin();
     TestLoadPluginsSkipsAlreadyLoadedPluginId();
+
+    TestNativePingPluginIntegration();
 
     Obelisk::Logger::Shutdown();
     fs::remove_all(logRoot);

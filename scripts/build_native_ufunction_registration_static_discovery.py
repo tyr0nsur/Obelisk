@@ -28,6 +28,61 @@ PLAYER_IDENTITY_FOCAL_TARGETS = {
     "ShooterPlayerController.ServerListPlayers",
     "ShooterPlayerController.ServerKickPlayer",
 }
+PLAYER_LIFECYCLE_TARGET_SET = reflection_target_sets.PLAYER_LIFECYCLE_TARGET_SET
+PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS = frozenset(
+    reflection_target_sets.PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS
+)
+PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS = frozenset(
+    reflection_target_sets.PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS
+)
+PLAYER_LIFECYCLE_REJECTED_START_SOURCE_TARGETS = frozenset(
+    reflection_target_sets.PLAYER_LIFECYCLE_REJECTED_START_SOURCE_TARGETS
+)
+PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS = frozenset(
+    reflection_target_sets.PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS
+)
+PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS = frozenset(
+    reflection_target_sets.PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS
+)
+PLAYER_LIFECYCLE_GUIDANCE_ONLY_TARGETS = (
+    PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS | PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS
+)
+PLAYER_LIFECYCLE_ALL_TARGETS = (
+    PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS | PLAYER_LIFECYCLE_GUIDANCE_ONLY_TARGETS
+)
+PLAYER_LIFECYCLE_RUNTIME_REQUIREMENT_BY_TARGET: dict[str, dict[str, Any]] = {
+    "ShooterGameMode.HandleNewPlayer": {
+        "required_runtime_shape": "ShooterGameMode.HandleNewPlayer(1,1)",
+        "required_source_target": "ShooterGameMode.HandleNewPlayer",
+        "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "required_copied_bool_values": ["1", "1"],
+    },
+    "ShooterGameMode.CheckJoinInProgress": {
+        "required_runtime_shape": "ShooterGameMode.CheckJoinInProgress(1,0)",
+        "required_source_target": "ShooterGameMode.CheckJoinInProgress",
+        "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "required_copied_bool_values": ["1", "0"],
+        "rejected_aliases": [
+            "ShooterGameMode.CheckJoinInProgress",
+            "CheckJoinInProgress",
+        ],
+    },
+    "ShooterGameMode.OnLogout": {
+        "required_runtime_shape": "ShooterGameMode.OnLogout(matched)",
+        "required_source_target": "ShooterGameMode.OnLogout",
+        "required_correlation_status": "matched",
+    },
+}
+PLAYER_LIFECYCLE_APPROVED_RUNTIME_TRIPLET_REQUIREMENT = {
+    "approved_runtime_evidence_present": False,
+    "approved_runtime_evidence_ready": False,
+    "static_evidence_can_replace_runtime_triplet": False,
+    "required_exact_triplet": [
+        PLAYER_LIFECYCLE_RUNTIME_REQUIREMENT_BY_TARGET["ShooterGameMode.HandleNewPlayer"],
+        PLAYER_LIFECYCLE_RUNTIME_REQUIREMENT_BY_TARGET["ShooterGameMode.CheckJoinInProgress"],
+        PLAYER_LIFECYCLE_RUNTIME_REQUIREMENT_BY_TARGET["ShooterGameMode.OnLogout"],
+    ],
+}
 DEFAULT_BINARY = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/"
     "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520/"
@@ -411,7 +466,59 @@ def target_member_sets(target: str, requested_target_sets: list[str]) -> list[st
             memberships.append(target_set)
     if target in PLAYER_IDENTITY_FOCAL_TARGETS and "players-identity-lifecycle-intake" not in memberships:
         memberships.append("players-identity-lifecycle-intake")
+    if (
+        target in PLAYER_LIFECYCLE_ALL_TARGETS
+        and PLAYER_LIFECYCLE_TARGET_SET in requested_target_sets
+        and PLAYER_LIFECYCLE_TARGET_SET not in memberships
+    ):
+        memberships.append(PLAYER_LIFECYCLE_TARGET_SET)
     return memberships
+
+
+def lifecycle_static_orientation(target: str) -> dict[str, Any]:
+    approved_triplet_source = target in PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS
+    static_anchor_source = target in PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS
+    rejected_start_source = target in PLAYER_LIFECYCLE_REJECTED_START_SOURCE_TARGETS
+    chronology_only = target in PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS
+    delegate_guidance_only = target in PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS
+    guidance_only = chronology_only or delegate_guidance_only
+    if static_anchor_source:
+        source_role = "static_lifecycle_anchor_source"
+    elif rejected_start_source:
+        source_role = "rejected_start_observer_triplet_source"
+    elif chronology_only:
+        source_role = "chronology_only_non_anchor_guidance"
+    elif delegate_guidance_only:
+        source_role = "delegate_signature_non_anchor_guidance"
+    else:
+        source_role = None
+    runtime_requirement = dict(PLAYER_LIFECYCLE_RUNTIME_REQUIREMENT_BY_TARGET.get(target, {}))
+    return {
+        "target_set": PLAYER_LIFECYCLE_TARGET_SET if target in PLAYER_LIFECYCLE_ALL_TARGETS else None,
+        "source_role": source_role,
+        "approved_runtime_triplet_source": approved_triplet_source,
+        "static_lifecycle_anchor_source": static_anchor_source,
+        "rejected_start_observer_triplet_source": rejected_start_source,
+        "non_anchor_guidance_only": guidance_only,
+        "chronology_only_non_anchor": chronology_only,
+        "delegate_signature_guidance_only": delegate_guidance_only,
+        "candidate_static_orientation_allowed": approved_triplet_source,
+        "blocks_report_on_failure": not guidance_only,
+        "required_runtime_shape": runtime_requirement.get("required_runtime_shape"),
+        "required_source_target": runtime_requirement.get("required_source_target"),
+        "required_copied_bool_fields": runtime_requirement.get("required_copied_bool_fields", []),
+        "required_copied_bool_values": runtime_requirement.get("required_copied_bool_values", []),
+        "required_correlation_status": runtime_requirement.get("required_correlation_status"),
+        "source_name_only": approved_triplet_source,
+        "bare_source_alias_counts_as_runtime_evidence": False,
+        "static_evidence_can_replace_runtime_triplet": False,
+        "approved_runtime_evidence": False,
+        "promotion_ready": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "sdk_progress_contribution": 0,
+        "p0_dependency_progress_contribution": 0,
+    }
 
 
 def safe_run_id(value: str) -> str:
@@ -449,6 +556,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     pending_target_reports: list[dict[str, Any]] = []
     for target in targets:
         outer_name, short_name = split_qualified_target(target)
+        lifecycle_orientation = lifecycle_static_orientation(target)
+        blocks_report_on_failure = bool(lifecycle_orientation["blocks_report_on_failure"])
+        non_anchor_guidance_only = bool(lifecycle_orientation["non_anchor_guidance_only"])
         string_hits = find_string_hits(data, segments, short_name) if segments else []
         for hit in string_hits:
             hit["used_for_registration_candidates"] = hit.get("encoding") == "ascii"
@@ -469,8 +579,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             for candidate in registration_candidates
             if candidate.get("status") == "candidate" and candidate.get("registrar_target_vma")
         }
-        for registrar in sorted(candidate_targets):
-            registrar_clusters.setdefault(str(registrar), []).append(target)
+        if blocks_report_on_failure:
+            for registrar in sorted(candidate_targets):
+                registrar_clusters.setdefault(str(registrar), []).append(target)
         target_blockers = []
         if not readable_hits:
             target_blockers.append({"reason": "target_name_string_not_found"})
@@ -481,6 +592,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         candidate_count = sum(1 for candidate in registration_candidates if candidate.get("status") == "candidate")
         blocked_candidate_count = sum(1 for candidate in registration_candidates if candidate.get("status") == "blocked")
         focal_target = target in PLAYER_IDENTITY_FOCAL_TARGETS
+        effective_target_blockers = [] if non_anchor_guidance_only else target_blockers
         pending_target_reports.append(
             {
                 "target": target,
@@ -490,6 +602,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 "short_name": short_name,
                 "target_set_memberships": target_member_sets(target, args.target_set),
                 "player_identity_focal_gate_target": focal_target,
+                "lifecycle_static_orientation": lifecycle_orientation,
+                "blocks_report_on_failure": blocks_report_on_failure,
+                "non_anchor_guidance_only": non_anchor_guidance_only,
                 "discovery_summary": {
                     "string_hit_counts": {
                         "ascii": sum(1 for hit in string_hits if hit.get("encoding") == "ascii"),
@@ -508,25 +623,62 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 },
                 "string_hits": string_hits,
                 "registration_candidates": registration_candidates,
-                "blockers": target_blockers,
-                "status": "candidate" if not target_blockers else "blocked",
+                "blockers": effective_target_blockers,
+                "non_blocking_findings": target_blockers if non_anchor_guidance_only else [],
+                "status": "guidance_only"
+                if non_anchor_guidance_only
+                else ("candidate" if not target_blockers else "blocked"),
             }
         )
 
-    registrar_cluster_sizes = {registrar: len(set(cluster_targets)) for registrar, cluster_targets in registrar_clusters.items()}
+    registrar_cluster_sizes = {
+        registrar: len(set(cluster_targets)) for registrar, cluster_targets in registrar_clusters.items()
+    }
     for target_report in pending_target_reports:
         selected = select_best_candidate(target_report["registration_candidates"], registrar_cluster_sizes)
-        if selected is None and target_report["status"] == "candidate":
+        if (
+            selected is None
+            and target_report["status"] == "candidate"
+            and target_report["blocks_report_on_failure"]
+        ):
             target_report["blockers"].append({"reason": "selected_registration_candidate_missing"})
             target_report["status"] = "blocked"
         target_report["selected_candidate"] = selected
         target_report["discovery_summary"]["selected_candidate_status"] = selected.get("status") if selected else None
         target_reports.append(target_report)
 
-    if any(target["status"] == "blocked" for target in target_reports):
+    blocking_target_reports = [target for target in target_reports if target.get("blocks_report_on_failure")]
+    if not blocking_target_reports:
+        blockers.append({"reason": "no_static_orientation_source_targets_requested"})
+    if any(target["status"] == "blocked" and target.get("blocks_report_on_failure") for target in target_reports):
         blockers.append({"reason": "one_or_more_targets_blocked"})
-    if not registrar_clusters:
+    if blocking_target_reports and not registrar_clusters:
         blockers.append({"reason": "registrar_cluster_not_inferred"})
+
+    lifecycle_triplet_requested = any(target in PLAYER_LIFECYCLE_ALL_TARGETS for target in targets)
+    lifecycle_triplet_source_targets = [
+        target["target"]
+        for target in target_reports
+        if target["target"] in PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS
+    ]
+    lifecycle_guidance_only_targets = [
+        target["target"]
+        for target in target_reports
+        if target["target"] in PLAYER_LIFECYCLE_GUIDANCE_ONLY_TARGETS
+    ]
+    if lifecycle_triplet_requested and not lifecycle_triplet_source_targets:
+        blockers.append({"reason": "approved_lifecycle_triplet_source_target_missing"})
+    missing_lifecycle_triplet_source_targets = sorted(
+        PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS - set(lifecycle_triplet_source_targets)
+    )
+    if lifecycle_triplet_requested and missing_lifecycle_triplet_source_targets:
+        blockers.append(
+            {
+                "reason": "approved_lifecycle_triplet_source_target_set_incomplete",
+                "missing_targets": missing_lifecycle_triplet_source_targets,
+                "observed_targets": lifecycle_triplet_source_targets,
+            }
+        )
 
     material_identity = {
         "artifact_kind": SCHEMA,
@@ -544,10 +696,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "approved_runtime_evidence": False,
         "identity_ready": False,
         "lookup_ready": False,
         "mutation_ready": False,
         "return_override_ready": False,
+        "sdk_progress_contribution": 0,
+        "p0_dependency_progress_contribution": 0,
+        "v1_completion_progress_contribution": 0,
         "callable_process_event_contract": False,
         "not_artifact_gate": True,
         "generated_at": utc_now(),
@@ -555,22 +711,39 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "expected_binary_sha256": args.expected_binary_sha256,
         "inputs": {"target_names": args.target, "target_sets": args.target_set, "input_addresses": []},
         "preplan_scope": {
-            "target_set": "players-identity-lifecycle-intake"
-            if "players-identity-lifecycle-intake" in args.target_set
-            or PLAYER_IDENTITY_FOCAL_TARGETS.issubset(set(targets))
-            else None,
+            "target_set": PLAYER_LIFECYCLE_TARGET_SET
+            if lifecycle_triplet_requested
+            else (
+                "players-identity-lifecycle-intake"
+                if "players-identity-lifecycle-intake" in args.target_set
+                or PLAYER_IDENTITY_FOCAL_TARGETS.issubset(set(targets))
+                else None
+            ),
             "focal_targets": [
                 target
                 for target in targets
                 if target in PLAYER_IDENTITY_FOCAL_TARGETS
             ],
+            "approved_lifecycle_triplet_source_targets": lifecycle_triplet_source_targets,
+            "missing_approved_lifecycle_triplet_source_targets": (
+                missing_lifecycle_triplet_source_targets
+                if lifecycle_triplet_requested
+                else []
+            ),
+            "non_anchor_guidance_only_targets": lifecycle_guidance_only_targets,
             "requires_full_12_target_inventory": True,
             "downstream_blockers": [
                 "requires_non_protected_core_evidence_pack",
                 "requires_reflection_inventory_pack",
                 "requires_focal_snapshots",
+                "approved_runtime_evidence_missing",
                 "requires_privacy_invalidation_policy",
             ],
+            "approved_runtime_triplet_requirement": (
+                PLAYER_LIFECYCLE_APPROVED_RUNTIME_TRIPLET_REQUIREMENT
+                if lifecycle_triplet_requested
+                else None
+            ),
         },
         "load_segments": [segment.to_json() for segment in segments],
         "targets": target_reports,
@@ -579,16 +752,27 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             for registrar, cluster_targets in sorted(registrar_clusters.items())
         ],
         "blockers": blockers,
-        "orientation_next_actions": [
-            "build complete non-protected core evidence pack",
-            "build full 12-target reflection inventory pack",
-            "plan exact focal snapshots for ServerListPlayers and ServerKickPlayer",
-        ],
+        "orientation_next_actions": (
+            [
+                "keep static registration rows candidate-only",
+                "use only CheckJoinInProgress, HandleNewPlayer, and OnLogout as lifecycle triplet source orientation",
+                "keep K2_PostLogin and lifecycle delegate signatures as non-anchor guidance",
+                "collect separately approved runtime triplet evidence before any SDK or P0 progress",
+            ]
+            if lifecycle_triplet_requested
+            else [
+                "build complete non-protected core evidence pack",
+                "build full 12-target reflection inventory pack",
+                "plan exact focal snapshots for ServerListPlayers and ServerKickPlayer",
+            ]
+        ),
         "non_claims": [
             "static registration discovery is navigation evidence only",
             "does_not_promote_public_sdk",
             "does_not_promote_ufunction_abi",
             "does_not_promote_runtime_hook",
+            "does_not_provide_approved_runtime_evidence",
+            "does_not_count_toward_sdk_or_p0_progress",
             "does_not_promote_identity_lookup_mutation_or_return_override",
             "does_not_promote_callable_process_event_contract",
             "does not prove UFunction object identity, UProperty chains, ParmsSize, or parameter offsets",

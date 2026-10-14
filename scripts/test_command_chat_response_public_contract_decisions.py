@@ -102,6 +102,58 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         ):
             self.assertIn(forbidden, payload["forbidden_public_contract"])
 
+        guardrail = payload["post_permissions_abi_evidence_guardrail"]
+        self.assertEqual(
+            guardrail["schema"],
+            "obelisk.command-chat-response-post-permissions-abi-evidence-guardrail.v1",
+        )
+        self.assertEqual(
+            guardrail["requires_valid_upstream_promotion_certificates"],
+            [
+                "obelisk.player-identity-promotion-certificate.v1",
+                "obelisk.permissions-admin-promotion-certificate.v1",
+            ],
+        )
+        self.assertIn(
+            "response/send/broadcast readiness aliases cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "post-runtime planning metadata and chat/RCON/broadcast/send-source aliases cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "source-kind/status metadata aliases for chat, RCON, broadcast, send-chat, replies, or response bridge cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "player-identity promotion certificates must carry current reviewed identity contract and approved runtime binding evidence; readiness/progress aliases cannot replace that certificate evidence",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "permissions/admin promotion certificates must carry current hash-bound input bindings for its surface hash, upstream player-identity certificate, permissions decisions, query fail-closed contract, and readiness reports",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "command/principal/authz/response bridge proof must be valid and hash-current; bridge reports, package shape, beta, status, and source aliases cannot replace it",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "final/terminal, authz-ready, response-path-complete, reply-ready, public/stable SDK, P0 progress, beta/Discord ack, scoped release statement, and package-shape aliases cannot count without exact ordered predecessor certificates and current source hashes",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "plain readiness/progress aliases such as readinessReady, readinessProgress, and progressReady cannot count as evidence or route progress",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertFalse(guardrail["certificate_metadata_counts_as_promotion"])
+        self.assertFalse(guardrail["response_send_broadcast_aliases_count_as_promotion"])
+
+        gate = payload["runtime_owned_principal_permissions_gate"]
+        self.assertIn("post-runtime planning metadata", gate["forbidden_authority_sources"])
+        self.assertIn("chat/RCON/broadcast/send source alias", gate["forbidden_authority_sources"])
+        self.assertIn("status metadata", gate["forbidden_authority_sources"])
+
         identity = next(
             item
             for item in payload["required_before_public_header"]
@@ -224,6 +276,7 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
                 "copied response ABI layout tests",
                 "SDK consumer tests",
                 "isolated runtime delivery evidence",
+                "valid hash-current command/principal/authz/response bridge proof",
                 "second-source or independently reviewed response target evidence",
             },
         )
@@ -326,6 +379,7 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
                 "generic chat routing cannot bypass promoted identity and permissions/admin",
                 "chat intake is observation only and cannot become identity, permission, command authority, moderation authority, targeting, or roadmap priority",
                 "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
+                "activation preconditions, beta notice sends, public reachability, request checks, and identity_public_contract_gate_missing aliases cannot bypass promoted identity and permissions/admin",
                 "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded",
             ],
         )

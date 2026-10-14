@@ -86,9 +86,11 @@ generation and scope fields, because `principal_handle` alone never authorizes.
 typedef struct ObeliskPermissionQuery {
     uint32_t abi_version;
     uint32_t struct_size;
+    uint64_t plugin_owner_token;
     uint64_t principal_handle;
     uint64_t principal_generation;
     uint64_t principal_scope_flags;
+    uint64_t server_process_epoch;
     const char* action;
     size_t action_size;
     const char* resource_scope;
@@ -129,6 +131,9 @@ Required ABI properties:
 - missing capability, missing identity, malformed strings, unsupported scope, stale
   principal, unloaded policy, or invalid owner token returns failure or `deny/unknown`,
   never `allow`;
+- `plugin_owner_token`, `server_process_epoch`, and `request_flags` are copied query
+  fields in the candidate contract; missing owner or process epoch context fails closed,
+  and unsupported request flags return `deny/unknown`, never `allow`;
 - missing `principal_generation`, mismatched `principal_generation`, unsupported
   `principal_scope_flags`, or any cache key that omits `principal_generation`,
   `principal_scope_flags`, `resource_scope`, or `policy_epoch` fails closed; no public

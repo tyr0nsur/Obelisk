@@ -35,16 +35,30 @@ static const char kDefaultConfig[] =
     "  \"instance_allowlist\": []\n"
     "}\n";
 
-static bool has_policy_api(const ObeliskApi* api)
+static bool has_api_metadata_prefix(const ObeliskApi* api)
 {
     return api != NULL &&
-        api->abi_version == OBELISK_API_ABI_VERSION &&
+        api->struct_size >= offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) &&
+        api->abi_version == OBELISK_API_ABI_VERSION;
+}
+
+static bool has_policy_api(const ObeliskApi* api)
+{
+    return has_api_metadata_prefix(api) &&
+        api->struct_size >= offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) +
+            sizeof(api->RegisterGameplayPolicyEventWithOwnerTokenHandle) &&
+        api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+            sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
+        api->struct_size >= offsetof(ObeliskApi, DescribeResourceKind) +
+            sizeof(api->DescribeResourceKind) &&
         api->struct_size >= offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
             sizeof(api->DescribeGameplayPolicyEventKind) &&
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+        (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) != 0 &&
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) != 0 &&
         api->RegisterGameplayPolicyEventWithOwnerTokenHandle != NULL &&
         api->UnregisterGameplayPolicyEventWithOwnerToken != NULL &&
+        api->DescribeResourceKind != NULL &&
         api->DescribeGameplayPolicyEventKind != NULL;
 }
 
@@ -105,8 +119,34 @@ static bool describe_inventory_event_kind(const ObeliskApi* api, uint32_t event_
         descriptor.field_mask != 0;
 }
 
+static bool validate_inventory_resource_descriptor(const ObeliskApi* api)
+{
+    ObeliskResourceKindDescriptor descriptor;
+    memset(&descriptor, 0, sizeof(descriptor));
+    descriptor.struct_size = sizeof(descriptor);
+    if (!api->DescribeResourceKind(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM, &descriptor))
+        return false;
+
+    const uint64_t required_flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
+        OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
+        OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+
+    return descriptor.abi_version == OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION &&
+        descriptor.struct_size == sizeof(descriptor) &&
+        descriptor.resource_kind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM &&
+        (descriptor.flags & required_flags) == required_flags &&
+        (descriptor.supported_gameplay_policy_event_mask &
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY) ==
+            OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY &&
+        descriptor.supported_gameplay_policy_field_mask != 0 &&
+        strcmp(descriptor.stable_name, "inventory_item") == 0;
+}
+
 static bool validate_inventory_policy_descriptors(const ObeliskApi* api)
 {
+    if (!validate_inventory_resource_descriptor(api))
+        return false;
+
     for (uint32_t event_kind = OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK;
          event_kind <= OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK;
          ++event_kind)

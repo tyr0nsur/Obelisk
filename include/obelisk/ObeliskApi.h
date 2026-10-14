@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "ObeliskCommandApi.h"
+#include "ObeliskPlayerLifecycleApi.h"
 
 #define OBELISK_API_ABI_VERSION 1u
 #define OBELISK_PLUGIN_METADATA_ABI_VERSION 1u
@@ -19,6 +21,9 @@
 #define OBELISK_API_CAPABILITY_CHAT_EVENTS (1ull << 9)
 #define OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS (1ull << 10)
 #define OBELISK_API_CAPABILITY_TIMERS (1ull << 11)
+#define OBELISK_API_CAPABILITY_COMMAND_REPLIES (1ull << 12)
+#define OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT (1ull << 13)
+#define OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS (1ull << 14)
 #define OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION 1u
 #define OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION 1u
 #define OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION 1u
@@ -198,18 +203,24 @@ typedef struct ObeliskGameplayPolicyEventDescriptor {
     char display_name[64];
 } ObeliskGameplayPolicyEventDescriptor;
 
+// Future copied-event extensions, especially player/principal identity fields, must be
+// appended and read only after event->struct_size covers that exact field. Current v1
+// copied event payloads expose no player/principal identity.
+
 // Gameplay policy event data is callback-scope: plugins may read the copied POD
 // payload during the callback only; retaining data requires a plugin-owned copy.
 // This observational surface provides no identity, lookup, mutation, return
-// override, or raw UE pointer access unless a future append-only API explicitly
-// adds a separate decision contract.
+// override, or raw UE pointer access. It also provides no player/principal identity,
+// ownership, permissions/admin authority, or ResourceHandle unless a future append-only
+// API explicitly adds a separate decision contract.
 typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);
 
 // Chat message event data is callback-scope: plugins may read the copied UTF-8
 // payload during the callback only; retaining data requires a plugin-owned copy.
 // This notification surface provides no identity, lookup, mutation, return
-// override, or raw UE pointer access. It does not provide command routing,
-// moderation, replies, or authoritative sender/resource identity.
+// override, or raw UE pointer access. It also provides no player/principal identity,
+// ownership, permissions/admin authority, or ResourceHandle. It does not provide
+// command routing, moderation, replies, or authoritative sender/resource identity.
 typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);
 
 // Process-local timer callback. Timer ids are runtime handles only: they are not stable
@@ -239,6 +250,11 @@ typedef struct ObeliskPluginInitContext {
     const char* config_dir;
     const char* config_path;
     const char* instance_id;
+    // Process-local owner token for owner-scoped APIs. A zero token is invalid. Non-zero
+    // tokens are plugin ownership proofs only: they are not player/principal identity,
+    // player identity owner tokens, ResourceHandle identity, lookup authority, or
+    // persistent handles, and must not be saved, shared with other ARK server processes,
+    // or reused after unload.
     uint64_t plugin_owner_token;
 } ObeliskPluginInitContext;
 
@@ -258,6 +274,9 @@ typedef struct ObeliskApi {
     // plugin code should use copied v0.1 ABI seeds such as GameplayPolicyEvent and
     // minimal ChatMessageEvent. Those copied seeds are promoted-experimental-only for v1
     // planning and are not a v1-complete SDK claim.
+    // Public SDK consumers must default-deny these legacy raw slots. A non-null legacy
+    // function pointer is not authorization to subscribe; consumers need the appended
+    // owner-token handle slots plus struct_size, capability, and runtime debug gates.
     // Global registrations are rejected unless the calling plugin's init-time capability
     // snapshot includes OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS and the live
     // OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS env plus allow-global-process-event-callbacks
@@ -276,8 +295,9 @@ typedef struct ObeliskApi {
     // posture rejects calls unless OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT was advertised
     // to the calling plugin and the call happens inside that plugin's init callback while
     // the live debug env+marker gate is active. Post-init calls through a captured API table
-    // fail closed. Plugins must check struct_size, capabilities, and this function pointer
-    // before use.
+    // fail closed. This slot and capability bit are not public SDK readiness or stable
+    // availability claims. Plugins must check struct_size, capabilities, and this function
+    // pointer before use.
     //
     // Callback/runtime contract: copied API-table calls made after ObeliskPlugin_Init
     // fail closed because ABI v1 has no owner-token call signature. Callback-time or
@@ -287,9 +307,20 @@ typedef struct ObeliskApi {
 
     // ABI metadata appended for compatibility with the original function table layout.
     // Future ABI-breaking layouts should move these fields to the front with a version bump.
+    // For ABI v1, every appended field remains unavailable unless struct_size covers the
+    // field, the matching capability bit is advertised when applicable, and the function
+    // pointer itself is non-null. Check availability per function pointer, using
+    // offsetof(ObeliskApi, Slot) + sizeof(api->Slot), because a runtime can expose one
+    // appended slot in a feature family while omitting a later register/unregister slot.
+    // New v1 fields must be appended after existing fields.
     uint32_t abi_version;
     uint32_t struct_size;
     uint64_t capabilities;
+
+    // Every ownerToken parameter in this table accepts only the process-local
+    // ObeliskPluginInitContext::plugin_owner_token for the calling plugin. These tokens
+    // are not player identity owner tokens, player/principal ownership proofs, lookup
+    // handles, or persistent identities.
 
     // Owner-token callback registration for callbacks whose function pointer does not
     // live in the plugin shared object. Plugins must check struct_size,
@@ -303,11 +334,16 @@ typedef struct ObeliskApi {
     // Handle-returning ProcessEvent callback registration. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS, plugin_owner_token != 0, and
     // OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES before using these fields.
+    // Do not register unless struct_size also covers the matching unregister slot and
+    // both function pointers are non-null; otherwise a plugin can create a handle it
+    // cannot release itself if initialization later fails.
     // Name-index-filtered variants also require the filtered raw ProcessEvent capability
     // and live env+marker gate. Global variants require the global raw ProcessEvent
     // capability and live env+marker gate. Both remain debug-only.
-    // A return value of 0 means the registration was rejected. Non-zero handles can be
-    // passed with the same owner token to
+    // A return value of 0 means the registration was rejected. Non-zero handles are
+    // process-local runtime values, not player/principal/resource identity. Do not persist
+    // them, share them across ARK server processes, or reuse them after unload/reload.
+    // They can be passed with the same owner token to
     // UnregisterProcessEventCallbackWithOwnerToken for granular cleanup; plugin-owner
     // cleanup on unload remains the runtime backstop.
     uint64_t (*RegisterPreProcessEventWithOwnerTokenHandle)(uint64_t ownerToken, OnProcessEventCallback callback);
@@ -318,8 +354,11 @@ typedef struct ObeliskApi {
 
     // Copied gameplay policy events. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS, plugin_owner_token != 0, and these
-    // function pointers before use. A return value of 0 means registration was rejected.
-    // Non-zero handles are process-local and must be unregistered with the same owner token.
+    // function pointers before use. Check both the register slot and matching unregister
+    // slot before registering. A return value of 0 means registration was rejected.
+    // Non-zero handles are process-local runtime values; do not persist them, share them
+    // across ARK server processes, or reuse them after unload/reload. Unregister with the
+    // same owner token when the plugin no longer needs the callback.
     uint64_t (*RegisterGameplayPolicyEventWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t eventKindMask,
@@ -330,23 +369,31 @@ typedef struct ObeliskApi {
     // Metadata-only resource kind descriptors. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS, and this function pointer before
     // use. This is category information for routing and plugin capability discovery only;
-    // it is not object identity, lookup, persistence, or a mutable resource API. Callers
-    // must initialize out->struct_size to sizeof(ObeliskResourceKindDescriptor) before use.
+    // it is not object identity, ownership, permission authority, lookup, persistence,
+    // ResourceHandle, or a mutable resource API. Callers must initialize
+    // out->struct_size to sizeof(ObeliskResourceKindDescriptor) before use. Current v1
+    // resource descriptors are category-only and must carry
+    // OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY,
+    // OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY, and
+    // OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP. Treat a descriptor missing either
+    // no-identity/no-lookup flag as unavailable for public SDK identity or lookup use.
     bool (*DescribeResourceKind)(uint32_t resourceKind, ObeliskResourceKindDescriptor* out);
 
     // Metadata-only gameplay policy event descriptors. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS, and this function pointer
     // before use. This is event-kind discovery for routing and plugin capability checks
-    // only; it is not identity, lookup, mutation, or return-override authority. Callers
-    // must initialize out->struct_size to sizeof(ObeliskGameplayPolicyEventDescriptor)
-    // before use.
+    // only; it is not identity, ownership, permissions/admin authority, lookup,
+    // ResourceHandle, mutation, or return-override authority. Callers must initialize
+    // out->struct_size to sizeof(ObeliskGameplayPolicyEventDescriptor) before use.
     bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);
 
     // Copied chat message notifications for plugins that parse text locally. Plugins must
     // check struct_size, OBELISK_API_CAPABILITY_CHAT_EVENTS, plugin_owner_token != 0, and
-    // these function pointers before use. A return value of 0 means registration was
-    // rejected. Non-zero handles are process-local and must be unregistered with the same
-    // owner token.
+    // these function pointers before use. Check both the register slot and matching
+    // unregister slot before registering. A return value of 0 means registration was
+    // rejected. Non-zero handles are process-local runtime values; do not persist them,
+    // share them across ARK server processes, or reuse them after unload/reload.
+    // Unregister with the same owner token when the plugin no longer needs the callback.
     uint64_t (*RegisterChatMessageEventWithOwnerTokenHandle)(
         uint64_t ownerToken,
         ObeliskChatMessageEventCallback callback,
@@ -355,7 +402,8 @@ typedef struct ObeliskApi {
 
     // Process-local owner-token timers. Plugins must check struct_size,
     // OBELISK_API_CAPABILITY_TIMERS, plugin_owner_token != 0, and these function pointers
-    // before use. A return value of 0 means registration was rejected. Non-zero handles
+    // before use. Check both the register slot and matching unregister slot before
+    // registering. A return value of 0 means registration was rejected. Non-zero handles
     // are process-local, owned by the registering plugin, cleaned up on plugin unload/init
     // failure, and must not be persisted to shared config or reused across ARK server
     // processes. delayMs must be non-zero. One-shot timers require intervalMs=0 and
@@ -374,19 +422,60 @@ typedef struct ObeliskApi {
         ObeliskTimerCallback callback,
         void* userData);
     bool (*UnregisterTimerWithOwnerToken)(uint64_t ownerToken, uint64_t timerId);
+
+    // Experimental native Linux command/reply surface. Check all three slots'
+    // struct_size coverage, non-null pointers, and COMMAND_REPLIES capability.
+    // Command names are NUL-terminated ASCII '/name' (maximum 64 bytes) and match
+    // the complete message exactly; '/pingx' and '/ping args' do not match '/ping'.
+    // Commands have no implicit admin requirement. A nonzero registration handle
+    // is owned by this plugin and removed before its shared object is closed.
+    uint64_t (*RegisterCommandWithOwnerTokenHandle)(
+        uint64_t ownerToken, const char* commandName, ObeliskCommandCallback callback, void* userData);
+    // Outside callbacks this waits for the registration's in-flight callbacks.
+    // From a callback it cancels subsequent delivery, but is not a quiescence
+    // barrier for userData; owner cleanup remains the unload barrier.
+    bool (*UnregisterCommandWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
+    // Reply text is borrowed only for this call (1..1024 UTF-8 bytes, no NULs).
+    // Only the current invocation token, owner, and invoking thread are accepted.
+    // true means the private backend accepted delivery, not a client receipt.
+    bool (*ReplyToCommandWithOwnerToken)(
+        uint64_t ownerToken, uint64_t invocationToken, ObeliskCommandStringView reply);
+
+    // Copied player observation for this command only. Check this slot's size,
+    // pointer and COMMAND_PLAYER_SNAPSHOT capability. Initialize out->struct_size
+    // to sizeof(ObeliskCommandPlayer). Only the current invocation's owner, token
+    // and thread are accepted; a nested invocation cannot read its parent's data.
+    // true means a snapshot was supplied, even when individual flags are absent.
+    // false leaves out unchanged. The views expire when this callback returns.
+    // This adds no identity lookup, authentication, permissions, or durable handles.
+    bool (*GetCommandPlayerWithOwnerToken)(
+        uint64_t ownerToken, uint64_t invocationToken, ObeliskCommandPlayer* out);
+
+    // Copied native post-login/logout-entry observations. Check both slots'
+    // sizes/pointers and PLAYER_LIFECYCLE_EVENTS before registering. A nonzero
+    // handle belongs to this plugin and is removed/drained before dlclose.
+    // These notifications supply no authentication, permissions, durable session
+    // handle, identity lookup, or command/reply token. See event lifetime/phase
+    // requirements in ObeliskPlayerLifecycleApi.h.
+    uint64_t (*RegisterPlayerLifecycleWithOwnerTokenHandle)(
+        uint64_t ownerToken, ObeliskPlayerLifecycleCallback callback, void* userData);
+    // Outside callbacks waits for this registration's current delivery. Inside
+    // callbacks cancels future delivery; owner cleanup remains the unload barrier.
+    bool (*UnregisterPlayerLifecycleWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);
 } ObeliskApi;
 
 // Plugins must export these functions to be loaded by Obelisk.
 // Metadata is validated before initialization. The runtime creates a missing
 // safe-disabled default config at:
 //   ${OBELISK_CONFIG_DIR}/<plugin_id>/config.json
-// default_config_json must include enabled=false, allow_all_instances=false, and an
-// instance_allowlist array so clustered installs have an explicit activation envelope.
+// default_config_json must be a top-level JSON object with enabled=false,
+// allow_all_instances=false, and an instance_allowlist array so clustered installs have
+// an explicit activation envelope. Public examples default instance_allowlist to [].
 // __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out);
 // The api and context pointers passed to ObeliskPlugin_Init are borrowed for init only.
 // If a plugin needs runtime callbacks during shutdown, worker threads, or later event
-// callbacks, copy only the advertised API prefix with a bounded copy and check
-// struct_size/capabilities before using appended fields.
+// callbacks, copy only the advertised API prefix with a bounded, zero-tail copy and check
+// struct_size/capabilities/non-null function pointers before using each appended slot.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //
 // Plugins may also export this optional lifecycle hook. When present, the runtime

@@ -99,7 +99,8 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         embed = json.loads(result.stdout)["embeds"][0]
         self.assertEqual(embed["color"], 0x3498DB)
-        self.assertIn("in-game test", embed["footer"]["text"])
+        self.assertIn("deprecated beta webhook path", embed["footer"]["text"])
+        self.assertIn("discord_beta_bridge.py", embed["footer"]["text"])
 
     def test_rejects_webhook_text_in_embed(self) -> None:
         webhook_text = "https://" + "discord.com/" + "api/webhooks" + "/123/secret"
@@ -216,7 +217,7 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertNotIn("discord.com/" + "api/webhooks", source)
         self.assertNotIn("discordapp.com/" + "api/webhooks", source)
 
-    def test_channel_webhooks_are_loaded_from_their_own_variables(self) -> None:
+    def test_community_webhook_is_loaded_from_its_own_variable(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             env_file = Path(tmpdir) / "discord-webhooks.env"
             env_file.write_text(
@@ -233,12 +234,26 @@ class SendDiscordEmbedTests(unittest.TestCase):
                 community = send_discord_embed.load_webhook_url(
                     argparse.Namespace(channel="community", env_file=env_file)
                 )
-                beta_test = send_discord_embed.load_webhook_url(
-                    argparse.Namespace(channel="beta-test", env_file=env_file)
-                )
 
         self.assertEqual(community, "https://example.invalid/community")
-        self.assertEqual(beta_test, "https://example.invalid/beta-test")
+
+    def test_beta_webhook_real_send_path_is_deprecated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_file = Path(tmpdir) / "discord-webhooks.env"
+            env_file.write_text(
+                "OBELISK_BETA_TEST_WEBHOOK_URL"
+                + "=https://example.invalid/beta-test\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with self.assertRaises(SystemExit) as raised:
+                    send_discord_embed.load_webhook_url(
+                        argparse.Namespace(channel="beta-test", env_file=env_file)
+                    )
+
+        self.assertIn("deprecated", str(raised.exception))
+        self.assertIn("discord_beta_bridge.py", str(raised.exception))
 
     def test_environment_webhook_overrides_local_env_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

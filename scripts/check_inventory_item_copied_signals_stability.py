@@ -13,6 +13,19 @@ from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from plan_obelisk_multi_surface_beta_capture import (  # noqa: E402
+    CURRENT_ROUTE_BLOCKER,
+    REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+)
+from reflection_target_sets import (  # noqa: E402
+    NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
+    NON_AUTHORIZING_READY_SCOPE,
+)
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component  # noqa: E402
+
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "inventory_item_copied_signals_public_contract_decisions.json"
 DEFAULT_PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_GAMEPLAY_EVENTS = REPO_ROOT / "docs" / "public_gameplay_events.json"
@@ -22,12 +35,121 @@ REPORT_SCHEMA = "obelisk.inventory-item-copied-signals-stability-check.v1"
 DECISIONS_SCHEMA = "obelisk.inventory-item-copied-signals-public-contract-decisions.v1"
 PUBLIC_SDK_SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 PUBLIC_GAMEPLAY_EVENTS_SCHEMA = "obelisk.public-gameplay-events.v1"
-
+NON_COUNTING_ACCOUNTING: dict[str, bool | int] = {
+    "approved_runtime_evidence_accepted": False,
+    "approved_runtime_evidence_present": False,
+    "approved_runtime_evidence_ready": False,
+    "clears_approved_runtime_evidence_missing": False,
+    "counts_toward_complete_sdk_claim": False,
+    "counts_as_approved_runtime_evidence": False,
+    "counts_as_runtime_evidence": False,
+    "counts_toward_p0_dependency_chain_claim": False,
+    "side_lane_counts_toward_sdk": False,
+    "side_lane_counts_toward_p0": False,
+    "sdk_p0_unlock_allowed": False,
+    "complete_sdk_claim_progress_contribution": 0,
+    "p0_dependency_chain_claim_progress_contribution": 0,
+    "promotion_ready": False,
+    "runtime_ready": False,
+    "runtime_capture_ready": False,
+    "replaces_player_principal_evidence": False,
+    "replaces_player_principal_triplet": False,
+    "player_principal_replacement_ready": False,
+    "live_ops_ready": False,
+    "public_sdk_ready": False,
+    "public_module_ready": False,
+    "stable_claim_allowed": False,
+    "v1_completion_ready": False,
+}
+READINESS_TRUTHFULNESS_REPORT: dict[str, Any] = {
+    "ready_field_semantics": "non_authorizing_guardrail_passed_only",
+    "ready_means": (
+        "the checked docs/header inputs still match the narrow copied-scalar "
+        "GameplayPolicyEvent side lane"
+    ),
+    "ready_does_not_mean": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
+    "public_inventory_sdk_claim_allowed": False,
+    "public_items_sdk_claim_allowed": False,
+    "public_inventory_sdk_ready": False,
+    "runtime_readiness_claim_allowed": False,
+    "v1_completion_claim_allowed": False,
+    "v1_progress_contribution": 0,
+    "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+    "required_runtime_evidence": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+    "multi_surface_beta_capture_counts_as_approved_runtime_evidence": False,
+}
+NEXT_BLOCKERS: dict[str, Any] = {
+    "player_principal_runtime": {
+        "id": CURRENT_ROUTE_BLOCKER,
+        "blocked_for_complete_sdk": True,
+        "blocked_for_p0_dependency_chain": True,
+        "required_artifact": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+        "candidate_beta_capture_plan_counts_as_runtime_evidence": False,
+        "candidate_beta_capture_pack_counts_as_runtime_evidence": False,
+        "required_future_evidence": [
+            "strict approved player-principal lifecycle runtime evidence",
+            "checker-accepted HandleNewPlayer/CheckJoinInProgress/OnLogout runtime triplet",
+        ],
+    },
+    "offline": {
+        "id": "public_inventory_items_mutation_contract_not_in_scope",
+        "blocked_for_current_copied_signal_guardrail": False,
+        "blocked_for_public_inventory_sdk": True,
+        "current_side_lane_status": "five copied POD scalar observations only",
+        "required_future_evidence": [
+            "separate narrow copied C ABI for each promoted inventory/item audit unit",
+            "rollback, privacy, and abuse controls for grants/removals/progression",
+            "append-only ABI layout and SDK consumer tests for any promoted inventory/items surface",
+        ],
+    },
+    "runtime": {
+        "id": "object_identity_resource_handle_runtime_evidence_missing",
+        "blocked_for_public_inventory_sdk": True,
+        "required_future_evidence": [
+            "runtime object negative samples",
+            "runtime serial reuse/wraparound semantics",
+            "callback-scope versus post-callback validity rules",
+        ],
+        "blocked_claims": [
+            "Inventory SDK",
+            "Items SDK",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+            "v1 completion",
+        ],
+    },
+}
 SURFACE = "obelisk.inventory_item_copied_signals.v1"
 GAMEPLAY_POLICY_EVENT_SURFACE = "obelisk.gameplay_policy_event.v1"
 GAMEPLAY_POLICY_EVENT = "obelisk.gameplay_policy.v1"
 INVENTORY_MUTATION_SURFACE = "obelisk.inventory_items_mutation.v1"
 RESOURCE_HANDLE_SURFACE = "obelisk.object_identity_resource_handle.v1"
+PROMOTED_EXPERIMENTAL_SURFACE_IDS = (
+    GAMEPLAY_POLICY_EVENT_SURFACE,
+    "obelisk.chat_message.v1",
+    "obelisk.chat.local_routing.v1",
+    SURFACE,
+)
+PROMOTED_EXPERIMENTAL_OUTCOME_STATUS = "unresolved"
+PROMOTED_EXPERIMENTAL_COMPLETE_SDK_ACCOUNTING = (
+    "fail_closed_until_promoted_excluded_or_post_v1"
+)
+PROMOTED_EXPERIMENTAL_ALLOWED_RESOLUTIONS = (
+    "promote_with_surface_specific_evidence",
+    "exclude_from_v1_release_statement",
+    "move_to_post_v1",
+)
+PROMOTED_EXPERIMENTAL_MUST_NOT_UNLOCK = (
+    "commands",
+    "moderation",
+    "identity",
+    "lookup",
+    "mutation",
+    "return override",
+    "ResourceHandle",
+)
 RESOURCE_KIND = "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
 ALL_INVENTORY_MASK = "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY"
 RETURN_VALUE = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
@@ -38,7 +160,6 @@ EXPECTED_ITEM_RETURN_TARGET_SET = "item-return-only-policy-slice"
 EXCLUDED_INVENTORY_ACTION_TARGET_SET = "inventory-action-compact-intake"
 EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS = (
     EXPECTED_INVENTORY_TARGET_SET,
-    EXPECTED_ITEM_RETURN_TARGET_SET,
 )
 EXPECTED_TARGET_SET_EVIDENCE_SCOPE_TERMS = {
     EXPECTED_INVENTORY_TARGET_SET: (
@@ -46,18 +167,6 @@ EXPECTED_TARGET_SET_EVIDENCE_SCOPE_TERMS = {
         "no standalone",
         "module-specific",
         "inventory",
-    ),
-    EXPECTED_ITEM_RETURN_TARGET_SET: (
-        "ReturnValue-only",
-        "AllowEquipItem",
-        "CanRepair",
-        "UseItemOntoItem",
-        "no standalone item or inventory module surface",
-        "no identity",
-        "no lookup",
-        "no mutation",
-        "no return override",
-        "ResourceHandle",
     ),
 }
 
@@ -99,6 +208,20 @@ EXPECTED_SIGNAL_MASKS = frozenset(signal["event_kind_mask"] for signal in EXPECT
 EXPECTED_SIGNAL_FIELDS = frozenset(
     field for signal in EXPECTED_ALLOWED_SIGNALS for field in signal["field_mask"]
 )
+EXPECTED_SIGNAL_KIND_VALUES = {
+    signal["kind"]: index for index, signal in enumerate(EXPECTED_ALLOWED_SIGNALS, start=7)
+}
+EXPECTED_SIGNAL_MASK_SHIFTS = {
+    signal["event_kind_mask"]: index for index, signal in enumerate(EXPECTED_ALLOWED_SIGNALS, start=6)
+}
+EXPECTED_FIELD_MASK_SHIFTS = {
+    RETURN_VALUE: 0,
+    REQUESTED_BY_PLAYER: 4,
+    IGNORE_COOLDOWN: 5,
+}
+EXPECTED_RESOURCE_KIND_VALUES = {
+    RESOURCE_KIND: 2,
+}
 EXPECTED_REQUIRED_FLAGS = frozenset(
     (
         "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
@@ -156,17 +279,64 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "public SDK",
         "runtime support",
         "runtime/v1 support",
+        "package shape",
+        "Plugin Hub",
         "support tier",
         "umbrella leaf promotion",
         "leaf promotion",
         "v1 support",
+        "contributes to public SDK v1",
+        "contributes to v1 completion",
+        "counts for public SDK v1",
+        "counts toward P0 dependency chain claim",
+        "counts toward v1 completion",
+        "complete SDK claim progress contribution",
+        "approved runtime evidence",
+        "approved runtime evidence accepted",
+        "approved runtime evidence ready",
+        "clears approved runtime evidence missing",
+        "countsForPublicSdkV1",
+        "countsTowardP0DependencyChainClaim",
+        "countsTowardV1Completion",
+        "complete_sdk_claim_progress_contribution",
+        "counts_for_public_sdk_v1",
+        "counts_toward_p0_dependency_chain_claim",
+        "counts_toward_v1_completion",
+        "p0_dependency_chain_claim_progress_contribution",
+        "player-principal lifecycle evidence",
+        "player principal lifecycle evidence",
+        "player-principal runtime evidence",
+        "player principal runtime evidence",
+        "player-principal triplet",
+        "player principal triplet",
+        "v1 completion contribution",
         "lookup",
         "mutation",
         "return override",
+        "resource handle",
         "ResourceHandle",
         "AdditionalData",
         "ResourceHandle API",
         "AdditionalData API",
+        "ArrayProperty",
+        "TArray",
+        "TArray copy",
+        "InventoryCustomFilter",
+        "InventoryCustomFilter API",
+        "InventoryCustomFilter callback",
+        "custom filter",
+        "custom-filter",
+        "custom filter array",
+        "array range",
+        "raw array",
+        "raw range",
+        "copied array",
+        "copied list",
+        "copied range",
+        "exposed range",
+        "exposes range",
+        "payload range",
+        "public array payload",
         "Inventory callback API",
         "InventoryComp",
         "action alias",
@@ -218,6 +388,8 @@ CLAIM_TEXT_SCAN_KEYS = CONTRACT_SCAN_KEYS | frozenset(
         "claims",
         "description",
         "evidence_summary",
+        "replacement_claim",
+        "replacement_claims",
         "marker",
         "markers",
         "note",
@@ -277,8 +449,43 @@ NEGATED_OR_BOUNDARY_RE = re.compile(
 CLAUSE_SPLIT_RE = re.compile(r"[,.;:\n\r]+")
 NEGATION_LIST_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]+")
 POSITIVE_TERM_SUFFIX_RE = re.compile(
-    r"^\s+(?:ready|enabled|public|supported|allowed|live|operational|exposes?|provides?)\b",
+    r"^\s+(?:ready|enabled|public|supported|allowed|live|operational|ok|green|"
+    r"go|pass(?:ed)?|ship(?:ped)?|done|yes|valid(?:ated)?|verified|unblocked|"
+    r"exposes?|provides?)\b",
     re.IGNORECASE,
+)
+POSITIVE_READINESS_SHORTCUT_WORDS = (
+    "ok",
+    "green",
+    "go",
+    "pass",
+    "ship",
+    "shipped",
+    "done",
+    "yes",
+    "unblocked",
+)
+POSITIVE_READINESS_SHORTCUT_SUBJECTS = (
+    "inventory sdk",
+    "items sdk",
+    "promotion",
+    "public abi",
+    "public readiness",
+    "public sdk",
+    "release",
+    "runtime",
+    "runtime evidence",
+    "source",
+    "stable sdk",
+    "v1",
+    "v1 completion",
+    "v1 sdk",
+    "package shape",
+    "plugin hub",
+    "support tier",
+    "mutation",
+    "return override",
+    "resource handle",
 )
 POSITIVE_READINESS_PHRASES = (
     "inventory sdk ready",
@@ -298,6 +505,13 @@ POSITIVE_READINESS_PHRASES = (
     "public sdk support",
     "runtime support",
     "runtime/v1 support",
+    "package shape passed",
+    "package shape ready",
+    "package shape readiness",
+    "package shape support",
+    "plugin hub ready",
+    "plugin hub readiness",
+    "plugin hub support",
     "support tier active",
     "support tier enabled",
     "support tier ready",
@@ -313,9 +527,49 @@ POSITIVE_READINESS_PHRASES = (
     "stable release",
     "stable sdk ready",
     "stable sdk readiness",
+    "approved runtime bundle",
+    "approved runtime evidence",
+    "approved runtime evidence accepted",
+    "approved runtime evidence ready",
+    "clears approved runtime evidence missing",
+    "contributes to public sdk v1",
+    "contributes to v1 completion",
+    "counts for public sdk v1",
     "counts toward complete sdk",
+    "counts toward complete sdk claim",
+    "counts toward p0 dependency chain claim",
+    "counts toward v1 completion",
+    "complete sdk claim progress contribution",
+    "countsForPublicSdkV1",
+    "countsTowardCompleteSdkClaim",
+    "countsTowardP0DependencyChainClaim",
+    "countsTowardV1Completion",
+    "complete_sdk_claim_progress_contribution",
+    "counts_for_public_sdk_v1",
     "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_v1_completion",
+    "p0_dependency_chain_claim_progress_contribution",
+    "runtime evidence approved",
+    "source approved",
+    "mutation ready",
+    "mutation support",
+    "return override ready",
+    "return override support",
+    "resource handle ready",
+    "resource handle readiness",
+    "resource handle support",
+    "player-principal lifecycle evidence",
+    "player principal lifecycle evidence",
+    "player-principal runtime evidence",
+    "player principal runtime evidence",
+    "player-principal triplet",
+    "player principal triplet",
+    "replaces player-principal lifecycle evidence",
+    "replaces player principal lifecycle evidence",
     "v1 completion",
+    "v1 completion contribution",
     "v1 completion ready",
     "v1 completion readiness",
     "v1 ready",
@@ -323,6 +577,200 @@ POSITIVE_READINESS_PHRASES = (
     "v1 sdk ready",
     "v1 sdk readiness",
 )
+POSITIVE_READINESS_PHRASES += tuple(
+    f"{subject} {shortcut}"
+    for subject in POSITIVE_READINESS_SHORTCUT_SUBJECTS
+    for shortcut in POSITIVE_READINESS_SHORTCUT_WORDS
+)
+READINESS_CONTEXT_KEY_RE = re.compile(
+    r"(?:public|sdk|api|abi|module|runtime|capture|live[_-]?ops|source|v1|p0|"
+    r"complete|completion|stable|promotion|resource[_-]?handle|return[_-]?override|"
+    r"identity|lookup|mutation|support|tier|package[_-]?shape|plugin[_-]?hub|"
+    r"approved[_-]?runtime|player[_-]?principal|principal[_-]?lifecycle|"
+    r"multi[_-]?surface|beta[_-]?capture|capture[_-]?(?:pack|plan|queue)|"
+    r"evidence[_-]?bundle|route[_-]?blocker)",
+    re.IGNORECASE,
+)
+SOURCE_READINESS_ALIAS_KEYS = frozenset(
+    (
+        "source_accepted",
+        "source_available",
+        "source_label",
+        "source_labels",
+        "source_marker",
+        "source_markers",
+        "source_readiness",
+        "source_ready",
+        "source_stable",
+        "source_status",
+        "source_support",
+        "source_tier",
+        "source_validated",
+        "source_validation",
+    )
+)
+FORBIDDEN_READINESS_ALIAS_PATH_SUFFIXES = frozenset(
+    (
+        "artifact_identity_approved",
+        "candidate_accepted",
+        "consume_gate_ready",
+        "inventory_public_contract",
+        "package_shape_passed",
+        "plugin_hub_ready",
+        "public_sdk_enabled",
+        "readiness_approved",
+        "runtime_validated",
+        "side_lane_counts_toward_v1",
+        "static_evidence_validated",
+        "support_tier_active",
+        "target_set_promoted",
+        "transfer_runtime_ready",
+        "v1_complete",
+    )
+)
+CLAIM_CONTEXT_CONTAINER_KEYS = frozenset(
+    (
+        "candidate",
+        "candidate_surfaces",
+        "capture_surfaces",
+        "live_ops",
+        "multi_surface_beta_capture_pack",
+        "multi_surface_beta_capture_plan",
+        "multi_surface_beta_capture_plan_queue",
+        "package_shape",
+        "player_principal",
+        "plugin_hub",
+        "public_module",
+        "public_sdk",
+        "readiness",
+        "required_primary_evidence",
+        "route_blocker",
+        "runtime_capture",
+        "source",
+        "support_tier",
+        "target_set",
+        "v1",
+    )
+)
+CONTEXTUAL_READINESS_STATUS_KEYS = frozenset(
+    (
+        "accepted",
+        "active",
+        "approved",
+        "complete",
+        "enabled",
+        "outcome",
+        "passed",
+        "promoted",
+        "readiness",
+        "ready",
+        "result",
+        "stable",
+        "state",
+        "status",
+        "validated",
+    )
+)
+CONTEXTUAL_READINESS_ACCOUNTING_TERMS = (
+    "contribution",
+    "count",
+    "counts",
+    "progress",
+)
+NEUTRAL_TRUE_METADATA_KEYS = frozenset(
+    (
+        "accepted_for_candidate_review",
+        "accepted_for_internal_planning",
+        "append_only_abi",
+        "capability_gated",
+        "candidate_capture_only",
+        "candidate_only",
+        "candidate_only_mode",
+        "consume_only",
+        "leaf_split_reviewed",
+        "must_remain_without_public_contract_until_promotion",
+        "non_counting",
+        "no_ue_internals_in_public_abi",
+        "not_artifact_gate",
+        "offline_only",
+        "public_header_allowed",
+        "broadcast_before_restart_if_players_connected",
+        "keep_servers_running_when_practical",
+        "keep_transfer_server_when_practical",
+        "must_be_checker_accepted",
+        "requires_checker_acceptance",
+        "restart_only_for_obelisk_update_or_gate_change",
+        "runtime_producer_gate_implemented",
+        "second_source_ready",
+    )
+)
+NEUTRAL_TRUE_METADATA_SUFFIXES = (
+    "_candidate_only",
+    "_consume_only",
+    "_non_counting",
+    "_not_artifact_gate",
+    "_offline_only",
+)
+NEUTRAL_POSITIVE_METADATA_KEYS = frozenset(
+    (
+        "bound_target_count",
+        "max_ark_servers_running",
+        "priority",
+        "second_source_accepted",
+        "source_binding_count",
+        "target_count",
+        "v1_dependency_chain_position",
+        "required_by_v1_dependency_chain_position",
+    )
+)
+NEUTRAL_POSITIVE_METADATA_SUFFIXES = (
+    "_chain_position",
+    "_dependency_chain_position",
+    "_target_count",
+)
+POSITIVE_STATUS_SHORTCUT_VALUES = frozenset(
+    (
+        "done",
+        "go",
+        "green",
+        "live",
+        "ok",
+        "operational",
+        "pass",
+        "ship",
+        "shipped",
+        "unblocked",
+        "valid",
+        "verified",
+        "yes",
+    )
+)
+POSITIVE_STATUS_VALUES = frozenset(
+    (
+        "accepted",
+        "active",
+        "approved",
+        "available",
+        "complete",
+        "completed",
+        "enabled",
+        "passed",
+        "promoted",
+        "public",
+        "public-ready",
+        "ready",
+        "release-ready",
+        "release-supported",
+        "runtime",
+        "runtime-ready",
+        "sdk-ready",
+        "stable",
+        "stable-ready",
+        "supported",
+        "validated",
+        "v1-ready",
+    )
+) | POSITIVE_STATUS_SHORTCUT_VALUES
 C_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 CPP_COMMENT_RE = re.compile(r"//.*")
 
@@ -347,7 +795,12 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **details: Any)
 
 def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        reject_symlink_component(path, label)
+        resolved = reject_protected_input_path(path, label)
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"--{label}", path=str(path), error=str(exc))
+        return None
     except OSError as exc:
         add(blockers, f"{label}_unreadable", f"--{label}", path=str(path), error=str(exc))
         return None
@@ -440,6 +893,12 @@ def flexible_phrase_match(text: str, phrase: str) -> re.Match[str] | None:
     return re.search(pattern, text, re.IGNORECASE)
 
 
+def normalized_claim_key(key: str) -> str:
+    camel_spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", key)
+    camel_spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", camel_spaced)
+    return re.sub(r"[^a-z0-9]+", "_", camel_spaced.lower()).strip("_")
+
+
 def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -493,6 +952,79 @@ def scan_positive_claim_terms_in_negative_container(
             scan_positive_claim_terms_in_negative_container(child, blockers, f"{trail}[{index}]")
 
 
+def positive_numeric_claim(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+
+def positive_progress_claim(value: Any) -> bool:
+    if positive_numeric_claim(value):
+        return True
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip()
+    ratio = re.fullmatch(r"([1-9]\d*)\s*/\s*\d+", normalized)
+    if ratio:
+        return True
+    return bool(re.fullmatch(r"[1-9]\d*", normalized))
+
+
+def positive_status_claim(value: Any) -> bool:
+    if value is True or positive_numeric_claim(value):
+        return True
+    if not isinstance(value, str):
+        return False
+    normalized = normalized_claim_key(value).replace("_", "-")
+    return normalized in POSITIVE_STATUS_VALUES or normalized.endswith("-ready")
+
+
+def readiness_context_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    if normalized in {"accepted_for_internal_planning", "accepted_for_candidate_review"}:
+        return False
+    return bool(READINESS_CONTEXT_KEY_RE.search(normalized))
+
+
+def stale_readiness_satisfied_alias_key(key: str) -> bool:
+    return key == "readiness_satisfied" or key.endswith("_readiness_satisfied")
+
+
+def neutral_positive_metadata_key(key: str) -> bool:
+    if key in NEUTRAL_TRUE_METADATA_KEYS or key in NEUTRAL_POSITIVE_METADATA_KEYS:
+        return True
+    if any(key.endswith(suffix) for suffix in NEUTRAL_TRUE_METADATA_SUFFIXES):
+        return True
+    return any(key.endswith(suffix) for suffix in NEUTRAL_POSITIVE_METADATA_SUFFIXES)
+
+
+def neutral_positive_metadata_path(key: str, trail: str) -> bool:
+    return (
+        key == "promotion_status"
+        and ".required_identity_promotion_certificate.promotion_status" in trail
+    )
+
+
+def normalized_trail_leaf_key(trail: str) -> str:
+    leaf = trail.rsplit(".", 1)[-1]
+    leaf = re.sub(r"\[\d+\]$", "", leaf)
+    return normalized_claim_key(leaf)
+
+
+def forbidden_readiness_alias_path(trail: str) -> bool:
+    normalized_trail = normalized_claim_key(trail)
+    return any(
+        normalized_trail == suffix or normalized_trail.endswith(f"_{suffix}")
+        for suffix in FORBIDDEN_READINESS_ALIAS_PATH_SUFFIXES
+    )
+
+
+def readiness_accounting_alias_key(key: str) -> bool:
+    return any(term in key for term in CONTEXTUAL_READINESS_ACCOUNTING_TERMS)
+
+
+def propagates_readiness_claim_context(key: str) -> bool:
+    return key in CLAIM_CONTEXT_CONTAINER_KEYS or key in SOURCE_READINESS_ALIAS_KEYS
+
+
 def scan_public_sdk_surfaces_inventory_side_lane_claims(
     value: Any, blockers: list[dict[str, Any]], trail: str = "$"
 ) -> None:
@@ -531,6 +1063,159 @@ def require_equal(
 def require_false(mapping: dict[str, Any], key: str, label: str, blockers: list[dict[str, Any]]) -> None:
     if mapping.get(key) is not False:
         add(blockers, f"{key}_not_false", f"{label}.{key}", value=mapping.get(key))
+
+
+def require_zero(mapping: dict[str, Any], key: str, label: str, blockers: list[dict[str, Any]]) -> None:
+    if mapping.get(key) != 0:
+        add(blockers, f"{key}_not_zero", f"{label}.{key}", value=mapping.get(key))
+
+
+def expected_promoted_experimental_outcome(surface_id: str) -> dict[str, Any]:
+    return {
+        "surface_id": surface_id,
+        "current_status": "promoted-experimental-only",
+        "outcome_status": PROMOTED_EXPERIMENTAL_OUTCOME_STATUS,
+        "complete_sdk_accounting": PROMOTED_EXPERIMENTAL_COMPLETE_SDK_ACCOUNTING,
+        "allowed_resolutions": list(PROMOTED_EXPERIMENTAL_ALLOWED_RESOLUTIONS),
+        "v1_completion_evidence": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "stable_claim_allowed": False,
+        "v1_completion_ready": False,
+        "must_not_unlock": list(PROMOTED_EXPERIMENTAL_MUST_NOT_UNLOCK),
+    }
+
+
+def validate_promoted_experimental_outcome(
+    record: Any,
+    *,
+    surface_id: str,
+    label: str,
+    blockers: list[dict[str, Any]],
+    reason_prefix: str,
+) -> None:
+    if not isinstance(record, dict):
+        add(
+            blockers,
+            f"{reason_prefix}_missing",
+            label,
+            expected=expected_promoted_experimental_outcome(surface_id),
+            value=record,
+        )
+        return
+
+    require_equal(record, "surface_id", surface_id, label, blockers)
+    require_equal(record, "current_status", "promoted-experimental-only", label, blockers)
+    require_equal(
+        record,
+        "outcome_status",
+        PROMOTED_EXPERIMENTAL_OUTCOME_STATUS,
+        label,
+        blockers,
+    )
+    require_equal(
+        record,
+        "complete_sdk_accounting",
+        PROMOTED_EXPERIMENTAL_COMPLETE_SDK_ACCOUNTING,
+        label,
+        blockers,
+    )
+    for key in (
+        "v1_completion_evidence",
+        "counts_toward_complete_sdk_claim",
+        "counts_toward_p0_dependency_chain_claim",
+        "public_sdk_ready",
+        "runtime_ready",
+        "stable_claim_allowed",
+        "v1_completion_ready",
+    ):
+        require_false(record, key, label, blockers)
+    for key in (
+        "complete_sdk_claim_progress_contribution",
+        "p0_dependency_chain_claim_progress_contribution",
+    ):
+        require_zero(record, key, label, blockers)
+
+    if tuple(record.get("allowed_resolutions") or []) != PROMOTED_EXPERIMENTAL_ALLOWED_RESOLUTIONS:
+        add(
+            blockers,
+            f"{reason_prefix}_allowed_resolutions_mismatch",
+            f"{label}.allowed_resolutions",
+            expected=list(PROMOTED_EXPERIMENTAL_ALLOWED_RESOLUTIONS),
+            value=record.get("allowed_resolutions"),
+        )
+    must_not_unlock = set(record.get("must_not_unlock") or [])
+    missing_must_not_unlock = sorted(set(PROMOTED_EXPERIMENTAL_MUST_NOT_UNLOCK) - must_not_unlock)
+    if missing_must_not_unlock:
+        add(
+            blockers,
+            f"{reason_prefix}_must_not_unlock_missing",
+            f"{label}.must_not_unlock",
+            missing=missing_must_not_unlock,
+            value=sorted(must_not_unlock),
+        )
+
+
+def validate_promoted_experimental_surface_outcomes(
+    payload: dict[str, Any], blockers: list[dict[str, Any]], label: str
+) -> list[str]:
+    raw_outcomes = payload.get("promoted_experimental_surface_outcomes")
+    if not isinstance(raw_outcomes, list):
+        add(
+            blockers,
+            "public_gameplay_promoted_experimental_outcomes_missing",
+            f"{label}.promoted_experimental_surface_outcomes",
+            expected=list(PROMOTED_EXPERIMENTAL_SURFACE_IDS),
+            value=raw_outcomes,
+        )
+        return []
+
+    outcomes_by_surface: dict[str, dict[str, Any]] = {}
+    duplicate_surfaces: list[str] = []
+    unexpected_surfaces: list[str] = []
+    for index, record in enumerate(raw_outcomes):
+        record_label = f"{label}.promoted_experimental_surface_outcomes[{index}]"
+        if not isinstance(record, dict) or not isinstance(record.get("surface_id"), str):
+            add(blockers, "public_gameplay_promoted_experimental_outcome_invalid", record_label, value=record)
+            continue
+        surface_id = record["surface_id"]
+        if surface_id in outcomes_by_surface:
+            duplicate_surfaces.append(surface_id)
+        outcomes_by_surface[surface_id] = record
+        if surface_id not in PROMOTED_EXPERIMENTAL_SURFACE_IDS:
+            unexpected_surfaces.append(surface_id)
+
+    for surface_id in PROMOTED_EXPERIMENTAL_SURFACE_IDS:
+        validate_promoted_experimental_outcome(
+            outcomes_by_surface.get(surface_id),
+            surface_id=surface_id,
+            label=f"{label}.promoted_experimental_surface_outcomes[{surface_id}]",
+            blockers=blockers,
+            reason_prefix="public_gameplay_promoted_experimental_outcome",
+        )
+    if duplicate_surfaces:
+        add(
+            blockers,
+            "public_gameplay_promoted_experimental_outcome_duplicate",
+            f"{label}.promoted_experimental_surface_outcomes",
+            value=sorted(set(duplicate_surfaces)),
+        )
+    if unexpected_surfaces:
+        add(
+            blockers,
+            "public_gameplay_promoted_experimental_outcome_unexpected",
+            f"{label}.promoted_experimental_surface_outcomes",
+            value=sorted(set(unexpected_surfaces)),
+        )
+    return [
+        surface_id
+        for surface_id in PROMOTED_EXPERIMENTAL_SURFACE_IDS
+        if surface_id in outcomes_by_surface
+    ]
 
 
 def find_surface(payload: dict[str, Any], surface_id: str) -> dict[str, Any] | None:
@@ -615,6 +1300,13 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     require_equal(payload, "public_header_allowed", True, label, blockers)
     if GAMEPLAY_POLICY_EVENT_SURFACE not in set(payload.get("depends_on") or []):
         add(blockers, "decisions_dependency_missing", f"{label}.depends_on", expected=GAMEPLAY_POLICY_EVENT_SURFACE)
+    validate_promoted_experimental_outcome(
+        payload.get("promoted_experimental_outcome"),
+        surface_id=SURFACE,
+        label=f"{label}.promoted_experimental_outcome",
+        blockers=blockers,
+        reason_prefix="decisions_promoted_experimental_outcome",
+    )
 
     actual_signals = normalized_signals(payload.get("allowed_signals"))
     expected = expected_signals_sorted()
@@ -693,17 +1385,27 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         add(blockers, "decisions_public_header_symbols_missing", f"{label}.public_header_symbols_now", missing=missing_symbols)
 
     scan_public_claim_terms(payload, blockers, label)
-    return {"allowed_signal_count": len(actual_signals), "allowed_kinds": sorted(item["kind"] for item in actual_signals)}
+    scan_readiness_claims(payload, blockers, label)
+    return {
+        "status": payload.get("status"),
+        "allowed_signal_count": len(actual_signals),
+        "allowed_kinds": sorted(item["kind"] for item in actual_signals),
+    }
 
 
 def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
     label = "$.public_gameplay_events"
     require_equal(payload, "schema", PUBLIC_GAMEPLAY_EVENTS_SCHEMA, label, blockers)
+    promoted_experimental_outcomes = validate_promoted_experimental_surface_outcomes(
+        payload,
+        blockers,
+        label,
+    )
 
     event = find_gameplay_policy_event(payload)
     if event is None:
         add(blockers, "gameplay_policy_event_missing", f"{label}.promoted_events")
-        return {"inventory_event_kinds": []}
+        return {"inventory_event_kinds": [], "promoted_experimental_outcomes": promoted_experimental_outcomes}
 
     require_equal(event, "v1_sdk_status", "promoted-experimental-only", f"{label}.{GAMEPLAY_POLICY_EVENT}", blockers)
     require_false(event, "v1_completion_evidence", f"{label}.{GAMEPLAY_POLICY_EVENT}", blockers)
@@ -902,7 +1604,10 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
 
     scan_public_claim_terms(payload, blockers, label)
     scan_readiness_claims(payload, blockers, label)
-    return {"inventory_event_kinds": sorted(item["kind"] for item in actual if item.get("kind"))}
+    return {
+        "inventory_event_kinds": sorted(item["kind"] for item in actual if item.get("kind")),
+        "promoted_experimental_outcomes": promoted_experimental_outcomes,
+    }
 
 
 def validate_public_sdk_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
@@ -995,34 +1700,120 @@ def validate_public_sdk_surfaces(payload: dict[str, Any], blockers: list[dict[st
     return {"inventory_copied_status": surface.get("status") if isinstance(surface, dict) else None}
 
 
-def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str) -> None:
+def scan_readiness_claims(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    trail: str,
+    *,
+    claim_context: bool = False,
+) -> None:
     forbidden_true_keys = {
+        "contributes_to_public_sdk_v1",
+        "contributes_to_v1_completion",
+        "approved_runtime_evidence_accepted",
+        "approved_runtime_evidence_missing_cleared",
+        "approved_runtime_evidence_missing_resolved",
+        "approved_runtime_evidence_present",
+        "approved_runtime_evidence_ready",
+        "clears_approved_runtime_evidence_missing",
+        "complete_sdk_claim_progress_contribution",
+        "counts_as_approved_runtime_evidence",
+        "counts_as_runtime_evidence",
+        "counts_for_public_sdk_v1",
+        "counts_toward_sdk",
+        "counts_toward_complete_sdk",
+        "counts_toward_complete_sdk_claim",
+        "counts_toward_p0_dependency_chain_claim",
+        "counts_toward_v1_completion",
+        "evidence_bundle_accepted",
         "inventory_sdk_ready",
         "items_sdk_ready",
-        "counts_toward_complete_sdk",
+        "live_ops_ready",
         "promotion_ready",
         "public_abi_ready",
         "public_inventory_sdk_ready",
         "public_items_sdk_ready",
+        "public_module_ready",
         "public_sdk_ready",
         "release_ready",
         "release_supported",
+        "runtime_capture_ready",
         "runtime_ready",
+        "source_accepted",
+        "source_readiness",
+        "source_ready",
+        "source_stable",
+        "source_status",
         "stable",
+        "stable_claim_allowed",
         "stable_sdk_ready",
+        "v1_completion_contribution",
         "v1_completion_ready",
         "v1_ready",
         "v1_sdk_ready",
+        "p0_dependency_chain_claim_progress_contribution",
+        "player_principal_replacement_ready",
+        "replaces_player_principal_evidence",
+        "replaces_player_principal_triplet",
+        "sdk_accounting_counts_as_completed_surface",
+        "p0_accounting_counts_as_promoted_surface",
     }
-    readiness_text_keys = forbidden_true_keys | READINESS_TEXT_SCAN_KEYS
+    forbidden_positive_progress_keys = {
+        "complete_sdk_claim_progress_contribution",
+        "complete_sdk_claim_progress_ratio",
+        "sdk_completion_progress_ratio",
+        "p0_dependency_chain_claim_progress_contribution",
+        "p0_dependency_chain_claim_progress_ratio",
+    }
+    readiness_text_keys = forbidden_true_keys | forbidden_positive_progress_keys | READINESS_TEXT_SCAN_KEYS
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             if key in NEGATIVE_KEYS:
                 continue
-            if key in forbidden_true_keys and child is True:
+            normalized_key = normalized_claim_key(str(key))
+            key_is_neutral_metadata = neutral_positive_metadata_key(
+                normalized_key
+            ) or neutral_positive_metadata_path(normalized_key, child_trail)
+            stale_readiness_satisfied_alias = stale_readiness_satisfied_alias_key(normalized_key)
+            forbidden_path_alias = forbidden_readiness_alias_path(child_trail)
+            direct_claim_context = readiness_context_key(str(key)) or stale_readiness_satisfied_alias or forbidden_path_alias
+            child_context = claim_context or direct_claim_context
+            if normalized_key in forbidden_true_keys and child is True:
                 add(blockers, "readiness_claim_enabled", child_trail)
-            if key in readiness_text_keys:
+            elif forbidden_path_alias and positive_status_claim(child):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            elif stale_readiness_satisfied_alias and positive_status_claim(child):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            elif normalized_key in SOURCE_READINESS_ALIAS_KEYS and positive_status_claim(child):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            if normalized_key in SOURCE_READINESS_ALIAS_KEYS and isinstance(child, (dict, list)):
+                for text_path, text in string_values(child, child_trail):
+                    if positive_status_claim(text):
+                        add(blockers, "readiness_claim_enabled", text_path, value=text)
+            if (
+                normalized_key in forbidden_positive_progress_keys
+                and positive_progress_claim(child)
+            ):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            if (
+                child_context
+                and not key_is_neutral_metadata
+                and readiness_accounting_alias_key(normalized_key)
+                and positive_progress_claim(child)
+            ):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            if (
+                child_context
+                and not key_is_neutral_metadata
+                and positive_status_claim(child)
+                and (
+                    direct_claim_context
+                    or normalized_key in CONTEXTUAL_READINESS_STATUS_KEYS
+                )
+            ):
+                add(blockers, "readiness_claim_enabled", child_trail, value=child)
+            if key in readiness_text_keys or normalized_key in readiness_text_keys:
                 for text_path, text in string_values(child, child_trail):
                     for phrase in POSITIVE_READINESS_PHRASES:
                         match = flexible_phrase_match(text, phrase)
@@ -1034,10 +1825,19 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
                             continue
                         add(blockers, "readiness_claim_enabled", text_path, value=text, term=phrase)
                         break
-            scan_readiness_claims(child, blockers, child_trail)
+            scan_readiness_claims(
+                child,
+                blockers,
+                child_trail,
+                claim_context=child_context or propagates_readiness_claim_context(normalized_key),
+            )
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            scan_readiness_claims(child, blockers, f"{trail}[{index}]")
+            scan_readiness_claims(child, blockers, f"{trail}[{index}]", claim_context=claim_context)
+    elif claim_context and positive_status_claim(value):
+        leaf_key = normalized_trail_leaf_key(trail)
+        if not neutral_positive_metadata_key(leaf_key) and not neutral_positive_metadata_path(leaf_key, trail):
+            add(blockers, "readiness_claim_enabled", trail, value=value)
 
 
 def extract_define_symbols(text: str) -> set[str]:
@@ -1058,10 +1858,32 @@ def extract_define_body(text: str, symbol: str) -> str:
     return ""
 
 
+def extract_shift_define_value(text: str, symbol: str) -> int | None:
+    body = extract_define_body(text, symbol)
+    if not body:
+        return None
+    match = re.search(
+        rf"^\s*#\s*define\s+{re.escape(symbol)}\s+\(?\s*1(?:u|U)?(?:ll|LL|l|L)?\s*<<\s*(\d+)\s*\)?",
+        body,
+        flags=re.MULTILINE,
+    )
+    return int(match.group(1)) if match else None
+
+
+def extract_enum_assignment_value(text: str, symbol: str) -> int | None:
+    match = re.search(rf"\b{re.escape(symbol)}\s*=\s*(\d+)\s*,", text)
+    return int(match.group(1)) if match else None
+
+
 def validate_public_header(path: Path, decisions: dict[str, Any] | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     label = "$.public_header"
     try:
-        raw_text = path.read_text(encoding="utf-8")
+        reject_symlink_component(path, "public_header")
+        resolved = reject_protected_input_path(path, "public_header")
+        raw_text = resolved.read_text(encoding="utf-8")
+    except SystemExit as exc:
+        add(blockers, "public_header_path_rejected", label, path=str(path), error=str(exc))
+        return {"inventory_event_kinds": []}
     except OSError as exc:
         add(blockers, "public_header_unreadable", label, path=str(path), error=str(exc))
         return {"inventory_event_kinds": []}
@@ -1101,6 +1923,54 @@ def validate_public_header(path: Path, decisions: dict[str, Any] | None, blocker
     if missing_defines:
         add(blockers, "public_header_expected_inventory_mask_defines_missing", label, missing=missing_defines)
 
+    for symbol, expected_value in EXPECTED_SIGNAL_KIND_VALUES.items():
+        observed = extract_enum_assignment_value(code, symbol)
+        if observed != expected_value:
+            add(
+                blockers,
+                "public_header_inventory_event_kind_value_mismatch",
+                label,
+                symbol=symbol,
+                expected=expected_value,
+                value=observed,
+            )
+
+    for symbol, expected_shift in EXPECTED_SIGNAL_MASK_SHIFTS.items():
+        observed = extract_shift_define_value(code, symbol)
+        if observed != expected_shift:
+            add(
+                blockers,
+                "public_header_inventory_event_mask_value_mismatch",
+                label,
+                symbol=symbol,
+                expected_shift=expected_shift,
+                value=observed,
+            )
+
+    for symbol, expected_shift in EXPECTED_FIELD_MASK_SHIFTS.items():
+        observed = extract_shift_define_value(code, symbol)
+        if observed != expected_shift:
+            add(
+                blockers,
+                "public_header_inventory_field_mask_value_mismatch",
+                label,
+                symbol=symbol,
+                expected_shift=expected_shift,
+                value=observed,
+            )
+
+    for symbol, expected_value in EXPECTED_RESOURCE_KIND_VALUES.items():
+        observed = extract_enum_assignment_value(code, symbol)
+        if observed != expected_value:
+            add(
+                blockers,
+                "public_header_inventory_resource_kind_value_mismatch",
+                label,
+                symbol=symbol,
+                expected=expected_value,
+                value=observed,
+            )
+
     for term in REQUIRED_FORBIDDEN_TERMS:
         if re.search(rf"\b{re.escape(term)}\b", code, re.IGNORECASE):
             add(blockers, "public_header_forbidden_inventory_claim_token", label, term=term)
@@ -1114,6 +1984,38 @@ def validate_public_header(path: Path, decisions: dict[str, Any] | None, blocker
         add(blockers, "public_header_symbols_now_missing_from_header", label, missing=sorted(missing_listed_symbols))
 
     return {"inventory_event_kinds": sorted(event_kinds), "inventory_event_masks": sorted(event_masks)}
+
+
+def build_multi_surface_beta_capture_guardrail() -> dict[str, Any]:
+    return {
+        "status": "candidate_only_non_counting",
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "required_first_artifact": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+        "approved_runtime_evidence": False,
+        "approved_runtime_evidence_ready": False,
+        "clears_approved_runtime_evidence_missing": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "side_lane_counts_toward_sdk": False,
+        "side_lane_counts_toward_p0": False,
+        "sdk_p0_unlock_allowed": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "runtime_ready": False,
+        "runtime_capture_ready": False,
+        "public_sdk_ready": False,
+        "public_module_ready": False,
+        "stable_claim_allowed": False,
+        "v1_completion_ready": False,
+        "replaces_player_principal_evidence": False,
+        "replaces_player_principal_triplet": False,
+        "non_claim": (
+            "candidate multi-surface beta capture pack/plan artifacts are prep only; "
+            "they do not satisfy approved player-principal runtime evidence"
+        ),
+    }
 
 
 def build_report(
@@ -1136,10 +2038,43 @@ def build_report(
         summaries["public_sdk_surfaces"] = validate_public_sdk_surfaces(public_sdk_surfaces, blockers)
     summaries["public_header"] = validate_public_header(public_header_path, decisions, blockers)
 
+    non_counting_accounting = dict(NON_COUNTING_ACCOUNTING)
+    beta_capture_guardrail = build_multi_surface_beta_capture_guardrail()
+    readiness_report = dict(READINESS_TRUTHFULNESS_REPORT)
+    readiness_report["input_guardrails_passed"] = not blockers
+    promoted_experimental_outcome_gate = {
+        "status": "fail_closed_unresolved_promoted_experimental_surfaces",
+        "unresolved_surfaces": list(PROMOTED_EXPERIMENTAL_SURFACE_IDS),
+        "allowed_resolutions": list(PROMOTED_EXPERIMENTAL_ALLOWED_RESOLUTIONS),
+        "complete_sdk_accounting": PROMOTED_EXPERIMENTAL_COMPLETE_SDK_ACCOUNTING,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "stable_claim_allowed": False,
+        "v1_completion_ready": False,
+        "must_not_unlock": list(PROMOTED_EXPERIMENTAL_MUST_NOT_UNLOCK),
+    }
     return {
         "schema": REPORT_SCHEMA,
         "ready": not blockers,
+        "ready_scope": NON_AUTHORIZING_READY_SCOPE,
+        "does_not_satisfy_readiness": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "required_runtime_evidence": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
         "surface": SURFACE,
+        "accepted_for_internal_planning": not blockers,
+        "offline_only": True,
+        "candidate_only": True,
+        "not_artifact_gate": True,
+        **non_counting_accounting,
+        "promoted_experimental_outcome_gate": promoted_experimental_outcome_gate,
+        "multi_surface_beta_capture_guardrail": beta_capture_guardrail,
+        "readiness_report": readiness_report,
+        "next_blockers": NEXT_BLOCKERS,
         "inputs": {
             "decisions": str(decisions_path),
             "public_sdk_surfaces": str(public_sdk_surfaces_path),
@@ -1150,9 +2085,21 @@ def build_report(
             "allowed_signal_count": len(EXPECTED_ALLOWED_SIGNALS),
             "allowed_signal_kinds": sorted(EXPECTED_SIGNAL_KINDS),
             "allowed_signal_masks": sorted(EXPECTED_SIGNAL_MASKS),
+            "accepted_for_internal_planning": not blockers,
+            "candidate_only": True,
+            "offline_only": True,
+            "not_artifact_gate": True,
+            "ready_scope": NON_AUTHORIZING_READY_SCOPE,
+            "does_not_satisfy_readiness": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
             "resource_kind_contract": "category-only metadata",
-            "public_sdk_ready": False,
-            "v1_completion_ready": False,
+            "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+            "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+            "required_runtime_evidence": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+            "multi_surface_beta_capture_guardrail": beta_capture_guardrail,
+            "promoted_experimental_outcome_gate": promoted_experimental_outcome_gate,
+            "readiness_report": readiness_report,
+            "next_blockers": NEXT_BLOCKERS,
+            **non_counting_accounting,
         },
         "checks": summaries,
         "blockers": [blocker["reason"] for blocker in blockers],

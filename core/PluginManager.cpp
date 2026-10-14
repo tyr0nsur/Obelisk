@@ -19,6 +19,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <iterator>
 #include <memory>
@@ -41,6 +42,7 @@ namespace Obelisk::Core
         thread_local void* g_CurrentPluginOwner = nullptr;
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
+        std::atomic_bool g_ForcePluginTimerCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
         std::atomic<int> g_PluginRetentionFailureAfterForTesting{-1};
         std::atomic_bool g_ForcePublicChatMessageTrackingFailureForTesting{false};
@@ -48,8 +50,10 @@ namespace Obelisk::Core
         std::atomic_bool g_ForcePublicChatMessageRollbackUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyTrackingFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicGameplayPolicyInventoryUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting{false};
+        std::atomic_bool g_ForcePluginOwnerApiStateFailureForTesting{false};
 #endif
 
         struct GameplayPolicyRegistration
@@ -71,6 +75,9 @@ namespace Obelisk::Core
         {
             uint64_t Capabilities = 0;
             ChatEventDispatcher* ChatDispatcher = nullptr;
+            CommandDispatcher* Commands = nullptr;
+            PlayerLifecycleDispatcher* PlayerLifecycle = nullptr;
+            bool Unloading = false;
         };
 
         std::mutex& PluginOwnerLifecycleMutex()
@@ -86,12 +93,6 @@ namespace Obelisk::Core
         }
 
         std::unordered_set<void*>& InitializingPluginOwners()
-        {
-            static auto* owners = new std::unordered_set<void*>();
-            return *owners;
-        }
-
-        std::unordered_set<void*>& UnloadingPluginOwners()
         {
             static auto* owners = new std::unordered_set<void*>();
             return *owners;
@@ -113,6 +114,18 @@ namespace Obelisk::Core
         {
             static auto* states = new std::unordered_map<void*, PluginOwnerApiState>();
             return *states;
+        }
+
+        bool HasPluginOwnerTokenForOwnerLocked(void* owner)
+        {
+            if (!owner)
+                return false;
+
+            return std::any_of(PluginOwnerTokens().begin(),
+                               PluginOwnerTokens().end(),
+                               [owner](const auto& item) {
+                                   return item.second == owner;
+                               });
         }
 
         std::mutex& GameplayPolicyRegistrationMutex()
@@ -339,7 +352,9 @@ namespace Obelisk::Core
                 return;
 
             std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
-            UnloadingPluginOwners().insert(owner);
+            const auto it = PluginOwnerApiStates().find(owner);
+            if (it != PluginOwnerApiStates().end())
+                it->second.Unloading = true;
         }
 
         void ClearPluginOwnerUnloading(void* owner)
@@ -348,15 +363,21 @@ namespace Obelisk::Core
                 return;
 
             std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
-            UnloadingPluginOwners().erase(owner);
+            const auto it = PluginOwnerApiStates().find(owner);
+            if (it != PluginOwnerApiStates().end())
+                it->second.Unloading = false;
         }
 
         bool IsUnloadingPluginOwnerLocked(void* owner)
         {
-            return owner && UnloadingPluginOwners().find(owner) != UnloadingPluginOwners().end();
+            if (!owner)
+                return false;
+            const auto it = PluginOwnerApiStates().find(owner);
+            return it != PluginOwnerApiStates().end() && it->second.Unloading;
         }
 
-        uint64_t AddPluginOwnerToken(void* owner, uint64_t capabilities, ChatEventDispatcher* chatDispatcher)
+        uint64_t AddPluginOwnerToken(void* owner, uint64_t capabilities, ChatEventDispatcher* chatDispatcher,
+                                    CommandDispatcher* commands, PlayerLifecycleDispatcher* playerLifecycle)
         {
             if (!owner)
                 return 0;
@@ -373,10 +394,25 @@ namespace Obelisk::Core
             } while (token == 0 || PluginOwnerTokens().find(token) != PluginOwnerTokens().end());
 
             PluginOwnerTokens()[token] = owner;
-            PluginOwnerApiStates()[owner] = PluginOwnerApiState{
-                .Capabilities = capabilities,
-                .ChatDispatcher = chatDispatcher,
-            };
+            try
+            {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (g_ForcePluginOwnerApiStateFailureForTesting.load(std::memory_order_acquire))
+                    throw std::runtime_error("injected plugin owner API state failure");
+#endif
+                PluginOwnerApiStates()[owner] = PluginOwnerApiState{
+                    .Capabilities = capabilities,
+                    .ChatDispatcher = chatDispatcher,
+                    .Commands = commands,
+                    .PlayerLifecycle = playerLifecycle,
+                    .Unloading = false,
+                };
+            }
+            catch (...)
+            {
+                PluginOwnerTokens().erase(token);
+                throw;
+            }
             return token;
         }
 
@@ -389,8 +425,10 @@ namespace Obelisk::Core
             const auto it = PluginOwnerTokens().find(token);
             if (it != PluginOwnerTokens().end())
             {
-                PluginOwnerApiStates().erase(it->second);
+                void* owner = it->second;
                 PluginOwnerTokens().erase(it);
+                if (!HasPluginOwnerTokenForOwnerLocked(owner))
+                    PluginOwnerApiStates().erase(owner);
             }
         }
 
@@ -406,6 +444,20 @@ namespace Obelisk::Core
             if (it == PluginOwnerApiStates().end())
                 return nullptr;
             return it->second.ChatDispatcher;
+        }
+
+        CommandDispatcher* PluginOwnerCommandDispatcherLocked(void* owner)
+        {
+            const auto it = PluginOwnerApiStates().find(owner);
+            if (it == PluginOwnerApiStates().end())
+                return nullptr;
+            return it->second.Commands;
+        }
+
+        PlayerLifecycleDispatcher* PluginOwnerPlayerLifecycleDispatcherLocked(void* owner)
+        {
+            const auto it = PluginOwnerApiStates().find(owner);
+            return it == PluginOwnerApiStates().end() ? nullptr : it->second.PlayerLifecycle;
         }
 
         bool CurrentPluginOwnerHasCapability(uint64_t capability)
@@ -1690,88 +1742,137 @@ namespace Obelisk::Core
             bool structureRemoved = false;
             bool inventoryRemoved = false;
             bool itemReturnRemoved = false;
+            bool trackingCleaned = false;
+            const auto reconcileRemovedDispatcherTracking = [&]() -> bool {
+                std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+                const auto it = GameplayPolicyRegistrations().find(registrationId);
+                if (it == GameplayPolicyRegistrations().end())
+                    return true;
+                if (it->second.Owner != owner)
+                    return true;
+
+                if (structureRemoved &&
+                    it->second.StructureRegistrationId == registration.StructureRegistrationId)
+                {
+                    it->second.StructureRegistrationId = 0;
+                }
+                if (inventoryRemoved &&
+                    it->second.InventoryRegistrationId == registration.InventoryRegistrationId)
+                {
+                    it->second.InventoryRegistrationId = 0;
+                }
+                if (itemReturnRemoved &&
+                    it->second.ItemReturnRegistrationId == registration.ItemReturnRegistrationId)
+                {
+                    it->second.ItemReturnRegistrationId = 0;
+                }
+
+                if (it->second.StructureRegistrationId == 0 &&
+                    it->second.InventoryRegistrationId == 0 &&
+                    it->second.ItemReturnRegistrationId == 0)
+                {
+                    GameplayPolicyRegistrations().erase(it);
+                    return true;
+                }
+
+                return false;
+            };
+            const auto syncRemovedDispatcherTracking = [&]() -> bool {
+                try
+                {
+                    trackingCleaned = reconcileRemovedDispatcherTracking();
+                    return true;
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("Failed to update gameplay policy tracking after backing callback cleanup",
+                                        e.what());
+                    return false;
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow(
+                        "Failed to update gameplay policy tracking after backing callback cleanup with unknown exception");
+                    return false;
+                }
+            };
+            try
+            {
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
-            if (g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.load(std::memory_order_acquire))
-                cleanupSucceeded = false;
+                if (g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.load(std::memory_order_acquire))
+                    cleanupSucceeded = false;
 #endif
-            if (registration.StructureRegistrationId != 0)
-            {
-                if (cleanupSucceeded)
+                if (registration.StructureRegistrationId != 0)
                 {
-                    structureRemoved = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.StructureRegistrationId);
-                    if (!structureRemoved && ownerCleanupRetry)
+                    if (cleanupSucceeded)
                     {
-                        const size_t fallbackRemoved =
-                            StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        structureRemoved = fallbackRemoved != 0;
+                        structureRemoved = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                            owner,
+                            registration.StructureRegistrationId);
+                        if (!structureRemoved && ownerCleanupRetry)
+                        {
+                            const size_t fallbackRemoved =
+                                StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                            structureRemoved = fallbackRemoved != 0;
+                        }
                     }
+                    cleanupSucceeded = cleanupSucceeded && structureRemoved;
+                    if (structureRemoved && !syncRemovedDispatcherTracking())
+                        cleanupSucceeded = false;
                 }
-                cleanupSucceeded = cleanupSucceeded && structureRemoved;
+                if (registration.InventoryRegistrationId != 0)
+                {
+                    if (cleanupSucceeded)
+                    {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                        if (g_ForcePublicGameplayPolicyInventoryUnregisterFailureForTesting.load(
+                                std::memory_order_acquire))
+                            throw std::runtime_error("injected public gameplay policy inventory unregister failure");
+#endif
+                        inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                            owner,
+                            registration.InventoryRegistrationId);
+                        if (!inventoryRemoved && ownerCleanupRetry)
+                        {
+                            const size_t fallbackRemoved =
+                                InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                            inventoryRemoved = fallbackRemoved != 0;
+                        }
+                    }
+                    cleanupSucceeded = cleanupSucceeded && inventoryRemoved;
+                    if (inventoryRemoved && !syncRemovedDispatcherTracking())
+                        cleanupSucceeded = false;
+                }
+                if (registration.ItemReturnRegistrationId != 0)
+                {
+                    if (cleanupSucceeded)
+                    {
+                        itemReturnRemoved = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                            owner,
+                            registration.ItemReturnRegistrationId);
+                        if (!itemReturnRemoved && ownerCleanupRetry)
+                        {
+                            const size_t fallbackRemoved =
+                                ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+                            itemReturnRemoved = fallbackRemoved != 0;
+                        }
+                    }
+                    cleanupSucceeded = cleanupSucceeded && itemReturnRemoved;
+                    if (itemReturnRemoved && !syncRemovedDispatcherTracking())
+                        cleanupSucceeded = false;
+                }
+
+                if (!trackingCleaned && !syncRemovedDispatcherTracking())
+                    cleanupSucceeded = false;
             }
-            if (registration.InventoryRegistrationId != 0)
+            catch (...)
             {
-                if (cleanupSucceeded)
-                {
-                    inventoryRemoved = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.InventoryRegistrationId);
-                    if (!inventoryRemoved && ownerCleanupRetry)
-                    {
-                        const size_t fallbackRemoved =
-                            InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        inventoryRemoved = fallbackRemoved != 0;
-                    }
-                }
-                cleanupSucceeded = cleanupSucceeded && inventoryRemoved;
-            }
-            if (registration.ItemReturnRegistrationId != 0)
-            {
-                if (cleanupSucceeded)
-                {
-                    itemReturnRemoved = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.ItemReturnRegistrationId);
-                    if (!itemReturnRemoved && ownerCleanupRetry)
-                    {
-                        const size_t fallbackRemoved =
-                            ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
-                        itemReturnRemoved = fallbackRemoved != 0;
-                    }
-                }
-                cleanupSucceeded = cleanupSucceeded && itemReturnRemoved;
+                if (structureRemoved || inventoryRemoved || itemReturnRemoved)
+                    (void)syncRemovedDispatcherTracking();
+                throw;
             }
 
-            std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
-            const auto it = GameplayPolicyRegistrations().find(registrationId);
-            if (it == GameplayPolicyRegistrations().end())
-                return cleanupSucceeded;
-            if (it->second.Owner != owner)
-                return cleanupSucceeded;
-
-            if (cleanupSucceeded)
-            {
-                GameplayPolicyRegistrations().erase(it);
-                return true;
-            }
-
-            if (structureRemoved &&
-                it->second.StructureRegistrationId == registration.StructureRegistrationId)
-            {
-                it->second.StructureRegistrationId = 0;
-            }
-            if (inventoryRemoved &&
-                it->second.InventoryRegistrationId == registration.InventoryRegistrationId)
-            {
-                it->second.InventoryRegistrationId = 0;
-            }
-            if (itemReturnRemoved &&
-                it->second.ItemReturnRegistrationId == registration.ItemReturnRegistrationId)
-            {
-                it->second.ItemReturnRegistrationId = 0;
-            }
-            return false;
+            return cleanupSucceeded && trackingCleaned;
         }
 
         size_t UnregisterGameplayPolicyRegistrationsForOwner(void* owner)
@@ -2309,6 +2410,161 @@ namespace Obelisk::Core
                 return false;
             }
         }
+
+        uint64_t PluginRegisterCommandWithOwnerTokenHandle(
+            uint64_t ownerToken, const char* commandName, ObeliskCommandCallback callback, void* userData)
+        {
+            if (!commandName || !callback)
+                return 0;
+            // Bound the C string scan before copying it into runtime storage.
+            const size_t commandSize = strnlen(commandName, 65);
+            if (commandSize > 64)
+                return 0;
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterCommandWithOwnerTokenHandle", ownerToken, [&](void* owner) -> uint64_t {
+                        auto* dispatcher = PluginOwnerCommandDispatcherLocked(owner);
+                        if (!dispatcher || !dispatcher->IsAvailable() ||
+                            !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_COMMAND_REPLIES))
+                            return 0;
+                        Dl_info callbackInfo{};
+                        if (!dladdr(reinterpret_cast<void*>(callback), &callbackInfo) || callbackInfo.dli_fbase != owner)
+                        {
+                            SafeLogWarnNoThrow("RegisterCommandWithOwnerTokenHandle",
+                                               "rejected callback outside the owning plugin mapping.");
+                            return 0;
+                        }
+                        return dispatcher->Register(owner, {commandName, commandSize}, callback, userData);
+                    });
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("RegisterCommandWithOwnerTokenHandle failed after exception.");
+                return 0;
+            }
+        }
+
+        bool PluginUnregisterCommandWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+        {
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterCommandWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                CommandDispatcher* dispatcher = nullptr;
+                {
+                    std::lock_guard lock(PluginOwnerLifecycleMutex());
+                    dispatcher = PluginOwnerCommandDispatcherLocked(owner);
+                }
+                // Never hold the lifecycle lock while waiting for callback quiescence.
+                return dispatcher && dispatcher->Unregister(owner, registrationId);
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("UnregisterCommandWithOwnerToken failed after exception.");
+                return false;
+            }
+        }
+
+        bool PluginReplyToCommandWithOwnerToken(uint64_t ownerToken, uint64_t invocationToken,
+                                               ObeliskCommandStringView reply)
+        {
+            if (!reply.data || reply.size == 0 || reply.size > 1024)
+                return false;
+            try
+            {
+                void* owner = nullptr;
+                CommandDispatcher* dispatcher = nullptr;
+                {
+                    std::lock_guard lock(PluginOwnerLifecycleMutex());
+                    owner = ResolveOwnerTokenForRegistrationLocked("ReplyToCommandWithOwnerToken", ownerToken);
+                    if (!owner || !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_COMMAND_REPLIES))
+                        return false;
+                    dispatcher = PluginOwnerCommandDispatcherLocked(owner);
+                }
+                return dispatcher && dispatcher->Reply(owner, invocationToken, {reply.data, reply.size});
+            }
+            catch (...)
+            {
+                return false;
+            }
+        }
+
+        bool PluginGetCommandPlayerWithOwnerToken(uint64_t ownerToken, uint64_t invocationToken,
+                                                  ObeliskCommandPlayer* out)
+        {
+            if (!out || out->struct_size < sizeof(ObeliskCommandPlayer))
+                return false;
+            try
+            {
+                void* owner = nullptr;
+                CommandDispatcher* dispatcher = nullptr;
+                {
+                    std::lock_guard lock(PluginOwnerLifecycleMutex());
+                    owner = ResolveOwnerTokenForRegistrationLocked("GetCommandPlayerWithOwnerToken", ownerToken);
+                    if (!owner || !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT))
+                        return false;
+                    dispatcher = PluginOwnerCommandDispatcherLocked(owner);
+                }
+                return dispatcher && dispatcher->GetPlayer(owner, invocationToken, out);
+            }
+            catch (...)
+            {
+                return false;
+            }
+        }
+
+        uint64_t PluginRegisterPlayerLifecycleWithOwnerTokenHandle(
+            uint64_t ownerToken, ObeliskPlayerLifecycleCallback callback, void* userData)
+        {
+            if (!callback)
+                return 0;
+            try
+            {
+                return RegisterProcessEventCallbackForOwnerToken(
+                    "RegisterPlayerLifecycleWithOwnerTokenHandle", ownerToken, [&](void* owner) -> uint64_t {
+                        auto* dispatcher = PluginOwnerPlayerLifecycleDispatcherLocked(owner);
+                        if (!dispatcher || !dispatcher->IsAvailable() ||
+                            !PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS))
+                            return 0;
+                        Dl_info callbackInfo{};
+                        if (!dladdr(reinterpret_cast<void*>(callback), &callbackInfo) || callbackInfo.dli_fbase != owner)
+                        {
+                            SafeLogWarnNoThrow("RegisterPlayerLifecycleWithOwnerTokenHandle",
+                                               "rejected callback outside the owning plugin mapping.");
+                            return 0;
+                        }
+                        return dispatcher->Register(owner, callback, userData);
+                    });
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("RegisterPlayerLifecycleWithOwnerTokenHandle failed after exception.");
+                return 0;
+            }
+        }
+
+        bool PluginUnregisterPlayerLifecycleWithOwnerToken(uint64_t ownerToken, uint64_t registrationId)
+        {
+            try
+            {
+                void* owner = ResolveOwnerTokenForUnregister("UnregisterPlayerLifecycleWithOwnerToken", ownerToken);
+                if (!owner)
+                    return false;
+                PlayerLifecycleDispatcher* dispatcher = nullptr;
+                {
+                    std::lock_guard lock(PluginOwnerLifecycleMutex());
+                    dispatcher = PluginOwnerPlayerLifecycleDispatcherLocked(owner);
+                }
+                return dispatcher && dispatcher->Unregister(owner, registrationId);
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("UnregisterPlayerLifecycleWithOwnerToken failed after exception.");
+                return false;
+            }
+        }
         uint64_t PluginRegisterTimerWithOwnerTokenHandle(
             uint64_t ownerToken,
             uint64_t delayMs,
@@ -2458,6 +2714,11 @@ namespace Obelisk::Core
         g_ForcePluginCallbackCleanupFailureForTesting.store(enabled, std::memory_order_release);
     }
 
+    void SetPluginTimerCleanupFailureForTesting(bool enabled)
+    {
+        g_ForcePluginTimerCleanupFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
     void SetPluginRetentionFailureForTesting(bool enabled)
     {
         g_ForcePluginRetentionFailureForTesting.store(enabled, std::memory_order_release);
@@ -2490,6 +2751,11 @@ namespace Obelisk::Core
         g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
     }
 
+    void SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(bool enabled)
+    {
+        g_ForcePublicGameplayPolicyInventoryUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
     void SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(bool enabled)
     {
         g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting.store(enabled, std::memory_order_release);
@@ -2507,15 +2773,20 @@ namespace Obelisk::Core
             std::memory_order_release);
     }
 
+    void SetPluginOwnerApiStateFailureForTesting(bool enabled)
+    {
+        g_ForcePluginOwnerApiStateFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token)
     {
         std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
         LoadedPluginOwners().erase(owner);
         InitializingPluginOwners().erase(owner);
-        UnloadingPluginOwners().erase(owner);
         if (token != 0)
             PluginOwnerTokens().erase(token);
-        PluginOwnerApiStates().erase(owner);
+        if (!HasPluginOwnerTokenForOwnerLocked(owner))
+            PluginOwnerApiStates().erase(owner);
     }
 #endif
 
@@ -2530,8 +2801,22 @@ namespace Obelisk::Core
     }
 
     PluginManager::PluginManager(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher)
+        : PluginManager(loader, chatDispatcher, CommandDispatcher::Get())
+    {
+    }
+
+    PluginManager::PluginManager(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher,
+                                 CommandDispatcher& commandDispatcher)
+        : PluginManager(loader, chatDispatcher, commandDispatcher, PlayerLifecycleDispatcher::Get())
+    {
+    }
+
+    PluginManager::PluginManager(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher,
+                                 CommandDispatcher& commandDispatcher, PlayerLifecycleDispatcher& playerLifecycleDispatcher)
         : m_Loader(&loader)
         , m_ChatDispatcher(&chatDispatcher)
+        , m_CommandDispatcher(&commandDispatcher)
+        , m_PlayerLifecycleDispatcher(&playerLifecycleDispatcher)
     {
         m_Api.LogInfo = PluginLogInfo;
         m_Api.LogWarn = PluginLogWarn;
@@ -2544,6 +2829,12 @@ namespace Obelisk::Core
         m_Api.abi_version = OBELISK_API_ABI_VERSION;
         m_Api.struct_size = sizeof(ObeliskApi);
         m_Api.capabilities = BuildApiCapabilities();
+        if (m_CommandDispatcher->IsAvailable())
+            m_Api.capabilities |= OBELISK_API_CAPABILITY_COMMAND_REPLIES;
+        if (m_CommandDispatcher->IsPlayerSnapshotsAvailable())
+            m_Api.capabilities |= OBELISK_API_CAPABILITY_COMMAND_PLAYER_SNAPSHOT;
+        if (m_PlayerLifecycleDispatcher->IsAvailable())
+            m_Api.capabilities |= OBELISK_API_CAPABILITY_PLAYER_LIFECYCLE_EVENTS;
         m_Api.RegisterPreProcessEventWithOwnerToken = PluginRegisterPreProcessEventWithOwnerToken;
         m_Api.RegisterPostProcessEventWithOwnerToken = PluginRegisterPostProcessEventWithOwnerToken;
         m_Api.RegisterPreProcessEventForNameIndexWithOwnerToken = PluginRegisterPreProcessEventForNameIndexWithOwnerToken;
@@ -2561,6 +2852,12 @@ namespace Obelisk::Core
         m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
         m_Api.RegisterTimerWithOwnerTokenHandle = PluginRegisterTimerWithOwnerTokenHandle;
         m_Api.UnregisterTimerWithOwnerToken = PluginUnregisterTimerWithOwnerToken;
+        m_Api.RegisterCommandWithOwnerTokenHandle = PluginRegisterCommandWithOwnerTokenHandle;
+        m_Api.UnregisterCommandWithOwnerToken = PluginUnregisterCommandWithOwnerToken;
+        m_Api.ReplyToCommandWithOwnerToken = PluginReplyToCommandWithOwnerToken;
+        m_Api.GetCommandPlayerWithOwnerToken = PluginGetCommandPlayerWithOwnerToken;
+        m_Api.RegisterPlayerLifecycleWithOwnerTokenHandle = PluginRegisterPlayerLifecycleWithOwnerTokenHandle;
+        m_Api.UnregisterPlayerLifecycleWithOwnerToken = PluginUnregisterPlayerLifecycleWithOwnerToken;
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
     }
@@ -2645,10 +2942,20 @@ namespace Obelisk::Core
             return UnregisterChatMessageRegistrationsForOwner(owner);
         }, &publicChatCleanupSucceeded);
         const size_t timerRemoved = cleanupFamily("timer", [&]() {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+            if (g_ForcePluginTimerCleanupFailureForTesting.load(std::memory_order_acquire))
+                throw std::runtime_error("injected plugin timer cleanup failure");
+#endif
             return TimerManager::Get().UnregisterCallbacksForOwner(owner);
         });
         const size_t chatRemoved = cleanupFamily("chat", [&]() {
             return m_ChatDispatcher->UnregisterCallbacksForOwner(owner);
+        });
+        const size_t commandRemoved = cleanupFamily("command", [&]() {
+            return m_CommandDispatcher->UnregisterCallbacksForOwner(owner);
+        });
+        const size_t playerLifecycleRemoved = cleanupFamily("player lifecycle", [&]() {
+            return m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner);
         });
         const size_t structureRemoved = cleanupFamily("structure", [&]() {
             return StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
@@ -2687,6 +2994,8 @@ namespace Obelisk::Core
         logRemoved(publicChatRemoved, "public chat");
         logRemoved(timerRemoved, "timer");
         logRemoved(chatRemoved, "chat");
+        logRemoved(commandRemoved, "command");
+        logRemoved(playerLifecycleRemoved, "player lifecycle");
         logRemoved(structureRemoved, "structure");
         logRemoved(inventoryRemoved, "inventory policy");
         logRemoved(itemReturnRemoved, "item return");
@@ -2707,6 +3016,14 @@ namespace Obelisk::Core
     {
         try
         {
+            const char* instanceIdEnv = std::getenv("OBELISK_INSTANCE_ID");
+            const std::string instanceId = instanceIdEnv ? instanceIdEnv : "";
+            if (!IsSafeInstanceId(instanceId))
+            {
+                OBELISK_ERROR("OBELISK_INSTANCE_ID must be a non-empty safe instance id before plugin loading. Plugins will not be loaded.");
+                return;
+            }
+
             const char* configRootEnv = std::getenv("OBELISK_CONFIG_DIR");
             if (!configRootEnv || configRootEnv[0] == '\0')
             {
@@ -2727,14 +3044,6 @@ namespace Obelisk::Core
             if (!ValidatePluginConfigRoot(configRoot, true, configRootError))
             {
                 OBELISK_ERROR("Invalid OBELISK_CONFIG_DIR: {}. Plugins will not be loaded.", configRootError);
-                return;
-            }
-
-            const char* instanceIdEnv = std::getenv("OBELISK_INSTANCE_ID");
-            const std::string instanceId = instanceIdEnv ? instanceIdEnv : "";
-            if (!IsSafeInstanceId(instanceId))
-            {
-                OBELISK_ERROR("OBELISK_INSTANCE_ID must be a non-empty safe instance id before plugin loading. Plugins will not be loaded.");
                 return;
             }
 
@@ -2760,7 +3069,16 @@ namespace Obelisk::Core
                 return;
             }
 
-            const fs::file_status pluginDirectoryStatus = fs::symlink_status(pluginDirectory);
+            std::error_code pluginDirectoryStatusError;
+            const fs::file_status pluginDirectoryStatus =
+                fs::symlink_status(pluginDirectory, pluginDirectoryStatusError);
+            if (pluginDirectoryStatusError)
+            {
+                OBELISK_ERROR("Plugin directory {} is not accessible: {}. Plugins will not be loaded.",
+                              directory,
+                              pluginDirectoryStatusError.message());
+                return;
+            }
             if (!fs::exists(pluginDirectoryStatus))
             {
                 OBELISK_WARN("Plugin directory {} does not exist. Plugins will not be loaded.", directory);
@@ -2778,19 +3096,55 @@ namespace Obelisk::Core
             }
 
             std::vector<fs::path> plugins;
-            for (const auto& entry : fs::directory_iterator(pluginDirectory))
+            std::error_code directoryIteratorError;
+            fs::directory_iterator iterator(pluginDirectory, fs::directory_options::none, directoryIteratorError);
+            if (directoryIteratorError)
             {
+                OBELISK_ERROR("Plugin directory {} could not be opened: {}. Plugins will not be loaded.",
+                              directory,
+                              directoryIteratorError.message());
+                return;
+            }
+
+            for (fs::directory_iterator end; iterator != end; iterator.increment(directoryIteratorError))
+            {
+                if (directoryIteratorError)
+                {
+                    OBELISK_ERROR("Plugin directory {} iteration failed: {}. Plugins will not be loaded.",
+                                  directory,
+                                  directoryIteratorError.message());
+                    return;
+                }
+
+                const auto& entry = *iterator;
                 if (entry.path().extension() != ".so")
                     continue;
 
-                if (entry.is_symlink())
+                std::error_code entryStatusError;
+                const fs::file_status entryStatus = entry.symlink_status(entryStatusError);
+                if (entryStatusError)
+                {
+                    OBELISK_WARN("Skipping plugin candidate {} because its status could not be read: {}.",
+                                 entry.path().filename().string(),
+                                 entryStatusError.message());
+                    continue;
+                }
+
+                if (fs::is_symlink(entryStatus))
                 {
                     OBELISK_WARN("Skipping plugin candidate {} because plugin symlinks are not allowed.", entry.path().filename().string());
                     continue;
                 }
 
-                if (entry.is_regular_file())
+                if (fs::is_regular_file(entryStatus))
                     plugins.push_back(entry.path());
+            }
+            if (directoryIteratorError)
+            {
+                OBELISK_ERROR("Plugin directory {} iteration failed: {}. Plugins will not be loaded.",
+                              directory,
+                              directoryIteratorError.message());
+                return;
             }
 
             std::sort(plugins.begin(), plugins.end());
@@ -2802,6 +3156,30 @@ namespace Obelisk::Core
                 std::string pluginName = path.filename().string();
 
                 OBELISK_INFO("Loading plugin: {}", pluginName);
+
+                std::error_code candidateStatusError;
+                const fs::file_status candidateStatus = fs::symlink_status(path, candidateStatusError);
+                if (candidateStatusError)
+                {
+                    OBELISK_WARN("Skipping plugin candidate {} because its status could not be rechecked: {}.",
+                                 pluginName,
+                                 candidateStatusError.message());
+                    continue;
+                }
+                if (fs::is_symlink(candidateStatus) || !fs::is_regular_file(candidateStatus))
+                {
+                    OBELISK_WARN("Skipping plugin candidate {} because it is no longer a regular non-symlink file.",
+                                 pluginName);
+                    continue;
+                }
+                std::string candidatePathError;
+                if (!ValidateExistingPathComponentsNoSymlinks(path, "Plugin candidate", candidatePathError))
+                {
+                    OBELISK_WARN("Skipping plugin candidate {} because its path is unsafe: {}.",
+                                 pluginName,
+                                 candidatePathError);
+                    continue;
+                }
 
                 std::string loaderError;
                 void* handle = m_Loader->Open(path, loaderError);
@@ -2846,6 +3224,17 @@ namespace Obelisk::Core
 
                 PreparedPluginConfig preparedConfig;
                 std::string configError;
+                std::string pluginConfigRootComponentError;
+                if (!ValidateExistingPathComponentsNoSymlinks(
+                        configRoot,
+                        "OBELISK_CONFIG_DIR",
+                        pluginConfigRootComponentError))
+                {
+                    OBELISK_ERROR("Plugin {} metadata/config rejected: OBELISK_CONFIG_DIR became unsafe: {}. Unloading.",
+                                  pluginName,
+                                  pluginConfigRootComponentError);
+                    continue;
+                }
                 if (!PreparePluginConfig(metadata, configRoot, instanceId, preparedConfig, configError))
                 {
                     OBELISK_ERROR("Plugin {} metadata/config rejected: {}. Unloading.", pluginName, configError);
@@ -2891,7 +3280,8 @@ namespace Obelisk::Core
                 void* pluginOwner = m_Loader->GetSymbolOwner(handle, reinterpret_cast<void*>(initFunc));
                 if (!pluginOwner)
                     pluginOwner = handle;
-                const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher);
+                const uint64_t pluginOwnerToken = AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher,
+                                                                     m_CommandDispatcher, m_PlayerLifecycleDispatcher);
                 auto ownerTokenCleanup = MakeScopeExit([&]() {
                     RemovePluginOwnerToken(pluginOwnerToken);
                 });
@@ -3176,12 +3566,13 @@ namespace Obelisk::Core
             {
                 try
                 {
-                    std::vector<PluginInfo> retryPlugins;
-                    retryPlugins.reserve(static_cast<size_t>(std::distance(m_LoadedPlugins.begin(), it.base())) +
-                                         retainedPlugins.size());
-                    retryPlugins.insert(retryPlugins.end(), m_LoadedPlugins.begin(), it.base());
-                    retryPlugins.insert(retryPlugins.end(), retainedPlugins.rbegin(), retainedPlugins.rend());
-                    m_LoadedPlugins = std::move(retryPlugins);
+                    static_assert(std::is_nothrow_move_constructible_v<PluginInfo>,
+                                  "partial unload retry publication must preserve mapped plugins without allocation");
+                    m_LoadedPlugins.erase(it.base(), m_LoadedPlugins.end());
+                    m_LoadedPlugins.insert(
+                        m_LoadedPlugins.end(),
+                        std::make_move_iterator(retainedPlugins.rbegin()),
+                        std::make_move_iterator(retainedPlugins.rend()));
                 }
                 catch (const std::exception& e)
                 {

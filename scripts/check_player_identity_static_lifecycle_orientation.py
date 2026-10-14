@@ -21,6 +21,13 @@ from check_player_identity_static_admin_thunks import (
     sha256_file,
 )
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
+from reflection_target_sets import (
+    NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
+    PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS,
+    PLAYER_LIFECYCLE_RUNTIME_TRIPLET_EVIDENCE_STATUS,
+    PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS,
+    player_lifecycle_anchor_source_policy,
+)
 from static_candidate_orientation_contract import build_contract, validate_contract
 
 
@@ -52,6 +59,16 @@ class LifecycleAnchor:
 
 LIFECYCLE_ANCHORS = (
     LifecycleAnchor(
+        target="ShooterGameMode.CheckJoinInProgress",
+        role_hint="session_start_rejected",
+        ascii_name="CheckJoinInProgress",
+        ascii_vma=0x416FF3A,
+        registration_vma=0x13CBC8F,
+        registration_class_load_vma=0x13CBC88,
+        thunk_vma=0x15CE900,
+        probable_fname_slot_vma=0x58ED3C0,
+    ),
+    LifecycleAnchor(
         target="ShooterGameMode.HandleNewPlayer",
         role_hint="session_start",
         ascii_name="HandleNewPlayer",
@@ -73,6 +90,100 @@ LIFECYCLE_ANCHORS = (
     ),
 )
 LIFECYCLE_TARGETS = tuple(anchor.target for anchor in LIFECYCLE_ANCHORS)
+RUNTIME_TRIPLET_REQUIREMENT_BY_ROLE: dict[str, dict[str, Any]] = {
+    "session_start": {
+        "required_runtime_shape": "ShooterGameMode.HandleNewPlayer(1,1)",
+        "required_source_target": "ShooterGameMode.HandleNewPlayer",
+        "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "required_copied_bool_values": ["1", "1"],
+    },
+    "session_start_rejected": {
+        "required_runtime_shape": "ShooterGameMode.CheckJoinInProgress(1,0)",
+        "required_source_target": "ShooterGameMode.CheckJoinInProgress",
+        "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "required_copied_bool_values": ["1", "0"],
+        "rejected_aliases": [
+            "ShooterGameMode.CheckJoinInProgress",
+            "CheckJoinInProgress",
+        ],
+    },
+    "session_end": {
+        "required_runtime_shape": "ShooterGameMode.OnLogout(matched)",
+        "required_source_target": "ShooterGameMode.OnLogout",
+        "required_correlation_status": "matched",
+    },
+}
+APPROVED_RUNTIME_TRIPLET_REQUIREMENT: dict[str, Any] = {
+    "approved_runtime_evidence_present": False,
+    "approved_runtime_evidence_ready": False,
+    "static_evidence_can_replace_runtime_triplet": False,
+    "required_exact_triplet": [
+        RUNTIME_TRIPLET_REQUIREMENT_BY_ROLE["session_start"],
+        RUNTIME_TRIPLET_REQUIREMENT_BY_ROLE["session_start_rejected"],
+        RUNTIME_TRIPLET_REQUIREMENT_BY_ROLE["session_end"],
+    ],
+    "non_claim": (
+        "static source orientation identifies source UFunctions only; approved runtime "
+        "evidence still requires one copied session_start, exact CheckJoinInProgress(1,0) "
+        "session_start_rejected, and matched session_end sibling set"
+    ),
+}
+SOURCE_NAME_ONLY_STATUS = "source_name_only_not_runtime_evidence"
+STATIC_ANCHOR_BINDING_STATUS = "static_anchor_source_name_only_not_runtime_evidence"
+CHECKJOIN_REJECTED_START_BINDING_STATUS = "observer_only_rejected_start_source_not_anchor"
+ALL_SIX_PLANNING_GAP_POLICY: dict[str, Any] = {
+    "target_set": "players-lifecycle-anchor-candidates",
+    "all_six_planning_gap_evidence_status": "non_evidence",
+    "planning_gap_records_count_as_runtime_proof": False,
+    "accepted_targets_fields_count_as_runtime_proof": False,
+    "approved_runtime_evidence_present": False,
+    "runtime_ready": False,
+    "public_sdk_ready": False,
+    "promotion_ready": False,
+    "does_not_satisfy": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
+}
+DIAGNOSTIC_REFLECTION_NOTE_GUARDRAILS: tuple[dict[str, Any], ...] = (
+    {
+        "source_phrase": "CheckJoinInProgressDiagnostic",
+        "classification": "diagnostic_reflection_note_only",
+        "approved_runtime_lifecycle_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
+        "counts_as_approved_runtime_lifecycle_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_lifecycle_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_progress": False,
+        "counts_as_p0_progress": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "public_readiness_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+    },
+    {
+        "source_phrase": "FName drift notes",
+        "classification": "reflection_drift_note_only",
+        "approved_runtime_lifecycle_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
+        "counts_as_approved_runtime_lifecycle_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_lifecycle_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_progress": False,
+        "counts_as_p0_progress": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "public_readiness_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+    },
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -220,6 +331,42 @@ def check_shared_names(data: bytes, segments: list[LoadSegment], blockers: list[
         append_blocker(blockers, "gamemode_name_utf32_mismatch", vma=hex(GAMEMODE_NAME_VMA))
 
 
+def runtime_triplet_requirement_for(anchor: LifecycleAnchor) -> dict[str, Any]:
+    requirement = dict(RUNTIME_TRIPLET_REQUIREMENT_BY_ROLE[anchor.role_hint])
+    requirement["source_name_only"] = True
+    requirement["bare_source_alias_counts_as_runtime_evidence"] = False
+    requirement["static_evidence_can_replace_runtime_triplet"] = False
+    return requirement
+
+
+def source_role_policy_for(anchor: LifecycleAnchor) -> dict[str, Any]:
+    static_anchor = anchor.target in PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS
+    rejected_start = anchor.role_hint == "session_start_rejected"
+    return {
+        "source_policy_scope": "source_names_only_not_runtime_evidence",
+        "runtime_evidence_status": PLAYER_LIFECYCLE_RUNTIME_TRIPLET_EVIDENCE_STATUS,
+        "accepted_runtime_triplet_source_name": anchor.target
+        in PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS,
+        "static_lifecycle_anchor_source_name": static_anchor,
+        "rejected_start_triplet_source_name": rejected_start,
+        "anchor_binding_status": CHECKJOIN_REJECTED_START_BINDING_STATUS
+        if rejected_start
+        else STATIC_ANCHOR_BINDING_STATUS,
+        "accepted_target_name_scope": SOURCE_NAME_ONLY_STATUS,
+        "anchor_binding_label_scope": SOURCE_NAME_ONLY_STATUS,
+        "accepted_target_name_counts_as_runtime_proof": False,
+        "anchor_binding_label_counts_as_runtime_proof": False,
+        "counts_as_approved_runtime_lifecycle_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_lifecycle_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_progress": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "promotion_ready": False,
+    }
+
+
 def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     resolved: Path | None = None
@@ -260,6 +407,8 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
                     {
                         "target": anchor.target,
                         "role_hint": anchor.role_hint,
+                        **runtime_triplet_requirement_for(anchor),
+                        **source_role_policy_for(anchor),
                         "status": "candidate_orientation_valid" if len(blockers) == before else "blocked",
                         "target_set_status": "known_lifecycle_orientation_not_in_closed_target_set",
                         "ascii_name_vma": hex(anchor.ascii_vma),
@@ -273,15 +422,18 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
 
     non_claims = [
         "valid static lifecycle orientation is bounded byte evidence for this offline binary only",
-        "does not add HandleNewPlayer or OnLogout to the closed players-identity-lifecycle-intake target set",
-        "does not prove accepted session-start or session-end lifecycle anchors",
+        "does not add HandleNewPlayer, CheckJoinInProgress, or OnLogout to the closed players-identity-lifecycle-intake target set",
+        "CheckJoinInProgress is rejected-start orientation only and does not prove an accepted copied runtime event",
+        "does not prove accepted session-start, rejected-start, or session-end lifecycle anchors",
+        "CheckJoinInProgressDiagnostic wording is diagnostic/reflection-level wording only and does not prove approved runtime lifecycle evidence, SDK/P0 progress, or public readiness",
+        "FName drift notes are reflection drift notes only and do not prove approved runtime lifecycle evidence, SDK/P0 progress, or public readiness",
         "does not prove UFunction object identity, FName indices, UProperty chains, parameter offsets, property order, field classes, or ParmsSize",
         "does not prove login/logout order, public principal validity, privacy-safe identity, or invalidation semantics",
         "does not replace core evidence, reflection inventory, sanitized snapshots, second-source evidence, runtime observation, or invalidation policy",
         "does not promote public identity, economy, runtime hooks, object lookup, ResourceHandle, or SDK surface",
         "does not promote permissions or commands",
         "does not promote mutation or return override",
-        "does not accept HandleNewPlayer or OnLogout as lifecycle anchors without reviewed layout evidence",
+        "does not accept HandleNewPlayer, CheckJoinInProgress, or OnLogout as lifecycle anchors without reviewed layout evidence",
     ]
     promotion_blockers = [
         "known_lifecycle_orientation_targets_not_in_closed_target_set",
@@ -293,6 +445,10 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "requires_principal_privacy_and_invalidation_policy_before_public_sdk_promotion",
         "requires_non_protected_core_evidence_pack",
         "requires_full_reflection_inventory_pack_for_players_identity_lifecycle_intake",
+        "check_join_in_progress_diagnostic_wording_is_not_approved_runtime_lifecycle_evidence",
+        "fname_drift_notes_are_not_approved_runtime_lifecycle_evidence",
+        "diagnostic_reflection_notes_do_not_count_toward_sdk_or_p0_progress",
+        "diagnostic_reflection_notes_do_not_clear_public_readiness",
     ]
     static_contract = build_contract(
         topic="player_identity_lifecycle_orientation",
@@ -334,11 +490,28 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "approved_runtime_lifecycle_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
+        "counts_as_approved_runtime_lifecycle_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_lifecycle_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_progress": False,
+        "counts_as_p0_progress": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "public_readiness_ready": False,
         "binary": str(resolved if resolved is not None else path),
         "binary_sha256": binary_sha256,
         "expected_binary_sha256": expected_sha256,
         "target_set": TARGET_SET,
         "checked_targets": checked_targets,
+        "approved_runtime_triplet_requirement": APPROVED_RUNTIME_TRIPLET_REQUIREMENT,
+        "lifecycle_source_policy": player_lifecycle_anchor_source_policy(),
+        "all_six_planning_gap_policy": ALL_SIX_PLANNING_GAP_POLICY,
+        "diagnostic_reflection_note_guardrails": list(DIAGNOSTIC_REFLECTION_NOTE_GUARDRAILS),
         "static_candidate_orientation_contract": static_contract,
         "blockers": blockers,
         "promotion_blockers": promotion_blockers,

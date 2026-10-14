@@ -27,7 +27,13 @@ write_obelisk_fixture() {
     local instance="${2:-arkserver2}"
     local experimental_markers="${3:-all}"
 
-    mkdir -p "${root}/logs/${instance}" "${root}/state/instances/${instance}"
+    mkdir -p \
+        "${root}/lib" \
+        "${root}/plugins" \
+        "${root}/config" \
+        "${root}/logs/${instance}" \
+        "${root}/state/instances/${instance}"
+    : > "${root}/lib/libobelisk.so"
     : > "${root}/state/instances/${instance}/enable-process-event-hook"
     : > "${root}/state/instances/${instance}/disable-plugins"
     case "${experimental_markers}" in

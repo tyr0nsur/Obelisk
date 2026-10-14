@@ -1,5 +1,6 @@
 #define OBELISK_TIMER_MANAGER_ENABLE_TEST_HOOKS
 #include "core/TimerManager.h"
+#include "core/GameplayCallbackScope.h"
 
 #include <atomic>
 #include <chrono>
@@ -25,6 +26,8 @@ namespace
         std::condition_variable Cv;
         int Count = 0;
         uint64_t LastTimerId = 0;
+        bool ScopeTracked = false;
+        bool GameplayDepthUnchanged = false;
     };
 
     void CountCallback(uint64_t timerId, void* userData)
@@ -34,6 +37,8 @@ namespace
             std::lock_guard<std::mutex> lock(state->Mutex);
             ++state->Count;
             state->LastTimerId = timerId;
+            state->ScopeTracked = Obelisk::Core::GameplayCallbackScope::Current() != nullptr;
+            state->GameplayDepthUnchanged = !Obelisk::Core::GameplayCallbackScope::IsInsideAnyCallback();
         }
         state->Cv.notify_all();
     }
@@ -179,6 +184,8 @@ namespace
             Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&]() { return state.Count == 1; }),
                     "one-shot timer did not fire");
             Require(state.LastTimerId == timerId, "one-shot timer callback received wrong id");
+            Require(state.ScopeTracked && state.GameplayDepthUnchanged,
+                    "timer callback must track its scope without changing gameplay cleanup depth");
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(25));

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -102,8 +104,62 @@ def approved_runtime_diagnosis(path: Path, *, ready: bool = True) -> dict:
         "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
+        "observed_runtime_cases": ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_OBSERVED_RUNTIME_CASES if ready else [],
+        "consumer_cases": ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_CONSUMER_CASES if ready else [],
         "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],
         "blockers": [] if ready else ["approved_runtime_manifest_not_accepted"],
+    }
+
+
+def hash_bound_player_identity_promotion_certificate_binding(path: Path) -> dict[str, str]:
+    reviewed_surface_hash = "1" * 64
+    review_record = {
+        "schema": ROUTE_GATE.PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_SCHEMA,
+        "artifact_id": ROUTE_GATE.PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_ID,
+        "surface": "obelisk.player_identity.v1",
+        "active_after_resolved_input": ROUTE_GATE.PLAYER_IDENTITY_PUBLIC_CONTRACT_REVIEW_INPUT,
+        "review_status": "reviewed",
+        "accepted_for_contract_review": True,
+        "next_blocker": "public_header_gate_missing",
+        "reviewed_surface_record_sha256": reviewed_surface_hash,
+        "resolved_decision_keys": list(ROUTE_GATE.PLAYER_IDENTITY_PUBLIC_CONTRACT_REVIEW_DECISION_KEYS),
+    }
+    for key in ROUTE_GATE.PLAYER_IDENTITY_CONTRACT_REVIEW_FALSE_KEYS:
+        review_record[key] = False
+    for key, expected in ROUTE_GATE.PLAYER_IDENTITY_CONTRACT_REVIEW_EXACT_FIELDS.items():
+        review_record[key] = expected
+    certificate = {
+        "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+        "surface_id": "obelisk.player_identity.v1",
+        "promotion_status": "promoted",
+        "v1_dependency_chain": ROUTE_GATE.CANONICAL_V1_DEPENDENCY_SEQUENCE,
+        "v1_dependency_chain_position": 1,
+        "required_by_surface": "obelisk.permissions_admin.v1",
+        "required_by_v1_dependency_chain_position": 2,
+        "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+        "reviewed_artifact_hash_policy": (
+            "must match the reviewed identity surface record hash carried by the certificate"
+        ),
+        "missing_mismatched_or_stale_certificate_counts": False,
+        "evidence": {
+            "reviewed_artifact_hash": reviewed_surface_hash,
+            "reviewed_surface_record_sha256": reviewed_surface_hash,
+            "promotion_evidence_kind": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_PROMOTION_EVIDENCE_KIND,
+            "semantic_proofs": sorted(
+                ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_REQUIRED_SEMANTIC_PROOFS
+            ),
+            "identity_public_contract_decision_record": review_record,
+            "identity_public_contract_decision_record_sha256": ROUTE_GATE.canonical_json_sha256(
+                review_record
+            ),
+        },
+    }
+    for key in ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_FALSE_KEYS:
+        certificate["evidence"][key] = False
+    path.write_text(json.dumps(certificate, sort_keys=True), encoding="utf-8")
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
     }
 
 
@@ -161,6 +217,141 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             text=True,
         )
 
+    def test_post_runtime_child_lock_quarantine_requires_locked_false_non_claiming_child(self) -> None:
+        check = {
+            "name": "permissions_admin_public_readiness",
+            "parse_error": None,
+            "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["permissions_admin_public_readiness"],
+            "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["permissions_admin_public_readiness"],
+            "dependency_chain_locked": True,
+            "current_route_blocker": "identity_public_contract_gate_missing",
+            "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "public_or_runtime_accounting_allowed": False,
+            "public_or_runtime_claims": [],
+            "blockers": sorted(ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_CHILD_LOCK_BLOCKERS),
+        }
+
+        self.assertTrue(ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(check))
+
+        check["public_or_runtime_claims"] = sorted(
+            ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_CHILD_LOCK_CLAIMS
+        )
+        self.assertTrue(ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(check))
+
+        check["public_or_runtime_claims"] = ["public_sdk_ready"]
+        self.assertFalse(ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(check))
+
+        check["public_or_runtime_claims"] = []
+        check["current_route_blocker"] = "public_header_gate_missing"
+        self.assertFalse(ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(check))
+
+        check["name"] = "commands_replies_public_readiness"
+        check["report_schema"] = ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["commands_replies_public_readiness"]
+        check["expected_schema"] = ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["commands_replies_public_readiness"]
+        check["current_route_blocker"] = "identity_public_contract_gate_missing"
+        check["blockers"] = sorted(
+            ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_CHILD_LOCK_BLOCKERS
+            | ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_RESPONSE_REPORT_DERIVED_BLOCKERS
+        )
+        self.assertFalse(ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(check))
+        self.assertTrue(
+            ROUTE_GATE.locked_child_post_runtime_identity_contract_quarantined(
+                check,
+                response_path_report_quarantined=True,
+            )
+        )
+
+    def test_post_runtime_identity_gap_quarantine_requires_exact_contract_lock(self) -> None:
+        report = {
+            "status": "blocked",
+            "current_blocker": "identity_public_contract_gate_missing",
+            "next_blocker": "identity_public_contract_gate_missing",
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "public_api_ready": False,
+            "runtime_ready": False,
+            "v1_completion_evidence": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "p0_progress_ready": False,
+            "sdk_p0_progress_ready": False,
+            "identity_public_contract_gate_missing": {"active": True},
+            "post_approved_runtime_evidence_gate": {
+                "active": True,
+                "next_blocker": "identity_public_contract_gate_missing",
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+            },
+            "post_approved_runtime_evidence_route_check": {
+                "contract_review_input_present": True,
+                "gap_report_valid": False,
+                "invalid_gap_report": True,
+                "diagnostic_current_blocker": "identity_public_contract_gate_missing",
+                "diagnostic_next_blocker": "identity_public_contract_gate_missing",
+                "remaining_route_blocker_is_legitimate": False,
+                "legitimate_remaining_route_blocker": None,
+            },
+            "post_runtime_public_identity_gap_summary": {
+                "active": True,
+                "current_blocker": "identity_public_contract_gate_missing",
+                "next_blocker": "identity_public_contract_gate_missing",
+                "only_valid_post_runtime_route": "identity_public_contract_gate_missing",
+                "approved_runtime_bundle_consumed": True,
+                "approved_runtime_evidence_scope": "consume_only_contract_review_input",
+                "permissions_admin_opened": False,
+                "permissions_admin_ready": False,
+                "command_chat_response_ready": False,
+                "commands_replies_ready": False,
+                "promotion_ready": False,
+                "public_contract_allowed": False,
+                "public_header_allowed": False,
+                "public_abi_ready": False,
+                "public_api_ready": False,
+                "public_sdk_ready": False,
+                "public_readiness": False,
+                "runtime_ready": False,
+                "runtime_readiness": False,
+                "lookup_ready": False,
+                "permissions_ready": False,
+                "commands_ready": False,
+            },
+        }
+        check = {
+            "name": "player_identity_public_contract_gap",
+            "parse_error": None,
+            "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["player_identity_public_contract_gap"],
+            "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["player_identity_public_contract_gap"],
+            "public_or_runtime_claims": sorted(
+                ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_GAP_CHECK_CLAIMS
+            ),
+            "blockers": sorted(ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_GAP_CHECK_BLOCKERS),
+            "report_payload": report,
+        }
+
+        self.assertTrue(ROUTE_GATE.identity_gap_post_runtime_contract_lock_quarantined(check))
+
+        overclaim = copy.deepcopy(check)
+        overclaim["public_or_runtime_claims"] = ["public_sdk_ready"]
+        self.assertFalse(ROUTE_GATE.identity_gap_post_runtime_contract_lock_quarantined(overclaim))
+
+        wrong_blocker = copy.deepcopy(check)
+        wrong_blocker["report_payload"]["current_blocker"] = "approved_runtime_evidence_missing"
+        self.assertFalse(ROUTE_GATE.identity_gap_post_runtime_contract_lock_quarantined(wrong_blocker))
+
+        ready_flag = copy.deepcopy(check)
+        ready_flag["report_payload"]["post_runtime_public_identity_gap_summary"]["public_sdk_ready"] = True
+        self.assertFalse(ROUTE_GATE.identity_gap_post_runtime_contract_lock_quarantined(ready_flag))
+
     def test_identity_lock_mode_accepts_default_route_at_runtime_evidence_blocker(self) -> None:
         args = SimpleNamespace(
             player_identity_lifecycle_anchor_candidates_manifest=None,
@@ -210,6 +401,36 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertIn("critical_path_approved_runtime_evidence_report_schema_mismatch", blockers)
         self.assertIn("critical_path_approved_runtime_evidence_counts_toward_runtime_not_false", blockers)
+
+    def test_identity_lock_rejects_accepted_runtime_diagnosis_with_handoff_or_p0_progress(self) -> None:
+        approved_runtime = Path("approved-runtime.json")
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+        phase = {
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_approved_runtime_evidence_manifest": {
+                **approved_runtime_diagnosis(approved_runtime),
+                "handoff_notes": {"status": "accepted"},
+                "side_lane_artifact": {"progress": "1/4"},
+                "p0_dependency_chain_claim_progress_contribution": 1,
+            },
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn("critical_path_approved_runtime_evidence_public_or_runtime_claim", blockers)
+        self.assertIn(
+            "critical_path_approved_runtime_evidence_p0_dependency_chain_claim_progress_contribution_not_zero",
+            blockers,
+        )
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'identity_public_contract_gate_missing'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
 
     def test_lifecycle_provenance_route_lock_skips_downstream_p0_children(self) -> None:
         args = SimpleNamespace(
@@ -449,6 +670,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "window_request",
                 {"operator": "operator_approval_request"},
                 "observer_window_env",
+                "runtime_principal_lifecycle_start_end_evidence",
+                "public_readiness",
                 "source_marker",
             ]
         }
@@ -456,6 +679,156 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         claims = ROUTE_GATE.collect_public_or_runtime_claims(payload, include_text_claims=False)
 
         self.assertEqual(["runtime_evidence_source"], claims)
+
+    def test_collect_claims_allows_approved_runtime_evidence_blocker_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "first_evidence_boundary": {
+                    "approved_runtime_evidence_missing": True,
+                },
+                "header_gate": {
+                    "approved_runtime_evidence_required_before_header_gate": True,
+                },
+                "approved_runtime_evidence_ready": True,
+                "approved_runtime_evidence_accepted": True,
+            },
+            include_text_claims=False,
+        )
+
+        self.assertNotIn("first_evidence_boundary.approved_runtime_evidence_missing", claims)
+        self.assertNotIn("header_gate.approved_runtime_evidence_required_before_header_gate", claims)
+        self.assertIn("approved_runtime_evidence_ready", claims)
+        self.assertIn("approved_runtime_evidence_accepted", claims)
+
+    def test_collect_claims_rejects_notice_status_aliases(self) -> None:
+        payload = {
+            "playerNoticeActionStatus": "sent",
+            "noticeActionResult": "accepted",
+            "player_notice": {"deliveryStatus": "delivered"},
+            "notice_bundle_accepted": True,
+            "approved_runtime_evidence_accepted": True,
+            "beta_notice_send_attestation": {
+                "mode": "confirmed_send",
+                "status": "confirmed_send",
+            },
+            "beta_notice_sent": True,
+            "confirmed_beta_notice_sent": True,
+            "approved_bundle_request_accepted": True,
+            "approved_runtime_bundle_request_accepted": True,
+            "public_reachability": {"status": "reachable"},
+            "public_readiness": {"status": "ready"},
+            "route_simulation": {"status": "accepted", "progress": "1/12"},
+            "post_evidence_identity_lock": {
+                "identity_lock_ready": True,
+                "p0_dependency_chain_progress_contribution": 1,
+            },
+            "source_marker": "public_sdk_ready",
+            "source_status": "supported",
+            "source_marker_pair": {
+                "source_marker": "generic_command_planning_package",
+                "status": "accepted",
+            },
+            "source_marker_list_pair": {
+                "source_markers": ["route_snapshot"],
+                "source_state": "ready",
+            },
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            payload,
+            include_text_claims=False,
+        )
+
+        self.assertEqual(
+            [
+                "approved_bundle_request_accepted",
+                "approved_runtime_bundle_request_accepted",
+                "approved_runtime_evidence_accepted",
+                "beta_notice_send_attestation.mode",
+                "beta_notice_send_attestation.status",
+                "beta_notice_sent",
+                "confirmed_beta_notice_sent",
+                "noticeActionResult",
+                "notice_bundle_accepted",
+                "playerNoticeActionStatus",
+                "player_notice.deliveryStatus",
+                "post_evidence_identity_lock.identity_lock_ready",
+                "post_evidence_identity_lock.p0_dependency_chain_progress_contribution",
+                "public_reachability",
+                "public_reachability.status",
+                "public_readiness",
+                "public_readiness.status",
+                "route_simulation.progress",
+                "route_simulation.status",
+                "source_marker",
+                "source_marker_list_pair.source_state",
+                "source_marker_pair.status",
+                "source_status",
+            ],
+            claims,
+        )
+
+    def test_collect_claims_rejects_provenance_status_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "route_snapshot_provenance": {
+                    "source_provenance": "route_snapshot",
+                    "status": "accepted",
+                },
+                "accepted_runtime_evidence_provenance": {
+                    "source_provenance": "accepted_runtime_evidence_only",
+                    "source_status": "ready",
+                },
+                "reviewed_contract_metadata_provenance": {
+                    "source_provenance": "reviewed_hash_current_contract_review_only",
+                    "state": "reviewed",
+                },
+            },
+            include_text_claims=False,
+        )
+
+        self.assertIn("route_snapshot_provenance.status", claims)
+        self.assertIn("accepted_runtime_evidence_provenance.source_status", claims)
+        self.assertIn("reviewed_contract_metadata_provenance.state", claims)
+
+    def test_materialized_runtime_evidence_route_context_uses_canonical_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "public-sdk-surfaces-route-context.json"
+            path, context, blockers = ROUTE_GATE.materialize_route_context_surfaces(
+                PUBLIC_SDK_SURFACES,
+                output,
+                approved_runtime_evidence_accepted=True,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        identity = next(
+            surface
+            for surface in payload["surfaces"]
+            if surface["id"] == "obelisk.player_identity.v1"
+        )
+        accepted = identity["evidence"]["accepted_runtime_evidence"]
+        binding = accepted["approved_runtime_evidence_binding"]
+
+        self.assertEqual([], blockers)
+        self.assertTrue(context["accepted_runtime_evidence_context"])
+        self.assertEqual(ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_INPUT_SCHEMA, accepted["schema"])
+        self.assertTrue(accepted["approved_runtime_evidence_binding_required"])
+        self.assertEqual(ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_BINDING_SCHEMA, binding["schema"])
+        self.assertEqual(
+            ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_BINDING_RESOLVED_INPUT,
+            binding["resolved_input"],
+        )
+        self.assertEqual("identity_public_contract_gate_missing", binding["next_blocker"])
+        self.assertEqual(
+            ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_BINDING_SCOPE,
+            binding["binding_scope"],
+        )
+        for key in ROUTE_GATE.APPROVED_RUNTIME_EVIDENCE_BINDING_FALSE_FLAGS:
+            self.assertFalse(binding[key], key)
+        self.assertEqual(
+            [],
+            ROUTE_GATE.collect_public_or_runtime_claims(accepted, include_text_claims=True),
+        )
 
     def test_accepts_current_route_as_planning_only(self) -> None:
         result = self.run_checker("--json")
@@ -472,6 +845,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["counts_toward_public_sdk"])
         self.assertFalse(report["counts_toward_runtime"])
         self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["counts_toward_complete_sdk_claim"])
+        self.assertFalse(report["counts_toward_p0_dependency_chain_claim"])
+        self.assertFalse(report["p0_progress_ready"])
+        self.assertFalse(report["sdk_p0_progress_ready"])
+        self.assertEqual(0, report["complete_sdk_claim_progress_contribution"])
+        self.assertEqual(0, report["p0_dependency_chain_claim_progress_contribution"])
         self.assertFalse(report["public_or_runtime_accounting_allowed"])
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
@@ -498,7 +877,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual(8, len(report["checks"]))
+        self.assertEqual(7, len(report["checks"]))
         self.assertEqual(
             "approved_runtime_evidence_missing",
             report["critical_path_phase"]["current_blocker"],
@@ -523,9 +902,31 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             },
             report["route_lock"],
         )
+        post_evidence = report["post_evidence_p0_lock_simulation"]
+        self.assertEqual(
+            "obelisk.command-permission-route-post-evidence-p0-lock-simulation.v1",
+            post_evidence["schema"],
+        )
+        self.assertTrue(post_evidence["simulation_only"])
+        self.assertFalse(post_evidence["approved_runtime_evidence_accepted"])
+        self.assertEqual("approved_runtime_evidence_missing", post_evidence["current_route_blocker"])
+        self.assertEqual(
+            "identity_public_contract_gate_missing",
+            post_evidence["simulated_route_blocker_after_accepted_runtime_evidence"],
+        )
+        self.assertTrue(post_evidence["identity_public_contract_required"])
+        self.assertFalse(post_evidence["permissions_admin_unlocked"])
+        self.assertFalse(post_evidence["command_response_unlocked"])
+        self.assertFalse(post_evidence["commands_replies_unlocked"])
+        self.assertFalse(post_evidence["public_sdk_ready"])
+        self.assertFalse(post_evidence["runtime_ready"])
+        self.assertFalse(post_evidence["counts_toward_complete_sdk_claim"])
+        self.assertFalse(post_evidence["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(0, post_evidence["complete_sdk_claim_progress_contribution"])
+        self.assertEqual(0, post_evidence["p0_dependency_chain_claim_progress_contribution"])
         check_names = {check["name"] for check in report["checks"]}
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
-        self.assertIn("player_identity_public_contract_gap", check_names)
+        self.assertNotIn("player_identity_public_contract_gap", check_names)
         self.assertTrue(ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS.issubset(check_names))
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
@@ -607,6 +1008,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(report["route_lock_invariant_valid"])
         self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
         self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
+        self.assertEqual(
+            ROUTE_GATE.IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_REQUIREMENTS,
+            report["identity_public_contract_decision_record_required"],
+        )
         self.assertEqual("identity_public_contract_gate_missing", phase["current_blocker"])
         self.assertEqual("identity_public_contract_gate_missing", phase["source_checker_primary_blocker"])
         self.assertEqual(["identity_public_contract_gate_missing"], phase["source_checker_blockers"])
@@ -614,12 +1019,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             child = next(check for check in report["checks"] if check["name"] == check_name)
             self.assertIn("--current-route-blocker", child["argv"])
             self.assertEqual(
-                "approved_runtime_evidence_missing",
+                "identity_public_contract_gate_missing",
                 child["argv"][child["argv"].index("--current-route-blocker") + 1],
                 child,
             )
-            self.assertEqual("approved_runtime_evidence_missing", child["current_route_blocker"], child)
-            self.assertEqual(["approved_runtime_evidence_missing"], child["remaining_route_blockers"], child)
+            self.assertEqual("identity_public_contract_gate_missing", child["current_route_blocker"], child)
+            self.assertEqual(["identity_public_contract_gate_missing"], child["remaining_route_blockers"], child)
             self.assertFalse(child["counts_toward_public_sdk"], child)
             self.assertFalse(child["counts_toward_runtime"], child)
             self.assertFalse(child["counts_toward_v1_completion"], child)
@@ -639,6 +1044,211 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
             },
             report["route_lock"],
+        )
+        post_evidence = report["post_evidence_p0_lock_simulation"]
+        self.assertTrue(post_evidence["simulation_only"])
+        self.assertTrue(post_evidence["approved_runtime_evidence_accepted"])
+        self.assertEqual("identity_public_contract_gate_missing", post_evidence["current_route_blocker"])
+        self.assertEqual(
+            ROUTE_GATE.IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_REQUIREMENTS,
+            post_evidence["required_identity_public_contract_decision_record"],
+        )
+        self.assertEqual(
+            ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_REQUIREMENTS,
+            post_evidence["required_player_identity_promotion_certificate"],
+        )
+        self.assertNotIn(
+            "promotion_status",
+            post_evidence["required_player_identity_promotion_certificate"],
+        )
+        self.assertIn(
+            "promotion_status",
+            post_evidence["required_player_identity_promotion_certificate"][
+                "required_certificate_fields"
+            ],
+        )
+        self.assertEqual(
+            [
+                "reviewed_identity_public_contract_decision_record",
+                "hash_current_source_artifacts",
+                "contract_review_only_scope",
+                "hash_bound_player_identity_promotion_certificate",
+            ],
+            post_evidence["cannot_unlock_without"],
+        )
+        self.assertFalse(post_evidence["identity_public_contract_decision_record_reviewed"])
+        self.assertFalse(post_evidence["identity_public_contract_decision_record_hash_current"])
+        self.assertFalse(post_evidence["identity_public_contract_decision_record_contract_review_only"])
+        self.assertFalse(post_evidence["reviewed_hash_current_contract_review_only"])
+        self.assertFalse(post_evidence["player_identity_promotion_certificate_accepted"])
+        self.assertFalse(post_evidence["player_identity_promotion_certificate_hash_bound"])
+        self.assertFalse(post_evidence["player_identity_promotion_certificate_promoted"])
+        self.assertFalse(post_evidence["permissions_admin_unlock_has_hash_bound_player_identity_promotion_certificate"])
+        self.assertEqual(
+            "identity_public_contract_gate_missing",
+            post_evidence["simulated_route_blocker_after_accepted_runtime_evidence"],
+        )
+        self.assertTrue(post_evidence["identity_public_contract_required"])
+        self.assertFalse(post_evidence["permissions_admin_unlocked"])
+        self.assertFalse(post_evidence["command_response_unlocked"])
+        self.assertFalse(post_evidence["commands_replies_unlocked"])
+        self.assertFalse(post_evidence["identity_evidence_only_unblocks_p0"])
+        self.assertFalse(post_evidence["identity_evidence_only_unlocks_permissions_admin"])
+        self.assertFalse(post_evidence["identity_evidence_only_unlocks_command_response"])
+        self.assertFalse(post_evidence["identity_evidence_only_unlocks_commands_replies"])
+        self.assertFalse(post_evidence["promotion_ready"])
+        self.assertFalse(post_evidence["public_sdk_ready"])
+        self.assertFalse(post_evidence["public_abi_ready"])
+        self.assertFalse(post_evidence["runtime_ready"])
+        self.assertFalse(post_evidence["stable_claim_allowed"])
+        self.assertEqual(0, post_evidence["complete_sdk_claim_progress_contribution"])
+        self.assertEqual(0, post_evidence["p0_dependency_chain_claim_progress_contribution"])
+        self.assertEqual(len(ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS), len(post_evidence["p0_child_checks"]))
+        for child in post_evidence["p0_child_checks"]:
+            requirement = ROUTE_GATE.POST_EVIDENCE_P0_CHILD_GATE_REQUIREMENTS[child["name"]]
+            self.assertTrue(child["present"], child)
+            self.assertEqual(requirement["surface"], child["surface"], child)
+            self.assertEqual(
+                requirement["required_before_unlocking"],
+                child["required_before_unlocking"],
+                child,
+            )
+            self.assertTrue(child["own_gate_required"], child)
+            self.assertFalse(child["accepted_runtime_identity_evidence_only_unlock_allowed"], child)
+            self.assertFalse(child["identity_evidence_shortcut_allowed"], child)
+            self.assertEqual("identity_public_contract_gate_missing", child["current_route_blocker"], child)
+            self.assertEqual(["identity_public_contract_gate_missing"], child["remaining_route_blockers"], child)
+            self.assertTrue(child["dependency_chain_locked"], child)
+            self.assertFalse(child["counts_toward_public_sdk"], child)
+            self.assertFalse(child["counts_toward_runtime"], child)
+            self.assertFalse(child["counts_toward_v1_completion"], child)
+            self.assertFalse(child["public_or_runtime_accounting_allowed"], child)
+
+    def test_post_evidence_simulation_expanded_aliases_stay_false_and_zero(self) -> None:
+        simulation = ROUTE_GATE.build_post_evidence_p0_lock_simulation(
+            critical_path_phase=identity_phase(),
+            checks=[],
+            approved_runtime_evidence_accepted=False,
+        )
+
+        for key in ROUTE_GATE.POST_EVIDENCE_P0_LOCK_FALSE_KEYS:
+            with self.subTest(key=key):
+                self.assertFalse(simulation[key])
+        for key in ROUTE_GATE.POST_EVIDENCE_P0_LOCK_ZERO_KEYS:
+            with self.subTest(key=key):
+                self.assertEqual(0, simulation[key])
+
+        simulation["live_ops_authorized"] = True
+        simulation["counts_toward_complete_sdk_claim_now"] = True
+        simulation["identity_public_contract_decision_record_reviewed"] = True
+        simulation["identity_public_contract_decision_record_hash_current"] = True
+        simulation["identity_public_contract_decision_record_contract_review_only"] = True
+        simulation["reviewed_hash_current_contract_review_only"] = True
+        simulation["player_identity_promotion_certificate_hash_bound"] = True
+        simulation["progress"] = "1/12"
+        blockers = ROUTE_GATE.validate_post_evidence_p0_lock_simulation(simulation)
+
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_live_ops_authorized_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_counts_toward_complete_sdk_claim_now_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_identity_public_contract_decision_record_reviewed_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_identity_public_contract_decision_record_hash_current_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_identity_public_contract_decision_record_contract_review_only_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_reviewed_hash_current_contract_review_only_not_false",
+            blockers,
+        )
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_player_identity_promotion_certificate_hash_bound_not_false",
+            blockers,
+        )
+        self.assertIn("post_evidence_p0_lock_simulation_progress_not_zero", blockers)
+
+        simulation = ROUTE_GATE.build_post_evidence_p0_lock_simulation(
+            critical_path_phase=identity_phase("identity_public_contract_gate_missing"),
+            checks=[],
+            approved_runtime_evidence_accepted=True,
+        )
+        simulation["required_identity_public_contract_decision_record"] = {
+            **ROUTE_GATE.IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_REQUIREMENTS,
+            "hash_bound_to_current_source_artifacts": False,
+        }
+        simulation["required_player_identity_promotion_certificate"] = {
+            **ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_REQUIREMENTS,
+            "missing_mismatched_or_stale_certificate_counts": True,
+        }
+        simulation["cannot_unlock_without"] = ["reviewed_identity_public_contract_decision_record"]
+        blockers = ROUTE_GATE.validate_post_evidence_p0_lock_simulation(simulation)
+        self.assertIn("post_evidence_p0_lock_simulation_decision_record_requirements_mismatch", blockers)
+        self.assertIn(
+            "post_evidence_p0_lock_simulation_identity_promotion_certificate_requirements_mismatch",
+            blockers,
+        )
+        self.assertIn("post_evidence_p0_lock_simulation_cannot_unlock_without_mismatch", blockers)
+
+    def test_post_evidence_simulation_rejects_child_identity_evidence_shortcut(self) -> None:
+        checks = [
+            {
+                "name": name,
+                "current_route_blocker": "identity_public_contract_gate_missing",
+                "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+                "dependency_chain_locked": True,
+                "counts_toward_public_sdk": False,
+                "counts_toward_runtime": False,
+                "counts_toward_v1_completion": False,
+                "public_or_runtime_accounting_allowed": False,
+            }
+            for name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS
+        ]
+        simulation = ROUTE_GATE.build_post_evidence_p0_lock_simulation(
+            critical_path_phase=identity_phase("identity_public_contract_gate_missing"),
+            checks=checks,
+            approved_runtime_evidence_accepted=True,
+        )
+        child = next(
+            item
+            for item in simulation["p0_child_checks"]
+            if item["name"] == "permissions_admin_public_readiness"
+        )
+        child["required_before_unlocking"] = ["accepted_runtime_identity_evidence"]
+        child["own_gate_required"] = False
+        child["accepted_runtime_identity_evidence_only_unlock_allowed"] = True
+        child["identity_evidence_shortcut_allowed"] = True
+
+        blockers = ROUTE_GATE.validate_post_evidence_p0_lock_simulation(simulation)
+
+        self.assertIn(
+            "permissions_admin_public_readiness: post-evidence child required gates mismatch",
+            blockers,
+        )
+        self.assertIn(
+            "permissions_admin_public_readiness: post-evidence child own gate must stay required",
+            blockers,
+        )
+        self.assertIn(
+            (
+                "permissions_admin_public_readiness: post-evidence child "
+                "accepted_runtime_identity_evidence_only_unlock_allowed must stay false"
+            ),
+            blockers,
+        )
+        self.assertIn(
+            "permissions_admin_public_readiness: post-evidence child identity_evidence_shortcut_allowed must stay false",
+            blockers,
         )
 
     def test_route_checks_forwards_approved_runtime_evidence_to_identity_gap_report(self) -> None:
@@ -692,7 +1302,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertNotIn("--approved-runtime-evidence", argv)
 
-    def test_approved_runtime_evidence_rejects_identity_contract_child_route_locks(self) -> None:
+    def test_approved_runtime_evidence_rejects_stale_runtime_child_route_locks(self) -> None:
         original_run_check = ROUTE_GATE.run_check
 
         def identity_contract_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
@@ -702,8 +1312,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 result["valid"] = True
                 result["blockers"] = []
             if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
-                result["current_route_blocker"] = "identity_public_contract_gate_missing"
-                result["remaining_route_blockers"] = ["identity_public_contract_gate_missing"]
+                result["current_route_blocker"] = "approved_runtime_evidence_missing"
+                result["remaining_route_blockers"] = ["approved_runtime_evidence_missing"]
             return result
 
         args = SimpleNamespace(
@@ -934,10 +1544,22 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 player_identity_lifecycle_anchor_candidates_manifest=None,
                 player_identity_principal_invalidation_policy_manifest=None,
                 player_identity_runtime_principal_lifecycle_evidence_manifest=None,
-                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=Path(tmp)
+                / "approved-runtime-principal-lifecycle.json",
                 json=True,
             )
-            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+            args.player_identity_approved_runtime_principal_lifecycle_evidence_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                ROUTE_GATE,
+                "build_critical_path_phase",
+                return_value=identity_phase(
+                    "identity_public_contract_gate_missing",
+                    approved_runtime_path=args.player_identity_approved_runtime_principal_lifecycle_evidence_manifest,
+                ),
+            ):
                 report = ROUTE_GATE.build_report(args)
 
             self.assertFalse(report["valid"])
@@ -1335,6 +1957,84 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             claims,
         )
 
+    def test_build_critical_path_phase_rejects_passive_or_diagnostic_identity_evidence_claims(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "primary_blocker": "identity_public_contract_gate_missing",
+                        "blockers": ["identity_public_contract_gate_missing"],
+                        "lifecycle_anchor_candidates_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+                        ),
+                        "principal_invalidation_policy_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+                        ),
+                        "status": "blocked",
+                        "ready": False,
+                        "accepted_for_internal_planning": False,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "first_evidence": {
+                            "approved_runtime_principal_lifecycle_evidence_manifest": {
+                                "identity_claim_source": "diagnostic_observer_triage",
+                                "public_identity_evidence_source_schema": (
+                                    "obelisk.player-principal-passive-snapshot.v1"
+                                ),
+                                "notes": [
+                                    "diagnostic observer triage is approved runtime evidence",
+                                    "passive snapshot does not count as approved runtime evidence",
+                                ],
+                            }
+                        },
+                    }
+                ),
+                stderr="",
+            )
+
+        args = SimpleNamespace(
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=Path("approved-runtime.json"),
+        )
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase(args)
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        claims = phase["source_checker_public_or_runtime_claims"]
+        self.assertIn("critical_path_identity_readiness_public_or_runtime_claim", blockers)
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.identity_claim_source",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest."
+            "public_identity_evidence_source_schema",
+            claims,
+        )
+        self.assertIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.notes[0]:positive_text_claim",
+            claims,
+        )
+        self.assertNotIn(
+            "first_evidence.approved_runtime_principal_lifecycle_evidence_manifest.notes[1]:positive_text_claim",
+            claims,
+        )
+
     def test_build_critical_path_phase_rejects_identity_readiness_text_overclaims(self) -> None:
         original_run = ROUTE_GATE.subprocess.run
 
@@ -1661,6 +2361,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "v1_completion_ready": True,
                 "v1SupportReady": True,
                 "v1_sdk_ready": True,
+                "sdkReady": True,
                 "publicSdkReady": True,
                 "publicHeaderReady": "ready",
                 "routeReady": True,
@@ -1668,6 +2369,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "publicRouteReady": True,
                 "permissionsAdminRouteReady": True,
                 "complete_sdk_ready": True,
+                "complete": True,
                 "full_api_supported": True,
                 "production_support_ready": True,
                 "stable_sdk_allowed": "ready",
@@ -1711,6 +2413,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("v1_completion_ready", claims)
         self.assertIn("v1SupportReady", claims)
         self.assertIn("v1_sdk_ready", claims)
+        self.assertIn("sdkReady", claims)
         self.assertIn("publicSdkReady", claims)
         self.assertIn("publicHeaderReady", claims)
         self.assertIn("routeReady", claims)
@@ -1718,6 +2421,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("publicRouteReady", claims)
         self.assertIn("permissionsAdminRouteReady", claims)
         self.assertIn("complete_sdk_ready", claims)
+        self.assertIn("complete", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)
         self.assertIn("stable_sdk_allowed", claims)
@@ -1732,6 +2436,787 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("route_gate_non_counting_counts_toward_public_sdk", claims)
         self.assertIn("route_gate_public_or_runtime_accounting_allowed", claims)
         self.assertIn("dependency_chain_unlocked", claims)
+
+    def test_collect_public_or_runtime_claims_allows_requirement_and_negative_guardrails_only(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "post_approved_runtime_evidence_gate": {
+                    "offline_preparation": {
+                        "must_bind_to_approved_runtime_evidence": True,
+                        "does_not_unlock_identity_public_contract_gate": True,
+                        "does_not_unlock_public_header_gate": True,
+                    }
+                },
+                "post_identity_query_only_diagnostics": {
+                    "diagnostic_only": True,
+                    "next_gate": {"requires_public_header_review": True},
+                },
+                "runtime_work_authorized": True,
+                "package_shape_ready": True,
+                "public_sdk_ready": True,
+            }
+        )
+
+        self.assertNotIn(
+            "post_approved_runtime_evidence_gate.offline_preparation.must_bind_to_approved_runtime_evidence",
+            claims,
+        )
+        self.assertNotIn(
+            "post_approved_runtime_evidence_gate.offline_preparation.does_not_unlock_identity_public_contract_gate",
+            claims,
+        )
+        self.assertNotIn("post_identity_query_only_diagnostics.diagnostic_only", claims)
+        self.assertNotIn("post_identity_query_only_diagnostics.next_gate.requires_public_header_review", claims)
+        self.assertIn("runtime_work_authorized", claims)
+        self.assertIn("package_shape_ready", claims)
+        self.assertIn("public_sdk_ready", claims)
+
+    def test_next_action_sequence_allows_planning_text_but_rejects_counting_fields(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "next_action_sequence": [
+                    {
+                        "description": "public SDK is ready after this planning sequence",
+                        "runtimeEvidenceReady": True,
+                        "countsAsRuntimeEvidence": True,
+                        "countsTowardCompleteSdkClaim": True,
+                        "completeSdkClaimProgressContribution": 1,
+                        "p0DependencyChainClaimProgressContribution": "1/4",
+                        "pluginHubReady": True,
+                        "pluginHubPublicationAllowed": True,
+                        "publicationAuthorized": True,
+                    }
+                ]
+            }
+        )
+
+        self.assertNotIn("next_action_sequence[0].description:positive_text_claim", claims)
+        for claim in (
+            "next_action_sequence[0].runtimeEvidenceReady",
+            "next_action_sequence[0].countsAsRuntimeEvidence",
+            "next_action_sequence[0].countsTowardCompleteSdkClaim",
+            "next_action_sequence[0].completeSdkClaimProgressContribution",
+            "next_action_sequence[0].p0DependencyChainClaimProgressContribution",
+            "next_action_sequence[0].pluginHubReady",
+            "next_action_sequence[0].pluginHubPublicationAllowed",
+            "next_action_sequence[0].publicationAuthorized",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_claims_keeps_planning_acceptance_separate_from_artifact_progress(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "accepted_for_planning": True,
+                "planning_acceptance": {
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "public_sdk_ready": False,
+                    "p0_dependency_chain_claim_progress_contribution": 0,
+                },
+                "terminal_certificate_metadata": {
+                    "status": "issued",
+                    "accepted_for_planning": True,
+                },
+                "package_shape_evidence": {
+                    "status": "accepted",
+                    "accepted_for_planning": True,
+                },
+                "response_planning_report": {
+                    "status": "accepted",
+                    "accepted_for_planning": True,
+                },
+                "response_status_report": {"status": "ready"},
+                "routeClearedForPublicSendChatAbi": True,
+                "scopedStatementReady": True,
+                "status_report": {"status": "ready"},
+                "child_checker_placeholder": {
+                    "status": "placeholder",
+                    "accepted_for_planning": True,
+                },
+                "split": [
+                    {"field": "terminalCertificateMetadata", "status": "issued"},
+                    {"field": "packageShapeEvidence", "status": "accepted"},
+                    {"field": "responsePlanningReport", "status": "accepted"},
+                    {"field": "route_cleared", "status": "ready"},
+                    {"field": "scoped_statement_counts_toward_completion", "value": True},
+                    {"field": "childCheckerPlaceholder", "status": "placeholder"},
+                ],
+            }
+        )
+
+        self.assertNotIn("accepted_for_planning", claims)
+        self.assertNotIn("planning_acceptance.accepted_for_planning", claims)
+        self.assertNotIn("planning_acceptance.public_sdk_ready", claims)
+        self.assertNotIn(
+            "planning_acceptance.p0_dependency_chain_claim_progress_contribution",
+            claims,
+        )
+        for claim in (
+            "terminal_certificate_metadata",
+            "terminal_certificate_metadata.status",
+            "package_shape_evidence",
+            "package_shape_evidence.status",
+            "response_planning_report",
+            "response_planning_report.status",
+            "response_status_report",
+            "response_status_report.status",
+            "routeClearedForPublicSendChatAbi",
+            "scopedStatementReady",
+            "status_report",
+            "status_report.status",
+            "child_checker_placeholder",
+            "child_checker_placeholder.status",
+            "split[0]",
+            "split[1]",
+            "split[2]",
+            "split[3]",
+            "split[4]",
+            "split[5]",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_public_or_runtime_claims_rejects_post_evidence_contract_review_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "post_evidence_p0_lock_simulation": {
+                    "identity_contract_decision_record_reviewed": True,
+                    "identity_contract_decision_record_hash_current": True,
+                    "identity_contract_decision_record_contract_review_only": True,
+                    "identity_public_contract_decision_record_reviewed": True,
+                    "identity_public_contract_decision_record_hash_current": True,
+                    "identity_public_contract_decision_record_contract_review_only": True,
+                    "identity_public_contract_record_reviewed": True,
+                    "reviewedIdentityPublicContract": True,
+                    "reviewedIdentityPublicContractDecisionRecord": True,
+                    "hashCurrentIdentityPublicContractDecisionRecord": True,
+                    "reviewed_hash_current_contract_review_only": True,
+                    "notes": ["identity contract decision record reviewed"],
+                }
+            }
+        )
+
+        self.assertIn("post_evidence_p0_lock_simulation.identity_contract_decision_record_reviewed", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_contract_decision_record_hash_current", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_contract_decision_record_contract_review_only", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_public_contract_decision_record_reviewed", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_public_contract_decision_record_hash_current", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_public_contract_decision_record_contract_review_only", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.identity_public_contract_record_reviewed", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.reviewedIdentityPublicContract", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.reviewedIdentityPublicContractDecisionRecord", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.hashCurrentIdentityPublicContractDecisionRecord", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.reviewed_hash_current_contract_review_only", claims)
+        self.assertIn("post_evidence_p0_lock_simulation.notes[0]:positive_text_claim", claims)
+
+    def test_collect_public_or_runtime_claims_accepts_post_approved_runtime_route_check_diagnostics(
+        self,
+    ) -> None:
+        diagnostic = {
+            "post_approved_runtime_evidence_route_check": {
+                "runtime_evidence_accepted": True,
+                "gap_report_valid": True,
+                "invalid_gap_report": False,
+                "invalid_gap_report_blockers": [],
+                "diagnostic_current_blocker": "identity_public_contract_gate_missing",
+                "diagnostic_next_blocker": "identity_public_contract_gate_missing",
+                "legitimate_remaining_route_blocker": "identity_public_contract_gate_missing",
+                "remaining_route_blocker_is_legitimate": True,
+                "identity_contract_gate_complete": False,
+                "blocked_surfaces_must_remain_false": [
+                    "public_identity",
+                    "lookup",
+                    "public_api",
+                    "public_abi",
+                    "public_header",
+                    "runtime_readiness",
+                    "sdk_readiness",
+                    "permissions_admin",
+                    "command_chat",
+                    "v1_completion",
+                    "p0_progress",
+                ],
+                "non_claim": (
+                    "identity_public_contract_gate_missing remains the only legitimate route "
+                    "blocker after accepted runtime evidence; no downstream surface is unlocked"
+                ),
+            }
+        }
+
+        self.assertEqual([], ROUTE_GATE.collect_public_or_runtime_claims(diagnostic))
+
+        overclaim = copy.deepcopy(diagnostic)
+        route_check = overclaim["post_approved_runtime_evidence_route_check"]
+        route_check["public_sdk_ready"] = True
+        route_check["runtime_ready"] = True
+        route_check["p0_dependency_chain_claim_progress_contribution"] = "1/4"
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(overclaim)
+
+        self.assertIn("post_approved_runtime_evidence_route_check.public_sdk_ready", claims)
+        self.assertIn("post_approved_runtime_evidence_route_check.runtime_ready", claims)
+        self.assertIn(
+            "post_approved_runtime_evidence_route_check.p0_dependency_chain_claim_progress_contribution",
+            claims,
+        )
+
+    def test_collect_public_or_runtime_claims_rejects_decision_record_metadata_p0_credit(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "identity_public_contract_decision_record": {
+                    "status": "reviewed_hash_current_contract_review_only",
+                    "credit": 1,
+                    "readiness_credit": "1/4",
+                    "percent": "25%",
+                    "p0": "ready",
+                    "zero_credit": 0,
+                    "zero_percent": "0%",
+                    "zero_p0": "0/4",
+                },
+                "split_metadata": [
+                    {
+                        "property": "reviewed_hash_current_contract_review_only",
+                        "value": "1/4",
+                    },
+                    {
+                        "property": "reviewed_hash_current_contract_review_only",
+                        "value": "p0 ready",
+                    },
+                    {
+                        "property": "reviewed_hash_current_contract_review_only",
+                        "value": "reviewed",
+                    },
+                ],
+            },
+            include_text_claims=False,
+        )
+
+        for claim in (
+            "identity_public_contract_decision_record.credit",
+            "identity_public_contract_decision_record.readiness_credit",
+            "identity_public_contract_decision_record.percent",
+            "identity_public_contract_decision_record.p0",
+            "split_metadata[0]",
+            "split_metadata[0].value",
+            "split_metadata[1]",
+            "split_metadata[1].value",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+        self.assertNotIn("identity_public_contract_decision_record.zero_credit", claims)
+        self.assertNotIn("identity_public_contract_decision_record.zero_percent", claims)
+        self.assertNotIn("identity_public_contract_decision_record.zero_p0", claims)
+
+    def test_collect_public_or_runtime_claims_accepts_blocked_decision_record_metadata_only(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "first_evidence": {
+                    "public_contract_gap_report": {
+                        "identity_public_contract_decision_record": {
+                            "provided": True,
+                            "record_valid": True,
+                            "reviewed_hash_current_contract_review_only": True,
+                            "accepted_for_contract_review": False,
+                            "review_inputs_non_counting_until": "runtime.lifecycle_evidence",
+                            "promotion_ready": False,
+                            "public_sdk_ready": False,
+                            "runtime_ready": False,
+                        }
+                    }
+                }
+            },
+            include_text_claims=False,
+        )
+        self.assertEqual([], claims)
+
+        accepted_claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "identity_public_contract_decision_record": {
+                    "reviewed_hash_current_contract_review_only": True,
+                    "accepted_for_contract_review": True,
+                    "review_inputs_non_counting_until": None,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                }
+            },
+            include_text_claims=False,
+        )
+        self.assertIn(
+            "identity_public_contract_decision_record.reviewed_hash_current_contract_review_only",
+            accepted_claims,
+        )
+
+    def test_collect_public_or_runtime_claims_rejects_plain_identity_certificate_status_metadata(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "player_identity_promotion_certificate": {
+                    "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "status": "promoted",
+                    "hash_bound_to_current_source_artifacts": True,
+                    "required_by_surface": "obelisk.permissions_admin.v1",
+                },
+                "player_identity_public_contract_status": {
+                    "status": "reviewed",
+                    "artifact_status": "reviewed",
+                },
+            },
+            include_text_claims=False,
+        )
+
+        self.assertIn("player_identity_promotion_certificate", claims)
+        self.assertIn("player_identity_promotion_certificate.promotion_status", claims)
+        self.assertIn("player_identity_promotion_certificate.status", claims)
+        self.assertIn("player_identity_promotion_certificate.hash_bound_to_current_source_artifacts", claims)
+        self.assertIn("player_identity_public_contract_status.status", claims)
+
+    def test_collect_public_or_runtime_claims_allows_hash_bound_identity_promotion_certificate_binding(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binding = hash_bound_player_identity_promotion_certificate_binding(
+                Path(temp_dir) / "player-identity-promotion-certificate.json"
+            )
+            claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"player_identity_promotion_certificate": binding},
+                include_text_claims=False,
+            )
+
+        self.assertEqual([], claims)
+
+    def test_collect_public_or_runtime_claims_rejects_unbound_identity_promotion_certificate_reference(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binding = hash_bound_player_identity_promotion_certificate_binding(
+                Path(temp_dir) / "player-identity-promotion-certificate.json"
+            )
+            binding["sha256"] = "f" * 64
+            claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"player_identity_promotion_certificate": binding},
+                include_text_claims=False,
+            )
+
+        self.assertIn("player_identity_promotion_certificate", claims)
+
+    def test_collect_public_or_runtime_claims_rejects_post_runtime_shortcut_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "post_runtime_shortcuts": {
+                    "contract_reviewed": True,
+                    "identity_contract_hash_current": True,
+                    "header_shape_valid": True,
+                    "p0_unlocked": "identity",
+                    "blocker_resolved": "runtime",
+                    "public": {"surface": {"status": "accepted"}},
+                    "split": [
+                        {"claim": "p0_unlocked", "value": "identity"},
+                        {"field": "blocker_resolved", "status": "runtime"},
+                    ],
+                }
+            }
+        )
+
+        for claim in (
+            "post_runtime_shortcuts.contract_reviewed",
+            "post_runtime_shortcuts.identity_contract_hash_current",
+            "post_runtime_shortcuts.header_shape_valid",
+            "post_runtime_shortcuts.p0_unlocked",
+            "post_runtime_shortcuts.blocker_resolved",
+            "post_runtime_shortcuts.public.surface.status",
+            "post_runtime_shortcuts.split[0]",
+            "post_runtime_shortcuts.split[1]",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_public_or_runtime_claims_rejects_scoped_release_statement_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "aliases": {
+                    "scopedReleaseStatementReady": True,
+                    "scoped_release_statement_counts_toward_complete_sdk_claim": True,
+                    "scoped_release_statement_outcomes_satisfy_completion": True,
+                },
+                "split_claims": [
+                    {"claim": "scoped_release_statement_ready", "value": "ready"},
+                ],
+                "notes": [
+                    "scoped release statement unlocks v1 completion",
+                    "scoped release statement counts toward public SDK",
+                    "scoped release statements cannot unlock P0 progress",
+                ],
+            }
+        )
+
+        self.assertIn("aliases.scopedReleaseStatementReady", claims)
+        self.assertIn("aliases.scoped_release_statement_counts_toward_complete_sdk_claim", claims)
+        self.assertIn("aliases.scoped_release_statement_outcomes_satisfy_completion", claims)
+        self.assertIn("split_claims[0]", claims)
+        self.assertIn("notes[0]:positive_text_claim", claims)
+        self.assertIn("notes[1]:positive_text_claim", claims)
+        self.assertNotIn("notes[2]:positive_text_claim", claims)
+
+    def test_collect_public_or_runtime_claims_rejects_final_authz_response_path_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "aliases": {
+                    "finalGateReady": True,
+                    "authzReady": True,
+                    "responsePathComplete": True,
+                },
+                "split_claims": [
+                    {"field": "finalGateReady", "status": "ready"},
+                    {"field": "authzReady", "value": True},
+                    {"field": "responsePathComplete", "state": "complete"},
+                ],
+                "notes": [
+                    "final gate ready now",
+                    "authz ready now",
+                    "response path complete now",
+                    "response path remains blocked until predecessor certificates",
+                ],
+            }
+        )
+
+        for claim in (
+            "aliases.finalGateReady",
+            "aliases.authzReady",
+            "aliases.responsePathComplete",
+            "split_claims[0]",
+            "split_claims[1]",
+            "split_claims[2]",
+            "notes[0]:positive_text_claim",
+            "notes[1]:positive_text_claim",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+        self.assertNotIn("notes[2]:positive_text_claim", claims)
+        self.assertNotIn("notes[3]:positive_text_claim", claims)
+
+    def test_collect_public_or_runtime_claims_rejects_package_shape_runtime_simulation_aliases(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "acceptedRuntimeSimulationReady": True,
+                "accepted_runtime_simulation": {"status": "accepted"},
+                "activation_precondition_report": {"status": "ready"},
+                "beta_notice_action_report": {"status": "accepted"},
+                "bridge_report": {"progress": "1/4", "status": "ready"},
+                "compact_context": {"status": "accepted"},
+                "copied_log_only": {"status": "ready"},
+                "handoff_notes": {"status": "accepted"},
+                "notice_action_report": {"status": "accepted"},
+                "passive_summary": {"status": "ready"},
+                "precondition_artifact": {"progress": "1/3"},
+                "pluginHubPlanningReady": True,
+                "plugin_hub_planning": {"status": "ready"},
+                "side_lane_artifact": {"progress": "1/4", "status": "ready"},
+                "support_tier_report": {"status": "supported"},
+                "supportTierReadinessReady": True,
+                "supportTierPackageReady": True,
+                "package_shape_support": {"status": "supported"},
+                "support_tier_package_shape": {"status": "supported"},
+                "packageShapeAccepted": True,
+                "public_contract_record_package": {"status": "accepted"},
+                "request_pack_public_contract_record": {"status": "accepted"},
+                "commandPlanningReady": True,
+                "command_planning_package": {"status": "ready"},
+                "command_response_planning_package": {"status": "ready"},
+                "copied_intent_package_shape": {"status": "ready"},
+                "route_snapshot": {"status": "accepted"},
+                "aliases": [
+                    {"field": "bridge_report", "status": "ready"},
+                    {"field": "compact_context", "status": "accepted"},
+                    {"field": "support_tier_report", "status": "supported"},
+                    {"field": "activation_precondition_report", "status": "ready"},
+                    {"field": "notice_action_report", "status": "accepted"},
+                    {"field": "plugin_hub_planning", "status": "supported"},
+                    {"field": "support_tier_package_shape", "status": "supported"},
+                    {"field": "accepted_runtime_simulation", "status": "accepted"},
+                    {"field": "command_planning_package", "status": "ready"},
+                    {"field": "route_snapshot", "status": "ready"},
+                ],
+                "notes": [
+                    "bridge report is ready",
+                    "activation precondition report is ready",
+                    "beta notice action report is accepted",
+                    "compact context is accepted for permissions/admin",
+                    "copied-log-only artifact is ready",
+                    "passive summary unlocks route readiness",
+                    "Plugin Hub planning is supported",
+                    "support tier report is supported",
+                    "package-shape support is ready",
+                    "support tier package shape is supported",
+                    "accepted runtime simulation is accepted",
+                    "package shape unlocks permissions/admin",
+                    "command planning is ready",
+                    "route snapshot is accepted",
+                    "handoff notes are accepted for permissions/admin",
+                    "side-lane artifact unlocks route",
+                    "support tier package shape remains blocked",
+                    "command planning remains blocked",
+                ],
+            }
+        )
+
+        for claim in (
+            "acceptedRuntimeSimulationReady",
+            "accepted_runtime_simulation.status",
+            "activation_precondition_report.status",
+            "beta_notice_action_report.status",
+            "bridge_report.progress",
+            "bridge_report.status",
+            "compact_context",
+            "compact_context.status",
+            "copied_log_only",
+            "copied_log_only.status",
+            "handoff_notes.status",
+            "notice_action_report.status",
+            "passive_summary.status",
+            "precondition_artifact.progress",
+            "pluginHubPlanningReady",
+            "plugin_hub_planning",
+            "plugin_hub_planning.status",
+            "side_lane_artifact.progress",
+            "side_lane_artifact.status",
+            "support_tier_report.status",
+            "supportTierReadinessReady",
+            "supportTierPackageReady",
+            "package_shape_support.status",
+            "support_tier_package_shape.status",
+            "packageShapeAccepted",
+            "public_contract_record_package.status",
+            "request_pack_public_contract_record.status",
+            "commandPlanningReady",
+            "command_planning_package.status",
+            "command_response_planning_package.status",
+            "copied_intent_package_shape.status",
+            "route_snapshot.status",
+            "aliases[0]",
+            "aliases[1]",
+            "aliases[2]",
+            "aliases[3]",
+            "aliases[4]",
+            "aliases[5]",
+            "aliases[6]",
+            "aliases[7]",
+            "aliases[8]",
+            "aliases[9]",
+        ):
+            self.assertIn(claim, claims)
+        for index in range(16):
+            self.assertIn(f"notes[{index}]:positive_text_claim", claims)
+        self.assertNotIn("notes[16]:positive_text_claim", claims)
+        self.assertNotIn("notes[17]:positive_text_claim", claims)
+
+    def test_collect_public_or_runtime_claims_rejects_downstream_route_shortcut_status_aliases(
+        self,
+    ) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "identity_public_contract_gate_missing": {
+                    "source_ready": True,
+                    "ready": True,
+                    "status": "ready",
+                },
+                "public_reachability_status": {"source_ready": True, "status": "reachable"},
+                "rcon_status": {"source_ready": True, "status": "ready"},
+                "admin_snapshot": {"source_ready": True, "status": "ready"},
+                "adminStatusSnapshotReady": True,
+                "server_list_players": {"source_ready": True, "status": "ready"},
+                "serverKickPlayerReady": True,
+                "broadcast_status": {"ready": True, "status": "enabled"},
+                "package_support_plugin": {
+                    "plugin_hub_support_ready": True,
+                    "support_tier_ready": True,
+                },
+                "split_claims": [
+                    {"field": "identity_public_contract_gate_missing", "source_ready": True},
+                    {"field": "public_reachability", "ready": True},
+                    {"field": "rcon_route", "status": "ready"},
+                    {"field": "admin_snapshot", "status": "ready"},
+                    {"field": "ServerListPlayers", "status": "ready"},
+                    {"field": "ServerKickPlayer", "status": "ready"},
+                    {"field": "broadcast_status", "status": "enabled"},
+                    {"field": "package_shape_support", "source_ready": True},
+                    {"field": "plugin_hub_package_shape", "ready": True},
+                ],
+            }
+        )
+
+        for claim in (
+            "identity_public_contract_gate_missing",
+            "public_reachability_status",
+            "public_reachability_status.source_ready",
+            "rcon_status",
+            "rcon_status.source_ready",
+            "admin_snapshot",
+            "admin_snapshot.source_ready",
+            "adminStatusSnapshotReady",
+            "server_list_players",
+            "server_list_players.source_ready",
+            "serverKickPlayerReady",
+            "broadcast_status",
+            "package_support_plugin.plugin_hub_support_ready",
+            "package_support_plugin.support_tier_ready",
+            "split_claims[0]",
+            "split_claims[1]",
+            "split_claims[2]",
+            "split_claims[3]",
+            "split_claims[4]",
+            "split_claims[5]",
+            "split_claims[6]",
+            "split_claims[7]",
+            "split_claims[8]",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_public_or_runtime_claims_rejects_multi_surface_pack_route_overclaims(self) -> None:
+        safe_claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "multi_surface_beta_capture_pack": {
+                    "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                    "status": "candidate_capture_pack",
+                    "candidate_only": True,
+                    "requires_checker_acceptance": True,
+                    "counts_as_approved_runtime_evidence": False,
+                    "counts_as_runtime_evidence": False,
+                    "counts_as_sdk_progress": False,
+                    "counts_as_p0_progress": False,
+                    "approved_runtime_evidence_missing": True,
+                    "remaining_route_blockers": ["approved_runtime_evidence_missing"],
+                },
+                "notes": [
+                    "multi-surface beta capture plan remains candidate-only and non-counting",
+                ],
+            }
+        )
+        self.assertEqual([], safe_claims)
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "multi_surface_beta_capture_pack": {
+                    "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                    "status": "candidate_capture_pack",
+                    "current_blocker": "cleared",
+                    "route_ready": True,
+                    "sdk_progress": "1/12",
+                    "public_readiness": "ready",
+                },
+                "multi_surface_beta_capture_plan_queue": {
+                    "schema": "obelisk.multi-surface-beta-capture-plan-queue.v1",
+                    "status": "ready",
+                    "queueStatus": "ready",
+                    "approved_runtime_evidence_missing": False,
+                    "approvedRuntimeEvidenceMissingCleared": True,
+                    "clearsApprovedRuntimeEvidenceMissing": True,
+                    "current_route_blocker": "identity_public_contract_gate_missing",
+                    "remaining_route_blockers": [],
+                    "completeSdkClaimProgressContribution": "1/12",
+                    "p0DependencyChainClaimProgressRatio": "1/4",
+                    "candidate_surfaces": [
+                        {
+                            "surface": "permissions_admin",
+                            "captureReady": True,
+                            "countsTowardSdk": True,
+                            "mutationAuthorityReady": True,
+                        }
+                    ],
+                },
+                "source_pair": {
+                    "source_provenance": "multi_surface_beta_capture_pack",
+                    "source_status": "accepted",
+                },
+                "split_claims": [
+                    {"field": "multiSurfaceBetaCapturePlanQueue", "status": "ready"},
+                ],
+                "notes": [
+                    "multi-surface beta capture pack is ready",
+                    "multi-surface beta capture plan clears approved_runtime_evidence_missing",
+                    "multi-surface beta capture plan remains candidate-only and non-counting",
+                ],
+            }
+        )
+
+        for claim in (
+            "multi_surface_beta_capture_pack.current_blocker",
+            "multi_surface_beta_capture_pack.public_readiness",
+            "multi_surface_beta_capture_pack.route_ready",
+            "multi_surface_beta_capture_pack.sdk_progress",
+            "multi_surface_beta_capture_plan_queue.status",
+            "multi_surface_beta_capture_plan_queue.queueStatus",
+            "multi_surface_beta_capture_plan_queue.approved_runtime_evidence_missing",
+            "multi_surface_beta_capture_plan_queue.approvedRuntimeEvidenceMissingCleared",
+            "multi_surface_beta_capture_plan_queue.clearsApprovedRuntimeEvidenceMissing",
+            "multi_surface_beta_capture_plan_queue.current_route_blocker",
+            "multi_surface_beta_capture_plan_queue.remaining_route_blockers",
+            "multi_surface_beta_capture_plan_queue.completeSdkClaimProgressContribution",
+            "multi_surface_beta_capture_plan_queue.p0DependencyChainClaimProgressRatio",
+            "multi_surface_beta_capture_plan_queue.candidate_surfaces[0].captureReady",
+            "multi_surface_beta_capture_plan_queue.candidate_surfaces[0].countsTowardSdk",
+            "multi_surface_beta_capture_plan_queue.candidate_surfaces[0].mutationAuthorityReady",
+            "source_pair.source_status",
+            "split_claims[0]",
+            "notes[0]:positive_text_claim",
+            "notes[1]:positive_text_claim",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+        self.assertNotIn("multi_surface_beta_capture_pack", claims)
+        self.assertNotIn("multi_surface_beta_capture_plan_queue", claims)
+        self.assertNotIn("notes[2]:positive_text_claim", claims)
+
+    def test_collect_public_or_runtime_claims_handles_public_identity_non_promotional_reasons(self) -> None:
+        safe_claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "public_identity_non_promotional_reasons": [
+                    "no public identity is promoted",
+                    "public identity remains blocked pending reviewed identity-contract evidence",
+                    "identity promotion remains blocked until the public contract gate is reviewed",
+                    "header, capability, and callback topics remain closed",
+                ]
+            }
+        )
+        self.assertEqual([], safe_claims)
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "public_identity_non_promotional_reasons": [
+                    "public identity is ready",
+                    "public player identity is promoted",
+                    "identity promotion is ready",
+                ],
+                "publicIdentityReady": True,
+                "playerIdentityPromoted": True,
+            }
+        )
+
+        self.assertIn("public_identity_non_promotional_reasons[0]:positive_text_claim", claims)
+        self.assertIn("public_identity_non_promotional_reasons[1]:positive_text_claim", claims)
+        self.assertIn("public_identity_non_promotional_reasons[2]:positive_text_claim", claims)
+        self.assertIn("publicIdentityReady", claims)
+        self.assertIn("playerIdentityPromoted", claims)
+
+    def test_collect_public_or_runtime_claims_accepts_public_header_contract_scan_diagnostics(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "owner_token_sdk_consumer_contract": {
+                    "public_header_contract_scan": {
+                        "path": "include/obelisk/ObeliskApi.h",
+                        "readable": True,
+                        "detected_identity_owner_token_symbols": [],
+                        "owner_token_registration_symbols": [],
+                        "borrowed_runtime_pointer_exposures": [],
+                    }
+                }
+            }
+        )
+
+        self.assertEqual([], claims)
 
     def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
@@ -1783,6 +3268,52 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.authz_principal_source", claims)
         self.assertNotIn("nested.candidate_source", claims)
 
+    def test_collect_public_or_runtime_claims_rejects_passive_or_diagnostic_identity_evidence_aliases(
+        self,
+    ) -> None:
+        payload = {
+            "nested": {
+                "identity_claim_source": "diagnostic_observer_triage",
+                "publicIdentityEvidenceSourceSchema": "obelisk.player-principal-passive-snapshot.v1",
+                "principal_evidence_source": "passive_snapshot_diff",
+                "evidence_classification": "passive_snapshot_non_evidence",
+                "diagnostic_only_non_evidence": True,
+                "schema": "obelisk.player-principal-passive-snapshot.v1",
+                "drift_summary": {
+                    "classification": "diagnostic_only_non_evidence",
+                    "source_kind": "passive_snapshot",
+                },
+                "notes": [
+                    "diagnostic observer triage is approved runtime evidence",
+                    "approved runtime evidence is derived from passive snapshot diff",
+                    "passive snapshot does not count as approved runtime evidence",
+                ],
+            },
+            "split": [
+                {
+                    "field": "public_identity_evidence_source_schema",
+                    "value": "obelisk.player-principal-passive-snapshot-diff.v1",
+                },
+                {"name": "identity_claim_source", "status": "diagnostic_triage"},
+            ],
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(payload)
+
+        self.assertIn("nested.identity_claim_source", claims)
+        self.assertIn("nested.publicIdentityEvidenceSourceSchema", claims)
+        self.assertIn("nested.principal_evidence_source", claims)
+        self.assertIn("nested.evidence_classification", claims)
+        self.assertIn("nested.diagnostic_only_non_evidence", claims)
+        self.assertIn("nested.drift_summary.classification", claims)
+        self.assertIn("nested.drift_summary.source_kind", claims)
+        self.assertIn("nested.notes[0]:positive_text_claim", claims)
+        self.assertIn("nested.notes[1]:positive_text_claim", claims)
+        self.assertNotIn("nested.notes[2]:positive_text_claim", claims)
+        self.assertNotIn("nested.schema:positive_text_claim", claims)
+        self.assertIn("split[0]", claims)
+        self.assertIn("split[1]", claims)
+
     def test_collect_public_or_runtime_claims_rejects_split_key_value_claims(self) -> None:
         payload = {
             "nested": [
@@ -1790,6 +3321,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 {"field": "public_reply_abi_allowed", "state": "ready"},
                 {"name": "identity_claim_source", "value": "runtime_lifecycle_evidence"},
                 {"claim": "principal-source", "status": "approved_runtime_principal_lifecycle_evidence"},
+                {"name": "sdkReady", "status": "ready"},
+                {"field": "complete", "value": True},
                 {"flag": "routeGateUnlocked", "enabled": "yes"},
                 {"key": "publicSdkReady", "value": False},
                 {"field": "identity_claim_source", "value": "unit-test-fixture"},
@@ -1803,8 +3336,77 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested[2]", claims)
         self.assertIn("nested[3]", claims)
         self.assertIn("nested[4]", claims)
-        self.assertNotIn("nested[5]", claims)
-        self.assertNotIn("nested[6]", claims)
+        self.assertIn("nested[5]", claims)
+        self.assertIn("nested[6]", claims)
+        self.assertNotIn("nested[7]", claims)
+        self.assertNotIn("nested[8]", claims)
+
+    def test_collect_public_or_runtime_claims_rejects_broad_downstream_aliases_and_progress(self) -> None:
+        payload = {
+            "nested": {
+                "permissionsAdminAccepted": True,
+                "commandResponsePromoted": {"status": "ready"},
+                "commandsRepliesPublicRuntimeReady": "ready",
+                "routeAcceptedAsCommandsRepliesReady": True,
+                "publicRuntimeReadinessPromoted": True,
+                "v1CompletionProgressContribution": "25%",
+                "p0DependencyChainProgressContribution": 1,
+                "promotedSurfaceCount": 1,
+                "promoted_surfaces_count": "1/4",
+                "surfacePromotionCount": 1,
+                "promotedSurfaceTotal": 1,
+                "promoted_surfaces_total": "1/4",
+                "surfacePromotionTotal": 1,
+                "promotedSurfaceCountZero": "0/4",
+                "promotedSurfaceTotalZero": "0/4",
+                "progress": "1/4",
+                "zeroProgress": "0%",
+                "blockedProgress": "blocked",
+                "runtimeEvidenceReady": True,
+            },
+            "split": [
+                {"field": "permissionsAdminPromoted", "status": "promoted"},
+                {"name": "commandsRepliesAccepted", "value": {"nested": {"state": "ready"}}},
+                {"key": "v1CompletionProgress", "value": "10%"},
+                {"claim": "publicSdkReady", "result": "accepted"},
+                {"field": "promotedSurfacesCount", "outcome": "approved"},
+                {"name": "runtimeReady", "claim_value": "validated"},
+                {"property": "countsTowardPublicSdk", "verdict": "yes"},
+                {"field": "commandResponsePromoted", "status": "blocked"},
+                {"field": "commandsRepliesPromoted", "result": "blocked"},
+            ],
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(payload)
+
+        self.assertIn("nested.permissionsAdminAccepted", claims)
+        self.assertIn("nested.commandResponsePromoted", claims)
+        self.assertIn("nested.commandsRepliesPublicRuntimeReady", claims)
+        self.assertIn("nested.routeAcceptedAsCommandsRepliesReady", claims)
+        self.assertIn("nested.publicRuntimeReadinessPromoted", claims)
+        self.assertIn("nested.v1CompletionProgressContribution", claims)
+        self.assertIn("nested.p0DependencyChainProgressContribution", claims)
+        self.assertIn("nested.promotedSurfaceCount", claims)
+        self.assertIn("nested.promoted_surfaces_count", claims)
+        self.assertIn("nested.surfacePromotionCount", claims)
+        self.assertIn("nested.promotedSurfaceTotal", claims)
+        self.assertIn("nested.promoted_surfaces_total", claims)
+        self.assertIn("nested.surfacePromotionTotal", claims)
+        self.assertIn("nested.progress", claims)
+        self.assertIn("split[0]", claims)
+        self.assertIn("split[1]", claims)
+        self.assertIn("split[2]", claims)
+        self.assertIn("split[3]", claims)
+        self.assertIn("split[4]", claims)
+        self.assertIn("split[5]", claims)
+        self.assertIn("split[6]", claims)
+        self.assertNotIn("nested.promotedSurfaceCountZero", claims)
+        self.assertNotIn("nested.promotedSurfaceTotalZero", claims)
+        self.assertNotIn("nested.zeroProgress", claims)
+        self.assertNotIn("nested.blockedProgress", claims)
+        self.assertNotIn("nested.runtimeEvidenceReady", claims)
+        self.assertNotIn("split[7]", claims)
+        self.assertNotIn("split[8]", claims)
 
     def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:
         original = ROUTE_GATE.run_check
@@ -1888,6 +3490,51 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 self.assertEqual(accepted_for_planning, result["accepted_for_planning"])
                 self.assertEqual([], result["public_or_runtime_claims"])
 
+    def test_run_check_rejects_child_downstream_unlock_aliases(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[
+                    "command_principal_authz_response_bridge"
+                ],
+                "valid": True,
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+                "dependency_chain_locked": True,
+                "current_route_blocker": "approved_runtime_evidence_missing",
+                "remaining_route_blockers": ["approved_runtime_evidence_missing"],
+                "counts_toward_public_sdk": False,
+                "counts_toward_runtime": False,
+                "counts_toward_v1_completion": False,
+                "public_or_runtime_accounting_allowed": False,
+                "commandResponseUnlocked": True,
+                "commandResponseReady": True,
+                "commandsRepliesUnlocked": True,
+                "commandsRepliesReady": True,
+                "responsePathReady": True,
+                "bridgeClaimsAllowed": True,
+            }
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("command_principal_authz_response_bridge", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertIn("commandResponseUnlocked", result["public_or_runtime_claims"])
+        self.assertIn("commandResponseReady", result["public_or_runtime_claims"])
+        self.assertIn("commandsRepliesUnlocked", result["public_or_runtime_claims"])
+        self.assertIn("commandsRepliesReady", result["public_or_runtime_claims"])
+        self.assertIn("responsePathReady", result["public_or_runtime_claims"])
+        self.assertIn("bridgeClaimsAllowed", result["public_or_runtime_claims"])
+
     def test_run_check_rejects_required_planning_only_child_missing_valid_field(self) -> None:
         original_run = ROUTE_GATE.subprocess.run
 
@@ -1913,6 +3560,43 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(result["planning_only"])
         self.assertTrue(result["accepted_for_planning"])
         self.assertEqual([], result["public_or_runtime_claims"])
+
+    def test_run_check_rejects_child_checker_placeholder_even_when_accepted_for_planning(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[
+                    "command_principal_authz_response_bridge"
+                ],
+                "valid": True,
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+                "child_checker_placeholder": {
+                    "status": "placeholder",
+                    "accepted_for_planning": True,
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                },
+            }
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("command_principal_authz_response_bridge", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertTrue(result["accepted_for_planning"])
+        self.assertIn("child_checker_placeholder", result["public_or_runtime_claims"])
+        self.assertIn("child_checker_placeholder.status", result["public_or_runtime_claims"])
 
     def test_run_check_rejects_required_locked_child_that_counts_while_identity_blocked(self) -> None:
         original_run = ROUTE_GATE.subprocess.run
@@ -1948,11 +3632,622 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(result["dependency_chain_locked"])
         self.assertTrue(result["counts_toward_public_sdk"])
 
+    def test_run_check_rejects_permissions_admin_plain_identity_certificate_metadata(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["permissions_admin_public_readiness"],
+                "valid": True,
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "dependency_chain_locked": True,
+                "current_route_blocker": "identity_public_contract_gate_missing",
+                "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+                "counts_toward_public_sdk": False,
+                "counts_toward_runtime": False,
+                "counts_toward_v1_completion": False,
+                "public_or_runtime_accounting_allowed": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+                "player_identity_promotion_certificate": {
+                    "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "status": "promoted",
+                    "hash_bound_to_current_source_artifacts": True,
+                    "required_by_surface": "obelisk.permissions_admin.v1",
+                },
+            }
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("permissions_admin_public_readiness", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertIn("player_identity_promotion_certificate", result["public_or_runtime_claims"])
+        self.assertIn(
+            "player_identity_promotion_certificate.promotion_status",
+            result["public_or_runtime_claims"],
+        )
+
+    def test_run_check_allows_permissions_admin_hash_bound_identity_certificate_metadata(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binding = hash_bound_player_identity_promotion_certificate_binding(
+                Path(temp_dir) / "player-identity-promotion-certificate.json"
+            )
+
+            def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+                report = {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["permissions_admin_public_readiness"],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "dependency_chain_locked": True,
+                    "current_route_blocker": "identity_public_contract_gate_missing",
+                    "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                    "public_or_runtime_accounting_allowed": False,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                    "blockers": [],
+                    "player_identity_promotion_certificate": binding,
+                }
+                return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+            try:
+                ROUTE_GATE.subprocess.run = fake_run
+                result = ROUTE_GATE.run_check("permissions_admin_public_readiness", ["unused.py", "--json"])
+            finally:
+                ROUTE_GATE.subprocess.run = original_run
+
+        self.assertTrue(result["valid"])
+        self.assertEqual([], result["public_or_runtime_claims"])
+
+    def test_collect_claims_rejects_certificate_builder_report_shortcuts(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "certificate_builder_report": {
+                    "schema": "obelisk.player-identity-promotion-certificate-build-report.v1",
+                    "status": "built",
+                    "identity_surface_certificate_binding_valid": True,
+                    "generated_certificate": {
+                        "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "hash_bound_to_current_source_artifacts": True,
+                    },
+                    "generated_certificate_reference": {
+                        "path": "/tmp/player-identity-promotion-certificate.json",
+                        "sha256": "0" * 64,
+                    },
+                }
+            },
+            include_text_claims=False,
+        )
+
+        self.assertIn(
+            "certificate_builder_report.identity_surface_certificate_binding_valid",
+            claims,
+        )
+        self.assertIn("certificate_builder_report.generated_certificate", claims)
+        self.assertIn(
+            "certificate_builder_report.generated_certificate.promotion_status",
+            claims,
+        )
+        self.assertIn(
+            "certificate_builder_report.generated_certificate.hash_bound_to_current_source_artifacts",
+            claims,
+        )
+        self.assertIn("certificate_builder_report.generated_certificate_reference", claims)
+        self.assertNotIn("certificate_builder_report.status", claims)
+
+    def test_collect_claims_rejects_post_runtime_bridge_certificate_reference_shortcuts(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "post_runtime_bridge_report": {
+                    "player_identity_certificate_reference": {
+                        "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                        "promotion_status": "promoted",
+                        "status": "promoted",
+                    },
+                    "post_identity_bridge": "hash_bound_player_identity_promotion_certificate",
+                }
+            },
+            include_text_claims=False,
+        )
+
+        self.assertIn("post_runtime_bridge_report.player_identity_certificate_reference", claims)
+        self.assertIn(
+            "post_runtime_bridge_report.player_identity_certificate_reference.promotion_status",
+            claims,
+        )
+        self.assertIn(
+            "post_runtime_bridge_report.player_identity_certificate_reference.status",
+            claims,
+        )
+        self.assertIn("post_runtime_bridge_report.post_identity_bridge", claims)
+
+    def test_collect_claims_rejects_decision_template_header_status_and_copy_shortcuts(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "identity_public_contract_decision_record_template": {
+                    "review_status": "reviewed",
+                    "hash_current": True,
+                    "decision_scope": "contract_review_only",
+                    "accepted_for_contract_review": True,
+                    "permissions_admin": {"status": "unlocked"},
+                },
+                "identity_claim_source": "public_header_gate_report",
+                "source_pair": {
+                    "source_provenance": "public_header_gate_report",
+                    "source_status": "ready",
+                },
+                "status_artifact": {"status": "ready"},
+                "copy_artifact": {"status": "accepted"},
+                "copied_runtime_status_report": {"status": "ready"},
+            },
+            include_text_claims=False,
+        )
+
+        for claim in (
+            "identity_public_contract_decision_record_template",
+            "identity_public_contract_decision_record_template.review_status",
+            "identity_public_contract_decision_record_template.hash_current",
+            "identity_public_contract_decision_record_template.decision_scope",
+            "identity_public_contract_decision_record_template.permissions_admin.status",
+            "identity_claim_source",
+            "source_pair.source_status",
+            "status_artifact",
+            "status_artifact.status",
+            "copy_artifact",
+            "copy_artifact.status",
+            "copied_runtime_status_report",
+            "copied_runtime_status_report.status",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_claims_allows_canonical_hash_bound_identity_certificate_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binding = hash_bound_player_identity_promotion_certificate_binding(
+                Path(temp_dir) / "player-identity-promotion-certificate.json"
+            )
+
+            claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"player_identity_promotion_certificate": binding},
+                include_text_claims=False,
+            )
+
+        self.assertEqual([], claims)
+
+    def test_collect_claims_rejects_minimal_identity_certificate_without_review_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            certificate_path = Path(temp_dir) / "player-identity-promotion-certificate.json"
+            reviewed_surface_hash = "1" * 64
+            certificate = {
+                "schema": ROUTE_GATE.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                "surface_id": "obelisk.player_identity.v1",
+                "promotion_status": "promoted",
+                "v1_dependency_chain": ROUTE_GATE.CANONICAL_V1_DEPENDENCY_SEQUENCE,
+                "v1_dependency_chain_position": 1,
+                "required_by_surface": "obelisk.permissions_admin.v1",
+                "required_by_v1_dependency_chain_position": 2,
+                "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+                "reviewed_artifact_hash_policy": (
+                    "must match the reviewed identity surface record hash carried by the certificate"
+                ),
+                "missing_mismatched_or_stale_certificate_counts": False,
+                "evidence": {
+                    "reviewed_artifact_hash": reviewed_surface_hash,
+                    "reviewed_surface_record_sha256": reviewed_surface_hash,
+                },
+            }
+            certificate_path.write_text(json.dumps(certificate, sort_keys=True), encoding="utf-8")
+            binding = {
+                "path": str(certificate_path),
+                "sha256": hashlib.sha256(certificate_path.read_bytes()).hexdigest(),
+            }
+
+            claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"player_identity_promotion_certificate": binding},
+                include_text_claims=False,
+            )
+
+        self.assertIn("player_identity_promotion_certificate", claims)
+
+    def test_collect_claims_rejects_generated_or_stale_identity_certificate_references(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            certificate_path = Path(temp_dir) / "player-identity-promotion-certificate.json"
+            binding = hash_bound_player_identity_promotion_certificate_binding(certificate_path)
+
+            generated_claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"generated_certificate": binding},
+                include_text_claims=False,
+            )
+            self.assertIn("generated_certificate", generated_claims)
+
+            certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+            certificate["current_reviewed_surface_record_sha256"] = "2" * 64
+            certificate_path.write_text(json.dumps(certificate, sort_keys=True), encoding="utf-8")
+            stale_binding = {
+                "path": str(certificate_path),
+                "sha256": hashlib.sha256(certificate_path.read_bytes()).hexdigest(),
+            }
+            stale_claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {"player_identity_promotion_certificate": stale_binding},
+                include_text_claims=False,
+            )
+
+        self.assertIn("player_identity_promotion_certificate", stale_claims)
+
+    def test_collect_claims_rejects_downstream_promotion_certificate_shortcuts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binding = hash_bound_player_identity_promotion_certificate_binding(
+                Path(temp_dir) / "player-identity-promotion-certificate.json"
+            )
+            claims = ROUTE_GATE.collect_public_or_runtime_claims(
+                {
+                    "child_report": {
+                        "hash_bound_player_identity_promotion_certificate": binding,
+                        "hash_bound_permissions_admin_promotion_certificate": binding,
+                        "hash_bound_command_chat_response_path_promotion_certificate": binding,
+                        "permissions_admin_promotion_certificate": binding,
+                        "command_response_promotion_certificate": "promoted",
+                        "promotion_certificate_ready": True,
+                        "p0_dependency_chain_claim_progress_contribution": 1,
+                        "source_kind": "hash_bound_permissions_admin_promotion_certificate",
+                        "split": [
+                            {
+                                "field": "command_response_promotion_certificate",
+                                "status": "promoted",
+                            },
+                            {
+                                "name": "hash_bound_command_chat_response_path_promotion_certificate",
+                                "value": binding,
+                            },
+                        ],
+                    }
+                },
+                include_text_claims=False,
+            )
+
+        self.assertNotIn(
+            "child_report.hash_bound_player_identity_promotion_certificate",
+            claims,
+        )
+        for claim in (
+            "child_report.hash_bound_permissions_admin_promotion_certificate",
+            "child_report.hash_bound_command_chat_response_path_promotion_certificate",
+            "child_report.permissions_admin_promotion_certificate",
+            "child_report.command_response_promotion_certificate",
+            "child_report.promotion_certificate_ready",
+            "child_report.p0_dependency_chain_claim_progress_contribution",
+            "child_report.source_kind",
+            "child_report.split[0]",
+            "child_report.split[1]",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, claims)
+
+    def test_collect_claims_allows_blocked_downstream_promotion_certificate_metadata(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "post_evidence_p0_lock_simulation": {
+                    "hash_bound_permissions_admin_promotion_certificate": False,
+                    "hash_bound_command_chat_response_path_promotion_certificate": False,
+                    "permissions_admin_promotion_certificate": False,
+                    "command_response_promotion_certificate": "blocked",
+                    "promotion_certificate_ready": False,
+                    "p0_dependency_chain_claim_progress_contribution": 0,
+                    "required_before_unlocking": [
+                        "hash_bound_player_identity_promotion_certificate",
+                        "permissions_admin_promotion_certificate",
+                        "command_chat_response_path_promotion_certificate",
+                    ],
+                    "requires_hash_bound_permissions_admin_promotion_certificate": True,
+                    "does_not_accept_downstream_promotion_certificate_aliases": True,
+                    "blockers": [
+                        "identity_public_contract_gate_missing",
+                        "permissions_admin_promotion_certificate_missing",
+                    ],
+                    "non_claim": (
+                        "downstream promotion certificates remain blocked until the canonical "
+                        "upstream identity gate is satisfied"
+                    ),
+                }
+            },
+            include_text_claims=True,
+        )
+
+        self.assertEqual([], claims)
+
+    def test_route_gate_rejects_child_source_kind_promotion_certificate_shortcut_despite_blockers(
+        self,
+    ) -> None:
+        original = ROUTE_GATE.run_check
+        with tempfile.TemporaryDirectory() as temp_dir:
+            approved_runtime_path = Path(temp_dir) / "approved-runtime.json"
+
+            def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+                payload: dict[str, object] = {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                    "blockers": [],
+                }
+                if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+                    payload.update(
+                        {
+                            "dependency_chain_locked": True,
+                            "current_route_blocker": "identity_public_contract_gate_missing",
+                            "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+                            "counts_toward_public_sdk": False,
+                            "counts_toward_runtime": False,
+                            "counts_toward_v1_completion": False,
+                            "public_or_runtime_accounting_allowed": False,
+                        }
+                    )
+                if name == "permissions_admin_public_readiness":
+                    payload.update(
+                        {
+                            "valid": False,
+                            "source_kind": "hash_bound_permissions_admin_promotion_certificate",
+                            "hash_bound_permissions_admin_promotion_certificate": False,
+                            "promotion_certificate_ready": False,
+                            "p0_dependency_chain_claim_progress_contribution": 0,
+                            "blockers": sorted(
+                                ROUTE_GATE.POST_RUNTIME_IDENTITY_CONTRACT_CHILD_LOCK_BLOCKERS
+                            ),
+                        }
+                    )
+                claims = ROUTE_GATE.collect_public_or_runtime_claims(payload)
+                blockers = payload.get("blockers", [])
+                return {
+                    "name": name,
+                    "argv": argv,
+                    "exit_code": 1 if name == "permissions_admin_public_readiness" else 0,
+                    "valid": not claims and payload.get("valid") is True and blockers == [],
+                    "report_schema": payload["schema"],
+                    "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "planning_only": payload.get("planning_only"),
+                    "accepted_for_planning": payload.get("accepted_for_planning"),
+                    "dependency_chain_locked": payload.get("dependency_chain_locked"),
+                    "current_route_blocker": payload.get("current_route_blocker"),
+                    "remaining_route_blockers": payload.get("remaining_route_blockers"),
+                    "counts_toward_public_sdk": payload.get("counts_toward_public_sdk"),
+                    "counts_toward_runtime": payload.get("counts_toward_runtime"),
+                    "counts_toward_v1_completion": payload.get("counts_toward_v1_completion"),
+                    "public_or_runtime_accounting_allowed": payload.get(
+                        "public_or_runtime_accounting_allowed"
+                    ),
+                    "public_or_runtime_claims": claims,
+                    "blockers": blockers,
+                    "parse_error": None,
+                    "stderr": "",
+                    "report_payload": payload,
+                }
+
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+                public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=(
+                    ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE
+                ),
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=(
+                    approved_runtime_path
+                ),
+                json=True,
+            )
+            try:
+                ROUTE_GATE.run_check = fake_run_check
+                with mock.patch.object(
+                    ROUTE_GATE,
+                    "build_critical_path_phase",
+                    return_value=identity_phase(
+                        "identity_public_contract_gate_missing",
+                        approved_runtime_path=approved_runtime_path,
+                    ),
+                ):
+                    report = ROUTE_GATE.build_report(args)
+            finally:
+                ROUTE_GATE.run_check = original
+
+        child = next(
+            check
+            for check in report["checks"]
+            if check["name"] == "permissions_admin_public_readiness"
+        )
+        self.assertFalse(report["valid"])
+        self.assertFalse(child["post_runtime_identity_contract_lock_quarantined"])
+        self.assertIn("source_kind", child["public_or_runtime_claims"])
+        self.assertIn(
+            "permissions_admin_public_readiness: child blockers not empty",
+            report["blockers"],
+        )
+        self.assertTrue(
+            any(
+                blocker.startswith(
+                    "permissions_admin_public_readiness: unexpected public/runtime claim: "
+                )
+                and "source_kind" in blocker
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
     def test_route_gate_composes_response_path_report_into_commands_replies(self) -> None:
         original = ROUTE_GATE.run_check
         seen_response_path_report = False
+        with tempfile.TemporaryDirectory() as temp_dir:
+            response_root = Path(temp_dir) / "response-root"
+            response_root.mkdir()
+            source_paths = {
+                "readiness_path": response_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME,
+                "decisions_path": response_root / "command_chat_response_public_contract_decisions.json",
+                "surfaces_path": response_root / "public_sdk_surfaces.json",
+                "public_header_path": response_root / "ObeliskApi.h",
+            }
+            for key, path in source_paths.items():
+                path.write_text(f"{key}\n", encoding="utf-8")
+            source_hashes = {
+                key: hashlib.sha256(path.read_bytes()).hexdigest()
+                for key, path in source_paths.items()
+            }
+
+            def base_result(name: str, argv: list[str]) -> dict[str, object]:
+                report_payload: dict[str, object] = {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "dependency_chain_locked": name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS,
+                    "current_route_blocker": (
+                        "approved_runtime_evidence_missing"
+                        if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS
+                        else None
+                    ),
+                    "remaining_route_blockers": (
+                        ["approved_runtime_evidence_missing"]
+                        if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS
+                        else None
+                    ),
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                    "public_or_runtime_accounting_allowed": False,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                    "public_header_allowed": False,
+                    "blockers": [],
+                }
+                return {
+                    "name": name,
+                    "argv": argv,
+                    "exit_code": 0,
+                    "valid": True,
+                    "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "planning_only": True,
+                    "accepted_for_planning": True,
+                    "dependency_chain_locked": report_payload["dependency_chain_locked"],
+                    "current_route_blocker": report_payload["current_route_blocker"],
+                    "remaining_route_blockers": report_payload["remaining_route_blockers"],
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                    "public_or_runtime_accounting_allowed": False,
+                    "public_or_runtime_claims": [],
+                    "blockers": [],
+                    "parse_error": None,
+                    "stderr": "",
+                    "report_payload": report_payload,
+                }
+
+            def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+                nonlocal seen_response_path_report
+                result = base_result(name, argv)
+                if name == "command_chat_response_public_readiness":
+                    payload = result["report_payload"]
+                    assert isinstance(payload, dict)
+                    payload.update(
+                        {
+                            "surface": "obelisk.command_chat_response_path.v1",
+                            "readiness_root": str(response_root),
+                            "readiness_path": str(source_paths["readiness_path"]),
+                            "decisions_path": str(source_paths["decisions_path"]),
+                            "surfaces_path": str(source_paths["surfaces_path"]),
+                            "public_header_path": str(source_paths["public_header_path"]),
+                            "source_artifact_hashes": source_hashes,
+                            "target_set": "command-chat-response-intake",
+                            "target_filters": [
+                                "ShooterPlayerController.ServerSendChatMessage",
+                                "ShooterPlayerController.ServerChatMessage_Impl",
+                            ],
+                            "readiness_status": "compared",
+                            "decisions_status": "blocked",
+                            "surfaces_status": "planning",
+                            "public_readiness_ready": False,
+                            "public_header_allowed": False,
+                            "promotion_ready": False,
+                            "public_sdk_ready": False,
+                            "public_abi_ready": False,
+                            "runtime_ready": False,
+                        }
+                    )
+                if name == "commands_replies_public_readiness":
+                    self.assertIn("--response-path-report", argv)
+                    self.assertIn("--response-path-report-root", argv)
+                    self.assertIn("--response-path-root", argv)
+                    self.assertIn("--response-path-readiness", argv)
+                    report_path = Path(argv[argv.index("--response-path-report") + 1])
+                    report_root = Path(argv[argv.index("--response-path-report-root") + 1])
+                    self.assertEqual(
+                        report_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_REPORT_NAME,
+                        report_path,
+                    )
+                    composed = json.loads(report_path.read_text(encoding="utf-8"))
+                    self.assertEqual(source_hashes, composed["source_artifact_hashes"])
+                    seen_response_path_report = True
+                return result
+
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+                public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                json=True,
+            )
+            try:
+                ROUTE_GATE.run_check = fake_run_check
+                with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                    report = ROUTE_GATE.build_report(args)
+            finally:
+                ROUTE_GATE.run_check = original
+
+        self.assertTrue(seen_response_path_report)
+        self.assertTrue(report["valid"], report["blockers"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertEqual([], report["blockers"])
+
+    def test_route_gate_does_not_synthesize_response_path_report_from_summary(self) -> None:
+        original = ROUTE_GATE.run_check
+        commands_replies_received_report = False
 
         def base_result(name: str, argv: list[str]) -> dict[str, object]:
+            locked = name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS
             return {
                 "name": name,
                 "argv": argv,
@@ -1962,6 +4257,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
                 "planning_only": True,
                 "accepted_for_planning": True,
+                "dependency_chain_locked": locked,
+                "current_route_blocker": "approved_runtime_evidence_missing" if locked else None,
+                "remaining_route_blockers": ["approved_runtime_evidence_missing"] if locked else None,
+                "counts_toward_public_sdk": False,
+                "counts_toward_runtime": False,
+                "counts_toward_v1_completion": False,
+                "public_or_runtime_accounting_allowed": False,
                 "public_or_runtime_claims": [],
                 "blockers": [],
                 "parse_error": None,
@@ -1971,50 +4273,43 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "valid": True,
                     "accepted_for_planning": True,
                     "planning_only": True,
+                    "dependency_chain_locked": locked,
+                    "current_route_blocker": "approved_runtime_evidence_missing" if locked else None,
+                    "remaining_route_blockers": ["approved_runtime_evidence_missing"] if locked else None,
+                    "counts_toward_public_sdk": False,
+                    "counts_toward_runtime": False,
+                    "counts_toward_v1_completion": False,
+                    "public_or_runtime_accounting_allowed": False,
                     "promotion_ready": False,
                     "public_sdk_ready": False,
                     "public_abi_ready": False,
                     "runtime_ready": False,
+                    "blockers": [],
                 },
             }
 
         def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
-            nonlocal seen_response_path_report
+            nonlocal commands_replies_received_report
             result = base_result(name, argv)
             if name == "command_chat_response_public_readiness":
-                result["report_payload"] = {
-                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
-                    "valid": True,
-                    "accepted_for_planning": True,
-                    "planning_only": True,
-                    "surface": "obelisk.command_chat_response_path.v1",
-                    "target_set": "command-chat-response-intake",
-                    "target_filters": [
-                        "ShooterPlayerController.ServerSendChatMessage",
-                        "ShooterPlayerController.ServerChatMessage_Impl",
-                    ],
-                    "readiness_status": "compared",
-                    "decisions_status": "blocked",
-                    "blockers": [],
-                    "public_readiness_ready": False,
-                    "public_header_allowed": False,
-                    "promotion_ready": True,
-                    "public_sdk_ready": False,
-                    "public_abi_ready": False,
-                    "runtime_ready": False,
-                }
+                payload = result["report_payload"]
+                assert isinstance(payload, dict)
+                payload.update(
+                    {
+                        "readiness_root": "/tmp/command-response-summary",
+                        "readiness_path": (
+                            f"/tmp/command-response-summary/"
+                            f"{ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME}"
+                        ),
+                        "public_readiness_ready": False,
+                        "public_header_allowed": False,
+                    }
+                )
             if name == "commands_replies_public_readiness":
-                self.assertIn("--response-path-report", argv)
-                self.assertIn("--response-path-report-root", argv)
-                report_path = Path(argv[argv.index("--response-path-report") + 1])
-                report_root = Path(argv[argv.index("--response-path-report-root") + 1])
-                self.assertEqual(report_root / "command-chat-response-public-readiness.json", report_path)
-                composed = json.loads(report_path.read_text(encoding="utf-8"))
-                seen_response_path_report = True
-                if composed.get("promotion_ready") is True:
-                    result["valid"] = False
-                    result["exit_code"] = 1
-                    result["blockers"] = ["response_path_report_promotion_ready_not_false"]
+                commands_replies_received_report = "--response-path-report" in argv
+                result["exit_code"] = 1
+                result["valid"] = False
+                result["blockers"] = ["response_path_report_required"]
             return result
 
         args = SimpleNamespace(
@@ -2034,11 +4329,21 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         finally:
             ROUTE_GATE.run_check = original
 
-        self.assertTrue(seen_response_path_report)
+        self.assertFalse(commands_replies_received_report)
         self.assertFalse(report["valid"])
-        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn(
+            "command_chat_response_public_readiness: source-artifact paths required before commands/replies handoff",
+            report["blockers"],
+        )
+        self.assertIn(
+            "command_chat_response_public_readiness: source-artifact hashes required before commands/replies handoff",
+            report["blockers"],
+        )
+        self.assertIn(
+            "commands_replies_public_readiness: missing composed response path report",
+            report["blockers"],
+        )
         self.assertIn("commands_replies_public_readiness: checker exited 1", report["blockers"])
-        self.assertIn("commands_replies_public_readiness: invalid route prerequisite", report["blockers"])
 
     def test_route_gate_rejects_split_command_response_child_context_even_if_children_pass(self) -> None:
         original = ROUTE_GATE.run_check

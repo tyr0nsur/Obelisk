@@ -31,13 +31,39 @@ Install the runtime and SDK package:
 ./scripts/install_obelisk.sh --backup-existing <obelisk-root>
 ```
 
+A successful installer exit means the expected runtime files, public header, CMake package
+files, and managed directories were published into the chosen central root. It is still
+package-shape evidence only: no runtime readiness, live-ops approval, stable release, SDK
+v1 completion, Plugin Hub readiness/publication, public module coverage, or support-tier
+activation follows from that install. Current package/install accounting remains SDK
+`0/12`, P0 `0/4`, stable `false`.
+This install guide also grants no live/server access: the latest release-readiness pass,
+release-readiness passes, `progress_normalization_trace`, source_overclaim diagnostics,
+`source_overclaim_total_flag_count=0`, beta notice drafts/actions, beta notices, passive
+waits/summaries/snapshots/triplets, the latest validation pass, six-agent closure notes,
+`.codex` cleanup, passive monitor ticks, passive monitor output,
+passive monitors, public reachability, Plugin Hub planning, historical
+TheIsland/Ragnarok/Genesis2 names, historical live approvals/map names, historical
+approvals/map names, prior approvals, package-shape installs, package installs,
+explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+package-shape install success, and side-lane accounting are
+chronology only unless the exact current-turn approval and accepted checker evidence are
+named. They do not move SDK/P0 progress. They are not runtime evidence/readiness,
+live-op authorization, Discord authorization, not Plugin Hub readiness, not stable SDK
+readiness, not stable SDK claims, not package-shape/public package readiness, and not
+support-tier activation.
+
 The install root must be supplied explicitly as a positional argument; the installer does
 not default to the live root and does not use inherited `OBELISK_ROOT` when omitted. The
 root must be a non-root absolute path and must not be a symlink. Managed subdirectories
 must also be real directories, not symlinks: `lib`, `plugins`, `include`,
 `include/obelisk`, `lib/cmake`, `lib/cmake/Obelisk`, `config`, `logs`, `state`, and
-`state/instances`. The installer rejects empty, relative, `/`, symlink roots, and
-symlinked managed paths before creating directories or publishing artifacts.
+`state/instances`. The installer rejects empty, relative, `/`, symlink roots, existing
+non-directory roots, existing non-directory managed paths, symlinked managed paths, and
+existing symlink/non-regular managed runtime or SDK artifact destinations before creating
+directories or publishing artifacts. The chosen root path must also not traverse symlink
+path components.
 
 The script copies:
 
@@ -67,7 +93,16 @@ Rollback should restore `libobelisk.so` and `libsubhook.so` as a compatible pair
 same backup timestamp, then restart only the explicitly approved target instance and rerun
 the stable posture check.
 
-External plugins can consume the installed SDK through the exported CMake package:
+Release-readiness and install-layout validation are offline checks. Do not point
+`OBELISK_BUILD_DIR`, second-source roots, second-source report directories, or release
+statement inputs under a live-server root, including that root's offline workspace; the
+release, RC-smoke, and install-layout checks reject both textual protected paths and paths
+that resolve there through symlinks. Release-readiness second-source report directories
+must also be new or empty and must not traverse symlink path components, so ignored
+artifact roots cannot carry stale generated reports into a fresh gate run.
+
+External plugin builds can consume the installed SDK package-shape through the exported
+CMake package:
 
 ```cmake
 find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
@@ -75,10 +110,21 @@ target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
 The numeric package version is the SDK compatibility floor for the current pre-release
-line, not a claim that a stable `v0.1.0` tag exists. The installed package also exposes
+line, not a claim that a stable `v0.1.0` tag exists. Exact stable-looking CMake version
+requests such as `find_package(Obelisk 0.1.0 EXACT CONFIG ...)` are rejected until a
+stable SDK claim is explicitly authorized. The installed package also exposes
 `Obelisk_*ABI_VERSION` CMake variables that mirror the `OBELISK_*ABI_VERSION` macros in
 `ObeliskApi.h`; plugin source should continue to check the header macros and runtime
 `struct_size`/capability fields before using appended ABI slots.
+The explicit non-`EXACT` numeric version plus `COMPONENTS SDK` request is package-shape
+evidence only. It does not imply stable SDK readiness, Plugin Hub readiness/publication,
+public package readiness, runtime readiness, support-tier activation, or v1 completion.
+`Obelisk::obelisk_sdk` is a public-header C ABI target only. It does not grant access to
+implementation headers, private runtime symbols, `libobelisk.so` as a plugin link
+dependency, public module SDK coverage, or support-tier activation.
+Finding or linking this target is a build/package boundary check only; do not describe it
+as runtime readiness, public SDK completion, stable release evidence, or Plugin Hub
+readiness.
 It also exports non-claim package metadata:
 `Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS=package-shape-evidence-only`,
 `Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED=FALSE`,
@@ -89,6 +135,10 @@ It also exports non-claim package metadata:
 `Obelisk_V1_COMPLETION_CLAIM_ALLOWED=FALSE`,
 `Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED=FALSE`, and
 `Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED=FALSE`.
+These package-shape markers do not resolve route completion for the current complete SDK
+track: SDK blocker promotion remains `0/12`, the P0 dependency chain remains `0/4`,
+`stable_claim_allowed=false`, and the active route blocker is
+`approved_runtime_evidence_missing`; in short, SDK `0/12`, P0 `0/4`, stable `false`.
 
 Plugins loaded from `plugins/` are expected to own their config defaults. The preferred
 directory for plugin config is:
@@ -113,8 +163,11 @@ Plugin Hub planning is explicitly requested, read the parked Plugin Hub docs as 
 only: `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
 `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; keep support-tier classification separate from
 installation, keep ArkServerApi/AseApi/NextGen inputs as names and demand signals only,
-and run the
-plugin installer with `--dry-run` before copying into a shared `plugins/` root.
+and run the plugin installer with `--dry-run` as an offline/package-shape check before any
+current-turn approved copy into a shared `plugins/` root. A dry-run, package-shape install,
+or copied `.so` remains non-authorizing/non-evidence and does not create Plugin Hub
+readiness/publication, public SDK promotion, support-tier activation, release readiness, or
+runtime readiness.
 
 Useful installer flags:
 
@@ -235,19 +288,48 @@ state/instances/<instance-id>/enable-chat-reflection  # experimental
 state/instances/<instance-id>/enable-inventory-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-structure-reflection  # experimental, metadata-only
 state/instances/<instance-id>/enable-item-return-events  # experimental, copied ReturnValue-only
+state/instances/<instance-id>/enable-player-principal-lifecycle-observer  # experimental, exact lifecycle observer
 ```
 
 `disable-plugins` is a supported LinuxGSM wrapper marker, not an independent runtime
 gate. The wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`; custom launchers must
 set that environment variable themselves when plugin loading should be disabled.
 
-The normal LinuxGSM wrapper is protected by default. If any experimental observer marker is
-present for the selected instance, it refuses to launch unless the current-turn approved
-debug window uses `OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance has
-`allow-observer-debug-window`. Experimental observer markers still do nothing unless
+The normal LinuxGSM wrapper is protected by default. If any experimental observer marker,
+runtime debug/scanner marker, callback escape marker, active debug request marker, or
+observer/debug environment is present for the selected instance, stable profile launch
+fails closed. A current-turn approved observer window must use
+`OBELISK_WRAPPER_PROFILE=observer-debug` and the same instance must have
+`allow-observer-debug-window`; do not persist that profile in the service environment.
+When `OBELISK_INSTANCE_ID` is set, the wrapper requires the safe token form
+`[A-Za-z0-9_-]+`; if `state/instances/<instance-id>` already exists, it must be a real
+non-symlink directory so marker checks cannot escape through path traversal or symlinks.
+The wrapper also refuses an `observer-debug` profile that has only the approval marker and
+no scoped observer/debug marker. Experimental observer markers still do nothing unless
 `allow-experimental-observers` is also present for the same instance. Use those markers
 only inside a current-turn approved exact debug window and remove them before returning
 the instance to stable posture.
+
+The player-principal lifecycle observer is exact for first evidence windows:
+
+```text
+OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=<supported ARK SHA256>
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
+```
+
+It also requires `enable-process-event-hook`, `disable-plugins`,
+`allow-observer-debug-window`, `allow-experimental-observers`, and
+`enable-player-principal-lifecycle-observer` as regular non-symlink markers on the same
+instance. Other observer/debug markers are incompatible with that lifecycle window.
+
+The player-principal lifecycle diagnostic candidate gate is not an install, package-shape,
+or SDK-readiness signal. `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES=1`
+may be used only inside a current-turn approved exact observer-debug diagnostic window
+that also enables the player-principal lifecycle observer gate. Diagnostic output is
+candidate-only FName target evidence; it must not read params, log identity, dispatch
+callbacks, satisfy approved runtime evidence, or promote runtime/public SDK readiness.
 
 `enable-chat-events` makes the wrapper set the minimal copied `ChatMessageEvent`
 producer:
@@ -381,10 +463,34 @@ operator notice path when applicable, enable only the required markers, avoid ra
 text or identity logging, preserve copied logs, and remove experimental markers before
 returning to stable posture.
 
-Stable production posture also requires no forbidden experimental marker entries for the
-instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,
-or public `CallProcessEvent` markers. Prove the running process with:
+Stable production posture also requires a non-symlink Obelisk root and managed
+subdirectories, a non-symlink runtime library, and no forbidden experimental marker
+entries for the instance, including observer, scanner, debug-control, native-exec,
+ptrace, global callback, or public `CallProcessEvent` markers. Offline posture checks
+must use `--proc-root` fixtures whose root, `environ`, and `maps` files do not resolve
+into live `/proc`; pass `--pid` for fixture checks so process discovery does not call
+`pgrep` against live `/proc`. Fixture roots under a live-server root are rejected even when
+`--allow-protected-root` is supplied; use a copied fixture under `/tmp` or another
+approved offline artifact workspace instead. Reading live `/proc` or validating a
+protected ARK server root also requires separate current-turn approval; the explicit
+flags below acknowledge that scope but do not grant it. Prove the running process with:
 
 ```bash
-scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance <instance-id>
+scripts/check_obelisk_server_posture.sh --expect-stable \
+  --allow-live-procfs-read --allow-protected-root \
+  --map <map> --instance <instance-id>
 ```
+
+During a current-turn approved passive observer-debug wait, do not treat a stable-posture
+failure as a stopped server. Do not chain LinuxGSM `monitor`, `start`, `stop`, or
+`restart` calls just because the expected player-dependent signal has not arrived yet.
+Wait with read-only player-presence checks or copied log tails inside the approved window,
+and prove that live posture separately with:
+
+```bash
+scripts/check_obelisk_server_posture.sh --expect-observer-debug \
+  --allow-live-procfs-read --allow-protected-root \
+  --map <map> --instance <instance-id>
+```
+
+Return to the `--expect-stable` check after the observer window is rolled back.

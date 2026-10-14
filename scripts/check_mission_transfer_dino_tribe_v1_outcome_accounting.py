@@ -18,10 +18,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import check_dino_scalar_readiness as dino_scalar_readiness
+import check_mission_copied_bool_readiness as mission_copied_bool_readiness
+import check_transfer_baccept_readiness as transfer_baccept_readiness
+import check_transfer_scriptstruct_readiness as transfer_scriptstruct_readiness
 from check_tribe_scalar_boundary_readiness import (
     DEFAULT_SNAPSHOT_ROOT as DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
     EXPECTED_ACCEPTED_FIELDS as TRIBE_EXPECTED_ACCEPTED_FIELDS,
     EXPECTED_REQUIRED_REDACTIONS as TRIBE_EXPECTED_REQUIRED_REDACTIONS,
+    FORBIDDEN_READY_KEYS as TRIBE_FORBIDDEN_READY_KEYS,
     REPORT_SCHEMA as TRIBE_SCALAR_BOUNDARY_SCHEMA,
     TARGET_SET as TRIBE_SCALAR_TARGET_SET,
     build_report as build_tribe_scalar_boundary_report,
@@ -32,10 +37,13 @@ from check_buff_status_readiness import (
     EXPECTED_REDACTED_FIELDS as BUFF_EXPECTED_REDACTED_FIELDS,
     EXPECTED_TARGETS as BUFF_EXPECTED_TARGETS,
     EXPECTED_ZERO_PARAM_TARGETS as BUFF_EXPECTED_ZERO_PARAM_TARGETS,
+    FORBIDDEN_NONZERO_KEYS as BUFF_FORBIDDEN_NONZERO_KEYS,
+    FORBIDDEN_READY_KEYS as BUFF_FORBIDDEN_READY_KEYS,
     REPORT_SCHEMA as BUFF_STATUS_SCHEMA,
     TARGET_SETS_USED as BUFF_TARGET_SETS_USED,
     build_report as build_buff_status_report,
 )
+from reflection_target_sets import side_lane_fail_closed_source_artifact_issues
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -46,11 +54,28 @@ REPORT_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check
 SURFACE_ID = "obelisk.mission_transfer_dino_tribe.v1"
 REQUIRED_LEAVES = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
 MISSION_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-mission-leaf-blocker-accounting.v1"
+TRANSFER_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-transfer-leaf-blocker-accounting.v1"
+DINO_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-dino-leaf-blocker-accounting.v1"
+TRANSFER_SCRIPTSTRUCT_LEAF_ACCOUNTING_SCHEMA = (
+    "obelisk.mission-transfer-dino-tribe-v1-transfer-scriptstruct-leaf-blocker-accounting.v1"
+)
 TRIBE_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-tribe-leaf-blocker-accounting.v1"
 BUFF_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-buff-leaf-blocker-accounting.v1"
 MISSION_REQUIRED_EVIDENCE = ("mission-compact-intake", "mission-copied-bool-policy-slice")
+TRANSFER_REQUIRED_EVIDENCE = ("transfer-ufunction-intake", "transfer-baccept-only-policy-slice")
+DINO_REQUIRED_EVIDENCE = ("dino-compact-intake",)
 TRIBE_REQUIRED_EVIDENCE = ("tribe-compact-intake",)
 BUFF_REQUIRED_EVIDENCE = ("buff-compact-intake", "buff-breadth-intake")
+SIDE_LANE_EXPECTED_TARGET_SETS_BY_LEAF = {
+    "mission": MISSION_REQUIRED_EVIDENCE,
+    "transfer": TRANSFER_REQUIRED_EVIDENCE + (transfer_scriptstruct_readiness.TARGET_SET,),
+    "dino_policy": DINO_REQUIRED_EVIDENCE,
+    "tribe_policy": TRIBE_REQUIRED_EVIDENCE,
+    "buff_status": BUFF_REQUIRED_EVIDENCE,
+}
+SIDE_LANE_SURFACE_EXPECTED_TARGET_SETS = tuple(
+    sorted({target_set for target_sets in SIDE_LANE_EXPECTED_TARGET_SETS_BY_LEAF.values() for target_set in target_sets})
+)
 MISSION_COPIED_TARGETS = (
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -72,12 +97,108 @@ MISSION_REDACTED_RECOGNITION_FIELDS = (
     "MissionType.GetPlayerUsableItems.Character",
     "MissionType.GetPlayerUsableItems.OutItemIDs",
 )
+MISSION_READINESS_FLAGS = mission_copied_bool_readiness.false_readiness_flags()
+MISSION_PUBLIC_FALSE_KEYS = tuple(key for key, value in MISSION_READINESS_FLAGS.items() if value is False)
+MISSION_ZERO_FIELDS = tuple(
+    key for key, value in MISSION_READINESS_FLAGS.items() if isinstance(value, int) and not isinstance(value, bool)
+)
+TRANSFER_PUBLIC_FALSE_KEYS = tuple(transfer_baccept_readiness.REPORT_FALSE_FLAGS)
+TRANSFER_ZERO_FIELDS = tuple(transfer_baccept_readiness.REPORT_ZERO_FIELDS)
+TRANSFER_SCRIPTSTRUCT_PUBLIC_FALSE_KEYS = tuple(transfer_scriptstruct_readiness.REPORT_FALSE_FLAGS)
+TRANSFER_SCRIPTSTRUCT_ZERO_FIELDS = tuple(transfer_scriptstruct_readiness.REPORT_ZERO_FIELDS)
+DINO_PUBLIC_FALSE_KEYS = (
+    "dino_sdk_ready",
+    "sdk_ready",
+    "module_sdk_ready",
+    "public_sdk_ready",
+    "public_dino_sdk_ready",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_callback_ready",
+    "public_module_ready",
+    "runtime_ready",
+    "runtime_capture_ready",
+    "runtime_hook_ready",
+    "runtime_wiring_ready",
+    "runtime_observer_approved",
+    "live_ops_ready",
+    "dispatcher_ready",
+    "callback_ready",
+    "descriptor_ready",
+    "capability_ready",
+    "identity_ready",
+    "lookup_ready",
+    "mutation_ready",
+    "return_override_ready",
+    "resource_handle_ready",
+    "v1_accounted",
+    "v1_completion",
+    "v1_completion_ready",
+    "p0_dependency_chain_accounted",
+    "p0_dependency_chain_ready",
+    "public_or_runtime_accounting_allowed",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "complete_sdk_claim_allowed",
+    "stable_claim_allowed",
+    "postcall_return_ready",
+    "promotion_ready",
+)
+DINO_ZERO_FIELDS = (
+    "complete_sdk_claim_progress_contribution",
+    "p0_dependency_chain_claim_progress_contribution",
+)
+OPTIONAL_FOCUSED_REPORT_FALSE_KEYS = (
+    "complete_sdk_ready",
+    "sdk_complete",
+    "sdk_completion",
+    "stable_claim_allowed",
+    "stable_sdk_ready",
+    "stable_sdk_claim_allowed",
+    "v1_accounted",
+    "v1_complete",
+    "v1_completion",
+    "v1_completion_ready",
+    "v1_ready",
+)
+OPTIONAL_FOCUSED_REPORT_ZERO_FIELDS = (
+    "sdk_completion_progress_contribution",
+    "stable_sdk_progress_contribution",
+    "v1_completion_progress_contribution",
+)
+UMBRELLA_ACCOUNTING_FALSE_FLAGS = {
+    "complete_sdk_ready": False,
+    "counts_toward_complete_sdk_claim": False,
+    "counts_toward_p0_dependency_chain_claim": False,
+    "counts_toward_public_sdk": False,
+    "counts_toward_runtime": False,
+    "counts_toward_v1_completion": False,
+    "p0_dependency_chain_accounted": False,
+    "p0_dependency_chain_ready": False,
+    "public_module_ready": False,
+    "public_or_runtime_accounting_allowed": False,
+    "readiness_counts_toward_v1_accounting": False,
+    "runtime_capture_ready": False,
+    "v1_completion_ready": False,
+    "live_ops_ready": False,
+}
+UMBRELLA_ACCOUNTING_ZERO_FIELDS = {
+    "complete_sdk_claim_progress_contribution": 0,
+    "p0_dependency_chain_claim_progress_contribution": 0,
+    "v1_completion_progress_contribution": 0,
+}
 TRIBE_PUBLIC_FALSE_KEYS = (
     "public_sdk_ready",
     "public_tribe_sdk_ready",
     "public_abi_ready",
+    "public_module_ready",
     "runtime_ready",
+    "runtime_capture_ready",
     "runtime_observer_approved",
+    "live_ops_ready",
     "identity_ready",
     "lookup_ready",
     "mutation_ready",
@@ -98,10 +219,13 @@ BUFF_PUBLIC_FALSE_KEYS = (
     "public_callback_ready",
     "public_descriptor_ready",
     "public_capability_ready",
+    "public_module_ready",
     "runtime_ready",
+    "runtime_capture_ready",
     "runtime_hook_ready",
     "runtime_wiring_ready",
     "runtime_observer_approved",
+    "live_ops_ready",
     "dispatcher_ready",
     "callback_ready",
     "descriptor_ready",
@@ -141,6 +265,9 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "identity_available",
     "identity_ready",
     "lifecycle_semantics_ready",
+    "p0_dependency_chain_accounted",
+    "p0_dependency_chain_ready",
+    "p0_ready",
     "lookup_available",
     "lookup_ready",
     "mission_sdk_ready",
@@ -202,11 +329,46 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "v1_completion",
     "v1_completion_ready",
     "v1_ready",
+    "mission_sdk_available",
+    "mission_sdk_promoted",
+    "mission_public_sdk_ready",
+    "transfer_runtime_available",
+    "transfer_runtime_ready",
+    "transfer_runtime_promoted",
+    "transfer_sdk_available",
+    "dino_policy_promoted",
+    "dino_policy_promotion_ready",
+    "dino_policy_sdk_ready",
+    "dino_sdk_available",
+    "public_dino_policy_sdk_ready",
+    "tribe_policy_promoted",
+    "tribe_policy_promotion_ready",
+    "tribe_policy_sdk_ready",
+    "tribe_sdk_available",
+    "public_tribe_policy_sdk_ready",
+    "buff_status_public_abi_ready",
+    "buff_status_public_c_abi_ready",
+    "buff_status_callback_ready",
+    "buff_status_sdk_available",
+    "public_c_abi_ready",
+    "public_c_abi_available",
     "copied_payload_policy_ready",
+    "contributes_to_public_sdk_v1",
+    "contributes_to_v1_completion",
+    "counts_for_public_sdk_v1",
+    "counts_toward_full_sdk_claim",
+    "counts_toward_production_sdk_claim",
+    "counts_toward_sdk_completion",
+    "counts_toward_v1_completion",
     "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
 }
 CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS = {
     "accounting_route",
+    "dino_policy",
+    "dino_policy_status",
+    "leaf_status",
+    "policy_status",
     "promotion_status",
     "public_sdk_status",
     "release_status",
@@ -215,23 +377,72 @@ CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS = {
     "sdk_completion",
     "status",
     "support_tier",
+    "tribe_policy",
+    "tribe_policy_status",
     "v1_completion",
 }
 CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES = {
+    "accepted",
     "active",
+    "approved",
     "available",
+    "allowed",
     "complete",
     "completed",
     "enabled",
+    "passed",
     "per_leaf_promoted",
     "promoted",
+    "public",
+    "public_ready",
+    "published",
     "ready",
     "release_ready",
     "release_supported",
+    "runtime",
+    "runtime_ready",
+    "sdk_ready",
     "stable",
     "stable_sdk",
+    "stable_ready",
     "supported",
+    "true",
+    "unblocked",
+    "unlocked",
+    "validated",
     "v1_complete",
+    "v1_ready",
+}
+CONTEXTUAL_POSITIVE_STATUS_KEYS = {
+    "accepted",
+    "active",
+    "approved",
+    "allowed",
+    "complete",
+    "enabled",
+    "outcome",
+    "passed",
+    "promoted",
+    "readiness",
+    "ready",
+    "result",
+    "stable",
+    "state",
+    "status",
+    "unblocked",
+    "unlocked",
+    "validated",
+}
+CONTEXTUAL_CANDIDATE_CONTAINER_KEYS = {
+    "candidate",
+    "package_shape",
+    "plugin_hub",
+    "public_sdk",
+    "readiness",
+    "runtime",
+    "support_tier",
+    "target_set",
+    "v1",
 }
 LEAF_ALIASES = {
     "mission": ("mission",),
@@ -242,6 +453,7 @@ LEAF_ALIASES = {
 }
 PROMOTED_LEAF_EVIDENCE_KEYS = ("abi_tests", "sdk_consumer_tests", "second_source_evidence")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+POSITIVE_PROGRESS_RATIO_RE = re.compile(r"^\s*[1-9][0-9]*\s*/\s*[1-9][0-9]*\s*$")
 LEAF_MISSING_PUBLIC_GATES = {
     "mission": (
         "public_mission_sdk_abi",
@@ -343,6 +555,8 @@ LEAF_PRIORITY_PROFILES = {
         "required_evidence": ("transfer-ufunction-intake", "transfer-baccept-only-policy-slice"),
         "reusable_evidence": (
             "focused bAccept copied-bool checker",
+            "candidate-only Transfer ScriptStruct checker",
+            "redacted Transfer ScriptStruct payload layout summary",
             "complete transfer intake provenance",
             "explicit consume-only promote gate",
         ),
@@ -353,8 +567,8 @@ LEAF_PRIORITY_PROFILES = {
             "teleport/spawn authority",
         ),
         "next_v1_reuse_step": (
-            "Reuse only the single copied-bool consume gate; defer transfer payloads, "
-            "identity, ownership, cross-map state, teleport/spawn, mutation, and return override."
+            "Reuse only the single copied-bool consume gate and candidate ScriptStruct layout summary; "
+            "defer transfer payload decoding, identity, ownership, cross-map state, teleport/spawn, mutation, and return override."
         ),
     },
     "buff_status": {
@@ -438,6 +652,10 @@ FORBIDDEN_CLAIM_PATTERNS = (
     r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+"
     r"(?:module|surface|callback|callbacks|descriptor|descriptors|capability|capabilities|"
     r"capability\s+bit|C\s+ABI|ABI)\b",
+    r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+public\s+"
+    r"(?:SDK|API|module|surface|callback|callbacks|descriptor|descriptors|capability|capabilities|"
+    r"capability\s+bit|C\s+ABI|ABI)\b",
+    r"\b(?:Dino|Tribe)\s+policy\s+(?:is\s+)?(?:promoted|ready|available|published|enabled|allowed|unblocked|unlocked)\b",
     r"\b(?:public\s+)?module\s+(?:SDK|API|callback|callbacks|descriptor|descriptors|capability|capabilities|"
     r"capability\s+bit|C\s+ABI|ABI)\b",
     r"\bpublic\s+(?:SDK|API|ABI|module|surface|callback|descriptor|capability|capability\s+bit|C\s+ABI)\b",
@@ -464,21 +682,30 @@ FORBIDDEN_CLAIM_RE = re.compile("|".join(f"(?:{pattern})" for pattern in FORBIDD
 CANDIDATE_READY_CLAIM_PATTERNS = (
     r"\b(?:public\s+SDK|public\s+ABI|runtime|runtime\s+observer|runtime\s+hook|"
     r"v1|v1\s+SDK|module\s+SDK|module\s+API|header\s+callbacks?|"
-    r"ABI\s+header\s+callbacks?|C\s+ABI\s+header\s+callbacks?|promotion)\s+"
-    r"(?:is\s+|are\s+)?(?:ready|readiness|complete|completion|available|published|enabled)\b",
+    r"ABI\s+header\s+callbacks?|C\s+ABI\s+header\s+callbacks?|promotion|"
+    r"P0(?:\s+dependency[- ]?chain)?)\s+"
+    r"(?:is\s+|are\s+)?(?:ready|readiness|complete|completion|available|published|enabled|allowed|unblocked|unlocked)\b",
+    r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+"
+    r"(?:SDK|API|runtime|runtime\s+observer|runtime\s+hook|public\s+ABI|public\s+C\s+ABI|"
+    r"ABI|C\s+ABI|callback|callbacks|ResourceHandle|mutation)\s+"
+    r"(?:is\s+|are\s+)?(?:ready|readiness|complete|completion|available|published|enabled|promoted|allowed|unblocked|unlocked)\b",
     r"\b(?:ready|complete)\s+for\s+v1\b",
     r"\b(?:ready|complete|available|published|enabled)\s+"
     r"(?:module\s+SDK|module\s+API|header\s+callbacks?|ABI\s+header\s+callbacks?|"
     r"C\s+ABI\s+header\s+callbacks?)\b",
-    r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b",
+    r"\b(?:ready|complete|available|enabled|allowed|unblocked|unlocked)\s+for\s+v1\b",
+    r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready|allowed|unblocked|unlocked)\b",
     r"\b(?:complete|full|production|stable)\s+SDK\s+(?:claim\s+)?"
     r"(?:is\s+)?(?:allowed|ready|complete)\b",
     r"\b(?:stable\s+claim|complete\s+SDK\s+claim)\s+(?:is\s+)?allowed\b",
     r"\bcounts?\s+toward\s+(?:the\s+)?(?:complete|full|production)\s+SDK\s+claim\b",
-    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|enabled|approved)\b",
+    r"\bcredits?\s+(?:toward|for|to)\s+(?:the\s+)?(?:complete|full|production|public|v1)\s+SDK\s+claim\b",
+    r"\b(?:counts?|contributes?)\s+(?:toward|for|to)\s+(?:the\s+)?"
+    r"(?:public\s+SDK\s+v1|v1\s+(?:completion|SDK|release)|complete\s+SDK\s+claim)\b",
+    r"\brelease\s+(?:readiness\s+)?(?:is\s+)?(?:ready|complete|satisfied|available|allowed|enabled|approved|unblocked|unlocked)\b",
     r"\brelease[- ]supported\b",
-    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|enabled|supported|release[- ]supported)\b",
-    r"\bstable\s+SDK\s+(?:is\s+)?(?:allowed|ready|complete|available|enabled)\b",
+    r"\bsupport[- ]?tier\s+(?:is\s+)?(?:active|available|ready|allowed|enabled|supported|release[- ]supported|unblocked|unlocked)\b",
+    r"\bstable\s+SDK\s+(?:is\s+)?(?:allowed|ready|complete|available|enabled|unblocked|unlocked)\b",
 )
 CANDIDATE_READY_CLAIM_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
@@ -493,7 +720,8 @@ CANDIDATE_MARKER_PROMOTION_RE = re.compile(
     r"\b(?:public|sdk|api|abi|runtime|observer|hook|wiring|dispatch|dispatcher|callback|"
     r"descriptor|capability|promot(?:e|ed|ion)?|approved(?:\s+runtime)?\s+bundle|"
     r"resource\s+handle|resourcehandle|identity|lookup|mutation|return\s+override|"
-    r"v1|completion|complete|stable|release|support|tier|supported|ready|available|enabled)\b",
+    r"v1|p0|dependency\s+chain|completion|complete|stable|release|support|tier|supported|"
+    r"ready|available|allowed|enabled|unblocked|unlocked)\b",
     re.IGNORECASE,
 )
 CANDIDATE_MARKER_NON_PROMOTION_RE = re.compile(
@@ -523,6 +751,81 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST, help="docs/public_sdk_surfaces.json path.")
     parser.add_argument("--split-note", type=Path, default=DEFAULT_SPLIT_NOTE, help="Leaf split research note path.")
     parser.add_argument(
+        "--mission-root",
+        type=Path,
+        default=mission_copied_bool_readiness.DEFAULT_ROOT,
+        help="Offline artifact root for the focused Mission copied-bool readiness checker.",
+    )
+    parser.add_argument(
+        "--mission-manifest",
+        type=Path,
+        help="Mission copied-bool policy-slice manifest; defaults to --mission-root/mission-copied-bool-policy-slice.json.",
+    )
+    parser.add_argument(
+        "--mission-expected-manifest-sha256",
+        default=mission_copied_bool_readiness.EXPECTED_MANIFEST_SHA256,
+        help="Expected Mission copied-bool policy manifest SHA256.",
+    )
+    parser.add_argument(
+        "--mission-skip-artifact-gates",
+        action="store_true",
+        help="Skip Mission consume/promote gate subprocesses for hermetic checker tests.",
+    )
+    parser.add_argument(
+        "--mission-fixture-boundary-only",
+        action="store_true",
+        help="Use Mission's repo fixture-boundary mode instead of artifact-root consume/promote checks.",
+    )
+    parser.add_argument(
+        "--transfer-root",
+        type=Path,
+        default=transfer_baccept_readiness.DEFAULT_ROOT,
+        help="Offline artifact root for the focused Transfer bAccept readiness checker.",
+    )
+    parser.add_argument(
+        "--transfer-manifest",
+        type=Path,
+        help="Transfer bAccept policy-slice manifest; defaults to --transfer-root/transfer-baccept-only-policy-slice.json.",
+    )
+    parser.add_argument(
+        "--transfer-expected-manifest-sha256",
+        default=transfer_baccept_readiness.EXPECTED_MANIFEST_SHA256,
+        help="Expected Transfer bAccept policy manifest SHA256.",
+    )
+    parser.add_argument(
+        "--transfer-skip-artifact-gates",
+        action="store_true",
+        help="Skip Transfer consume/promote gate subprocesses for hermetic checker tests.",
+    )
+    parser.add_argument(
+        "--transfer-scriptstruct-snapshot-root",
+        type=Path,
+        default=transfer_scriptstruct_readiness.DEFAULT_SNAPSHOT_ROOT,
+        help="Sanitized ScriptStruct snapshot root for candidate-only Transfer payload layout evidence.",
+    )
+    parser.add_argument(
+        "--transfer-scriptstruct-report",
+        type=Path,
+        help="Existing redacted ScriptStruct report JSON for hermetic Transfer ScriptStruct checker tests.",
+    )
+    parser.add_argument(
+        "--dino-repo-root",
+        type=Path,
+        default=REPO_ROOT,
+        help="Repository root for candidate-only Dino scalar source-isolation checks.",
+    )
+    parser.add_argument(
+        "--dino-report",
+        type=Path,
+        help="Existing redacted UFunction signature report JSON for hermetic Dino scalar checker tests.",
+    )
+    parser.add_argument(
+        "--dino-snapshot-root",
+        type=Path,
+        default=dino_scalar_readiness.DEFAULT_SNAPSHOT_ROOT,
+        help="Sanitized UFunction snapshot root for candidate-only Dino scalar evidence.",
+    )
+    parser.add_argument(
         "--tribe-snapshot-root",
         type=Path,
         default=DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
@@ -545,15 +848,64 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(item)
 
 
+def add_side_lane_source_artifact_issues(
+    blockers: list[dict[str, Any]],
+    value: Any,
+    *,
+    label: str,
+    expected_target_sets: tuple[str, ...],
+    leaf: str | None = None,
+) -> None:
+    for issue in side_lane_fail_closed_source_artifact_issues(
+        value,
+        expected_target_sets=expected_target_sets,
+        path=label,
+    ):
+        reason = issue.get("reason")
+        path = issue.get("path")
+        if not isinstance(reason, str) or not isinstance(path, str):
+            continue
+        extra = {key: child for key, child in issue.items() if key not in {"reason", "path"}}
+        if leaf is not None:
+            extra["leaf"] = leaf
+        add(blockers, reason, path, **extra)
+
+
 def load_json(path: Path, label: str) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        reject_symlink_component(path, label)
+        safe_path = reject_protected_input_path(path, label)
+        payload = json.loads(safe_path.read_text(encoding="utf-8"))
+    except SystemExit:
+        raise
     except OSError as exc:
         raise SystemExit(f"{label}: unreadable: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise SystemExit(f"{label}: invalid JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise SystemExit(f"{label}: top-level JSON must be an object")
+    return payload
+
+
+def load_optional_focus_report(path: Path | None, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        reject_symlink_component(path, label)
+        safe_path = reject_protected_input_path(path, label)
+        payload = json.loads(safe_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        add(blockers, "focused_report_unreadable", label, path=str(path), detail=str(exc))
+        return {}
+    except json.JSONDecodeError as exc:
+        add(blockers, "focused_report_malformed", label, path=str(path), detail=str(exc))
+        return {}
+    except SystemExit as exc:
+        add(blockers, "focused_report_path_rejected", label, path=str(path), detail=str(exc))
+        return {}
+    if not isinstance(payload, dict):
+        add(blockers, "focused_report_not_object", label, path=str(path))
+        return {}
     return payload
 
 
@@ -571,7 +923,11 @@ def read_optional(path: Path | None, label: str) -> str:
     if path is None:
         return ""
     try:
-        return path.read_text(encoding="utf-8")
+        reject_symlink_component(path, label)
+        safe_path = reject_protected_input_path(path, label)
+        return safe_path.read_text(encoding="utf-8")
+    except SystemExit:
+        raise
     except OSError as exc:
         raise SystemExit(f"{label}: unreadable: {exc}") from exc
 
@@ -721,15 +1077,23 @@ def release_statement_outcome(text: str) -> dict[str, Any]:
             "forbidden_claims": [],
             "ready_claims": [],
         }
-    surface_line = next((line for line in text.splitlines() if SURFACE_ID in line), "")
+    surface_line = next(
+        (line for line in text.splitlines() if line.strip().startswith(f"{SURFACE_ID}:")),
+        "",
+    )
+    surface_scope_text = surface_line if surface_line else text
     leaf_exclusions = {}
     leaf_promotions = {}
     for leaf, aliases in LEAF_ALIASES.items():
         alias_excluded = False
         alias_promoted = False
         for alias in aliases:
-            alias_excluded = alias_excluded or has_unnegated_alias_outcome(text, alias, "excluded")
-            alias_promoted = alias_promoted or has_unnegated_alias_outcome(text, alias, "promoted")
+            alias_excluded = alias_excluded or has_unnegated_alias_outcome(
+                surface_scope_text, alias, "excluded"
+            )
+            alias_promoted = alias_promoted or has_unnegated_alias_outcome(
+                surface_scope_text, alias, "promoted"
+            )
         leaf_exclusions[leaf] = alias_excluded
         leaf_promotions[leaf] = alias_promoted
     return {
@@ -737,8 +1101,8 @@ def release_statement_outcome(text: str) -> dict[str, Any]:
         "umbrella_excluded": bool(surface_line) and has_unnegated_alias_outcome(surface_line, SURFACE_ID, "excluded"),
         "leaf_exclusions": leaf_exclusions,
         "leaf_promotions": leaf_promotions,
-        "forbidden_claims": sorted(set(forbidden_claims(text))),
-        "ready_claims": sorted(set(candidate_ready_claims(text))),
+        "forbidden_claims": sorted(set(forbidden_claims(surface_scope_text))),
+        "ready_claims": sorted(set(candidate_ready_claims(surface_scope_text))),
     }
 
 
@@ -1039,24 +1403,226 @@ def validate_promoted_leaf_evidence(
     return False
 
 
-def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
+def normalize_candidate_alias_key(key: Any) -> str:
+    if not isinstance(key, str):
+        return str(key)
+    camel_spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", key)
+    camel_spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", camel_spaced)
+    return re.sub(r"[^a-z0-9]+", "_", camel_spaced.lower()).strip("_")
+
+
+def candidate_alias_true_overclaim(normalized_key: str) -> bool:
+    if normalized_key in MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS:
+        return True
+    if normalized_key in {
+        "callback",
+        "callbacks",
+        "live_ops",
+        "mutation",
+        "public_abi",
+        "public_c_abi",
+        "public_module",
+        "resource_handle",
+        "runtime",
+        "runtime_capture",
+        "sdk",
+        "v1",
+    }:
+        return True
+    tokens = {token for token in normalized_key.split("_") if token}
+    token_text = f"_{normalized_key}_"
+    if token_text.startswith("_counts_toward_") and tokens & {"sdk", "v1", "completion", "claim"}:
+        return True
+    if tokens & {"counts", "contributes", "contribution"} and tokens & {"sdk", "v1", "completion", "claim"}:
+        return True
+    state_tokens = {
+        "accounted",
+        "allowed",
+        "available",
+        "allowed",
+        "complete",
+        "completion",
+        "contributes",
+        "contribution",
+        "enabled",
+        "promoted",
+        "promotion",
+        "published",
+        "ready",
+        "supported",
+        "unblocked",
+        "unlocked",
+    }
+    sensitive_tokens = {
+        "abi",
+        "api",
+        "callback",
+        "capability",
+        "claim",
+        "complete",
+        "descriptor",
+        "dispatcher",
+        "handle",
+        "hook",
+        "identity",
+        "lookup",
+        "mutation",
+        "p0",
+        "public",
+        "release",
+        "resource",
+        "runtime",
+        "sdk",
+        "source",
+        "stable",
+        "support",
+        "tier",
+        "v1",
+        "wiring",
+    }
+    sensitive_phrases = (
+        "complete_sdk_claim",
+        "resource_handle",
+        "return_override",
+        "public_abi",
+        "public_c_abi",
+        "public_sdk",
+        "runtime_observer",
+        "runtime_hook",
+        "runtime_wiring",
+    )
+    if any(phrase in normalized_key for phrase in sensitive_phrases):
+        return bool(tokens & state_tokens)
+    if "promoted" in tokens and (
+        "policy" in tokens or tokens & {"mission", "transfer", "dino", "tribe", "buff", "status"}
+    ):
+        return True
+    return bool(tokens & state_tokens and tokens & sensitive_tokens)
+
+
+def candidate_alias_context(normalized_key: str) -> bool:
+    if normalized_key in CONTEXTUAL_CANDIDATE_CONTAINER_KEYS:
+        return True
+    if candidate_alias_true_overclaim(normalized_key) or candidate_alias_promoted_string_overclaim(normalized_key):
+        return True
+    tokens = {token for token in normalized_key.split("_") if token}
+    sensitive_tokens = {
+        "abi",
+        "api",
+        "callback",
+        "capability",
+        "claim",
+        "complete",
+        "completion",
+        "descriptor",
+        "dispatcher",
+        "handle",
+        "hook",
+        "identity",
+        "live",
+        "lookup",
+        "module",
+        "mutation",
+        "ops",
+        "p0",
+        "public",
+        "release",
+        "resource",
+        "runtime",
+        "sdk",
+        "source",
+        "stable",
+        "support",
+        "tier",
+        "v1",
+        "wiring",
+    }
+    return bool(tokens & sensitive_tokens)
+
+
+def candidate_alias_promoted_string_overclaim(normalized_key: str) -> bool:
+    if normalized_key in CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS:
+        return True
+    tokens = {token for token in normalized_key.split("_") if token}
+    return bool(
+        "status" in tokens
+        and (tokens & {"mission", "transfer", "dino", "tribe", "buff", "policy", "runtime", "sdk", "source", "v1"})
+    )
+
+
+def positive_numeric_claim(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+
+def positive_progress_claim(value: Any) -> bool:
+    return positive_numeric_claim(value) or (
+        isinstance(value, str) and POSITIVE_PROGRESS_RATIO_RE.fullmatch(value) is not None
+    )
+
+
+def positive_status_claim(value: Any) -> bool:
+    if value is True:
+        return True
+    if positive_numeric_claim(value):
+        return True
+    if not isinstance(value, str):
+        return False
+    normalized = value.lower().replace("-", "_").replace(" ", "_")
+    return (
+        normalized in CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES
+        or normalized.endswith("_ready")
+    )
+
+
+def progress_or_completion_alias(normalized_key: str) -> bool:
+    tokens = {token for token in normalized_key.split("_") if token}
+    progress_tokens = {
+        "count",
+        "counting",
+        "counts",
+        "progress",
+        "contribution",
+        "completion",
+        "percent",
+        "ratio",
+        "credit",
+        "credits",
+    }
+    scope_tokens = {"sdk", "v1", "p0", "claim", "public", "runtime", "stable", "complete"}
+    return bool(tokens & progress_tokens and tokens & scope_tokens)
+
+
+def collect_true_ready_overclaims(value: Any, prefix: str = "$", *, claim_context: bool = False) -> list[str]:
     overclaims: list[str] = []
     if isinstance(value, dict):
         for key, child in value.items():
             child_path = f"{prefix}.{key}"
-            normalized_key = key.lower().replace("-", "_").replace(" ", "_") if isinstance(key, str) else key
-            if normalized_key in MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS and child is True:
+            normalized_key = normalize_candidate_alias_key(key)
+            child_context = claim_context or candidate_alias_context(normalized_key)
+            if candidate_alias_true_overclaim(normalized_key) and child is True:
                 overclaims.append(child_path)
             if (
-                normalized_key in CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS
+                child_context
+                and (
+                    progress_or_completion_alias(normalized_key)
+                    or normalized_key
+                    in {"progress", "progress_contribution", "claim_progress", "credit", "credits", "claim_credit"}
+                )
+                and positive_progress_claim(child)
+            ):
+                overclaims.append(child_path)
+            if child_context and normalized_key in CONTEXTUAL_POSITIVE_STATUS_KEYS and positive_status_claim(child):
+                overclaims.append(child_path)
+            elif (
+                candidate_alias_promoted_string_overclaim(normalized_key)
                 and isinstance(child, str)
                 and child.lower().replace("-", "_").replace(" ", "_") in CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES
             ):
                 overclaims.append(child_path)
-            overclaims.extend(collect_true_ready_overclaims(child, child_path))
+            overclaims.extend(collect_true_ready_overclaims(child, child_path, claim_context=child_context))
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            overclaims.extend(collect_true_ready_overclaims(child, f"{prefix}[{index}]"))
+            overclaims.extend(collect_true_ready_overclaims(child, f"{prefix}[{index}]", claim_context=claim_context))
     return overclaims
 
 
@@ -1136,6 +1702,13 @@ def validate_candidate_leaf_evidence(
             if leaf_id == "mission"
             else "leaf_candidate_evidence_forbidden_claim"
         )
+        add_side_lane_source_artifact_issues(
+            blockers,
+            evidence,
+            label=label,
+            expected_target_sets=SIDE_LANE_EXPECTED_TARGET_SETS_BY_LEAF.get(leaf_id, ()),
+            leaf=leaf_id,
+        )
         for field in collect_true_ready_overclaims(evidence, label):
             add(blockers, ready_reason, field, leaf=leaf_id)
         claims = forbidden_claims("\n".join(flattened_strings(evidence)))
@@ -1173,6 +1746,12 @@ def validate_candidate_surface_evidence(surface: dict[str, Any], blockers: list[
     if not isinstance(evidence, dict):
         return
     label = "$.surface.evidence"
+    add_side_lane_source_artifact_issues(
+        blockers,
+        evidence,
+        label=label,
+        expected_target_sets=SIDE_LANE_SURFACE_EXPECTED_TARGET_SETS,
+    )
     for field in collect_true_ready_overclaims(evidence, label):
         add(blockers, "surface_candidate_ready_overclaim", field)
     for claim in forbidden_claims("\n".join(flattened_strings(evidence))):
@@ -1217,15 +1796,436 @@ def non_counting_allowed_v1_outcome(leaf: dict[str, Any], accounted_by: str | No
     return "not counted for v1 by this candidate-only checker; requires explicit leaf exclusion"
 
 
+def checker_blocker_reasons(report: dict[str, Any]) -> list[str]:
+    blockers = report.get("blockers")
+    if not isinstance(blockers, list):
+        return []
+    reasons: list[str] = []
+    for blocker in blockers:
+        if isinstance(blocker, dict) and isinstance(blocker.get("reason"), str):
+            reasons.append(blocker["reason"])
+        else:
+            reasons.append(str(blocker))
+    return reasons
+
+
+def focused_gate_status(report: dict[str, Any], key: str) -> dict[str, Any]:
+    gate = report.get(key)
+    if not isinstance(gate, dict):
+        return {"gate_status_observed": None, "returncode": None, "blocker_reasons": []}
+    return {
+        "gate_status_observed": gate.get("status"),
+        "returncode": gate.get("returncode"),
+        "blocker_reasons": string_list(gate.get("blocker_reasons")),
+    }
+
+
+def validate_optional_focused_non_counting_fields(
+    report: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    label: str,
+    reason_prefix: str,
+) -> None:
+    for key in OPTIONAL_FOCUSED_REPORT_FALSE_KEYS:
+        if key in report and report.get(key) is not False:
+            add(blockers, f"{reason_prefix}_optional_public_or_completion_claim", f"{label}.{key}", key=key)
+    for key in OPTIONAL_FOCUSED_REPORT_ZERO_FIELDS:
+        if key in report and report.get(key) != 0:
+            add(blockers, f"{reason_prefix}_optional_progress_contribution_nonzero", f"{label}.{key}", key=key)
+
+
+def required_false_fields_clear(report: dict[str, Any], keys: tuple[str, ...] | set[str]) -> bool:
+    return all(report.get(key) is False for key in keys)
+
+
+def optional_ready_fields_clear(report: dict[str, Any], keys: tuple[str, ...] | set[str]) -> bool:
+    return all(not positive_status_claim(report.get(key)) for key in keys if key in report)
+
+
+def required_zero_fields_clear(report: dict[str, Any], keys: tuple[str, ...] | set[str]) -> bool:
+    return all(report.get(key) == 0 for key in keys)
+
+
+def optional_zero_fields_clear(report: dict[str, Any], keys: tuple[str, ...] | set[str]) -> bool:
+    return all(not positive_numeric_claim(report.get(key)) for key in keys if key in report)
+
+
+def optional_focused_non_counting_fields_clear(report: dict[str, Any]) -> bool:
+    return optional_ready_fields_clear(report, set(OPTIONAL_FOCUSED_REPORT_FALSE_KEYS)) and optional_zero_fields_clear(
+        report,
+        set(OPTIONAL_FOCUSED_REPORT_ZERO_FIELDS),
+    )
+
+
+def validate_mission_copied_bool_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.mission_leaf_blocker_accounting.focused_checker_report"
+    if report.get("schema") != mission_copied_bool_readiness.REPORT_SCHEMA:
+        add(blockers, "mission_copied_bool_checker_schema_mismatch", f"{label}.schema")
+    if report.get("accepted_for_internal_planning") is not True:
+        add(blockers, "mission_copied_bool_checker_not_internal_planning_ready", f"{label}.accepted_for_internal_planning")
+    for key in ("ready", "consume_only", "internal_reusable_evidence_only", "not_artifact_gate"):
+        if report.get(key) is not True:
+            add(blockers, "mission_copied_bool_checker_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "mission_copied_bool_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in MISSION_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "mission_copied_bool_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in MISSION_ZERO_FIELDS:
+        if report.get(key) != 0:
+            add(blockers, "mission_copied_bool_progress_contribution_nonzero", f"{label}.{key}", key=key)
+    validate_optional_focused_non_counting_fields(
+        report,
+        blockers,
+        label=label,
+        reason_prefix="mission_copied_bool",
+    )
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "mission_copied_bool_summary_missing", f"{label}.summary")
+        return
+    copied_targets = string_list(summary.get("copied_targets"))
+    missing_targets = sorted(set(MISSION_COPIED_TARGETS) - set(copied_targets))
+    if missing_targets:
+        add(
+            blockers,
+            "mission_copied_bool_targets_missing",
+            f"{label}.summary.copied_targets",
+            missing=missing_targets,
+        )
+    copied_fields = string_list(summary.get("copied_fields"))
+    missing_fields = sorted(set(MISSION_COPIED_BOOL_FIELDS) - set(copied_fields))
+    if missing_fields:
+        add(
+            blockers,
+            "mission_copied_bool_fields_missing",
+            f"{label}.summary.copied_fields",
+            missing=missing_fields,
+        )
+    redacted_fields = string_list(summary.get("redacted_fields"))
+    missing_redactions = sorted(set(MISSION_REDACTED_RECOGNITION_FIELDS) - set(redacted_fields))
+    if missing_redactions:
+        add(
+            blockers,
+            "mission_copied_bool_redactions_missing",
+            f"{label}.summary.redacted_fields",
+            missing=missing_redactions,
+        )
+    if summary.get("get_player_usable_items_recognition_only") is not True:
+        add(
+            blockers,
+            "mission_copied_bool_recognition_only_missing",
+            f"{label}.summary.get_player_usable_items_recognition_only",
+        )
+
+
+def validate_transfer_baccept_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.transfer_leaf_blocker_accounting.focused_checker_report"
+    if report.get("schema") != transfer_baccept_readiness.REPORT_SCHEMA:
+        add(blockers, "transfer_baccept_checker_schema_mismatch", f"{label}.schema")
+    if report.get("accepted_for_internal_planning") is not True:
+        add(blockers, "transfer_baccept_checker_not_internal_planning_ready", f"{label}.accepted_for_internal_planning")
+    for key in ("ready", "consume_only", "not_artifact_gate"):
+        if report.get(key) is not True:
+            add(blockers, "transfer_baccept_checker_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "transfer_baccept_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in TRANSFER_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "transfer_baccept_public_or_runtime_claim", f"{label}.{key}", key=key)
+    validate_optional_focused_non_counting_fields(
+        report,
+        blockers,
+        label=label,
+        reason_prefix="transfer_baccept",
+    )
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "transfer_baccept_summary_missing", f"{label}.summary")
+        return
+    copied_targets = string_list(summary.get("copied_targets"))
+    if set(copied_targets) != {transfer_baccept_readiness.EXPECTED_COPIED_TARGET}:
+        add(
+            blockers,
+            "transfer_baccept_copied_target_mismatch",
+            f"{label}.summary.copied_targets",
+            expected=[transfer_baccept_readiness.EXPECTED_COPIED_TARGET],
+            value=copied_targets,
+        )
+    copied_fields = string_list(summary.get("copied_fields"))
+    if set(copied_fields) != {transfer_baccept_readiness.EXPECTED_COPIED_FIELD}:
+        add(
+            blockers,
+            "transfer_baccept_copied_field_mismatch",
+            f"{label}.summary.copied_fields",
+            expected=[transfer_baccept_readiness.EXPECTED_COPIED_FIELD],
+            value=copied_fields,
+        )
+    input_targets = string_list(summary.get("input_targets"))
+    missing_input_targets = sorted(set(transfer_baccept_readiness.EXPECTED_INPUT_TARGETS) - set(input_targets))
+    if missing_input_targets:
+        add(
+            blockers,
+            "transfer_baccept_input_targets_missing",
+            f"{label}.summary.input_targets",
+            missing=missing_input_targets,
+        )
+    forbidden_fields = string_list(summary.get("forbidden_fields"))
+    missing_forbidden = sorted(set(transfer_baccept_readiness.EXPECTED_FORBIDDEN_FIELDS) - set(forbidden_fields))
+    if missing_forbidden:
+        add(
+            blockers,
+            "transfer_baccept_forbidden_fields_missing",
+            f"{label}.summary.forbidden_fields",
+            missing=missing_forbidden,
+        )
+
+
+def validate_transfer_scriptstruct_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.transfer_scriptstruct_leaf_blocker_accounting.focused_checker_report"
+    if report.get("schema") != transfer_scriptstruct_readiness.REPORT_SCHEMA:
+        add(blockers, "transfer_scriptstruct_checker_schema_mismatch", f"{label}.schema")
+    for key in (
+        "ready",
+        "accepted_for_candidate_review",
+        "accepted_for_internal_planning",
+        "candidate_only",
+        "candidate_only_mode",
+        "consume_only",
+    ):
+        if report.get(key) is not True:
+            add(blockers, "transfer_scriptstruct_checker_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "transfer_scriptstruct_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in TRANSFER_SCRIPTSTRUCT_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "transfer_scriptstruct_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in TRANSFER_SCRIPTSTRUCT_ZERO_FIELDS:
+        if report.get(key) != 0:
+            add(blockers, "transfer_scriptstruct_progress_contribution_nonzero", f"{label}.{key}", key=key)
+    validate_optional_focused_non_counting_fields(
+        report,
+        blockers,
+        label=label,
+        reason_prefix="transfer_scriptstruct",
+    )
+    if report.get("explicitly_excluded") != transfer_scriptstruct_readiness.EXPLICITLY_EXCLUDED:
+        add(blockers, "transfer_scriptstruct_explicit_exclusions_mismatch", f"{label}.explicitly_excluded")
+    if report.get("item_net_info_excluded") is not True:
+        add(blockers, "transfer_scriptstruct_item_net_info_not_excluded", f"{label}.item_net_info_excluded")
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "transfer_scriptstruct_summary_missing", f"{label}.summary")
+        return
+    if summary.get("target_set") != transfer_scriptstruct_readiness.TARGET_SET:
+        add(blockers, "transfer_scriptstruct_target_set_mismatch", f"{label}.summary.target_set")
+    targets = string_list(summary.get("targets"))
+    if targets != transfer_scriptstruct_readiness.EXPECTED_TARGETS:
+        add(
+            blockers,
+            "transfer_scriptstruct_targets_mismatch",
+            f"{label}.summary.targets",
+            expected=transfer_scriptstruct_readiness.EXPECTED_TARGETS,
+            value=targets,
+        )
+    expected_signature_count = len(transfer_scriptstruct_readiness.EXPECTED_TARGETS)
+    for key in ("snapshot_count", "signature_count"):
+        if summary.get(key) != expected_signature_count:
+            add(
+                blockers,
+                "transfer_scriptstruct_count_mismatch",
+                f"{label}.summary.{key}",
+                key=key,
+                expected=expected_signature_count,
+                value=summary.get(key),
+            )
+    expected_field_count = sum(
+        int(spec["property_count"]) for spec in transfer_scriptstruct_readiness.EXPECTED_SIGNATURES.values()
+    )
+    for key in ("field_count_total", "redacted_payload_field_count"):
+        if summary.get(key) != expected_field_count:
+            add(
+                blockers,
+                "transfer_scriptstruct_field_count_mismatch",
+                f"{label}.summary.{key}",
+                key=key,
+                expected=expected_field_count,
+                value=summary.get(key),
+            )
+    if summary.get("copied_scalar_count_total") != 0:
+        add(
+            blockers,
+            "transfer_scriptstruct_copied_scalar_count_nonzero",
+            f"{label}.summary.copied_scalar_count_total",
+            value=summary.get("copied_scalar_count_total"),
+        )
+    expected_bool_tail_fields = sorted(
+        f"{target}.{field}"
+        for target, spec in transfer_scriptstruct_readiness.EXPECTED_SIGNATURES.items()
+        for field in spec["bool_tail_fields"]
+    )
+    bool_tail_fields = string_list(summary.get("bool_tail_fields"))
+    if bool_tail_fields != expected_bool_tail_fields:
+        add(
+            blockers,
+            "transfer_scriptstruct_bool_tail_fields_mismatch",
+            f"{label}.summary.bool_tail_fields",
+            expected=expected_bool_tail_fields,
+            value=bool_tail_fields,
+        )
+    not_promoted = set(string_list(summary.get("not_promoted_surfaces")))
+    missing_not_promoted = sorted(transfer_scriptstruct_readiness.REQUIRED_NOT_PROMOTED_SURFACES - not_promoted)
+    if missing_not_promoted:
+        add(
+            blockers,
+            "transfer_scriptstruct_not_promoted_surfaces_missing",
+            f"{label}.summary.not_promoted_surfaces",
+            missing=missing_not_promoted,
+        )
+    if summary.get("explicitly_excluded") != transfer_scriptstruct_readiness.EXPLICITLY_EXCLUDED:
+        add(blockers, "transfer_scriptstruct_summary_exclusions_mismatch", f"{label}.summary.explicitly_excluded")
+    if summary.get("item_net_info_excluded") is not True:
+        add(blockers, "transfer_scriptstruct_summary_item_net_info_not_excluded", f"{label}.summary.item_net_info_excluded")
+
+
+def validate_dino_scalar_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.dino_leaf_blocker_accounting.focused_checker_report"
+    if report.get("schema") != dino_scalar_readiness.REPORT_SCHEMA:
+        add(blockers, "dino_scalar_checker_schema_mismatch", f"{label}.schema")
+    if report.get("accepted_for_internal_planning") is not True:
+        add(blockers, "dino_scalar_checker_not_internal_planning_ready", f"{label}.accepted_for_internal_planning")
+    for key in ("ready", "offline_only", "not_artifact_gate"):
+        if report.get(key) is not True:
+            add(blockers, "dino_scalar_checker_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "dino_scalar_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in DINO_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "dino_scalar_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in DINO_ZERO_FIELDS:
+        if report.get(key) != 0:
+            add(blockers, "dino_scalar_progress_contribution_nonzero", f"{label}.{key}", key=key)
+    validate_optional_focused_non_counting_fields(
+        report,
+        blockers,
+        label=label,
+        reason_prefix="dino_scalar",
+    )
+    if report.get("scalar_only_ready") is not True:
+        add(blockers, "dino_scalar_only_not_ready", f"{label}.scalar_only_ready")
+    if report.get("precall_scalar_ready") is not True:
+        add(blockers, "dino_precall_scalar_not_ready", f"{label}.precall_scalar_ready")
+    if report.get("postcall_return_ready") is not False:
+        add(blockers, "dino_postcall_return_overclaim", f"{label}.postcall_return_ready")
+
+    target_set = report.get("target_set")
+    if not isinstance(target_set, dict):
+        add(blockers, "dino_scalar_target_set_missing", f"{label}.target_set")
+    else:
+        if target_set.get("target_set") != dino_scalar_readiness.TARGET_SET:
+            add(blockers, "dino_scalar_target_set_mismatch", f"{label}.target_set.target_set")
+        input_targets = set(string_list(target_set.get("input_targets")))
+        missing_input_targets = sorted(dino_scalar_readiness.EXPECTED_INPUT_TARGETS - input_targets)
+        if missing_input_targets:
+            add(
+                blockers,
+                "dino_scalar_input_targets_missing",
+                f"{label}.target_set.input_targets",
+                missing=missing_input_targets,
+            )
+        if target_set.get("missing_targets") != []:
+            add(blockers, "dino_scalar_target_set_has_missing_targets", f"{label}.target_set.missing_targets")
+
+    source_isolation = report.get("source_isolation")
+    if not isinstance(source_isolation, dict):
+        add(blockers, "dino_scalar_source_isolation_missing", f"{label}.source_isolation")
+    elif source_isolation.get("status") != "isolated":
+        add(
+            blockers,
+            "dino_scalar_source_isolation_not_isolated",
+            f"{label}.source_isolation.status",
+            value=source_isolation.get("status"),
+        )
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "dino_scalar_summary_missing", f"{label}.summary")
+        return
+    expected_summary_sets = (
+        ("layout_scalar_fields", dino_scalar_readiness.EXPECTED_LAYOUT_SCALAR_FIELDS),
+        ("precall_copied_fields", dino_scalar_readiness.EXPECTED_COPIED_FIELDS),
+        ("deferred_return_fields", dino_scalar_readiness.EXPECTED_EXCLUDED_FIELDS),
+        ("redacted_fields", dino_scalar_readiness.EXPECTED_REDACTED_FIELDS),
+        ("descriptors", dino_scalar_readiness.EXPECTED_DESCRIPTORS),
+    )
+    for key, expected in expected_summary_sets:
+        values = set(string_list(summary.get(key)))
+        if values != expected:
+            add(
+                blockers,
+                "dino_scalar_summary_field_mismatch",
+                f"{label}.summary.{key}",
+                key=key,
+                missing=sorted(expected - values),
+                unexpected=sorted(values - expected),
+            )
+    if summary.get("pre_call_only") is not True:
+        add(blockers, "dino_scalar_pre_call_only_missing", f"{label}.summary.pre_call_only")
+    if summary.get("return_values_excluded") is not True:
+        add(blockers, "dino_scalar_return_values_not_excluded", f"{label}.summary.return_values_excluded")
+
+
 def build_mission_leaf_blocker_accounting(
     leaves: dict[str, dict[str, Any]],
     leaf_family_accounting: dict[str, Any],
+    mission_report: dict[str, Any],
 ) -> dict[str, Any]:
     leaf = leaves.get("mission", {})
     current_evidence = string_list(leaf.get("current_evidence"))
     missing_required_evidence = sorted(set(MISSION_REQUIRED_EVIDENCE) - set(current_evidence))
     gaps = leaf_family_accounting.get("leaf_family_gaps")
     mission_gap = gaps.get("mission") if isinstance(gaps, dict) and isinstance(gaps.get("mission"), dict) else {}
+    summary = mission_report.get("summary") if isinstance(mission_report.get("summary"), dict) else {}
+    copied_targets = string_list(summary.get("copied_targets") if isinstance(summary, dict) else None) or list(
+        MISSION_COPIED_TARGETS
+    )
+    copied_fields = string_list(summary.get("copied_fields") if isinstance(summary, dict) else None) or list(
+        MISSION_COPIED_BOOL_FIELDS
+    )
+    redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None) or list(
+        MISSION_REDACTED_RECOGNITION_FIELDS
+    )
+    checker_ready = (
+        mission_report.get("accepted_for_internal_planning") is True
+        and not mission_report.get("blockers")
+        and required_false_fields_clear(mission_report, set(MISSION_PUBLIC_FALSE_KEYS))
+        and required_zero_fields_clear(mission_report, set(MISSION_ZERO_FIELDS))
+        and optional_focused_non_counting_fields_clear(mission_report)
+    )
 
     return {
         "schema": MISSION_LEAF_ACCOUNTING_SCHEMA,
@@ -1233,10 +2233,15 @@ def build_mission_leaf_blocker_accounting(
         "lane": "mission_copied_bool_policy_slice",
         "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
         "accounting_scope": "candidate-only internal blocker accounting",
-        "accepted_for_internal_planning": not missing_required_evidence and leaf.get("status") == "planning",
+        "accepted_for_internal_planning": (
+            not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+        ),
+        "candidate_only": True,
         "consume_only": True,
         "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
         "v1_accounted": bool(mission_gap.get("v1_accounted")),
+        "focused_checker_v1_accounted": False,
         "mission_sdk_ready": False,
         "public_abi_ready": False,
         "public_sdk_ready": False,
@@ -1248,20 +2253,34 @@ def build_mission_leaf_blocker_accounting(
         "promotion_ready": False,
         "return_override_ready": False,
         "v1_completion": False,
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
         "focused_checker": "scripts/check_mission_copied_bool_readiness.py",
+        "focused_checker_report": {
+            "schema": mission_report.get("schema"),
+            "checker_status_observed": mission_report.get("status"),
+            "checker_ready_observed": bool(mission_report.get("ready")),
+            "accepted_for_internal_planning": bool(mission_report.get("accepted_for_internal_planning")),
+            "consume_only": bool(mission_report.get("consume_only")),
+            "not_artifact_gate": bool(mission_report.get("not_artifact_gate")),
+            "blocker_reasons": checker_blocker_reasons(mission_report),
+            "consume_gate": focused_gate_status(mission_report, "consume_gate"),
+            "promote_gate": focused_gate_status(mission_report, "promote_gate"),
+        },
         "input_target_set": "mission-compact-intake",
         "output_target_set": "mission-copied-bool-policy-slice",
         "required_evidence": list(MISSION_REQUIRED_EVIDENCE),
         "current_evidence": current_evidence,
         "missing_required_evidence": missing_required_evidence,
         "copied_bool_boundary": {
-            "copied_targets": list(MISSION_COPIED_TARGETS),
-            "copied_bool_fields": list(MISSION_COPIED_BOOL_FIELDS),
-            "copied_bool_count": len(MISSION_COPIED_BOOL_FIELDS),
+            "checker_schema": mission_report.get("schema"),
+            "checker_ready": checker_ready,
+            "copied_targets": copied_targets if checker_ready else [],
+            "copied_bool_fields": copied_fields if checker_ready else [],
+            "copied_bool_count": len(copied_fields) if checker_ready else 0,
         },
         "redaction_boundary": {
             "recognition_only_targets": list(MISSION_RECOGNITION_ONLY_TARGETS),
-            "redacted_recognition_fields": list(MISSION_REDACTED_RECOGNITION_FIELDS),
+            "redacted_recognition_fields": redacted_fields,
             "forbidden_promotions": [
                 "mission identity",
                 "player/controller/character identity",
@@ -1277,14 +2296,413 @@ def build_mission_leaf_blocker_accounting(
         "remaining_public_gates": string_list(mission_gap.get("missing_public_gates")),
         "outcome": (
             "internal_planning_only"
-            if not missing_required_evidence and leaf.get("status") == "planning"
+            if not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
             else "blocked_accounting"
         ),
+        "blocker_parity": {
+            "focused_checker_blocker_reasons": checker_blocker_reasons(mission_report),
+            "umbrella_blocker_reason": (
+                None if checker_ready else "mission_copied_bool_checker_blocked_or_not_ready"
+            ),
+        },
         "non_claims": [
             "mission leaf accounting is exactly consume-only internal reusable evidence",
             "mission leaf accounting does not promote a public Mission SDK, ABI, callback, or descriptor",
             "mission leaf accounting does not promote runtime hooks, dispatcher wiring, mutation, return override, identity, lookup, arrays, or ResourceHandle",
             "mission leaf accounting does not expand beyond the frozen copied-bool policy slice",
+            "mission copied-bool readiness does not count toward P0 dependency-chain or complete-SDK accounting",
+        ],
+    }
+
+
+def build_transfer_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    transfer_report: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("transfer", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    missing_required_evidence = sorted(set(TRANSFER_REQUIRED_EVIDENCE) - set(current_evidence))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    transfer_gap = (
+        gaps.get("transfer")
+        if isinstance(gaps, dict) and isinstance(gaps.get("transfer"), dict)
+        else {}
+    )
+    summary = transfer_report.get("summary") if isinstance(transfer_report.get("summary"), dict) else {}
+    copied_targets = string_list(summary.get("copied_targets") if isinstance(summary, dict) else None)
+    copied_fields = string_list(summary.get("copied_fields") if isinstance(summary, dict) else None)
+    input_targets = string_list(summary.get("input_targets") if isinstance(summary, dict) else None)
+    forbidden_fields = string_list(summary.get("forbidden_fields") if isinstance(summary, dict) else None)
+    checker_ready = (
+        transfer_report.get("accepted_for_internal_planning") is True
+        and not transfer_report.get("blockers")
+        and required_false_fields_clear(transfer_report, set(TRANSFER_PUBLIC_FALSE_KEYS))
+        and required_zero_fields_clear(transfer_report, set(TRANSFER_ZERO_FIELDS))
+        and optional_focused_non_counting_fields_clear(transfer_report)
+    )
+
+    return {
+        "schema": TRANSFER_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "transfer",
+        "lane": "transfer_baccept_only_policy_slice",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": (
+            not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+        ),
+        "candidate_only": True,
+        "consume_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "v1_accounted": bool(transfer_gap.get("v1_accounted")),
+        "focused_checker_v1_accounted": False,
+        "transfer_sdk_ready": False,
+        "public_transfer_sdk_ready": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_sdk_ready": False,
+        "public_header_ready": False,
+        "public_contract_ready": False,
+        "public_metadata_helpers_ready": False,
+        "runtime_hook_ready": False,
+        "runtime_hook_wiring_ready": False,
+        "runtime_ready": False,
+        "runtime_validated": False,
+        "runtime_validation_ready": False,
+        "dispatcher_ready": False,
+        "dispatcher_wiring_ready": False,
+        "server_validation_ready": False,
+        "identity_ready": False,
+        "player_identity_public_contract_ready": False,
+        "ownership_ready": False,
+        "cross_map_state_public_contract_ready": False,
+        "downloaded_character_public_contract_ready": False,
+        "dino_payload_public_contract_ready": False,
+        "transfer_payload_decoding_ready": False,
+        "transfer_payload_public_contract_ready": False,
+        "resource_handle_public_contract_ready": False,
+        "mutation_ready": False,
+        "promotion_ready": False,
+        "return_override_ready": False,
+        "v1_completion": False,
+        "v1_completion_evidence": False,
+        "v1_ready": False,
+        "v1_release_ready": False,
+        **{key: 0 for key in TRANSFER_ZERO_FIELDS},
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
+        "focused_checker": "scripts/check_transfer_baccept_readiness.py",
+        "focused_checker_report": {
+            "schema": transfer_report.get("schema"),
+            "checker_status_observed": transfer_report.get("status"),
+            "checker_ready_observed": bool(transfer_report.get("ready")),
+            "accepted_for_internal_planning": bool(transfer_report.get("accepted_for_internal_planning")),
+            "consume_only": bool(transfer_report.get("consume_only")),
+            "not_artifact_gate": bool(transfer_report.get("not_artifact_gate")),
+            "blocker_reasons": checker_blocker_reasons(transfer_report),
+            "consume_gate": focused_gate_status(transfer_report, "consume_gate"),
+            "promote_gate": focused_gate_status(transfer_report, "promote_gate"),
+        },
+        "input_target_set": transfer_baccept_readiness.INPUT_TARGET_SET,
+        "output_target_set": transfer_baccept_readiness.OUTPUT_TARGET_SET,
+        "required_evidence": list(TRANSFER_REQUIRED_EVIDENCE),
+        "current_evidence": current_evidence,
+        "missing_required_evidence": missing_required_evidence,
+        "copied_bool_boundary": {
+            "checker_schema": transfer_report.get("schema"),
+            "checker_ready": checker_ready,
+            "input_targets": input_targets if checker_ready else [],
+            "copied_targets": copied_targets if checker_ready else [],
+            "copied_bool_fields": copied_fields if checker_ready else [],
+            "copied_bool_count": len(copied_fields) if checker_ready else 0,
+        },
+        "redaction_boundary": {
+            "forbidden_fields": forbidden_fields,
+            "required_forbidden_fields": sorted(transfer_baccept_readiness.EXPECTED_FORBIDDEN_FIELDS),
+            "forbidden_promotions": [
+                "public Transfer SDK",
+                "transfer payload decoding or ownership",
+                "downloaded character payload contract",
+                "dino payload contract",
+                "player identity",
+                "ownership lookup",
+                "cross-map state correlation",
+                "teleport/spawn authority",
+                "runtime hook wiring",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "remaining_public_gates": string_list(transfer_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+            else "blocked_accounting"
+        ),
+        "blocker_parity": {
+            "focused_checker_blocker_reasons": checker_blocker_reasons(transfer_report),
+            "umbrella_blocker_reason": None if checker_ready else "transfer_baccept_checker_blocked_or_not_ready",
+        },
+        "non_claims": [
+            "transfer leaf accounting is exactly consume-only internal reusable evidence",
+            "transfer leaf accounting does not promote a public Transfer SDK, ABI, callback, descriptor, or v1 completion",
+            "transfer leaf accounting does not promote runtime hooks, dispatcher wiring, identity, ownership lookup, payload decoding, cross-map correlation, teleport/spawn, mutation, return override, or ResourceHandle",
+            "transfer bAccept readiness does not count toward P0 dependency-chain or complete-SDK accounting",
+        ],
+    }
+
+
+def build_transfer_scriptstruct_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    scriptstruct_report: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("transfer", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    transfer_gap = (
+        gaps.get("transfer")
+        if isinstance(gaps, dict) and isinstance(gaps.get("transfer"), dict)
+        else {}
+    )
+    summary = scriptstruct_report.get("summary") if isinstance(scriptstruct_report.get("summary"), dict) else {}
+    targets = string_list(summary.get("targets") if isinstance(summary, dict) else None)
+    bool_tail_fields = string_list(summary.get("bool_tail_fields") if isinstance(summary, dict) else None)
+    not_promoted_surfaces = string_list(summary.get("not_promoted_surfaces") if isinstance(summary, dict) else None)
+    expected_bool_tail_fields = sorted(
+        f"{target}.{field}"
+        for target, spec in transfer_scriptstruct_readiness.EXPECTED_SIGNATURES.items()
+        for field in spec["bool_tail_fields"]
+    )
+    checker_ready = (
+        scriptstruct_report.get("accepted_for_internal_planning") is True
+        and not scriptstruct_report.get("blockers")
+        and required_false_fields_clear(scriptstruct_report, set(TRANSFER_SCRIPTSTRUCT_PUBLIC_FALSE_KEYS))
+        and required_zero_fields_clear(scriptstruct_report, set(TRANSFER_SCRIPTSTRUCT_ZERO_FIELDS))
+        and optional_focused_non_counting_fields_clear(scriptstruct_report)
+        and summary.get("target_set") == transfer_scriptstruct_readiness.TARGET_SET
+        and targets == transfer_scriptstruct_readiness.EXPECTED_TARGETS
+        and bool_tail_fields == expected_bool_tail_fields
+        and summary.get("copied_scalar_count_total") == 0
+    )
+
+    return {
+        "schema": TRANSFER_SCRIPTSTRUCT_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "transfer",
+        "lane": "transfer_scriptstruct_payload_layout_candidate",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": leaf.get("status") == "planning" and checker_ready,
+        "candidate_only": True,
+        "consume_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "v1_accounted": False,
+        "focused_checker_v1_accounted": False,
+        "release_statement_or_manifest_exclusion_accounted": bool(transfer_gap.get("v1_accounted")),
+        "stable_claim_allowed": False,
+        "stable_sdk_ready": False,
+        "v1_completion": False,
+        "v1_completion_ready": False,
+        "v1_completion_progress_contribution": 0,
+        **{key: False for key in TRANSFER_SCRIPTSTRUCT_PUBLIC_FALSE_KEYS},
+        **{key: 0 for key in TRANSFER_SCRIPTSTRUCT_ZERO_FIELDS},
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
+        "focused_checker": "scripts/check_transfer_scriptstruct_readiness.py",
+        "focused_checker_report": {
+            "schema": scriptstruct_report.get("schema"),
+            "checker_status_observed": scriptstruct_report.get("status"),
+            "checker_ready_observed": bool(scriptstruct_report.get("ready")),
+            "accepted_for_candidate_review": bool(scriptstruct_report.get("accepted_for_candidate_review")),
+            "accepted_for_internal_planning": bool(scriptstruct_report.get("accepted_for_internal_planning")),
+            "candidate_only": bool(scriptstruct_report.get("candidate_only")),
+            "consume_only": bool(scriptstruct_report.get("consume_only")),
+            "blocker_reasons": checker_blocker_reasons(scriptstruct_report),
+        },
+        "input_target_set": transfer_scriptstruct_readiness.TARGET_SET,
+        "required_evidence": [transfer_scriptstruct_readiness.TARGET_SET],
+        "current_evidence": current_evidence,
+        "missing_required_evidence": [],
+        "scriptstruct_boundary": {
+            "checker_schema": scriptstruct_report.get("schema"),
+            "checker_ready": checker_ready,
+            "target_set": summary.get("target_set") if checker_ready and isinstance(summary, dict) else None,
+            "targets": targets if checker_ready else [],
+            "snapshot_count": summary.get("snapshot_count") if checker_ready and isinstance(summary, dict) else 0,
+            "signature_count": summary.get("signature_count") if checker_ready and isinstance(summary, dict) else 0,
+            "field_count_total": summary.get("field_count_total") if checker_ready and isinstance(summary, dict) else 0,
+            "redacted_payload_field_count": (
+                summary.get("redacted_payload_field_count") if checker_ready and isinstance(summary, dict) else 0
+            ),
+            "copied_scalar_count_total": (
+                summary.get("copied_scalar_count_total") if checker_ready and isinstance(summary, dict) else 0
+            ),
+            "bool_tail_fields": bool_tail_fields if checker_ready else [],
+            "bool_tail_field_count": len(bool_tail_fields) if checker_ready else 0,
+            "payload_decoding_ready": False,
+        },
+        "redaction_boundary": {
+            "redacted_payload_field_count": (
+                summary.get("redacted_payload_field_count") if checker_ready and isinstance(summary, dict) else 0
+            ),
+            "explicitly_excluded": transfer_scriptstruct_readiness.EXPLICITLY_EXCLUDED,
+            "item_net_info_excluded": bool(scriptstruct_report.get("item_net_info_excluded")),
+            "not_promoted_surfaces": not_promoted_surfaces if checker_ready else [],
+            "forbidden_promotions": [
+                "public ScriptStruct SDK",
+                "public Transfer SDK",
+                "transfer payload decoding",
+                "downloaded character payload contract",
+                "dino payload contract",
+                "ItemNetInfo exposure",
+                "cross-map state correlation",
+                "object identity",
+                "raw UE params",
+                "runtime hook wiring",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "remaining_public_gates": string_list(transfer_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if leaf.get("status") == "planning" and checker_ready
+            else "blocked_accounting"
+        ),
+        "blocker_parity": {
+            "focused_checker_blocker_reasons": checker_blocker_reasons(scriptstruct_report),
+            "umbrella_blocker_reason": None if checker_ready else "transfer_scriptstruct_checker_blocked_or_not_ready",
+        },
+        "non_claims": [
+            "transfer ScriptStruct accounting is candidate-only internal layout evidence",
+            "transfer ScriptStruct readiness does not promote public ScriptStruct or Transfer SDK callbacks",
+            "transfer ScriptStruct readiness does not decode transfer payloads, ItemNetInfo, raw UE params, cross-map state, object identity, mutation, return override, or ResourceHandle",
+            "transfer ScriptStruct readiness does not count toward v1, P0 dependency-chain, runtime, stable, or complete-SDK accounting",
+        ],
+    }
+
+
+def build_dino_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    dino_report: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("dino_policy", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    missing_required_evidence = sorted(set(DINO_REQUIRED_EVIDENCE) - set(current_evidence))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    dino_gap = (
+        gaps.get("dino_policy")
+        if isinstance(gaps, dict) and isinstance(gaps.get("dino_policy"), dict)
+        else {}
+    )
+    summary = dino_report.get("summary") if isinstance(dino_report.get("summary"), dict) else {}
+    target_set = dino_report.get("target_set") if isinstance(dino_report.get("target_set"), dict) else {}
+    source_isolation = dino_report.get("source_isolation") if isinstance(dino_report.get("source_isolation"), dict) else {}
+    precall_copied_fields = string_list(summary.get("precall_copied_fields") if isinstance(summary, dict) else None)
+    deferred_return_fields = string_list(summary.get("deferred_return_fields") if isinstance(summary, dict) else None)
+    redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None)
+    checker_ready = (
+        dino_report.get("accepted_for_internal_planning") is True
+        and not dino_report.get("blockers")
+        and required_false_fields_clear(dino_report, set(DINO_PUBLIC_FALSE_KEYS))
+        and required_zero_fields_clear(dino_report, set(DINO_ZERO_FIELDS))
+        and optional_focused_non_counting_fields_clear(dino_report)
+        and dino_report.get("scalar_only_ready") is True
+        and dino_report.get("precall_scalar_ready") is True
+        and dino_report.get("postcall_return_ready") is False
+        and set(precall_copied_fields) == dino_scalar_readiness.EXPECTED_COPIED_FIELDS
+        and set(deferred_return_fields) == dino_scalar_readiness.EXPECTED_EXCLUDED_FIELDS
+        and set(redacted_fields) == dino_scalar_readiness.EXPECTED_REDACTED_FIELDS
+        and source_isolation.get("status") == "isolated"
+    )
+
+    return {
+        "schema": DINO_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "dino_policy",
+        "lane": "dino_scalar_boundary_candidate",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": (
+            not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+        ),
+        "candidate_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "v1_accounted": False,
+        "focused_checker_v1_accounted": False,
+        "release_statement_or_manifest_exclusion_accounted": bool(dino_gap.get("v1_accounted")),
+        **{key: False for key in DINO_PUBLIC_FALSE_KEYS},
+        **{key: 0 for key in DINO_ZERO_FIELDS},
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
+        "focused_checker": "scripts/check_dino_scalar_readiness.py",
+        "focused_checker_report": {
+            "schema": dino_report.get("schema"),
+            "checker_status_observed": dino_report.get("status"),
+            "checker_ready_observed": bool(dino_report.get("ready")),
+            "accepted_for_internal_planning": bool(dino_report.get("accepted_for_internal_planning")),
+            "offline_only": bool(dino_report.get("offline_only")),
+            "not_artifact_gate": bool(dino_report.get("not_artifact_gate")),
+            "blocker_reasons": checker_blocker_reasons(dino_report),
+            "source_isolation_status": source_isolation.get("status"),
+        },
+        "input_target_set": dino_scalar_readiness.TARGET_SET,
+        "required_evidence": list(DINO_REQUIRED_EVIDENCE),
+        "current_evidence": current_evidence,
+        "missing_required_evidence": missing_required_evidence,
+        "scalar_boundary": {
+            "checker_schema": dino_report.get("schema"),
+            "checker_ready": checker_ready,
+            "target_set": target_set.get("target_set") if checker_ready else None,
+            "input_targets": string_list(target_set.get("input_targets")) if checker_ready else [],
+            "scalar_only_ready": checker_ready and bool(dino_report.get("scalar_only_ready")),
+            "precall_scalar_ready": checker_ready and bool(dino_report.get("precall_scalar_ready")),
+            "precall_copied_fields": precall_copied_fields if checker_ready else [],
+            "precall_copied_count": len(precall_copied_fields) if checker_ready else 0,
+            "deferred_return_fields": deferred_return_fields if checker_ready else [],
+            "deferred_return_count": len(deferred_return_fields) if checker_ready else 0,
+            "postcall_return_ready": False,
+            "return_values_excluded": (
+                bool(summary.get("return_values_excluded")) if checker_ready and isinstance(summary, dict) else False
+            ),
+        },
+        "redaction_boundary": {
+            "redacted_fields": redacted_fields,
+            "required_redactions": sorted(dino_scalar_readiness.EXPECTED_REDACTED_FIELDS),
+            "forbidden_promotions": [
+                "public Dino SDK",
+                "dino/player/passenger identity",
+                "ownership lookup or lifetime contract",
+                "object references",
+                "post-call return policy",
+                "runtime hook wiring",
+                "dispatcher lifecycle",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "source_isolation": {
+            "status": source_isolation.get("status"),
+            "violations": source_isolation.get("violations") if isinstance(source_isolation.get("violations"), list) else [],
+        },
+        "remaining_public_gates": string_list(dino_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if not missing_required_evidence and leaf.get("status") == "planning" and checker_ready
+            else "blocked_accounting"
+        ),
+        "blocker_parity": {
+            "focused_checker_blocker_reasons": checker_blocker_reasons(dino_report),
+            "umbrella_blocker_reason": None if checker_ready else "dino_scalar_checker_blocked_or_not_ready",
+        },
+        "non_claims": [
+            "dino leaf accounting is candidate-only internal scalar evidence",
+            "dino scalar readiness does not promote a public Dino SDK, ABI, callback, descriptor, or v1 completion",
+            "dino scalar readiness does not promote runtime hooks, dispatcher wiring, identity, lookup, object references, mutation, return override, or ResourceHandle",
+            "dino scalar readiness does not count toward v1, P0 dependency-chain, runtime, stable, or complete-SDK accounting",
         ],
     }
 
@@ -1310,6 +2728,9 @@ def validate_tribe_scalar_boundary_report(report: dict[str, Any], blockers: list
     for key in TRIBE_PUBLIC_FALSE_KEYS:
         if report.get(key) is not False:
             add(blockers, "tribe_scalar_boundary_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in sorted(set(TRIBE_FORBIDDEN_READY_KEYS) - set(TRIBE_PUBLIC_FALSE_KEYS)):
+        if key in report and positive_status_claim(report.get(key)):
+            add(blockers, "tribe_scalar_boundary_optional_public_or_runtime_claim", f"{label}.{key}", key=key)
 
     summary = report.get("summary")
     if not isinstance(summary, dict):
@@ -1357,6 +2778,16 @@ def build_tribe_leaf_blocker_accounting(
     redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None)
     optional_controls = summary.get("optional_controls") if isinstance(summary, dict) else None
     control_ready = scalar_report.get("server_request_tribe_log_control_ready")
+    checker_ready = (
+        scalar_report.get("accepted_for_internal_planning") is True
+        and not scalar_report.get("blockers")
+        and required_false_fields_clear(scalar_report, set(TRIBE_PUBLIC_FALSE_KEYS))
+        and optional_ready_fields_clear(scalar_report, set(TRIBE_FORBIDDEN_READY_KEYS) - set(TRIBE_PUBLIC_FALSE_KEYS))
+        and scalar_report.get("tribe_scalar_boundary_ready") is True
+        and control_ready is True
+        and set(accepted_scalar_fields) == set(TRIBE_EXPECTED_ACCEPTED_FIELDS)
+        and set(TRIBE_EXPECTED_REQUIRED_REDACTIONS).issubset(set(redacted_fields))
+    )
 
     return {
         "schema": TRIBE_LEAF_ACCOUNTING_SCHEMA,
@@ -1367,8 +2798,7 @@ def build_tribe_leaf_blocker_accounting(
         "accepted_for_internal_planning": (
             not missing_required_evidence
             and leaf.get("status") == "planning"
-            and scalar_report.get("accepted_for_internal_planning") is True
-            and not scalar_report.get("blockers")
+            and checker_ready
         ),
         "candidate_only": True,
         "internal_reusable_evidence_only": True,
@@ -1387,6 +2817,10 @@ def build_tribe_leaf_blocker_accounting(
         "return_override_ready": False,
         "resource_handle_ready": False,
         "v1_completion": False,
+        "focused_checker_v1_accounted": False,
+        "release_statement_or_manifest_exclusion_accounted": bool(tribe_gap.get("v1_accounted")),
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
+        **UMBRELLA_ACCOUNTING_ZERO_FIELDS,
         "focused_checker": "scripts/check_tribe_scalar_boundary_readiness.py",
         "input_target_set": TRIBE_SCALAR_TARGET_SET,
         "required_evidence": list(TRIBE_REQUIRED_EVIDENCE),
@@ -1394,12 +2828,12 @@ def build_tribe_leaf_blocker_accounting(
         "missing_required_evidence": missing_required_evidence,
         "scalar_boundary": {
             "checker_schema": scalar_report.get("schema"),
-            "checker_ready": bool(scalar_report.get("ready")),
-            "tribe_scalar_boundary_ready": bool(scalar_report.get("tribe_scalar_boundary_ready")),
-            "server_request_tribe_log_control_ready": control_ready,
-            "accepted_scalar_fields": accepted_scalar_fields,
-            "accepted_scalar_count": len(accepted_scalar_fields),
-            "optional_controls": optional_controls if isinstance(optional_controls, list) else [],
+            "checker_ready": checker_ready,
+            "tribe_scalar_boundary_ready": checker_ready and bool(scalar_report.get("tribe_scalar_boundary_ready")),
+            "server_request_tribe_log_control_ready": checker_ready and bool(control_ready),
+            "accepted_scalar_fields": accepted_scalar_fields if checker_ready else [],
+            "accepted_scalar_count": len(accepted_scalar_fields) if checker_ready else 0,
+            "optional_controls": optional_controls if checker_ready and isinstance(optional_controls, list) else [],
         },
         "redaction_boundary": {
             "redacted_fields": redacted_fields,
@@ -1423,8 +2857,7 @@ def build_tribe_leaf_blocker_accounting(
             "internal_planning_only"
             if not missing_required_evidence
             and leaf.get("status") == "planning"
-            and scalar_report.get("accepted_for_internal_planning") is True
-            and not scalar_report.get("blockers")
+            and checker_ready
             else "blocked_accounting"
         ),
         "non_claims": [
@@ -1458,6 +2891,12 @@ def validate_buff_status_report(report: dict[str, Any], blockers: list[dict[str,
     for key in BUFF_PUBLIC_FALSE_KEYS:
         if report.get(key) is not False:
             add(blockers, "buff_status_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in sorted(set(BUFF_FORBIDDEN_READY_KEYS) - set(BUFF_PUBLIC_FALSE_KEYS)):
+        if key in report and positive_status_claim(report.get(key)):
+            add(blockers, "buff_status_optional_public_or_runtime_claim", f"{label}.{key}", key=key)
+    for key in sorted(BUFF_FORBIDDEN_NONZERO_KEYS):
+        if key in report and positive_numeric_claim(report.get(key)):
+            add(blockers, "buff_status_progress_contribution_nonzero", f"{label}.{key}", key=key)
 
     summary = report.get("summary")
     if not isinstance(summary, dict):
@@ -1514,11 +2953,22 @@ def build_buff_leaf_blocker_accounting(
     copied_bool_fields = string_list(summary.get("copied_bool_fields") if isinstance(summary, dict) else None)
     redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None)
     zero_param_targets = summary.get("zero_param_targets") if isinstance(summary, dict) else None
+    zero_param_ready_targets = []
+    if isinstance(zero_param_targets, list):
+        zero_param_ready_targets = [
+            entry.get("target")
+            for entry in zero_param_targets
+            if isinstance(entry, dict) and entry.get("ready") is True
+        ]
     checker_ready = (
         buff_report.get("accepted_for_internal_planning") is True
         and not buff_report.get("blockers")
-        and buff_report.get("copied_payload_policy_ready") is False
-        and buff_report.get("lifecycle_semantics_ready") is False
+        and required_false_fields_clear(buff_report, set(BUFF_PUBLIC_FALSE_KEYS))
+        and optional_ready_fields_clear(buff_report, set(BUFF_FORBIDDEN_READY_KEYS) - set(BUFF_PUBLIC_FALSE_KEYS))
+        and optional_zero_fields_clear(buff_report, set(BUFF_FORBIDDEN_NONZERO_KEYS))
+        and set(copied_bool_fields) == set(BUFF_EXPECTED_COPIED_BOOL_FIELDS)
+        and set(BUFF_EXPECTED_REDACTED_FIELDS).issubset(set(redacted_fields))
+        and set(zero_param_ready_targets) == set(BUFF_EXPECTED_ZERO_PARAM_TARGETS)
     )
 
     return {
@@ -1551,6 +3001,10 @@ def build_buff_leaf_blocker_accounting(
         "v1_completion": False,
         "copied_payload_policy_ready": False,
         "lifecycle_semantics_ready": False,
+        "focused_checker_v1_accounted": False,
+        "release_statement_or_manifest_exclusion_accounted": bool(buff_gap.get("v1_accounted")),
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
+        **UMBRELLA_ACCOUNTING_ZERO_FIELDS,
         "focused_checker": "scripts/check_buff_status_readiness.py",
         "input_target_sets": list(BUFF_TARGET_SETS_USED),
         "required_evidence": list(BUFF_REQUIRED_EVIDENCE),
@@ -1558,14 +3012,14 @@ def build_buff_leaf_blocker_accounting(
         "missing_required_evidence": missing_required_evidence,
         "scalar_boundary": {
             "checker_schema": buff_report.get("schema"),
-            "checker_ready": bool(buff_report.get("ready")),
-            "buff_status_candidate_ready": bool(buff_report.get("buff_status_candidate_ready")),
-            "copied_bool_boundary_ready": bool(buff_report.get("copied_bool_boundary_ready")),
-            "class_object_redaction_ready": bool(buff_report.get("class_object_redaction_ready")),
-            "zero_param_lifecycle_shape_ready": bool(buff_report.get("zero_param_lifecycle_shape_ready")),
-            "copied_bool_fields": copied_bool_fields,
-            "copied_bool_count": len(copied_bool_fields),
-            "zero_param_targets": zero_param_targets if isinstance(zero_param_targets, list) else [],
+            "checker_ready": checker_ready,
+            "buff_status_candidate_ready": checker_ready and bool(buff_report.get("buff_status_candidate_ready")),
+            "copied_bool_boundary_ready": checker_ready and bool(buff_report.get("copied_bool_boundary_ready")),
+            "class_object_redaction_ready": checker_ready and bool(buff_report.get("class_object_redaction_ready")),
+            "zero_param_lifecycle_shape_ready": checker_ready and bool(buff_report.get("zero_param_lifecycle_shape_ready")),
+            "copied_bool_fields": copied_bool_fields if checker_ready else [],
+            "copied_bool_count": len(copied_bool_fields) if checker_ready else 0,
+            "zero_param_targets": zero_param_targets if checker_ready and isinstance(zero_param_targets, list) else [],
             "checked_target_count": len(BUFF_EXPECTED_TARGETS),
         },
         "redaction_boundary": {
@@ -1692,6 +3146,7 @@ def build_leaf_family_accounting(
         "public_sdk_ready": False,
         "runtime_ready": False,
         "promotion_ready": False,
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
         "planning_target_sets": planning_target_sets,
         "missing_leaf_families": missing_leaf_families,
         "non_promoted_leaf_families": non_promoted_leaf_families,
@@ -1799,6 +3254,20 @@ def build_report(
     manifest_path: Path,
     split_note_path: Path,
     release_statement_path: Path | None = None,
+    mission_root: Path = mission_copied_bool_readiness.DEFAULT_ROOT,
+    mission_manifest: Path | None = None,
+    mission_expected_manifest_sha256: str = mission_copied_bool_readiness.EXPECTED_MANIFEST_SHA256,
+    mission_skip_artifact_gates: bool = False,
+    mission_fixture_boundary_only: bool = False,
+    transfer_root: Path = transfer_baccept_readiness.DEFAULT_ROOT,
+    transfer_manifest: Path | None = None,
+    transfer_expected_manifest_sha256: str = transfer_baccept_readiness.EXPECTED_MANIFEST_SHA256,
+    transfer_skip_artifact_gates: bool = False,
+    transfer_scriptstruct_snapshot_root: Path = transfer_scriptstruct_readiness.DEFAULT_SNAPSHOT_ROOT,
+    transfer_scriptstruct_report_path: Path | None = None,
+    dino_repo_root: Path = REPO_ROOT,
+    dino_report_path: Path | None = None,
+    dino_snapshot_root: Path = dino_scalar_readiness.DEFAULT_SNAPSHOT_ROOT,
     tribe_snapshot_root: Path = DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
     buff_snapshot_root: Path = DEFAULT_BUFF_STATUS_SNAPSHOT_ROOT,
 ) -> dict[str, Any]:
@@ -1863,6 +3332,37 @@ def build_report(
     if surface.get("status") == "excluded" and not manifest_umbrella_excluded:
         add(blockers, "manifest_excluded_route_missing_leaf_exclusions", "$.leaf_decision_units")
 
+    mission_copied_bool_report = mission_copied_bool_readiness.build_report(
+        mission_root,
+        mission_manifest,
+        mission_expected_manifest_sha256,
+        mission_skip_artifact_gates,
+        mission_fixture_boundary_only,
+    )
+    validate_mission_copied_bool_report(mission_copied_bool_report, blockers)
+    transfer_baccept_report = transfer_baccept_readiness.build_report(
+        transfer_root,
+        transfer_manifest,
+        transfer_expected_manifest_sha256,
+        transfer_skip_artifact_gates,
+    )
+    validate_transfer_baccept_report(transfer_baccept_report, blockers)
+    transfer_scriptstruct_source_report = load_optional_focus_report(
+        transfer_scriptstruct_report_path,
+        "transfer_scriptstruct_report",
+        blockers,
+    )
+    transfer_scriptstruct_report = transfer_scriptstruct_readiness.build_report(
+        snapshot_root=transfer_scriptstruct_snapshot_root,
+        source_report=transfer_scriptstruct_source_report,
+    )
+    validate_transfer_scriptstruct_report(transfer_scriptstruct_report, blockers)
+    dino_scalar_report = dino_scalar_readiness.build_report(
+        dino_repo_root,
+        dino_report_path,
+        dino_snapshot_root,
+    )
+    validate_dino_scalar_report(dino_scalar_report, blockers)
     tribe_scalar_boundary_report = build_tribe_scalar_boundary_report(tribe_snapshot_root)
     validate_tribe_scalar_boundary_report(tribe_scalar_boundary_report, blockers)
     buff_status_report = build_buff_status_report(buff_snapshot_root)
@@ -1879,7 +3379,26 @@ def build_report(
         route = "candidate_only"
     leaf_family_accounting = build_leaf_family_accounting(surface, leaves, outcome, route, blockers)
     leaf_priority = build_leaf_priority(leaves, leaf_family_accounting, blockers)
-    mission_leaf_blocker_accounting = build_mission_leaf_blocker_accounting(leaves, leaf_family_accounting)
+    mission_leaf_blocker_accounting = build_mission_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        mission_copied_bool_report,
+    )
+    transfer_leaf_blocker_accounting = build_transfer_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        transfer_baccept_report,
+    )
+    transfer_scriptstruct_leaf_blocker_accounting = build_transfer_scriptstruct_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        transfer_scriptstruct_report,
+    )
+    dino_leaf_blocker_accounting = build_dino_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        dino_scalar_report,
+    )
     tribe_leaf_blocker_accounting = build_tribe_leaf_blocker_accounting(
         leaves,
         leaf_family_accounting,
@@ -1890,6 +3409,36 @@ def build_report(
         leaf_family_accounting,
         buff_status_report,
     )
+    leaf_family_accounting["non_counting_internal_evidence"] = {
+        "transfer_scriptstruct": {
+            "leaf": "transfer",
+            "checker": "scripts/check_transfer_scriptstruct_readiness.py",
+            "checker_ready": bool(transfer_scriptstruct_report.get("ready")),
+            "accepted_for_internal_planning": bool(
+                transfer_scriptstruct_report.get("accepted_for_internal_planning")
+            ),
+            "target_set": transfer_scriptstruct_readiness.TARGET_SET,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress_contribution": 0,
+        },
+        "dino_scalar": {
+            "leaf": "dino_policy",
+            "checker": "scripts/check_dino_scalar_readiness.py",
+            "checker_ready": bool(dino_scalar_report.get("ready")),
+            "accepted_for_internal_planning": bool(dino_scalar_report.get("accepted_for_internal_planning")),
+            "target_set": dino_scalar_readiness.TARGET_SET,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress_contribution": 0,
+        },
+    }
 
     return {
         "schema": REPORT_SCHEMA,
@@ -1906,6 +3455,9 @@ def build_report(
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},
         "candidate_only_accounting": leaf_family_accounting,
         "mission_leaf_blocker_accounting": mission_leaf_blocker_accounting,
+        "transfer_leaf_blocker_accounting": transfer_leaf_blocker_accounting,
+        "transfer_scriptstruct_leaf_blocker_accounting": transfer_scriptstruct_leaf_blocker_accounting,
+        "dino_leaf_blocker_accounting": dino_leaf_blocker_accounting,
         "tribe_leaf_blocker_accounting": tribe_leaf_blocker_accounting,
         "buff_leaf_blocker_accounting": buff_leaf_blocker_accounting,
         "leaf_priority": leaf_priority,
@@ -1916,7 +3468,9 @@ def build_report(
         "non_claims": [
             "candidate-only accounting does not add Mission, Transfer, Dino, Tribe, or Buff APIs",
             "candidate-only accounting does not add identity, lookup, mutation, return override, runtime hook, ResourceHandle, teleport/spawn, ownership lookup, or cross-map correlation",
+            "candidate-only accounting does not count focused Mission, Transfer, Transfer ScriptStruct, Dino, Tribe, or Buff readiness toward P0 dependency-chain or complete-SDK accounting",
         ],
+        **UMBRELLA_ACCOUNTING_FALSE_FLAGS,
     }
 
 
@@ -1926,6 +3480,20 @@ def main() -> int:
         args.manifest,
         args.split_note,
         args.release_statement,
+        args.mission_root,
+        args.mission_manifest,
+        args.mission_expected_manifest_sha256,
+        args.mission_skip_artifact_gates,
+        args.mission_fixture_boundary_only,
+        args.transfer_root,
+        args.transfer_manifest,
+        args.transfer_expected_manifest_sha256,
+        args.transfer_skip_artifact_gates,
+        args.transfer_scriptstruct_snapshot_root,
+        args.transfer_scriptstruct_report,
+        args.dino_repo_root,
+        args.dino_report,
+        args.dino_snapshot_root,
         args.tribe_snapshot_root,
         args.buff_snapshot_root,
     )

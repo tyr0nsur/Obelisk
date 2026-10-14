@@ -1,5 +1,123 @@
 {
   "schema": "obelisk.public-gameplay-events.v1",
+  "promoted_experimental_surface_outcomes": [
+    {
+      "surface_id": "obelisk.gameplay_policy_event.v1",
+      "current_status": "promoted-experimental-only",
+      "outcome_status": "unresolved",
+      "complete_sdk_accounting": "fail_closed_until_promoted_excluded_or_post_v1",
+      "allowed_resolutions": [
+        "promote_with_surface_specific_evidence",
+        "exclude_from_v1_release_statement",
+        "move_to_post_v1"
+      ],
+      "v1_completion_evidence": false,
+      "counts_toward_complete_sdk_claim": false,
+      "counts_toward_p0_dependency_chain_claim": false,
+      "complete_sdk_claim_progress_contribution": 0,
+      "p0_dependency_chain_claim_progress_contribution": 0,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "stable_claim_allowed": false,
+      "v1_completion_ready": false,
+      "must_not_unlock": [
+        "commands",
+        "moderation",
+        "identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "surface_id": "obelisk.chat_message.v1",
+      "current_status": "promoted-experimental-only",
+      "outcome_status": "unresolved",
+      "complete_sdk_accounting": "fail_closed_until_promoted_excluded_or_post_v1",
+      "allowed_resolutions": [
+        "promote_with_surface_specific_evidence",
+        "exclude_from_v1_release_statement",
+        "move_to_post_v1"
+      ],
+      "v1_completion_evidence": false,
+      "counts_toward_complete_sdk_claim": false,
+      "counts_toward_p0_dependency_chain_claim": false,
+      "complete_sdk_claim_progress_contribution": 0,
+      "p0_dependency_chain_claim_progress_contribution": 0,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "stable_claim_allowed": false,
+      "v1_completion_ready": false,
+      "must_not_unlock": [
+        "commands",
+        "moderation",
+        "identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "surface_id": "obelisk.chat.local_routing.v1",
+      "current_status": "promoted-experimental-only",
+      "outcome_status": "unresolved",
+      "complete_sdk_accounting": "fail_closed_until_promoted_excluded_or_post_v1",
+      "allowed_resolutions": [
+        "promote_with_surface_specific_evidence",
+        "exclude_from_v1_release_statement",
+        "move_to_post_v1"
+      ],
+      "v1_completion_evidence": false,
+      "counts_toward_complete_sdk_claim": false,
+      "counts_toward_p0_dependency_chain_claim": false,
+      "complete_sdk_claim_progress_contribution": 0,
+      "p0_dependency_chain_claim_progress_contribution": 0,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "stable_claim_allowed": false,
+      "v1_completion_ready": false,
+      "must_not_unlock": [
+        "commands",
+        "moderation",
+        "identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "surface_id": "obelisk.inventory_item_copied_signals.v1",
+      "current_status": "promoted-experimental-only",
+      "outcome_status": "unresolved",
+      "complete_sdk_accounting": "fail_closed_until_promoted_excluded_or_post_v1",
+      "allowed_resolutions": [
+        "promote_with_surface_specific_evidence",
+        "exclude_from_v1_release_statement",
+        "move_to_post_v1"
+      ],
+      "v1_completion_evidence": false,
+      "counts_toward_complete_sdk_claim": false,
+      "counts_toward_p0_dependency_chain_claim": false,
+      "complete_sdk_claim_progress_contribution": 0,
+      "p0_dependency_chain_claim_progress_contribution": 0,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "stable_claim_allowed": false,
+      "v1_completion_ready": false,
+      "must_not_unlock": [
+        "commands",
+        "moderation",
+        "identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    }
+  ],
   "metadata_surfaces": [
     {
       "surface_id": "obelisk.resource_kind_descriptors.v1",
@@ -343,8 +461,7 @@
       "plugin_owner_cleanup": true,
       "target_sets": [
         "structure-observer-intake",
-        "minimal-second-source-intake",
-        "item-return-only-policy-slice"
+        "minimal-second-source-intake"
       ],
       "second_source_reports": [
         "docs/research/2026-05-28-second-source-reversing-gap-matrix.md",
@@ -368,13 +485,6 @@
             "docs/research/2026-05-29-minimal-second-source-readiness.md"
           ],
           "scope": "layout-only compact inventory/structure backing; no standalone module-specific inventory or structure surface"
-        },
-        {
-          "target_set": "item-return-only-policy-slice",
-          "reports": [
-            "docs/research/2026-05-30-item-return-only-policy-slice.md"
-          ],
-          "scope": "second-source accepted copied ReturnValue-only item backing for AllowEquipItem, CanRepair, and UseItemOntoItem; no standalone item or inventory module surface, no identity, no lookup, no mutation, no return override, and no ResourceHandle"
         }
       ],
       "excluded_target_sets": [

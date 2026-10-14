@@ -1,608 +1,177 @@
-# Obelisk
+# Obelisk — native Linux ARK plugin prototype
 
-Obelisk is a Linux-native runtime, C API, and SDK track for ARK: Survival
-Evolved server modders on Linux. It uses UE4 reflection and `ProcessEvent`
-evidence to promote copied, scoped plugin-facing APIs without ArkApi/Windows ABI
-assumptions.
+This private repository contains the native Linux runtime and plugin API being
+developed for **ARK: Survival Evolved**. The public project name is
+**ObeliskNative**; Obelisk remains the internal source and ABI name.
 
-It aims to bring familiar ARK plugin concepts to Linux as an Obelisk-native SDK:
-runtime injection, UE event hooks, a scoped core plugin ABI, reflection-driven
-research tooling, and promoted gameplay APIs with explicit ownership, privacy,
-and lifecycle gates. ArkServerApi/AseApi and popular plugin families are names and demand
-signals only. They are not architecture or ergonomics sources, behavior maps, porting
-targets, copying sources, runtime evidence, or implementation guides for offsets, layouts,
-ABI assumptions, wrappers, raw UE pointer APIs, command parsers, return semantics, or
-implementations. Local popular-plugin clones such as NextGenPlugins are held to the same
-demand-dictionary boundary.
+## Verified milestone
 
-ARK: Survival Evolved dedicated servers are the current product target and
-validation environment. ARK/LinuxGSM details are operational adapters around the
-same Linux plugin runtime and SDK promotion path.
+On 14 October 2026, a real **Epic Games 361.8** client connected to the
+**public-branch ASE native Linux dedicated server 361.7**. The `oPing` plugin
+received `/ping` and the player confirmed the visible `pong` reply. Ordinary
+chat and a disconnect/relogin were also confirmed. Copied native identity
+observations were consistent across that relogin; this does not establish
+storefront provenance, authentication or a durable player/session contract.
 
-## Status
+The prototype baseline passed **147 CTest checks** before the latest identity
+and lifecycle extension. The current build now passes **149/149 CTest checks**,
+including the new identity and lifecycle fixtures. Those automated checks
+cover runtime and plugin behavior; the real-client observation establishes
+the in-game command/reply path. Steam acceptance, reply separation between two
+real players and the remaining session cases are still pending.
 
-Validated core baseline; not a production-stable v1.0 or complete SDK claim:
+The current source appends copied player observations and typed lifecycle
+notifications to the C API, extending `ObeliskApi` to **264 bytes on Linux
+x86_64**. Their build and fixture checks pass. The Epic client also confirmed
+the name and opaque native ID displayed by `/whoami`, and the plugin received
+the new owner-validated login observation. Logout/relogin delivery, interrupted
+connections and two-player separation remain pending for this new path.
 
-- `LD_PRELOAD` bootstrap for the current ARK/Linux validation target.
-- Absolute x64 `UObject::ProcessEvent` hook with target validation.
-- C ABI plugin loading through `ObeliskPlugin_GetInfo` and
-  `ObeliskPlugin_Init(api, context)`.
-- Runtime-owned plugin config under `${OBELISK_CONFIG_DIR}/<plugin-id>/config.json`.
-- Multi-instance plugin rollout through `OBELISK_INSTANCE_ID` and
-  `instance_allowlist`; shared config is supported, while runtime handles and mutable
-  state stay process-local unless a plugin implements explicit cross-process locking.
-- Central install and LinuxGSM wrapper guardrails, including read-only wrapper drift
-  checks before maintenance restarts.
-- Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
-- Public SDK header at `include/obelisk/ObeliskApi.h`.
+This is a working prototype, not a production-stable release or a complete
+ArkApi-equivalent SDK. See [oPing implementation and acceptance status](docs/OPING_PROTOTYPE.md)
+for the current target, evidence and remaining checks.
 
-v1 SDK direction:
+## Current development
 
-- `v1.0` means a complete public SDK contract for ARK/Linux plugin authors, not
-  only a stable runtime.
-- Canonical blockers are tracked in
-  [`docs/SDK_V1_COMPATIBILITY.md`](docs/SDK_V1_COMPATIBILITY.md) and
-  [`docs/public_sdk_surfaces.json`](docs/public_sdk_surfaces.json): player
-  identity/principal, permissions/admin, command response and commands/replies,
-  inventory/items, structures/build policy, dinos/tribes/buffs/missions/
-  transfers, operator/storage ingress, and gameplay tick/module paths.
-- RC and post-RC surfaces improve plugin-author readiness, but they do not
-  replace the complete v1 SDK blocker track or authorize `v1.0 stable`,
-  complete, full, or production SDK wording.
-- The current executable SDK gate remains blocked: complete-SDK progress is
-  `0/12`, the P0 dependency chain is `0/4`, `stable_claim_allowed=false`, and
-  the active route blocker is `approved_runtime_evidence_missing`.
-- Active narrow blocker examples stay exact: player identity needs approved copied runtime
-  principal lifecycle evidence, and ResourceHandle needs rejected runtime object
-  samples plus runtime serial reuse/wraparound semantics. Plugin Hub remains
-  post-SDK-complete planning only.
+The immediate work is a small, useful Linux plugin demonstrated with real
+clients. The operator-authorized scope is recorded in
+[the October reboot review](docs/REBOOT_2026-10-13.md); its initial installation
+and smoke-test details are historical, while `OPING_PROTOTYPE.md` tracks the
+active public-branch target.
 
-v0.1-rc public C ABI slices:
+The runtime loads native `.so` plugins through a versioned C ABI. The current
+command path matches exact text, runs on the invoking game thread and sends a
+synchronous reply to that invocation. Registered commands are consumed;
+ordinary chat continues through the original game implementation. UE pointers
+and target-specific layouts stay in the private Linux adapter.
 
-- Promoted `GameplayPolicyEvent` callback ABI for copied POD structure-backed policy
-  signals tied to fresh [`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md)
-  and inventory-backed policy signals through the same generic family.
-- Minimal v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
-  copied plugin-facing delivery has accepted `enable-chat-events` validation for all four
-  known send modes (`0..3`). Historical `enable-chat-reflection` observer output is not
-  delivery evidence. This remains a copied notification contract only, not commands,
-  identity, moderation/blocking, mutation, return override, or UE internals.
-- Metadata-only `DescribeResourceKind` helper for category descriptors; no resource
-  handles or lookup yet.
-- Metadata-only `DescribeGameplayPolicyEventKind` helper for promoted event-kind
-  descriptors.
-- CTest coverage for plugin config and ABI layout.
+Next acceptance work:
 
-Core runtime primitives:
+- Verify `/ping` with a real Steam client.
+- Connect two players and confirm each reply reaches only its intended player.
+- Exercise disconnect/relogin and reject expired or previous invocation tokens.
+- Corroborate the new copied player snapshot and lifecycle API with real sessions,
+  including failed or interrupted connections.
 
-- Timer callbacks are process-local runtime utilities: owner-token scoped registration,
-  zero-failure handles, one-shot/repeating callbacks, explicit unregister, and plugin
-  lifecycle cleanup. They are not gameplay/module timer abstractions, shared scheduler
-  state, UE identity, persistent handles, or cluster coordination.
+After that, extend administration and gameplay through concrete plugin needs.
+The first milestone does not require completing every historical SDK module.
 
-Experimental:
-
-- ReflectionScanner and offline analyzer tooling.
-- FName/GNames/GObjects/UFunction discovery.
-- Binary-hash-gated runtime observers for candidate modules.
-- Internal UTF-32 `FString` decoder candidate.
-- Sanitized UFunction/ScriptStruct snapshot fixtures and second-source comparison tooling.
-- General reflected parameter decoding beyond candidate-only module recognizers.
-
-Not ready:
-
-- Public gameplay module APIs beyond `GameplayPolicyEvent` and notification-only
-  `ChatMessageEvent`: players, richer chat, tribes, inventory, items, dinos, full
-  structure/resources APIs, missions, transfers, permissions, gameplay/module timer
-  abstractions, admin, and commands.
-- Production-ready gameplay SDK.
-
-See [docs/STATUS.md](docs/STATUS.md) for the current stability matrix and
-[docs/VERSIONING.md](docs/VERSIONING.md) for the pre-release versioning policy.
-
-## Why Obelisk
-
-Linux dedicated server binaries are often stripped and do not expose a clean
-native plugin interface. Obelisk takes the Linux path:
-
-- ELF runtime injection via `LD_PRELOAD`.
-- Native Linux memory and module inspection.
-- x86_64-safe detours.
-- A C ABI boundary for plugins.
-- UE4 reflection and `ProcessEvent` as the long-term compatibility layer.
-
-## Repository Layout
-
-```text
-include/obelisk/      Public SDK headers for plugin authors
-api/                  Transitional include wrappers
-core/                 Event manager, plugin manager, config validation
-hooks/                Runtime hooks, including ProcessEvent
-loader/               LD_PRELOAD bootstrap
-runtime/              Logging and runtime services
-ue/                   UE4 memory/reflection helpers
-examples/             Creator-facing examples for the installed SDK package
-plugins/oBaseEvents/  Release-scope event/config/lifecycle reference plugin
-plugins/oProcessTimer/  Release-scope process-local timer reference plugin
-plugins/oDescriptorCatalog/  Release-scope descriptor-catalog reference plugin
-tests/                Offline C++/SDK/ABI tests
-docs/                 Architecture, install, research, release notes
-scripts/              Install and offline analyzer helpers
-packaging/            Harness adapters and wrapper templates
-```
-
-Plugin policy is documented in
-[docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). The initial read-only
-operator CLI is documented in [docs/OPERATOR_CLI.md](docs/OPERATOR_CLI.md).
-Plugin Hub work is deferred until the complete SDK contract is closed. The current notes in
-[docs/PLUGIN_HUB_FOUNDATION_V1.md](docs/PLUGIN_HUB_FOUNDATION_V1.md) and
-[docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md) are retained
-only as post-SDK planning boundaries. They must not drive current prioritization, release
-claims, or new public SDK surface work. Finish the SDK blocker chain first.
-
-## Build And Test
+## Build and test
 
 Requirements:
 
-- Linux x86_64
-- CMake 3.22+
-- C++20 compiler
-- Git
+- Linux x86_64, CMake 3.22+, Git, and a C/C++ compiler with C++20 support.
+- OpenSSL Crypto development headers and library. On Debian/Ubuntu, install
+  `libssl-dev` alongside `build-essential`, `cmake` and `git`.
+- The pinned fmt, spdlog and subhook dependency sources. CMake fetches them on a
+  fresh configure; the active laboratory build already retains them in `_deps`.
 
-Quick contributor loop:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build -j"$(nproc)"
-ctest --test-dir build --output-on-failure
-scripts/run_script_tests.sh
-```
-
-Packaging layout checks:
+From the repository root, reuse the sibling build directory:
 
 ```bash
-scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
-LAYOUT_CHECK_ROOT="$(mktemp -d /tmp/obelisk-layout-check.XXXXXX)"
-scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
+cmake -S . -B ../build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build ../build -j2
+ctest --test-dir ../build --output-on-failure
 ```
 
-Release gate:
+The active source is `/servidor/obelisk/Obelisk` and the sole laboratory build is
+`/servidor/obelisk/build`. Its pinned dependency sources and manifest are retained
+there. Use focused targets while iterating, then the relevant full build/tests.
+Script and packaging checks are available through `scripts/run_script_tests.sh`
+and the installer helpers; their historical release gates are separate from
+real-client acceptance of this prototype.
 
-Release-candidate, installer, SDK package, CMake export, promoted public API,
-and first-stable scope changes use this canonical release gate instead of ad hoc
-command groups:
-
-```bash
-scripts/check_release_readiness.sh
-```
-
-When promoting reflected gameplay/module surfaces, use the same gate with
-second-source readiness enabled and explicitly named target sets. See
-[docs/RELEASE.md](docs/RELEASE.md) for the full promotion policy.
-
-Changes on the `ProcessEvent` hot path, including target-specific observer work,
-should also run the local benchmark checker before review. The current benchmark
-target is chat-specific because that observer exercises the hot path:
-
-```bash
-cmake --build build --target chat_reflection_benchmark
-./build/chat_reflection_benchmark 20000 > /tmp/obelisk-chat-reflection-benchmark.txt
-python3 scripts/check_chat_reflection_benchmark.py /tmp/obelisk-chat-reflection-benchmark.txt
-```
-
-Main build outputs:
+Main outputs:
 
 ```text
-build/libobelisk.so
-build/plugins/oBaseEvents/oBaseEvents.so
-build/plugins/oProcessTimer/oProcessTimer.so
-build/plugins/oDescriptorCatalog/oDescriptorCatalog.so
-build/_deps/subhook-build/libsubhook.so
+../build/libobelisk.so
+../build/_deps/subhook-build/libsubhook.so
+../build/plugins/oPing/oPing.so
+../build/plugins/oBaseEvents/oBaseEvents.so
+../build/plugins/oProcessTimer/oProcessTimer.so
+../build/plugins/oDescriptorCatalog/oDescriptorCatalog.so
 ```
 
-## Runtime Layout
+`plugins/oPing/` is the current command/reply example and is built by default.
+`OBELISK_BUILD_EXPERIMENTAL_PLUGINS` controls the additional historical examples.
 
-Obelisk installs under an operator-chosen root, referenced in docs as
-`<obelisk-root>`:
+## Repository layout
 
 ```text
-<obelisk-root>/
-  lib/
-    libobelisk.so
-    libsubhook.so
-  plugins/
-    PluginName.so
-  config/
-    <plugin-id>/
-      config.json
-  logs/
-    <instance-id>/
-      Obelisk.log
-      Obelisk-<Map>.log
-  state/
-    instances/
-      <instance-id>/
-        enable-process-event-hook
-        disable-plugins
+include/obelisk/       C API headers, command data and lifecycle event contracts
+plugins/oPing/        Current /ping example and experimental /whoami/lifecycle work
+core/                 Plugin manager, command dispatch, configuration and cleanup
+hooks/                ProcessEvent and private native chat/lifecycle adapters
+loader/               LD_PRELOAD bootstrap
+runtime/              Logging, binary identity and runtime services
+ue/                   Private UE memory, text and class validation helpers
+plugins/              Other retained reference and experimental plugins
+examples/             Installed SDK package examples
+tests/               Offline C++, plugin, ABI and SDK consumer checks
+docs/                Current prototype notes and historical research/planning
+scripts/             Installation, analysis and validation helpers
+packaging/           Harness and LinuxGSM wrapper templates
 ```
 
-The stable runtime posture uses `enable-process-event-hook` for the core hook and
-fail-closed plugin suppression through `OBELISK_DISABLE_PLUGINS=1`. The
-`disable-plugins` marker is the LinuxGSM wrapper input that records this intent; it
-is not an independent runtime gate by itself. Experimental observer, scanner,
-outbound-call, ptrace, native-exec, and raw callback markers are debug-only posture,
-documented in [docs/INSTALL.md](docs/INSTALL.md) and [docs/STATUS.md](docs/STATUS.md);
-they require an approved debug or beta window and should not be treated as stable
-operational defaults.
+## Runtime and plugin contract
 
-The target binary directory should only need a thin launcher/wrapper. Runtime
-libraries, plugins, config, logs, and state markers belong under the Obelisk
-root. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts to
-confirm the installed LinuxGSM wrapper still matches the versioned template. See
-[docs/INSTALL.md](docs/INSTALL.md).
-
-## Public Plugin ABI
-
-Plugins compile against:
-
-```cpp
-#include <obelisk/ObeliskApi.h>
-```
-
-External plugins should consume the installed SDK package:
-
-```cmake
-find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
-target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
-```
-
-Minimal shape:
-
-```cpp
-#include <obelisk/ObeliskApi.h>
-#include <cstddef>
-
-static ObeliskApi g_api{};
-static bool g_has_api = false;
-
-static void ResetState()
-{
-    g_api = {};
-    g_has_api = false;
-}
-
-static bool HasApiMetadataPrefix(const ObeliskApi* api)
-{
-    return api &&
-        api->struct_size >= offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities);
-}
-
-extern "C" __attribute__((visibility("default")))
-bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
-{
-    try {
-        if (!out)
-            return false;
-
-        out->abi_version = OBELISK_PLUGIN_METADATA_ABI_VERSION;
-        out->struct_size = sizeof(ObeliskPluginMetadata);
-        out->plugin_id = "example";
-        out->name = "Example Plugin";
-        out->version = "0.1.0-rc.2";
-        out->config_file = "config.json";
-        out->default_config_json =
-            "{\"enabled\":false,\"allow_all_instances\":false,\"instance_allowlist\":[]}\n";
-        return true;
-    } catch (...) {
-        return false;
-    }
-}
-
-extern "C" __attribute__((visibility("default")))
-bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
-{
-    try {
-        if (!api || !context)
-            return false;
-        if (!HasApiMetadataPrefix(api) || api->abi_version != OBELISK_API_ABI_VERSION)
-            return false;
-        if (context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
-            context->struct_size < sizeof(ObeliskPluginInitContext))
-            return false;
-
-        g_api = *api;
-        g_has_api = true;
-        api->LogInfo("Plugin loaded");
-        return true;
-    } catch (...) {
-        ResetState();
-        return false;
-    }
-}
-
-extern "C" __attribute__((visibility("default")))
-void ObeliskPlugin_Shutdown()
-{
-    try {
-        if (g_has_api && g_api.LogInfo)
-            g_api.LogInfo("Plugin shutdown");
-    } catch (...) {
-    }
-    ResetState();
-}
-```
-
-Prefer copied Obelisk-level events. Filtered and global raw `ProcessEvent` callbacks are
-hot-path debug tools unless explicitly measured and gated.
-
-Callbacks registered after `ObeliskPlugin_Init`, from helper libraries, or from background
-threads should use the owner-token registration fields appended to `ObeliskApi`. New
-plugins should prefer the handle-returning owner-token functions when
-`OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS` and
-`OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS` and
-`OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES` are advertised, store returned
-handles only in process-local state, and unregister them with
-`UnregisterProcessEventCallbackWithOwnerToken` during shutdown. Handles are not cluster
-state: never write them into shared plugin config or assume they are valid in another ARK
-server process. Legacy registration functions reject callbacks that cannot be attributed
-to the initializing plugin or an already-loaded plugin shared object.
-Apply the same rule to owner tokens, worker threads, sockets, caches, open file handles,
-borrowed UE pointers, and other mutable runtime state: keep them process-local unless the
-plugin documents and tests explicit cross-process ownership and locking.
-
-`ObeliskApi*` and `ObeliskPluginInitContext*` are borrowed for `ObeliskPlugin_Init` only.
-Copy the `ObeliskApi` table by value if shutdown, worker threads, or later callbacks need
-runtime functions.
-
-The promoted gameplay callback path is `GameplayPolicyEvent`. It is copied POD policy
-data, not a UE object/resource handle. Structure-backed claims point to fresh
-[`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md),
-which is layout-only support for copied/redacted backing. Plugins must check the
-capability, appended function pointers, `struct_size`, and a non-zero
-`plugin_owner_token` before subscribing:
-
-```cpp
-static uint64_t g_gameplay_policy_handle = 0;
-
-static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
-{
-    (void)user_data;
-    if (!event ||
-        event->abi_version != OBELISK_GAMEPLAY_POLICY_EVENT_ABI_VERSION ||
-        event->struct_size < sizeof(ObeliskGameplayPolicyEvent))
-        return;
-
-    if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE) != 0)
-    {
-        const bool allowed =
-            (event->bool_values & (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_RETURN_VALUE)) != 0;
-        (void)allowed;
-    }
-
-    if ((event->flags & OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED) != 0)
-    {
-        if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER) != 0)
-        {
-            const bool requested_by_player =
-                (event->bool_values &
-                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER)) != 0;
-            (void)requested_by_player;
-        }
-        if ((event->field_mask & OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN) != 0)
-        {
-            const bool ignore_cooldown =
-                (event->bool_values &
-                    (1ull << OBELISK_GAMEPLAY_POLICY_FIELD_IGNORE_COOLDOWN)) != 0;
-            (void)ignore_cooldown;
-        }
-    }
-}
-
-static bool HasGameplayPolicyEventApi(const ObeliskApi* api, uint64_t owner_token)
-{
-    return api &&
-        owner_token != 0 &&
-        (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
-        api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
-            sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
-        api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
-        api->UnregisterGameplayPolicyEventWithOwnerToken;
-}
-
-// During ObeliskPlugin_Init, after copying api/context into plugin-owned state:
-if (HasGameplayPolicyEventApi(&g_api, g_owner_token))
-{
-    const uint64_t event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL;
-    // Use OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY for inventory-backed only.
-    g_gameplay_policy_handle = g_api.RegisterGameplayPolicyEventWithOwnerTokenHandle(
-        g_owner_token,
-        event_mask,
-        OnGameplayPolicyEvent,
-        nullptr);
-    if (g_gameplay_policy_handle == 0)
-        return false;
-}
-
-// During ObeliskPlugin_Shutdown, before callback state can disappear:
-if (g_has_api && g_gameplay_policy_handle != 0 && g_api.UnregisterGameplayPolicyEventWithOwnerToken)
-    g_api.UnregisterGameplayPolicyEventWithOwnerToken(g_owner_token, g_gameplay_policy_handle);
-```
-
-`resource_kind` is categorical only. It is useful for routing or sanitized metrics such as
-"structure-backed policy event" or "inventory-item-backed policy event", but it is not a
-lookup key, persistent resource id, player/tribe/inventory/item identity, coordinates, UE
-pointer, or proof that two events refer to the same game object. Inventory-backed policy
-events are delivered through the same generic `GameplayPolicyEvent` masks, kinds, fields,
-and `INVENTORY_BACKED` flag; v0.1 does not ship a public Inventory SDK, Inventory callback
-ABI, item handle, lookup API, inventory contents API, mutation API, or return-override
-contract.
-
-Use `OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL` to receive every promoted policy event,
-`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES` for structure-backed policy only, or
-`OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY` for inventory-backed policy only.
-Inventory-backed events currently expose copied scalar booleans only when their field bits
-are present: `REQUESTED_BY_PLAYER` for remote-add checks, `IGNORE_COOLDOWN` for use checks,
-and `RETURN_VALUE` for the observed policy result. These fields are observations, not
-identity, lookup, mutation, or override authority.
-
-Plugins that need category metadata can call `DescribeResourceKind` after checking
-`OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS`, that `struct_size` covers the appended
-`DescribeResourceKind` slot, and that the function pointer is non-null. The returned
-`ObeliskResourceKindDescriptor` is copied POD metadata only: stable category name,
-supported gameplay policy masks, supported field masks, and flags that explicitly mark the
-category as no-identity and no-lookup.
-
-Plugins that need metadata for promoted event kinds can call
-`DescribeGameplayPolicyEventKind` after checking
-`OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, that `struct_size` covers the
-appended slot, and that the function pointer is non-null. The returned
-`ObeliskGameplayPolicyEventDescriptor` is copied POD metadata only: stable event name,
-resource category, event-kind mask, supported field mask, and copied-payload/backing
-flags. It does not expose UE internals, identity, lookup, mutation, or override authority.
-
-The v0.1-rc chat callback ABI is `ChatMessageEvent`. It is a copied UTF-8 notification
-contract for plugins that parse text locally, not a command SDK or chat authority surface.
-Plugins must check `OBELISK_API_CAPABILITY_CHAT_EVENTS`, the appended function pointers,
-`struct_size`, and a non-zero `plugin_owner_token` before subscribing. The event exposes
-message bytes, `send_mode`, copied-payload flags, and a process-local sequence only; it
-does not expose sender identity, resource identity, raw `FString`, UE pointers,
-FName/GObjects indices, raw params, chat send/moderation/blocking, mutation, or return
-override authority. Callback data is valid only for the callback duration, and the handle
-must be unregistered with `UnregisterChatMessageEventWithOwnerToken` during shutdown.
-Copied plugin-facing delivery evidence covers the gated `enable-chat-events` producer
-during an approved operator-selected beta-test window; `enable-chat-reflection` is only
-the historical observer path, so SDK registration support alone is not a delivery claim.
-
-`CallProcessEvent` is a low-level trampoline escape hatch. The ABI slot exists for
-compatibility, but plugins must treat it as unavailable unless `struct_size` covers the
-field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, the function pointer is
-non-null, and the call happens inside that plugin's `ObeliskPlugin_Init` while the live
-debug env+marker gate is active. Post-init calls through a captured API table fail closed;
-callback/runtime execution needs a future owner-token ABI. Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
-
-Owner-token timers are process-local runtime utilities. The timer unregister call cancels
-future delivery for a handle, but plugins must not treat it as proof that a timer callback
-already in flight has returned. Keep timer `user_data` valid until the plugin has its own
-quiescence proof or until Obelisk owner cleanup quiesces callbacks during
-unload/init-failure cleanup.
-
-The official reference plugin set includes [oBaseEvents](docs/oBaseEvents.md),
-`oProcessTimer`, and `oDescriptorCatalog`; each demonstrates a release-scope core/SDK
-pattern without expanding gameplay module scope. Experimental copied chat and policy
-examples are documented separately in [plugins/README.md](plugins/README.md) and are not
-production Plugin Hub modules.
-
-## ARK Debug Harness
-
-The current harness runs Obelisk inside `ShooterGameServer` with `LD_PRELOAD`.
-LinuxGSM wrapper templates live under `packaging/linuxgsm/`.
-
-This harness validates loader, hook, logging, marker, and plugin ABI behavior
-against a real UE4 Linux server. Do not treat ARK paths, map names, or observed
-`FName` indices as stable SDK contracts.
-
-## Runtime Controls
-
-Important environment variables:
+The isolated prototype uses `LD_PRELOAD`, a binary-verified private adapter and
+one plugin, `oPing.so`. The active runtime is described in
+[OPING_PROTOTYPE.md](docs/OPING_PROTOTYPE.md). Runtime libraries, plugin binaries,
+configuration and logs belong under an operator-chosen runtime root:
 
 ```text
-OBELISK_ROOT
-OBELISK_PLUGIN_DIR
-OBELISK_CONFIG_DIR
-OBELISK_LOG_DIR
-OBELISK_INSTANCE_ID
-OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
-OBELISK_DISABLE_PLUGINS=1
-OBELISK_ENABLE_REFLECTION_SCANNER=1
-OBELISK_ENABLE_INVENTORY_REFLECTION=1
-OBELISK_ENABLE_STRUCTURE_REFLECTION=1
-OBELISK_ENABLE_CHAT_EVENTS=1
-OBELISK_CHAT_EVENTS_BINARY_SHA256=<supported ARK SHA256>
-OBELISK_CHAT_EVENTS_DISPATCH_LIMIT=<positive dispatch budget>
-OBELISK_ENABLE_CHAT_REFLECTION=1
-OBELISK_<MODULE>_REFLECTION_BINARY_SHA256=<supported ARK SHA256>
-OBELISK_<MODULE>_REFLECTION_LOG_LIMIT=<bounded-count>
-OBELISK_PE_TRACE_LIMIT=0
+<runtime-root>/lib/libobelisk.so
+<runtime-root>/lib/libsubhook.so
+<runtime-root>/plugins/oPing.so
+<runtime-root>/config/<plugin-id>/config.json
+<runtime-root>/logs/<instance-id>/
+<runtime-root>/state/instances/<instance-id>/
 ```
 
-`OBELISK_INSTANCE_ID` must be a non-empty safe token using only letters, digits, `_`, or
-`-`. Plugin loading fails closed when the id is missing or unsafe, because shared-cluster
-plugin config uses this value for activation scope.
+Plugin code includes `<obelisk/ObeliskApi.h>` and exports
+`ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init` and optionally
+`ObeliskPlugin_Shutdown`. Check ABI versions, `struct_size`, capabilities and
+function pointers before using appended slots. Copy the borrowed API/context
+information needed after initialization into plugin-owned state.
 
-Experimental runtime controls that can affect server safety require both their environment
-variable and the matching instance marker under
-`OBELISK_ROOT/state/instances/<OBELISK_INSTANCE_ID>/`:
+Command invocation tokens expire when their callback returns. They authorize
+only the current synchronous reply on the invoking thread and for the owning
+plugin. Player snapshots and lifecycle strings are callback-scoped copied
+observations; copy their bytes before retaining them. They provide no
+permissions, authentication, durable session handle or subsequent reply rights.
+See [command data](include/obelisk/ObeliskCommandApi.h) and
+[lifecycle data](include/obelisk/ObeliskPlayerLifecycleApi.h) for exact lifetimes.
 
-```text
-OBELISK_DEBUG_ALLOW_PTRACE=1             + allow-ptrace
-OBELISK_ENABLE_DEBUG_CONTROL=1           + enable-debug-control
-OBELISK_ENABLE_REFLECTION_SCANNER=1      + enable-reflection-scanner
-OBELISK_ENABLE_NATIVE_EXEC_PROBES=1      + enable-native-exec-probes
-```
+Keep worker-thread timers away from UE gameplay calls. Callback registrations
+and plugin-owned resources must drain before unload. The native adapter remains
+installed until process exit; hot reload/removal is outside this milestone.
+Historical reflection scanners and unverified layouts remain disabled on the
+current server.
 
-Experimental scanners, candidate module observers, text logging, broad tracing, and native
-exec probes stay opt-in. Reflection captures belong on isolated/debug instances or an
-operator-approved validation target only. Do not use these controls on normal player-facing
-or performance-sensitive servers. Debug targets should be started only for scoped tests and
-returned to stable posture afterward.
+## Retained history and reference material
 
-Candidate module observers require the environment gate, supported binary SHA, the
-observer-specific instance marker, and `allow-experimental-observers` on the same
-instance. Stable posture rejects that allow marker.
+The recovered work remains useful for architecture, ABI design, packaging and
+research. Earlier complete-SDK plans and promotion counters describe a broader
+release goal; they are not the acceptance criteria or authorization gates for
+the current operator-requested prototype. Historical `0/12` SDK progress must
+not be read as zero working gameplay or as a requirement to implement twelve
+modules before improving `oPing`.
 
-## Roadmap
+- [Initial reboot review](docs/REBOOT_2026-10-13.md): recovery, first smoke tests
+  and the revised goal; superseded target paths are identified there.
+- [Architecture](docs/ARCHITECTURE.md), [plugin architecture](docs/PLUGIN_ARCHITECTURE.md)
+  and [contributor notes](CONTRIBUTING.md): retained design and implementation context.
+- [Historical stability matrix](docs/STATUS.md), [versioning](docs/VERSIONING.md),
+  [complete-SDK compatibility plan](docs/SDK_V1_COMPATIBILITY.md) and
+  [release policy](docs/RELEASE.md): historical broader release tracking.
+- [Installation reference](docs/INSTALL.md), [operator CLI](docs/OPERATOR_CLI.md)
+  and [plugin examples](plugins/README.md): existing helpers; verify their target
+  assumptions before applying them to the active laboratory instance.
+- [Research archive](docs/research/): retained evidence and its original scope.
+- [Plugin Hub foundation](docs/PLUGIN_HUB_FOUNDATION_V1.md) and
+  [capability matrix](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md): future planning,
+  not delivered functionality.
 
-Near-term engineering:
-
-- Keep CI as a fast quality gate for build, CTest, analyzer tests, SDK consumer
-  fixtures, and install dry-runs. Release-candidate validation stays centered on
-  `scripts/check_release_readiness.sh`.
-- Strengthen sanitized reflection snapshots, manifest regeneration, and second-source
-  comparison for candidate modules.
-- Define copied-data ownership and callback lifetime before exposing additional
-  plugin-facing gameplay events.
-- Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
-  validates the current field layout.
-- Keep Plugin Hub planning parked until the complete SDK contract is done. Do not spend
-  current engineering rounds on Plugin Hub packaging, examples, or intake tooling unless
-  a future SDK-complete release decision explicitly reopens that post-SDK track.
-
-Later:
-
-- Public module APIs for players, richer chat, tribes, inventory, items, dinos,
-  structures, missions, transfers, permissions, gameplay/module timer abstractions,
-  admin, and commands.
-
-## Contributing
-
-Useful starting points:
-
-- [CONTRIBUTING.md](CONTRIBUTING.md)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/STATUS.md](docs/STATUS.md)
-- [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)
-- [docs/research/](docs/research/)
-
-High-value areas:
-
-- Linux ELF/x86_64 hooking.
-- UE4 reflection and reverse engineering.
-- C ABI/plugin lifecycle design.
-- CMake, SDK packaging, and CI.
-- Offline analyzers and reproducible research notes.
-
-## Safety
-
-Obelisk runs inside the target server process. A bad hook or unsafe plugin can
-crash that process.
-
-For debug harness validation:
-
-- Enable hooks per instance, not globally.
-- Keep experimental scanners disabled by default.
-- Keep native exec probes off unless explicitly isolated.
-- Prefer copied Obelisk-level events; filtered raw callbacks require an explicit gate.
-- Keep logs per instance.
-- Treat multi-instance plugins as the normal clustered case: shared config is fine,
-  shared mutable state requires an explicit ownership and locking design.
-- Do not promote observed offsets or `FName` indices without repeatable evidence.
+Use recorded client behavior for gameplay claims, focused build/tests for
+implementation changes and the current prototype document for active status.

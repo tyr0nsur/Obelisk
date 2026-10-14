@@ -16,6 +16,37 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 
 SCHEMA = "obelisk.permissions-admin-query-failclosed-contract.v1"
 REPORT_SCHEMA = "obelisk.permissions-admin-query-failclosed-contract-check.v1"
+IDENTITY_SURFACE = "obelisk.player_identity.v1"
+SURFACE = "obelisk.permissions_admin.v1"
+PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_SCHEMA = (
+    "obelisk.player-identity-public-contract-decision-record.v1"
+)
+PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = "obelisk.player-identity-promotion-certificate.v1"
+NO_CREDIT_FALSE_KEYS = (
+    "counts_toward_permissions_admin",
+    "permissions_admin_unlock_allowed",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "public_or_runtime_accounting_allowed",
+    "route_ready",
+    "public_route_ready",
+    "permissions_admin_route_ready",
+    "stable_claim_allowed",
+    "stable_sdk_ready",
+    "plugin_hub_ready",
+    "publication_ready",
+)
+NO_CREDIT_ZERO_KEYS = (
+    "sdk_progress",
+    "p0_progress",
+    "complete_sdk_claim_progress_contribution",
+    "p0_dependency_chain_claim_progress_contribution",
+    "public_sdk_progress_contribution",
+    "runtime_progress_contribution",
+)
 
 REQUIRED_QUERY_FIELDS = frozenset(
     (
@@ -23,6 +54,7 @@ REQUIRED_QUERY_FIELDS = frozenset(
         "principal_handle",
         "principal_generation",
         "principal_scope_flags",
+        "server_process_epoch",
         "action",
         "action_size",
         "resource_scope",
@@ -35,6 +67,7 @@ REQUIRED_QUERY_FIELD_SEQUENCE = (
     "principal_handle",
     "principal_generation",
     "principal_scope_flags",
+    "server_process_epoch",
     "action",
     "action_size",
     "resource_scope",
@@ -46,6 +79,7 @@ REQUIRED_QUERY_FIELD_TYPES = {
     "principal_handle": "uint64_opaque",
     "principal_generation": "uint64",
     "principal_scope_flags": "uint64_flags",
+    "server_process_epoch": "uint64",
     "action": "copied_bytes",
     "action_size": "size_t",
     "resource_scope": "copied_bytes",
@@ -79,6 +113,7 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
     (
         "stale_principal",
         "scope_mismatch",
+        "stale_principal_scope_flags",
         "process_mismatch",
         "missing_principal",
         "missing_runtime_principal_identity",
@@ -87,23 +122,28 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "operator_config_principal_claim",
         "operator_config_permission_claim",
         "operator_config_allow_capability_claim",
+        "plugin_supplied_authority_claim",
         "missing_action",
         "malformed_action_size",
         "action_size_exceeds_max",
         "malformed_resource_scope_size",
         "resource_scope_size_exceeds_max",
         "missing_principal_handle",
+        "principal_handle_only",
         "missing_principal_generation",
         "missing_principal_scope_flags",
+        "missing_server_process_epoch",
         "missing_principal_provenance",
         "principal_generation_mismatch",
         "plugin_supplied_principal_tuple",
+        "plugin_supplied_principal_provenance",
         "server_process_epoch_mismatch",
         "unsupported_principal_scope_flags",
         "missing_plugin_owner_token",
         "zero_plugin_owner_token",
         "unknown_plugin_owner_token",
         "unloading_plugin_owner_token",
+        "owner_token_identity_or_permission_claim",
         "missing_capability",
         "rate_limit_exceeded",
         "unknown_authority",
@@ -122,6 +162,7 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
 REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "stale_principal",
     "scope_mismatch",
+    "stale_principal_scope_flags",
     "process_mismatch",
     "missing_principal",
     "missing_runtime_principal_identity",
@@ -130,23 +171,28 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "operator_config_principal_claim",
     "operator_config_permission_claim",
     "operator_config_allow_capability_claim",
+    "plugin_supplied_authority_claim",
     "missing_action",
     "malformed_action_size",
     "action_size_exceeds_max",
     "malformed_resource_scope_size",
     "resource_scope_size_exceeds_max",
     "missing_principal_handle",
+    "principal_handle_only",
     "missing_principal_generation",
     "missing_principal_scope_flags",
+    "missing_server_process_epoch",
     "missing_principal_provenance",
     "principal_generation_mismatch",
     "plugin_supplied_principal_tuple",
+    "plugin_supplied_principal_provenance",
     "server_process_epoch_mismatch",
     "unsupported_principal_scope_flags",
     "missing_plugin_owner_token",
     "zero_plugin_owner_token",
     "unknown_plugin_owner_token",
     "unloading_plugin_owner_token",
+    "owner_token_identity_or_permission_claim",
     "missing_capability",
     "rate_limit_exceeded",
     "unknown_authority",
@@ -202,14 +248,25 @@ REQUIRED_NON_CLAIMS = frozenset(
         "candidate-only pre-ABI permissions/admin query contract",
         "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
         "allow decisions require policy provenance and fail closed on missing or unknown authority",
+        "principal_handle alone never authorizes; generation, scope flags, server process epoch, and runtime-owned provenance are required before allow",
         "command text and operator config cannot establish principal identity or permission claims before runtime principal observation",
+        "plugin-supplied provenance, plugin-supplied authority, and invalid owner tokens cannot establish identity or permission authority",
+        "only a reviewed, hash-bound, current player-identity promotion certificate can satisfy the upstream identity dependency; identity aliases, stale decision records, route reports, and runtime evidence substitutes remain non-counting",
+        "generated, scaffold, placeholder, template, stale, or hash-unbound upstream certificates cannot satisfy the upstream identity dependency",
+        "nested readiness, progress, unlock, route, public, runtime, stable, Plugin Hub, publication, or SDK/P0 accounting aliases remain non-counting until the full hash-bound dependency chain is accepted",
+        "runtime-window artifacts, beta/Discord notices, no-users status, package installs, side-lanes, passive evidence, unblocked/allowed aliases, and generic identity-present aliases cannot unlock readiness",
+        "RCON, ListPlayers, Kick, ServerListPlayers, ServerKickPlayer, admin snapshots, static thunk, route candidate, source-ready, status, and command aliases are admin orientation or operational metadata only and cannot unlock readiness or progress",
         "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate",
+        "v1 remains false for this candidate-only pre-ABI planning artifact",
     )
 )
 REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY = {
     "config_enables_surface_only": True,
     "runtime_observation_establishes_identity": True,
     "runtime_principal_required_for_permission_authority": True,
+    "principal_handle_alone_authorizes": False,
+    "principal_handle_only_creates_identity_allowed": False,
+    "principal_handle_only_creates_permission_allowed": False,
     "command_text_principal_claim_allowed": False,
     "operator_config_principal_claim_allowed": False,
     "command_text_permission_claim_allowed": False,
@@ -220,18 +277,25 @@ REQUIRED_PRINCIPAL_PROVENANCE_POLICY = {
     "plugin_supplied_principal_tuple_allowed": False,
     "command_supplied_principal_tuple_allowed": False,
     "operator_config_supplied_principal_tuple_allowed": False,
+    "plugin_supplied_principal_provenance_allowed": False,
+    "runtime_owned_principal_provenance_required_before_allow": True,
     "principal_tuple_provenance_required_before_allow": True,
     "principal_generation_provenance_required_before_allow": True,
     "principal_scope_provenance_required_before_allow": True,
     "server_process_epoch_required_before_allow": True,
+    "principal_handle_generation_scope_epoch_required_before_allow": True,
     "missing_principal_provenance_result": "deny",
+    "missing_server_process_epoch_result": "deny",
+    "principal_handle_only_result": "deny",
     "stale_principal_result": "deny",
+    "stale_principal_scope_flags_result": "deny",
     "principal_generation_mismatch_result": "deny",
     "scope_mismatch_result": "deny",
     "process_mismatch_result": "deny",
     "server_process_epoch_mismatch_result": "deny",
     "unsupported_principal_scope_flags_result": "deny",
     "plugin_supplied_principal_tuple_result": "deny",
+    "plugin_supplied_principal_provenance_result": "deny",
     "public_abi_field_allowed": False,
     "runtime_ready": False,
 }
@@ -246,6 +310,9 @@ REQUIRED_OWNER_TOKEN_POLICY = {
     "unloading_owner_token_result": "deny",
     "zero_owner_token_result": "deny",
     "missing_owner_token_result": "deny",
+    "invalid_owner_token_cannot_create_identity_or_permission": True,
+    "owner_token_does_not_establish_principal_identity": True,
+    "owner_token_does_not_grant_permission": True,
     "owner_cleanup_invalidates_query_budget": True,
     "owner_cleanup_invalidates_candidate_cache": True,
     "plugin_supplied_owner_identity_allowed": False,
@@ -259,7 +326,10 @@ REQUIRED_POLICY_PROVENANCE_POLICY = {
     "authority_kind_required_before_allow": True,
     "authority_generation_required_before_allow": True,
     "policy_epoch_required_before_allow": True,
+    "complete_policy_provenance_required_before_allow": True,
+    "policy_source_id_generation_authority_kind_generation_epoch_required_before_allow": True,
     "plugin_supplied_policy_provenance_allowed": False,
+    "plugin_supplied_policy_provenance_creates_authority_allowed": False,
     "command_text_policy_provenance_claim_allowed": False,
     "operator_config_policy_provenance_claim_allowed": False,
     "operator_config_allow_provenance_allowed": False,
@@ -305,14 +375,34 @@ REQUIRED_SEQUENCE_GATE = {
 REQUIRED_ARTIFACT_IDENTITY = {
     "artifact_kind": SCHEMA,
     "artifact_status": "candidate_only_pre_abi_contract",
-    "dependency_surface": "obelisk.player_identity.v1",
+    "dependency_surface": IDENTITY_SURFACE,
 }
 REQUIRED_DEPENDENCY_CONTEXT = {
-    "upstream_surface": "obelisk.player_identity.v1",
+    "upstream_surface": IDENTITY_SURFACE,
     "upstream_surface_status": "planning_only",
     "required_lifecycle_anchor_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
     "required_principal_invalidation_schema": "obelisk.players-identity-principal-invalidation-policy.v1",
     "required_runtime_evidence_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    "required_identity_public_contract_decision_record_schema": (
+        PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD_SCHEMA
+    ),
+    "required_identity_public_contract_decision_record_id": "reviewed_identity_public_contract_decision_record",
+    "required_identity_public_contract_review_status": "reviewed",
+    "required_identity_promotion_certificate_schema": PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+    "required_identity_promotion_certificate_surface": IDENTITY_SURFACE,
+    "required_identity_promotion_certificate_required_by_surface": SURFACE,
+    "required_identity_promotion_certificate_chain_position": 1,
+    "required_identity_promotion_certificate_required_by_chain_position": 2,
+    "required_identity_promotion_certificate_reviewed_artifact_hash": (
+        "evidence.reviewed_surface_record_sha256"
+    ),
+    "required_identity_promotion_certificate_hash_policy": (
+        "evidence.reviewed_artifact_hash must equal evidence.reviewed_surface_record_sha256"
+    ),
+    "missing_mismatched_or_stale_identity_certificate_counts": False,
+    "identity_alias_or_stale_source_unlock_allowed": False,
+    "identity_decision_record_alone_unlock_allowed": False,
+    "runtime_evidence_alone_unlock_allowed": False,
     "public_identity_required_before_promotion": True,
     "public_identity_promoted": False,
     "permissions_admin_public_abi_promoted": False,
@@ -372,7 +462,13 @@ READY_OVERCLAIM_KEYS = frozenset(
         "api_stable",
         "accepted_runtime_evidence_ready",
         "admin_authority_ready",
+        "admin_route_snapshot_ready",
+        "admin_snapshot_ready",
+        "admin_status_snapshot_ready",
+        "beta_notice_ready",
+        "beta_notice_sent",
         "command_router_allowed",
+        "command_candidate_ready",
         "complete_api",
         "complete_sdk",
         "complete_support",
@@ -383,12 +479,53 @@ READY_OVERCLAIM_KEYS = frozenset(
         "full_sdk",
         "full_support",
         "identity_contract_reviewed",
+        "identity_observed",
+        "identity_present",
+        "identity_ready",
+        "identity_unblocked",
+        "identity_public_contract_gate_accepted",
+        "identity_public_contract_gate_missing",
+        "identity_public_contract_gate_missing_accepted",
+        "identity_public_contract_gate_missing_passed",
+        "identity_public_contract_gate_missing_resolved",
+        "identity_public_contract_gate_missing_unblocked",
+        "identity_public_contract_gate_missing_unlocked",
+        "identity_public_contract_gate_passed",
+        "identity_public_contract_gate_resolved",
+        "no_players_status_ready",
+        "no_users_passive_wait_ready",
+        "no_users_status_ready",
+        "package_install_unblocked",
         "operator_approval_granted",
+        "package_install_accepted",
+        "package_install_ready",
+        "package_shape_accepted",
+        "package_shape_install_accepted",
+        "package_shape_install_ready",
+        "package_shape_ready",
+        "package_shape_support_ready",
         "permission_header_allowed",
+        "permission_header_unblocked",
         "permissions_admin_ready",
+        "permissions_admin_unblocked",
         "permissions_query_ready",
+        "permissions_query_unblocked",
         "permissions_unlocked",
+        "permissions_unblocked",
+        "plugin_hub_counts_toward_completion",
+        "plugin_hub_counts_toward_public_sdk",
+        "plugin_hub_counts_toward_v1_completion",
+        "plugin_hub_package_published",
+        "plugin_hub_planning_accepted",
+        "plugin_hub_planning_ready",
+        "plugin_hub_planning_supported",
+        "plugin_hub_ready",
+        "plugin_hub_readiness_claim_allowed",
+        "plugin_hub_support_tier_ready",
         "principal_ready",
+        "principal_observed",
+        "principal_present",
+        "principal_unblocked",
         "production_grade_api",
         "production_grade_sdk",
         "production_grade_support",
@@ -398,6 +535,13 @@ READY_OVERCLAIM_KEYS = frozenset(
         "promoted",
         "promote_ready",
         "promotion_ready",
+        "public",
+        "public_allowed",
+        "public_enabled",
+        "public_ready",
+        "public_supported",
+        "public_unblocked",
+        "public_unlocked",
         "public_or_runtime_accounting_allowed",
         "public_api",
         "public_api_allowed",
@@ -409,14 +553,25 @@ READY_OVERCLAIM_KEYS = frozenset(
         "public_bridge_abi_allowed",
         "public_reply_abi_ready",
         "public_route_ready",
+        "public_route_unblocked",
         "public_response_abi_allowed",
         "public_response_path_ready",
+        "route_candidate_ready",
         "public_sdk_ready",
+        "public_sdk_unblocked",
         "route_ready",
+        "route_unblocked",
         "route_readiness_ready",
         "runtime_approval",
         "runtime_approval_granted",
+        "runtime_window_artifact_ready",
+        "runtime_window_authorized",
+        "runtime_window_closure_ready",
+        "runtime_window_execution_ready",
+        "runtime_window_plan_ready",
+        "runtime_window_ready",
         "runtime_ready",
+        "runtime_unblocked",
         "runtime_readiness_allowed",
         "runtime_work_authorized",
         "sdk_complete",
@@ -426,6 +581,11 @@ READY_OVERCLAIM_KEYS = frozenset(
         "sdk_stable",
         "send_chat_ready",
         "server_operations_authorized",
+        "side_lane_accepted",
+        "side_lane_artifact_accepted",
+        "side_lane_artifact_ready",
+        "side_lane_ready",
+        "source_ready",
         "stable_claim_allowed",
         "stable_api",
         "stable_sdk",
@@ -435,8 +595,79 @@ READY_OVERCLAIM_KEYS = frozenset(
         "support_production_grade",
         "support_production_ready",
         "support_stable",
+        "v1",
         "v1_completion_ready",
+        "v1_completion_unblocked",
+        "v1_enabled",
+        "v1_promoted",
+        "v1_ready",
+        "v1_unblocked",
     )
+)
+PROGRESS_OVERCLAIM_KEYS = frozenset(
+    (
+        "claim_progress",
+        "claim_progress_contribution",
+        "claim_progress_percent",
+        "claim_progress_ratio",
+        "complete_sdk_claim_progress_contribution",
+        "complete_sdk_claim_progress_percent",
+        "complete_sdk_claim_progress_ratio",
+        "complete_sdk_progress",
+        "complete_sdk_progress_contribution",
+        "complete_sdk_progress_percent",
+        "complete_sdk_progress_ratio",
+        "p0_dependency_chain_claim_progress_contribution",
+        "p0_dependency_chain_claim_progress_percent",
+        "p0_dependency_chain_claim_progress_ratio",
+        "p0_dependency_chain_progress",
+        "p0_dependency_chain_progress_contribution",
+        "p0_dependency_chain_progress_percent",
+        "p0_dependency_chain_progress_ratio",
+        "p0_progress",
+        "p0_progress_contribution",
+        "p0_progress_percent",
+        "p0_progress_ratio",
+        "progress",
+        "progress_contribution",
+        "progress_percent",
+        "progress_ratio",
+        "public_sdk_progress",
+        "public_sdk_progress_contribution",
+        "public_sdk_progress_percent",
+        "public_sdk_progress_ratio",
+        "runtime_progress",
+        "runtime_progress_contribution",
+        "runtime_progress_percent",
+        "runtime_progress_ratio",
+        "sdk_progress",
+        "sdk_progress_contribution",
+        "sdk_progress_percent",
+        "sdk_progress_ratio",
+        "v1_completion_contribution",
+        "v1_completion_progress",
+        "v1_completion_progress_contribution",
+    )
+)
+PUBLIC_ALIAS_OVERCLAIM_KEYS = frozenset(
+    (
+        "public",
+        "public_allowed",
+        "public_enabled",
+        "public_ready",
+        "public_supported",
+        "public_unblocked",
+        "public_unlocked",
+    )
+)
+BROAD_PROGRESS_OVERCLAIM_KEY_RE = re.compile(
+    r"(?:^|_)(?:"
+    r"credits?|"
+    r"progress(?:_(?:contribution|percent|ratio|ready))?|"
+    r"readiness_credit|"
+    r"sdk_credit|"
+    r"sdk_completion_credit"
+    r")(?:_|$)"
 )
 BROAD_READY_OVERCLAIM_KEY_RE = re.compile(
     r"^(?:"
@@ -444,23 +675,206 @@ BROAD_READY_OVERCLAIM_KEY_RE = re.compile(
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
     r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
-    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:permissions?_admin|permissions?_quer(?:y|ies)|permission_header|public_(?:header|route|sdk)|"
+    r"admin_(?:route_)?snapshot|admin_status_snapshot|"
+    r"rcon(?:_command|_route|_status)?|list_players?|kick(?:_player)?|kickplayer|server_(?:list_players|kick_player)|"
+    r"static(?:_admin)?_thunk|source|"
+    r"route|runtime|runtime_window|v1(?:_completion)?|stable_claim)"
+    r"(?:_(?:ready|allowed|enabled|public|unblocked|unlocked))?"
     r")$"
+)
+GENERIC_NESTED_READY_OVERCLAIM_KEY_RE = re.compile(
+    r"(?:^|_)(?:ready|readiness|unblocked|unlocked|supported|enabled|allowed|"
+    r"complete|completion|promoted|promotion)$"
 )
 POSITIVE_OVERCLAIM_VALUES = frozenset(
     (
         "allowed",
+        "accepted",
+        "approved",
         "available",
         "enabled",
         "live",
         "operational",
+        "observed",
+        "present",
         "promoted",
         "public",
         "ready",
+        "sent",
         "supported",
         "true",
+        "unblocked",
         "unlocked",
         "yes",
+    )
+)
+SHORTCUT_ARTIFACT_OVERCLAIM_KEYS = frozenset(
+    (
+        "beta_notice",
+        "beta_capture",
+        "beta_capture_candidate",
+        "beta_capture_pack",
+        "discord_notice",
+        "discord_sent",
+        "inline_certificate",
+        "inline_promotion_certificate",
+        "inline_player_identity_promotion_certificate",
+        "inline_permissions_admin_promotion_certificate",
+        "player_identity_promotion_certificate",
+        "player_identity_promotion_certificate_inline",
+        "permissions_admin_promotion_certificate",
+        "permissions_admin_promotion_certificate_inline",
+        "no_players_status",
+        "no_users_passive_wait",
+        "no_users_status",
+        "package_install",
+        "package_shape",
+        "package_shape_install",
+        "package_shape_support",
+        "passive_evidence",
+        "passive_monitor",
+        "passive_snapshot",
+        "passive_summary",
+        "admin_route_snapshot",
+        "admin_snapshot",
+        "admin_status_snapshot",
+        "admin_capture_candidate",
+        "admin_target",
+        "copied_admin_target",
+        "kick",
+        "kick_player",
+        "kickplayer",
+        "kick_path_capture_candidate",
+        "kick_path_candidate",
+        "list_player_capture_candidate",
+        "list_player_candidate",
+        "list_players_candidate",
+        "plugin_hub",
+        "plugin_hub_planning",
+        "plugin_hub_support_tier",
+        "rcon_command_candidate",
+        "rcon_command_route",
+        "rcon_command_status",
+        "rcon",
+        "rcon_status",
+        "rcon_route_candidate",
+        "route_candidate",
+        "route_candidates",
+        "command_candidate",
+        "command_candidates",
+        "command_source",
+        "route_source",
+        "admin_source",
+        "runtime_window",
+        "runtime_window_artifact",
+        "runtime_window_closure",
+        "runtime_window_execution",
+        "runtime_window_plan",
+        "runtime_status_report",
+        "runtime_evidence_status",
+        "runtime_evidence_status_report",
+        "beta_runtime_status",
+        "copied_runtime_status_report",
+        "scoped_release_statement",
+        "scoped_statement",
+        "copy_artifact",
+        "status_artifact",
+        "server_kick_player",
+        "server_list_players",
+        "side_lane",
+        "side_lane_artifact",
+        "source_ready",
+        "start_end_evidence",
+        "start_end_only",
+        "start_end_only_evidence",
+        "runtime_principal_lifecycle_start_end_evidence",
+        "runtime_principal_start_end_evidence",
+        "static_admin_thunk",
+        "static_thunk",
+        "transfer_b_accept_candidate",
+        "transfer_b_accept_route",
+        "transfer_baccept_candidate",
+        "transfer_baccept_route",
+        "multi_surface_beta_capture_pack",
+        "multi_surface_beta_capture_plan_queue",
+        "support_tier",
+        "support_tier_metadata",
+        "support_tier_report",
+        "terminal_certificate",
+        "terminal_status_certificate",
+    )
+)
+EXACT_PROMOTION_CREDIT_ALIAS_KEYS = frozenset(
+    (
+        "approved_runtime_evidence",
+        "beta",
+        "complete_sdk",
+        "discord",
+        "p0",
+        "package_shape",
+        "passive_snapshot",
+        "plugin_hub",
+        "public_sdk",
+        "ready",
+        "runtime_ready",
+        "scoped_release_statement",
+        "stable_sdk",
+        "support_tier",
+    )
+)
+SHORTCUT_ARTIFACT_SOURCE_KEYS = frozenset(
+    (
+        "artifact_provenance",
+        "evidence_provenance",
+        "metadata_provenance",
+        "provenance",
+        "provenance_marker",
+        "provenance_markers",
+        "review_provenance",
+        "route_provenance",
+        "snapshot_provenance",
+        "admin_source",
+        "admin_sources",
+        "command",
+        "command_candidate",
+        "command_candidates",
+        "command_source",
+        "command_sources",
+        "route",
+        "route_candidate",
+        "route_candidates",
+        "route_source",
+        "route_sources",
+        "source",
+        "source_class",
+        "source_classes",
+        "source_kind",
+        "source_kinds",
+        "source_path",
+        "source_paths",
+        "sources",
+        "source_marker",
+        "source_markers",
+        "source_provenance",
+        "source_provenances",
+    )
+)
+SHORTCUT_ARTIFACT_STATUS_KEYS = frozenset(
+    (
+        "accepted",
+        "allowed",
+        "approved",
+        "available",
+        "outcome",
+        "ready",
+        "result",
+        "state",
+        "status",
+        "supported",
+        "value",
+        "verdict",
     )
 )
 READY_OVERCLAIM_STRINGS = {
@@ -472,18 +886,91 @@ READY_OVERCLAIM_STRINGS = {
     "public sdk ready": "public_sdk_ready",
     "permissions/admin is public and ready": "permissions_admin_ready",
     "identity contract reviewed": "identity_contract_reviewed",
+    "identity present": "identity_present",
+    "principal present": "principal_present",
+    "identity observed": "identity_observed",
+    "principal observed": "principal_observed",
     "principal ready": "principal_ready",
     "permissions query ready": "permissions_query_ready",
+    "permissions query unblocked": "permissions_query_unblocked",
     "permissions unlocked": "permissions_unlocked",
+    "permissions unblocked": "permissions_unblocked",
     "permission header allowed": "permission_header_allowed",
+    "permission header unblocked": "permission_header_unblocked",
     "admin authority ready": "admin_authority_ready",
     "accepted runtime evidence ready": "accepted_runtime_evidence_ready",
+    "inline promotion certificate is promoted": "inline_promotion_certificate",
+    "inline player identity promotion certificate is promoted": "inline_player_identity_promotion_certificate",
+    "runtime status report is ready": "runtime_status_report_ready",
+    "runtime evidence status report is ready": "runtime_evidence_status_report_ready",
+    "copied runtime status report is ready": "copied_runtime_status_report_ready",
+    "beta runtime status is ready": "beta_runtime_status_ready",
+    "approved runtime evidence ready": "approved_runtime_evidence_ready",
+    "beta is ready": "beta_ready",
+    "discord is sent": "discord_sent",
+    "discord sent": "discord_sent",
+    "p0 is ready": "p0_ready",
+    "p0 ready": "p0_ready",
+    "multi-surface beta capture pack is ready": "multi_surface_beta_capture_pack_ready",
+    "terminal certificate is ready": "terminal_certificate_ready",
+    "support tier is supported": "support_tier_supported",
+    "scoped release statement is ready": "scoped_release_statement_ready",
+    "beta notice sent": "beta_notice_sent",
+    "beta notice ready": "beta_notice_ready",
+    "discord notice sent": "discord_sent",
+    "runtime window ready": "runtime_window_ready",
+    "runtime window unblocked": "runtime_window_ready",
+    "runtime-window artifact is ready": "runtime_window_artifact_ready",
+    "runtime-window plan is ready": "runtime_window_plan_ready",
+    "no users status ready": "no_users_status_ready",
+    "no-users passive wait ready": "no_users_passive_wait_ready",
+    "package install accepted": "package_install_accepted",
+    "package install is accepted": "package_install_accepted",
+    "package install ready": "package_install_ready",
+    "package install is ready": "package_install_ready",
+    "package shape accepted": "package_shape_accepted",
+    "package shape is accepted": "package_shape_accepted",
+    "package shape ready": "package_shape_ready",
+    "package shape is ready": "package_shape_ready",
+    "plugin hub planning is supported": "plugin_hub_planning_supported",
+    "plugin hub ready": "plugin_hub_ready",
+    "side-lane artifact is ready": "side_lane_artifact_ready",
+    "side lane artifact is ready": "side_lane_artifact_ready",
+    "side lane ready": "side_lane_ready",
     "reply endpoint is live": "public_reply_abi_ready",
     "runtime ready": "runtime_ready",
+    "source ready": "source_ready",
+    "source-ready": "source_ready",
+    "admin snapshot ready": "admin_snapshot_ready",
+    "admin snapshot is ready": "admin_snapshot_ready",
+    "admin status snapshot ready": "admin_status_snapshot_ready",
+    "admin status snapshot is ready": "admin_status_snapshot_ready",
+    "rcon route ready": "rcon_route_ready",
+    "rcon ready": "rcon_ready",
+    "rcon status ready": "rcon_status_ready",
+    "listplayers ready": "list_players_ready",
+    "list players ready": "list_players_ready",
+    "kickplayer ready": "kick_player_ready",
+    "kick player ready": "kick_player_ready",
+    "static thunk ready": "static_thunk_ready",
+    "static admin thunk ready": "static_admin_thunk_ready",
+    "route candidate ready": "route_candidate_ready",
+    "command candidate ready": "command_candidate_ready",
+    "route ready": "route_ready",
+    "route-ready": "route_ready",
+    "public route ready": "public_route_ready",
+    "public-route ready": "public_route_ready",
+    "permissions admin route ready": "permissions_admin_route_ready",
+    "permissions/admin route ready": "permissions_admin_route_ready",
+    "public ready": "public_ready",
+    "public allowed": "public_allowed",
     "promotion ready": "promotion_ready",
     "promote ready": "promote_ready",
     "stable claim allowed": "stable_claim_allowed",
+    "v1 enabled": "v1_enabled",
     "v1 completion ready": "v1_completion_ready",
+    "v1 promoted": "v1_promoted",
+    "v1 ready": "v1_ready",
 }
 OVERCLAIM_NEGATIVE_PREFIXES = (
     "$.negative_surface_exclusions",
@@ -492,9 +979,11 @@ OVERCLAIM_NEGATIVE_PREFIXES = (
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"\b(?:"
-    r"accepted[_ -]?runtime[_ -]?evidence|admin[_ -]?authority|identity[_ -]?(?:public[_ -]?)?contract|"
+    r"accepted[_ -]?runtime[_ -]?evidence|admin[_ -]?(?:authority|(?:route[_ -]?)?snapshot|status[_ -]?snapshot)|identity[_ -]?(?:public[_ -]?)?contract|"
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
     r"permission[_ -]?headers?|permissions?[_ -]?quer(?:y|ies)|permissions?|principal|"
+    r"rcon(?:[_ -]?(?:command|route|status))?|list[_ -]?players?|kick(?:[_ -]?players?)?|"
+    r"static[_ -]?(?:admin[_ -]?)?thunks?|source[_ -]?ready|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
     r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"
@@ -502,13 +991,13 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
     r")\b(?:\s+(?:is|are))?\s+"
     r"\b(?:authorized|granted|public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|"
-    r"operational|supported)\b",
+    r"operational|supported|unblocked)\b",
     re.IGNORECASE,
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED = re.compile(
     r"\b(?:public[_ -]?(?:api|abi)|sdk|api|support)\b\s+"
     r"(?:is|are|now|becomes?|became)\s+"
-    r"\b(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?|public|ready|supported)\b",
+    r"\b(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?|public|ready|supported|unblocked)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_PREFIX_RE = re.compile(
@@ -541,6 +1030,29 @@ FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(
         "operator config",
         "operator-config",
         "operator_config",
+    )
+)
+FORBIDDEN_ADMIN_SOURCE_TERMS = frozenset(
+    (
+        "command_candidate",
+        "admin_route_snapshot",
+        "admin_snapshot",
+        "admin_status_snapshot",
+        "kick",
+        "kick_player",
+        "kickplayer",
+        "list_players",
+        "listplayers",
+        "rcon",
+        "route_candidate",
+        "server_kick_player",
+        "server_list_players",
+        "serverkickplayer",
+        "serverlistplayers",
+        "static_admin_thunk",
+        "static_thunk",
+        "staticadminthunk",
+        "staticthunk",
     )
 )
 
@@ -612,6 +1124,7 @@ def build_template_manifest() -> dict[str, Any]:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "runtime_promotion_allowed": False,
+        "v1": False,
         "query_contract": {
             "kind": "query_only_fail_closed_permission_check",
             "mutation_allowed": False,
@@ -662,6 +1175,10 @@ def build_template_manifest() -> dict[str, Any]:
             "allowed_authority_kinds": sorted(REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
             "operator_config_allow_capable": False,
             "plugin_supplied_authority_allowed": False,
+            "plugin_supplied_authority_creates_identity_allowed": False,
+            "plugin_supplied_authority_creates_permission_allowed": False,
+            "command_text_authority_allowed": False,
+            "operator_config_authority_creates_permission_allowed": False,
             "remote_authority_allowed": False,
             "cross_process_authority_allowed": False,
             "unknown_authority_fails_closed": True,
@@ -724,6 +1241,58 @@ def normalized_key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
+def is_source_overclaim_key(key_name: str) -> bool:
+    return (
+        "source_overclaim" in key_name
+        or "source_overclaims" in key_name
+        or "source_overclaimed" in key_name
+    )
+
+
+def is_source_overclaim_count_key(key_name: str) -> bool:
+    return (
+        "count" in key_name
+        or "flag_count" in key_name
+        or "total_flag" in key_name
+    )
+
+
+def zero_source_overclaim_count_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return value == 0
+    if isinstance(value, str):
+        return normalized_key(value) in {"0", "0_0", "zero"}
+    return False
+
+
+def contains_source_overclaim_zero_marker(value: Any, *, source_overclaim_context: bool = False) -> bool:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_name = normalized_key(key)
+            child_context = source_overclaim_context or is_source_overclaim_key(key_name)
+            if child_context and is_source_overclaim_count_key(key_name) and zero_source_overclaim_count_value(child):
+                return True
+            if contains_source_overclaim_zero_marker(child, source_overclaim_context=child_context):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(
+            contains_source_overclaim_zero_marker(item, source_overclaim_context=source_overclaim_context)
+            for item in value
+        )
+    return False
+
+
+def source_overclaim_zero_has_positive_status_alias(value: dict[str, Any]) -> bool:
+    return any(
+        normalized_key(key) in SHORTCUT_ARTIFACT_STATUS_KEYS
+        and contains_positive_overclaim_value(child)
+        for key, child in value.items()
+    )
+
+
 def is_positive_overclaim_value(value: Any) -> bool:
     if value is True:
         return True
@@ -731,6 +1300,74 @@ def is_positive_overclaim_value(value: Any) -> bool:
         return value != 0
     if isinstance(value, str):
         return normalized_key(value) in POSITIVE_OVERCLAIM_VALUES
+    return False
+
+
+def contains_positive_overclaim_value(value: Any) -> bool:
+    if is_positive_overclaim_value(value):
+        return True
+    if isinstance(value, list):
+        return any(contains_positive_overclaim_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(
+            contains_positive_overclaim_value(child)
+            for key, child in value.items()
+            if normalized_key(key) in SHORTCUT_ARTIFACT_STATUS_KEYS
+        )
+    return False
+
+
+def progress_overclaim_key(key_name: str) -> bool:
+    return (
+        key_name in PROGRESS_OVERCLAIM_KEYS
+        or BROAD_PROGRESS_OVERCLAIM_KEY_RE.search(key_name) is not None
+    )
+
+
+def progress_overclaim_value_is_nonzero(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = normalized_key(value)
+        if normalized in {
+            "",
+            "0",
+            "0_0",
+            "blocked",
+            "false",
+            "missing",
+            "no",
+            "none",
+            "not_ready",
+            "pending",
+            "unresolved",
+            "zero",
+        }:
+            return False
+        if re.fullmatch(r"0+\s*/\s*[1-9]\d*", value.strip().casefold()):
+            return False
+        if re.fullmatch(r"0+(?:\.0+)?\s*(?:%|percent)", value.strip().casefold()):
+            return False
+        return True
+    if isinstance(value, list):
+        return any(progress_overclaim_value_is_nonzero(item) for item in value)
+    if isinstance(value, dict):
+        return any(progress_overclaim_value_is_nonzero(item) for item in value.values())
+    return False
+
+
+def value_marks_shortcut_artifact(value: Any) -> bool:
+    if isinstance(value, str):
+        normalized = normalized_key(value)
+        return normalized in EXACT_PROMOTION_CREDIT_ALIAS_KEYS or any(
+            term in normalized for term in SHORTCUT_ARTIFACT_OVERCLAIM_KEYS
+        )
+    if isinstance(value, list):
+        return any(value_marks_shortcut_artifact(item) for item in value)
+    if isinstance(value, dict):
+        return any(value_marks_shortcut_artifact(item) for item in value.values())
     return False
 
 
@@ -798,7 +1435,10 @@ def find_forbidden_surface(value: Any, trail: str = "$") -> tuple[str, str] | No
 
 def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
     if isinstance(value, str):
-        return normalized_key(value) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+        normalized = normalized_key(value)
+        return normalized in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES or any(
+            term in normalized for term in FORBIDDEN_ADMIN_SOURCE_TERMS
+        )
     if isinstance(value, list):
         return any(contains_forbidden_pre_runtime_claim_source(item) for item in value)
     if isinstance(value, dict):
@@ -831,13 +1471,56 @@ def collect_overclaim_fields(value: Any, trail: str = "$") -> list[dict[str, str
         return []
     found: list[dict[str, str]] = []
     if isinstance(value, dict):
+        if contains_source_overclaim_zero_marker(value) and source_overclaim_zero_has_positive_status_alias(value):
+            found.append({"reason": "source_overclaim_zero_status_alias_overclaim", "label": trail})
+        shortcut_source_context = any(
+            value_marks_shortcut_artifact(child)
+            for key, child in value.items()
+            if normalized_key(key) in SHORTCUT_ARTIFACT_SOURCE_KEYS
+        )
+        if shortcut_source_context:
+            for key, child in value.items():
+                if normalized_key(key) in SHORTCUT_ARTIFACT_STATUS_KEYS and contains_positive_overclaim_value(child):
+                    found.append({"reason": "shortcut_artifact_source_overclaim", "label": f"{trail}.{key}"})
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             key_name = normalized_key(key)
             if key_name in READY_OVERCLAIM_KEYS and child is True:
                 found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
+            elif key_name in PUBLIC_ALIAS_OVERCLAIM_KEYS and contains_positive_overclaim_value(child):
+                found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
+            elif key_name in EXACT_PROMOTION_CREDIT_ALIAS_KEYS and contains_positive_overclaim_value(child):
+                found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
+            elif key_name in SHORTCUT_ARTIFACT_OVERCLAIM_KEYS and contains_positive_overclaim_value(child):
+                found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
+            elif progress_overclaim_key(key_name) and progress_overclaim_value_is_nonzero(child):
+                found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
             elif BROAD_READY_OVERCLAIM_KEY_RE.fullmatch(key_name) and is_positive_overclaim_value(child):
                 found.append({"reason": "public_or_runtime_readiness_overclaim", "label": child_trail})
+            elif (
+                GENERIC_NESTED_READY_OVERCLAIM_KEY_RE.search(key_name) is not None
+                and not any(
+                    token in key_name
+                    for token in (
+                        "blocked_until",
+                        "forbidden",
+                        "must_remain",
+                        "never_count",
+                        "non_evidence",
+                        "not_sufficient",
+                        "rejected",
+                        "required",
+                        "requires",
+                    )
+                )
+                and not key_name.endswith("_count")
+                and (
+                    progress_overclaim_value_is_nonzero(child)
+                    if progress_overclaim_key(key_name)
+                    else contains_positive_overclaim_value(child)
+                )
+            ):
+                found.append({"reason": "generic_readiness_or_progress_alias_overclaim", "label": child_trail})
             found.extend(collect_overclaim_fields(child, child_trail))
     elif isinstance(value, list):
         for index, child in enumerate(value):
@@ -1104,7 +1787,11 @@ def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> tu
                 authority_kinds=legacy_duplicates,
             )
     for key in (
+        "command_text_authority_allowed",
         "plugin_supplied_authority_allowed",
+        "plugin_supplied_authority_creates_identity_allowed",
+        "plugin_supplied_authority_creates_permission_allowed",
+        "operator_config_authority_creates_permission_allowed",
         "remote_authority_allowed",
         "cross_process_authority_allowed",
     ):
@@ -1452,7 +2139,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        return Validation(blockers, [], [], [], [], [], [], [])
+        return Validation(blockers, [], [], [], [], [], [], [], [])
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -1466,9 +2153,16 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         "public_sdk_ready",
         "runtime_ready",
         "runtime_promotion_allowed",
+        "v1",
     ):
         if payload.get(key) is not False:
             add(blockers, f"{key}_not_false", f"$.{key}")
+    for key in NO_CREDIT_FALSE_KEYS:
+        if key in payload and payload.get(key) is not False:
+            add(blockers, f"{key}_not_false", f"$.{key}")
+    for key in NO_CREDIT_ZERO_KEYS:
+        if key in payload and payload.get(key) != 0:
+            add(blockers, f"{key}_not_zero", f"$.{key}")
 
     validate_exact_mapping(
         payload.get("artifact_identity"),
@@ -1543,7 +2237,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
 
 
 def build_report(payload: dict[str, Any], validation: Validation, *, check_mode: str) -> dict[str, Any]:
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "input_schema": payload.get("schema"),
         "mode": check_mode,
@@ -1556,6 +2250,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "v1": False,
         "query_fields": validation.query_fields,
         "decisions": validation.decisions,
         "decision_fields": validation.decision_fields,
@@ -1567,6 +2262,9 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
     }
+    report.update({key: False for key in NO_CREDIT_FALSE_KEYS})
+    report.update({key: 0 for key in NO_CREDIT_ZERO_KEYS})
+    return report
 
 
 def main() -> int:

@@ -22,6 +22,9 @@ static uint64_t g_TimerHandle = 0;
 static uint64_t g_TimerUserData = 0xC0FFEE05;
 static bool g_TimerSeen = false;
 static bool g_TimerAccepted = false;
+static char g_ConfigDir[256];
+static char g_ConfigPath[256];
+static char g_InstanceId[64];
 
 static void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* user_data)
 {
@@ -171,6 +174,7 @@ static void CompileScheduledCallback(uint64_t timer_id, void* user_data)
 
 static void CompileGameplayPolicyAbi(void)
 {
+    volatile uint64_t owner_token_callback_capability = OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
     volatile uint64_t capability = OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS;
     volatile uint64_t resource_descriptor_capability = OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS;
     volatile uint64_t event_descriptor_capability =
@@ -190,6 +194,8 @@ static void CompileGameplayPolicyAbi(void)
     volatile uint64_t requested_by_player = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
     volatile uint64_t ignore_cooldown = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
     volatile uint64_t category_only = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY;
+    volatile uint64_t no_identity = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY;
+    volatile uint64_t no_lookup = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
     volatile uint32_t event_descriptor_abi = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION;
     volatile uint64_t chat_copied_payload = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
     ObeliskStringView chat_message_view = {"hello", 5};
@@ -284,6 +290,7 @@ static void CompileGameplayPolicyAbi(void)
     callback(&item_return_event, NULL);
     chat_callback(&chat_event, NULL);
     scheduled_callback(1, NULL);
+    (void)owner_token_callback_capability;
     (void)capability;
     (void)resource_descriptor_capability;
     (void)event_descriptor_capability;
@@ -302,6 +309,8 @@ static void CompileGameplayPolicyAbi(void)
     (void)requested_by_player;
     (void)ignore_cooldown;
     (void)category_only;
+    (void)no_identity;
+    (void)no_lookup;
     (void)event_descriptor_abi;
     (void)chat_copied_payload;
     (void)chat_message_view;
@@ -309,10 +318,43 @@ static void CompileGameplayPolicyAbi(void)
     (void)event_descriptor;
 }
 
+static bool CopyInitString(char* destination, size_t destination_size, const char* value)
+{
+    if (!destination || destination_size == 0 || !value || strlen(value) >= destination_size)
+        return false;
+
+    strncpy(destination, value, destination_size - 1);
+    destination[destination_size - 1] = '\0';
+    return true;
+}
+
+static bool CopiedInitPointersIntact(void)
+{
+    return strncmp(g_ConfigDir, "/tmp/obelisk-sdk-consumer.", 26) == 0 &&
+        strstr(g_ConfigPath, "/config.json") != NULL &&
+        strcmp(g_InstanceId, "sdk-consumer-test") == 0;
+}
+
+static bool HasApiMetadataPrefix(const ObeliskApi* api)
+{
+    if (!api ||
+        api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+    {
+        return false;
+    }
+
+    if (api->abi_version != OBELISK_API_ABI_VERSION)
+        return false;
+
+    return true;
+}
+
 static bool HasTimerApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) +
+            sizeof(api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) &&
         api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
             sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
         api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
@@ -321,8 +363,10 @@ static bool HasTimerApi(const ObeliskApi* api)
 
 static bool HasChatMessageEventApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle) +
+            sizeof(api->RegisterChatMessageEventWithOwnerTokenHandle) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
             sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
         api->RegisterChatMessageEventWithOwnerTokenHandle &&
@@ -331,12 +375,27 @@ static bool HasChatMessageEventApi(const ObeliskApi* api)
 
 static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) +
+            sizeof(api->RegisterGameplayPolicyEventWithOwnerTokenHandle) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
             sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
         api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
         api->UnregisterGameplayPolicyEventWithOwnerToken;
+}
+
+static bool PostInitCallProcessEventSkipped(void)
+{
+    if (!g_HasApi ||
+        g_Api.struct_size < offsetof(ObeliskApi, capabilities) + sizeof(g_Api.capabilities) ||
+        (g_Api.capabilities & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
+        !g_Api.CallProcessEvent)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
@@ -350,7 +409,7 @@ static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
         OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
         OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
 
-    if (!api ||
+    if (!HasApiMetadataPrefix(api) ||
         (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
         api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) + sizeof(api->DescribeResourceKind) ||
         !api->DescribeResourceKind)
@@ -408,7 +467,7 @@ static bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
 {
     ObeliskGameplayPolicyEventDescriptor descriptor;
 
-    if (!api ||
+    if (!HasApiMetadataPrefix(api) ||
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
         api->struct_size < offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
             sizeof(api->DescribeGameplayPolicyEventKind) ||
@@ -534,6 +593,9 @@ static void ResetState(void)
     g_TimerHandle = 0;
     g_TimerSeen = false;
     g_TimerAccepted = false;
+    g_ConfigDir[0] = '\0';
+    g_ConfigPath[0] = '\0';
+    g_InstanceId[0] = '\0';
 }
 
 static const char* kDefaultConfig = "{\n"
@@ -564,8 +626,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (!api || !context)
         return false;
 
-    if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
+    if (!HasApiMetadataPrefix(api) ||
         context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
         context->struct_size < sizeof(ObeliskPluginInitContext))
     {
@@ -591,6 +652,13 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     g_ChatMessageEventAccepted = false;
     g_TimerSeen = false;
     g_TimerAccepted = false;
+    if (!CopyInitString(g_ConfigDir, sizeof(g_ConfigDir), context->config_dir) ||
+        !CopyInitString(g_ConfigPath, sizeof(g_ConfigPath), context->config_path) ||
+        !CopyInitString(g_InstanceId, sizeof(g_InstanceId), context->instance_id))
+    {
+        ResetState();
+        return false;
+    }
 
     if (HasGameplayPolicyEventApi(api))
     {
@@ -677,4 +745,14 @@ __attribute__((visibility("default"))) bool CAbiMinimal_TimerSeen(void)
 __attribute__((visibility("default"))) bool CAbiMinimal_TimerAccepted(void)
 {
     return g_TimerAccepted;
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_CopiedInitPointersIntact(void)
+{
+    return CopiedInitPointersIntact();
+}
+
+__attribute__((visibility("default"))) bool CAbiMinimal_PostInitCallProcessEventSkipped(void)
+{
+    return PostInitCallProcessEventSkipped();
 }

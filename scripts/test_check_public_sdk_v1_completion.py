@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -19,20 +21,35 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from check_public_sdk_v1_completion import (
+    ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS,
+    ACTIONABLE_PATH_ZERO_KEYS,
+    DEFAULT_SCOPED_RELEASE_STATEMENT,
+    HELPER_SUBPROCESS_TIMEOUT_ENV,
     SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER,
+    SUBPROCESS_CACHE_DIR_TEST_ENV,
+    _helper_subprocess_cache_key,
+    approved_in_game_evidence_completion_status,
+    approved_runtime_evidence_non_approved_artifact_reasons,
     blocker_guidance,
     command_permission_route_gate_public_or_runtime_claims,
     completion_blocker_outcome_rows,
+    fastest_next_sdk_unblock,
+    normalized_completion_summary,
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
+    route_gate_post_evidence_p0_lock_simulation_alias_violations,
+    run_helper_subprocess,
+    run_structure_census_readiness,
     secondary_report_completion_claims_without_blocker,
+    side_lane_completion_accounting_alias_violations,
     surface_has_promotion_evidence,
 )
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
     manifest as approved_runtime_principal_lifecycle_manifest,
 )
+import check_public_sdk_v1_completion as completion_checker
 
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
 SCOPED_RELEASE_STATEMENT_BUILDER = REPO_ROOT / "scripts" / "build_v1_scoped_release_statement.py"
@@ -52,6 +69,96 @@ EXPERIMENTAL_EXCLUSION_DETAILS = {
     "obelisk.chat.local_routing.v1": "chat routing is not included in v1.",
     "obelisk.inventory_item_copied_signals.v1": "inventory copied signals are not included in v1.",
 }
+EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES = [
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.object_identity_resource_handle.v1",
+    "obelisk.structure_census.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
+    "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+]
+MISSION_TRANSFER_DINO_TRIBE_SURFACE_ID = "obelisk.mission_transfer_dino_tribe.v1"
+EXPECTED_SCOPED_NON_COMPLETE_REQUIRED_BLOCKER_OUTCOMES = [
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.object_identity_resource_handle.v1",
+    "obelisk.structure_census.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
+    MISSION_TRANSFER_DINO_TRIBE_SURFACE_ID,
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+]
+REPO_TEST_TEMP_PREFIXES = (
+    (REPO_ROOT / "tests" / "core", "ActiveManifestBinding"),
+    (REPO_ROOT / "tests" / "core", "CommandChatResponsePromotion"),
+    (REPO_ROOT / "tests" / "core", "CommandResponseDependencyCertificate"),
+    (REPO_ROOT / "tests" / "core", "CommandResponsePermissionsDependency"),
+    (REPO_ROOT / "tests" / "core", "CommandResponsePlanningOnly"),
+    (REPO_ROOT / "tests" / "core", "CommandResponseReportClaims"),
+    (REPO_ROOT / "tests" / "core", "CommandResponseSourceHashes"),
+    (REPO_ROOT / "tests" / "core", "CommandResponseSummaryOnly"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesDependencyCertificate"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesNestedActiveInputs"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesNestedResponseHashes"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesPlanningOnly"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesPromotion"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesReportClaims"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesSourceHashes"),
+    (REPO_ROOT / "tests" / "core", "CommandsRepliesSummaryOnly"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportActiveInputs"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportArtifact"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportCommandSurface"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportMalformedHash"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportMissingInputs"),
+    (REPO_ROOT / "tests" / "core", "ExecutedReportMissingProvenance"),
+    (REPO_ROOT / "tests" / "core", "InlineExecutedReport"),
+    (REPO_ROOT / "tests" / "core", "InventoryDescriptorCatalog"),
+    (REPO_ROOT / "tests" / "core", "InventoryItemMutationPromotion"),
+    (REPO_ROOT / "tests" / "core", "InventoryItemReturnEventDispatcher"),
+    (REPO_ROOT / "tests" / "core", "InventoryMutationPromotion"),
+    (REPO_ROOT / "tests" / "core", "InventoryPolicyEventDispatcher"),
+    (REPO_ROOT / "tests" / "core", "MissionLeafEvidence"),
+    (REPO_ROOT / "tests" / "core", "MissionLeafSidecar"),
+    (REPO_ROOT / "tests" / "core", "MissionTransferDinoTribePromotion"),
+    (REPO_ROOT / "tests" / "core", "PermissionsAdminCertificate"),
+    (REPO_ROOT / "tests" / "core", "PermissionsAdminCertificateSurface"),
+    (REPO_ROOT / "tests" / "core", "PermissionsAdminPlanningOnly"),
+    (REPO_ROOT / "tests" / "core", "PermissionsAdminPromotion"),
+    (REPO_ROOT / "tests" / "core", "PermissionsAdminReportClaims"),
+    (REPO_ROOT / "tests" / "core", "PlayerIdentityEvidence"),
+    (REPO_ROOT / "tests" / "core", "PlayerIdentityPluginHubFoundation"),
+    (REPO_ROOT / "tests" / "core", "PlayerIdentityPromotion"),
+    (REPO_ROOT / "tests" / "core", "PlayerIdentityStaticOrientation"),
+    (REPO_ROOT / "tests" / "core", "ReadinessActiveInputs"),
+    (REPO_ROOT / "tests" / "core", "StructureCensusPromotion"),
+    (REPO_ROOT / "tests" / "core", "StructureCensusPromotionAbi"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "CommandChatResponsePromotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "CommandsRepliesPromotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "InlineExecutedReport"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "InventoryDescriptorCatalog"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "InventoryItemReturnEventDispatcher"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "InventoryPolicyEventDispatcher"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "MissionLeafEvidence"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "MissionLeafSidecar"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "PlayerIdentityPromotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "command_chat_response_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "command_response_summary_only"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "commands_replies_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "commands_replies_summary_only"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "inline_executed_report"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "inventory_descriptor_catalog_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "inventory_item_mutation_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "mission_transfer_dino_tribe_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "permissions_admin_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "player_identity_plugin_hub_foundation"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "player_identity_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "player_identity_static_orientation"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "structure_census_promotion"),
+    (REPO_ROOT / "tests" / "sdk_consumer", "structure_census_promotion_sdk"),
+    (REPO_ROOT / "tests" / "sdk_installed_consumer", "StructureCensusInstalledConsumer"),
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -254,15 +361,126 @@ def complete_excluded_manifest() -> tuple[dict, str]:
 
 
 class PublicSdkV1CompletionCheckTests(unittest.TestCase):
+    _checker_subprocess_cache: tempfile.TemporaryDirectory[str] | None = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.cleanup_repo_test_tempdirs()
+        cls._checker_subprocess_cache = tempfile.TemporaryDirectory(
+            prefix="obelisk-public-sdk-v1-completion-cache-"
+        )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        try:
+            if cls._checker_subprocess_cache is not None:
+                cls._checker_subprocess_cache.cleanup()
+            cls.cleanup_repo_test_tempdirs()
+        finally:
+            cls._checker_subprocess_cache = None
+            super().tearDownClass()
+
     def setUp(self) -> None:
+        self._repo_test_tempdirs_before = self.repo_test_tempdirs()
+        self._generated_repo_test_tempdirs: set[Path] = set()
         self._old_test_workspace_prefixes = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+        self._old_subprocess_cache_dir = os.environ.get(SUBPROCESS_CACHE_DIR_TEST_ENV)
         os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        if self._checker_subprocess_cache is not None:
+            os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = self._checker_subprocess_cache.name
 
     def tearDown(self) -> None:
-        if self._old_test_workspace_prefixes is None:
-            os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
-        else:
-            os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = self._old_test_workspace_prefixes
+        try:
+            self.assert_no_repo_test_tempdir_leaks()
+        finally:
+            if self._old_test_workspace_prefixes is None:
+                os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+            else:
+                os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = self._old_test_workspace_prefixes
+            if self._old_subprocess_cache_dir is None:
+                os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+            else:
+                os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = self._old_subprocess_cache_dir
+
+    @staticmethod
+    def repo_test_tempdirs() -> set[Path]:
+        artifacts: set[Path] = set()
+        for parent, prefix in REPO_TEST_TEMP_PREFIXES:
+            if parent.exists():
+                artifacts.update(path for path in parent.glob(f"{prefix}*") if path.is_dir())
+        return artifacts
+
+    @classmethod
+    def cleanup_repo_test_tempdirs(cls, *, baseline: set[Path] | None = None) -> None:
+        protected = baseline or set()
+        for path in sorted(cls.repo_test_tempdirs() - protected, reverse=True):
+            if path.is_dir():
+                shutil.rmtree(path)
+
+    def assert_no_repo_test_tempdir_leaks(self) -> None:
+        before = getattr(self, "_repo_test_tempdirs_before", set())
+        self.cleanup_repo_test_tempdirs(baseline=before)
+        leaked_after_cleanup = self.repo_test_tempdirs() - before
+        if leaked_after_cleanup:
+            self.fail(
+                "test leaked repo-local temp dirs in tracked test roots: "
+                + ", ".join(
+                    str(path.relative_to(REPO_ROOT))
+                    for path in sorted(leaked_after_cleanup)
+                )
+            )
+
+    @contextlib.contextmanager
+    def repo_test_tempdir(self, test_root: str, prefix: str):
+        parent = REPO_ROOT / "tests" / test_root
+        temp_dir = tempfile.TemporaryDirectory(dir=parent, prefix=prefix)
+        path = Path(temp_dir.name)
+        self._generated_repo_test_tempdirs.add(path)
+        try:
+            yield path
+        finally:
+            temp_dir.cleanup()
+
+    def test_repo_tempdir_guard_tracks_claim_accounting_fixture_prefixes(self) -> None:
+        tracked = {
+            (parent.relative_to(REPO_ROOT).as_posix(), prefix)
+            for parent, prefix in REPO_TEST_TEMP_PREFIXES
+        }
+        expected = {
+            ("tests/core", "PlayerIdentityEvidence"),
+            ("tests/core", "ActiveManifestBinding"),
+            ("tests/core", "MissionLeafEvidence"),
+            ("tests/sdk_consumer", "MissionLeafEvidence"),
+            ("tests/core", "MissionLeafSidecar"),
+            ("tests/sdk_consumer", "MissionLeafSidecar"),
+            ("tests/core", "PlayerIdentityPluginHubFoundation"),
+            ("tests/sdk_consumer", "player_identity_plugin_hub_foundation"),
+            ("tests/core", "PlayerIdentityStaticOrientation"),
+            ("tests/sdk_consumer", "player_identity_static_orientation"),
+            ("tests/core", "InlineExecutedReport"),
+            ("tests/core", "ExecutedReportArtifact"),
+            ("tests/core", "ExecutedReportCommandSurface"),
+            ("tests/core", "ExecutedReportActiveInputs"),
+            ("tests/core", "ExecutedReportMissingProvenance"),
+            ("tests/core", "ExecutedReportMissingInputs"),
+            ("tests/core", "ExecutedReportMalformedHash"),
+        }
+        self.assertTrue(expected.issubset(tracked))
+
+    def test_repo_tempdir_cleanup_removes_interrupted_run_residue(self) -> None:
+        stale = Path(
+            tempfile.mkdtemp(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="InventoryItemReturnEventDispatcherInterrupted",
+            )
+        )
+        (stale / "residue.txt").write_text("interrupted run residue\n", encoding="utf-8")
+
+        self.assertTrue(stale.exists())
+        self.cleanup_repo_test_tempdirs(baseline=self._repo_test_tempdirs_before)
+
+        self.assertFalse(stale.exists())
 
     def run_checker(
         self,
@@ -273,18 +491,195 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         run_env = os.environ.copy()
         if env is not None:
             run_env.update(env)
-        result = subprocess.run(
-            ["python3", str(SCRIPT), *args],
-            cwd=REPO_ROOT,
-            check=False,
-            env=run_env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            result = subprocess.run(
+                ["python3", str(SCRIPT), *args],
+                cwd=REPO_ROOT,
+                check=False,
+                env=run_env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as exc:
+            self.fail(
+                "checker subprocess timed out after "
+                f"{exc.timeout}s for args={args!r}\nstdout={exc.stdout}\nstderr={exc.stderr}"
+            )
         if check and result.returncode != 0:
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
+
+    def assertRequiredItemsPresent(
+        self,
+        actual: object,
+        required: list[str],
+        *,
+        field: str,
+    ) -> None:
+        self.assertIsInstance(actual, list, f"{field} should be a list")
+        missing = [item for item in required if item not in actual]
+        self.assertEqual(missing, [], f"{field} missing required items; actual={actual!r}")
+
+    def assertApprovedRuntimeEvidenceMissingRoute(
+        self,
+        report: dict[str, object],
+        *,
+        field: str,
+    ) -> None:
+        self.assertEqual(report["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertRequiredItemsPresent(
+            report["remaining_route_blockers"],
+            ["approved_runtime_evidence_missing"],
+            field=f"{field}.remaining_route_blockers",
+        )
+
+    def test_helper_subprocess_cache_is_disabled_without_cache_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            helper = root / "helper.py"
+            payload_path = root / "payload.json"
+            helper.write_text(
+                "import json\n"
+                "import pathlib\n"
+                "import sys\n"
+                "print(json.dumps(json.loads(pathlib.Path(sys.argv[1]).read_text())))\n",
+                encoding="utf-8",
+            )
+            payload_path.write_text(json.dumps({"value": 1}), encoding="utf-8")
+            old_cache = os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+            try:
+                first = run_helper_subprocess([sys.executable, str(helper), str(payload_path)])
+                payload_path.write_text(json.dumps({"value": 2}), encoding="utf-8")
+                second = run_helper_subprocess([sys.executable, str(helper), str(payload_path)])
+            finally:
+                if old_cache is None:
+                    os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+                else:
+                    os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = old_cache
+
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(json.loads(first.stdout), {"value": 1})
+        self.assertEqual(json.loads(second.stdout), {"value": 2})
+
+    def test_helper_subprocess_timeout_returns_fail_closed_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            helper = root / "slow_helper.py"
+            helper.write_text(
+                "import time\n"
+                "time.sleep(5)\n"
+                "print('{}')\n",
+                encoding="utf-8",
+            )
+            old_timeout = os.environ.get(HELPER_SUBPROCESS_TIMEOUT_ENV)
+            old_cache = os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+            try:
+                os.environ[HELPER_SUBPROCESS_TIMEOUT_ENV] = "0.01"
+                result = run_helper_subprocess([sys.executable, str(helper)])
+            finally:
+                if old_timeout is None:
+                    os.environ.pop(HELPER_SUBPROCESS_TIMEOUT_ENV, None)
+                else:
+                    os.environ[HELPER_SUBPROCESS_TIMEOUT_ENV] = old_timeout
+                if old_cache is None:
+                    os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+                else:
+                    os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = old_cache
+
+        self.assertEqual(result.returncode, 124)
+        self.assertIn("helper subprocess timed out", result.stderr)
+
+    def test_helper_subprocess_cache_key_tracks_input_files_and_obelisk_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            helper = root / "helper.py"
+            input_path = root / "input.json"
+            helper.write_text("print('ok')\n", encoding="utf-8")
+            input_path.write_text(json.dumps({"value": 1}), encoding="utf-8")
+            argv = [sys.executable, str(helper), str(input_path), "--json"]
+            marker_env = "OBELISK_PUBLIC_SDK_V1_COMPLETION_CACHE_AUDIT_MARKER"
+            old_marker = os.environ.get(marker_env)
+            try:
+                os.environ[marker_env] = "one"
+                baseline = _helper_subprocess_cache_key(argv)
+                os.environ[marker_env] = "two"
+                env_changed = _helper_subprocess_cache_key(argv)
+                os.environ[marker_env] = "one"
+                input_path.write_text(json.dumps({"value": 2}), encoding="utf-8")
+                file_changed = _helper_subprocess_cache_key(argv)
+            finally:
+                if old_marker is None:
+                    os.environ.pop(marker_env, None)
+                else:
+                    os.environ[marker_env] = old_marker
+
+        self.assertNotEqual(baseline, env_changed)
+        self.assertNotEqual(baseline, file_changed)
+
+    def test_cached_helper_failure_keeps_structure_census_blocked(self) -> None:
+        structure_payload = {
+            "schema": "obelisk.structure-census-readiness-check.v1",
+            "ready": True,
+            "status": "candidate_ready",
+            "outcome": "candidate_only",
+            "accounting_mode": "candidate_only",
+            "accepted_for_internal_planning": True,
+            "offline_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "enforcement_ready": False,
+            "candidate_only_accounting": {
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "build_policy_ready": False,
+                "public_structure_sdk_ready": False,
+                "structure_identity_ready": False,
+            },
+            "blockers": [],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            helper = root / "structure_census_helper.py"
+            cache_dir = root / "cache"
+            helper.write_text(
+                "import json\n"
+                f"payload = {structure_payload!r}\n"
+                "print(json.dumps(payload, sort_keys=True))\n",
+                encoding="utf-8",
+            )
+            old_cache = os.environ.get(SUBPROCESS_CACHE_DIR_TEST_ENV)
+            try:
+                os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = str(cache_dir)
+                argv = [sys.executable, str(helper), "--json"]
+                cache_dir.mkdir()
+                cache_path = cache_dir / f"{_helper_subprocess_cache_key(argv)}.json"
+                cache_path.write_text(
+                    json.dumps(
+                        {
+                            "schema": "obelisk.public-sdk-v1-completion-helper-subprocess-cache.v1",
+                            "returncode": 1,
+                            "stdout": json.dumps(structure_payload, sort_keys=True),
+                            "stderr": "cached helper failure",
+                        },
+                        sort_keys=True,
+                    ),
+                    encoding="utf-8",
+                )
+                report, blockers = run_structure_census_readiness(helper)
+            finally:
+                if old_cache is None:
+                    os.environ.pop(SUBPROCESS_CACHE_DIR_TEST_ENV, None)
+                else:
+                    os.environ[SUBPROCESS_CACHE_DIR_TEST_ENV] = old_cache
+
+        self.assertEqual(report["exit_code"], 1)
+        self.assertEqual(report["ready"], True)
+        self.assertIn("structure_census_readiness_invalid", blockers)
 
     def test_scoped_release_statement_builder_generates_non_claim_blocker_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -307,8 +702,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.assertIn("bookkeeping only", statement)
             self.assertIn("docs/SDK_V1_COMPATIBILITY.md", statement)
             self.assertIn("docs/public_sdk_surfaces.json", statement)
+            self.assertIn("Required scoped non-promoted blocker outcomes listed: 8/8", statement)
             self.assertIn("obelisk.inventory_items_mutation.v1: post-v1 - no Inventory SDK", statement)
             self.assertIn("obelisk.structure_census.v1: excluded - no StructureEvents SDK", statement)
+            self.assertIn(
+                "obelisk.mission_transfer_dino_tribe.v1: excluded - mission excluded, transfer excluded, "
+                "dino_policy excluded, tribe_policy excluded, and buff_status excluded",
+                statement,
+            )
             for surface_id in (
                 "obelisk.player_identity.v1",
                 "obelisk.permissions_admin.v1",
@@ -335,11 +736,240 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         payload = json.loads(result.stdout)
+        progress = payload["v1_sdk_progress"]
+        summary = payload["summary"]
+        sdk_completion = summary["sdk_completion"]
+        p0_completion = summary["p0_completion"]
         self.assertEqual(result.returncode, 0)
         self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
         self.assertTrue(payload["scoped_release_statement"]["ready"])
         self.assertFalse(payload["stable_claim_allowed"])
         self.assertFalse(payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
+        self.assertApprovedRuntimeEvidenceMissingRoute(
+            payload["scoped_release_statement"],
+            field="scoped_release_statement",
+        )
+        self.assertEqual(
+            payload["scoped_release_statement"]["next_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            payload["scoped_release_statement"]["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertFalse(payload["scoped_release_statement"]["approved_runtime_evidence"])
+        self.assertFalse(payload["scoped_release_statement"]["approved_runtime_evidence_accepted"])
+        self.assertFalse(
+            payload["scoped_release_statement"][
+                "approved_runtime_principal_lifecycle_evidence_bundle_accepted"
+            ]
+        )
+        self.assertFalse(payload["scoped_release_statement"]["evidence_bundle_accepted"])
+        self.assertEqual(summary["schema"], "obelisk.public-sdk-v1-completion-summary.v1")
+        self.assertEqual(summary["status"], "blocked")
+        self.assertFalse(summary["ready"])
+        self.assertEqual(summary["blockers"], payload["blockers"])
+        self.assertFalse(summary["stable_claim_allowed"])
+        self.assertFalse(summary["stable_release_contract_claim_allowed"])
+        for readiness_key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "public_abi_ready",
+            "runtime_ready",
+            "complete_sdk_ready",
+            "v1_completion_ready",
+        ):
+            with self.subTest(readiness_key=readiness_key):
+                self.assertFalse(payload[readiness_key])
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload, field="payload")
+        fastest_unblock = payload["fastest_next_sdk_unblock"]
+        self.assertEqual(
+            fastest_unblock["schema"],
+            "obelisk.public-sdk-v1-fastest-next-unblock.v1",
+        )
+        self.assertEqual(fastest_unblock["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(
+            fastest_unblock["current_route_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertEqual(
+            fastest_unblock["unblock_kind"],
+            "approved_copied_runtime_principal_lifecycle_evidence",
+        )
+        self.assertFalse(payload["approved_in_game_evidence_ready"])
+        self.assertFalse(payload["approved_runtime_evidence_ready"])
+        self.assertEqual(
+            payload["next_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            payload["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        approved_in_game = payload["approved_in_game_evidence"]
+        self.assertEqual(
+            approved_in_game["schema"],
+            "obelisk.public-sdk-v1-approved-in-game-evidence-status.v1",
+        )
+        self.assertFalse(approved_in_game["approved_in_game_evidence_ready"])
+        self.assertFalse(approved_in_game["approved_runtime_evidence"])
+        self.assertFalse(approved_in_game["approved_runtime_evidence_ready"])
+        self.assertFalse(approved_in_game["evidence_bundle_accepted"])
+        self.assertTrue(
+            approved_in_game["complete_lifecycle_event_triplet_observed_diagnostic_only"]
+        )
+        self.assertEqual(
+            approved_in_game["diagnostic_complete_triplet_path_ids"],
+            ["active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"],
+        )
+        self.assertEqual(
+            approved_in_game["missing_role_path_ids"],
+            ["active_genesis2_passive_missing_roles"],
+        )
+        self.assertEqual(
+            approved_in_game["next_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            approved_in_game["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertFalse(approved_in_game["current_turn_scope_required"])
+        self.assertTrue(approved_in_game["active_runtime_window_requires_standing_or_current_scope"])
+        self.assertTrue(approved_in_game["standing_launch_authority_recorded"])
+        self.assertTrue(approved_in_game["standing_launch_authority_satisfies_runtime_window_scope"])
+        self.assertTrue(
+            approved_in_game["runtime_window_can_be_prepared_under_standing_authority"]
+        )
+        self.assertFalse(
+            approved_in_game["runtime_window_preparation_counts_as_approved_runtime_evidence"]
+        )
+        self.assertFalse(
+            approved_in_game["runtime_window_preparation_counts_toward_sdk"]
+        )
+        self.assertFalse(
+            approved_in_game["standing_launch_authority_counts_as_runtime_evidence"]
+        )
+        self.assertFalse(
+            approved_in_game["standing_launch_authority_counts_toward_p0_dependency_chain"]
+        )
+        self.assertIn(
+            "prepare necessary ObeliskSDK runtime windows",
+            approved_in_game["runtime_window_scope_requirement"],
+        )
+        self.assertTrue(approved_in_game["player_notice_action_required"])
+        self.assertFalse(approved_in_game["live_ops_authorized"])
+        self.assertFalse(approved_in_game["server_operations_authorized"])
+        self.assertFalse(approved_in_game["workspace_writes_authorized"])
+        self.assertFalse(approved_in_game["runtime_capture_authorized"])
+        self.assertFalse(approved_in_game["discord_authorized"])
+        self.assertFalse(approved_in_game["reads_live_logs"])
+        self.assertFalse(approved_in_game["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(approved_in_game["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(approved_in_game["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(approved_in_game["p0_dependency_chain_claim_progress_contribution"], 0)
+        ragnarok_summary = approved_in_game["path_summaries"][
+            "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"
+        ]
+        self.assertEqual(
+            ragnarok_summary["source_scope"],
+            "historical_documented_passive_context",
+        )
+        self.assertEqual(ragnarok_summary["freshness"], "not_current_runtime_evidence")
+        self.assertFalse(ragnarok_summary["current_live_capture"])
+        self.assertFalse(ragnarok_summary["current_posture_input"])
+        self.assertFalse(ragnarok_summary["approved_offline_bundle_candidate"])
+        self.assertTrue(ragnarok_summary["complete_required_role_triplet"])
+        self.assertEqual(ragnarok_summary["evidence_status"], "diagnostic_passive_non_evidence")
+        self.assertFalse(ragnarok_summary["counts_as_approved_runtime_evidence"])
+        self.assertFalse(ragnarok_summary["evidence_bundle_accepted"])
+        genesis2_summary = approved_in_game["path_summaries"][
+            "active_genesis2_passive_missing_roles"
+        ]
+        self.assertEqual(
+            genesis2_summary["source_scope"],
+            "historical_documented_passive_context",
+        )
+        self.assertEqual(genesis2_summary["freshness"], "not_current_runtime_evidence")
+        self.assertFalse(genesis2_summary["current_live_capture"])
+        self.assertFalse(genesis2_summary["current_posture_input"])
+        self.assertFalse(genesis2_summary["complete_required_role_triplet"])
+        self.assertFalse(genesis2_summary["counts_as_approved_runtime_evidence"])
+        self.assertEqual(
+            fastest_unblock["required_event_roles"],
+            ["session_start", "session_start_rejected", "session_end"],
+        )
+        self.assertFalse(fastest_unblock["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(fastest_unblock["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(fastest_unblock["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(fastest_unblock["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertTrue(fastest_unblock["prioritization_only"])
+        self.assertFalse(fastest_unblock["public_sdk_ready"])
+        self.assertFalse(fastest_unblock["runtime_ready"])
+        self.assertEqual(
+            payload["command_permission_route_gate"]["current_route_blocker"],
+            payload["current_route_blocker"],
+        )
+        self.assertEqual(
+            payload["command_permission_route_gate"]["remaining_route_blockers"],
+            payload["remaining_route_blockers"],
+        )
+        self.assertApprovedRuntimeEvidenceMissingRoute(summary, field="summary")
+        self.assertTrue(summary["route_gate_blocked"])
+        self.assertTrue(payload["route_gate_blocked"])
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["complete_sdk_progress_ratio"], "0/12")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_ratio"], "0/12")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["complete_sdk_blockers_remaining_for_claim_count"], 12)
+        self.assertEqual(sdk_completion["status"], "blocked")
+        self.assertFalse(sdk_completion["ready"])
+        self.assertFalse(sdk_completion["claim_ready"])
+        self.assertFalse(sdk_completion["claim_allowed"])
+        self.assertEqual(sdk_completion["total"], 12)
+        self.assertEqual(sdk_completion["promoted_for_claim_count"], 0)
+        self.assertEqual(sdk_completion["remaining_for_claim_count"], 12)
+        self.assertEqual(sdk_completion["progress_ratio"], "0/12")
+        self.assertEqual(sdk_completion["promoted_for_claim_surfaces"], [])
+        self.assertEqual(
+            sdk_completion["remaining_for_claim_surfaces"],
+            payload["complete_sdk_blocker_claim_accounting"]["remaining_for_claim_surfaces"],
+        )
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_ratio"], "0/4")
+        self.assertEqual(payload["p0_chain_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_chain_promoted_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(payload["p0_chain_promoted_count"], 0)
+        self.assertEqual(p0_completion["status"], "blocked")
+        self.assertFalse(p0_completion["ready"])
+        self.assertEqual(p0_completion["total"], 4)
+        self.assertEqual(p0_completion["promoted_for_claim_count"], 0)
+        self.assertEqual(p0_completion["remaining_for_claim_count"], 4)
+        self.assertEqual(p0_completion["progress_ratio"], "0/4")
+        self.assertEqual(p0_completion["promoted_for_claim_surfaces"], [])
+        self.assertEqual(
+            p0_completion["remaining_for_claim_surfaces"],
+            payload["p0_dependency_chain_claim_accounting"]["remaining_for_claim_surfaces"],
+        )
+        self.assertApprovedRuntimeEvidenceMissingRoute(p0_completion, field="summary.p0_completion")
+        self.assertTrue(p0_completion["route_gate_blocked"])
+        self.assertRequiredItemsPresent(
+            p0_completion["route_gate_current_blockers"],
+            ["approved_runtime_evidence_missing"],
+            field="summary.p0_completion.route_gate_current_blockers",
+        )
+        self.assertEqual(
+            payload["complete_sdk_claim_progress_ratio"],
+            progress["complete_sdk_claim_progress_ratio"],
+        )
+        self.assertEqual(
+            payload["p0_dependency_chain_claim_progress_ratio"],
+            progress["p0_dependency_chain_claim_progress_ratio"],
+        )
         self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertNotIn("release_statement_missing_sdk_compatibility_reference", payload["blockers"])
         self.assertNotIn("release_statement_missing_public_sdk_surfaces_reference", payload["blockers"])
@@ -347,22 +977,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["scoped_release_statement"]["unexpected_surface_records"], [])
         self.assertEqual(
             payload["scoped_release_statement"]["allowed_surface_records"],
-            [
-                "obelisk.inventory_items_mutation.v1",
-                "obelisk.object_identity_resource_handle.v1",
-                "obelisk.structure_census.v1",
-                "obelisk.lifecycle_ops_recovery.v1",
-                "obelisk.player_services_economy_mobility.v1",
-                "obelisk.operator_ingress_storage.v1",
-                "obelisk.gameplay_tick_callbacks.v1",
-            ],
+            EXPECTED_SCOPED_NON_COMPLETE_REQUIRED_BLOCKER_OUTCOMES,
         )
         self.assertEqual(
-            payload["v1_sdk_progress"]["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
-            7,
+            progress["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
+            8,
         )
         self.assertEqual(
-            payload["v1_sdk_progress"]["p0_release_statement_scoped_non_complete_outcome_count"],
+            progress["p0_release_statement_scoped_non_complete_outcome_count"],
             0,
         )
         self.assertEqual(payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_count"], 0)
@@ -371,6 +993,862 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_ratio"], "0/4")
         self.assertIn("v1_required_dependency_chain_unpromoted", payload["blockers"])
 
+    def test_plain_gate_uses_durable_scoped_statement_without_progress(self) -> None:
+        result = self.run_checker("--json", check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["release_statement"], str(DEFAULT_SCOPED_RELEASE_STATEMENT))
+        self.assertEqual(payload["release_statement_source"], "default_scoped_release_statement")
+        self.assertEqual(
+            payload["default_scoped_release_statement"],
+            str(DEFAULT_SCOPED_RELEASE_STATEMENT),
+        )
+        self.assertTrue(payload["default_scoped_release_statement_exists"])
+        self.assertTrue(payload["default_scoped_release_statement_used"])
+        self.assertIn(
+            "enabled for fail-closed scoped bookkeeping",
+            payload["release_statement_auto_discovery"],
+        )
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(payload["scoped_release_statement_required_outcome_count"], 8)
+        self.assertEqual(payload["scoped_release_statement_missing_required_outcome_count"], 0)
+        self.assertEqual(
+            payload["scoped_release_statement_missing_required_outcome_surfaces"],
+            [],
+        )
+        self.assertEqual(payload["scoped_release_statement_satisfied_outcome_count"], 8)
+        self.assertEqual(payload["release_statement_scoped_non_complete_bookkeeping_blocker_count"], 8)
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload, field="payload")
+        self.assertApprovedRuntimeEvidenceMissingRoute(
+            payload["command_permission_route_gate"],
+            field="command_permission_route_gate",
+        )
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload["summary"], field="summary")
+        trace = payload["progress_normalization_trace"]
+        self.assertEqual(
+            trace["schema"],
+            "obelisk.public-sdk-v1-progress-normalization-trace.v1",
+        )
+        self.assertTrue(trace["status_report_only"])
+        self.assertEqual(trace["status"], "blocked")
+        self.assertFalse(trace["ready"])
+        self.assertEqual(trace["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(
+            trace["next_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            trace["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(trace["complete_sdk_progress_ratio"], "0/12")
+        self.assertEqual(trace["p0_chain_progress_ratio"], "0/4")
+        self.assertFalse(trace["approved_runtime_evidence_ready"])
+        self.assertFalse(trace["runtime_ready"])
+        self.assertFalse(trace["public_sdk_ready"])
+        self.assertFalse(trace["stable_claim_allowed"])
+        self.assertFalse(trace["counts_toward_complete_sdk_claim"])
+        self.assertFalse(trace["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(trace["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(trace["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertIn("approved_runtime_evidence_missing", trace["normalization_reasons"])
+        self.assertIn(
+            "missing_required_artifact:approved_runtime_principal_lifecycle_evidence_bundle",
+            trace["normalization_reasons"],
+        )
+        self.assertApprovedRuntimeEvidenceMissingRoute(trace, field="progress_normalization_trace")
+        self.assertEqual(payload["v1_sdk_progress"]["progress_normalization_trace"], trace)
+        stable_blockers = payload["stable_sdk_remaining_blockers"]
+        self.assertEqual(
+            stable_blockers["schema"],
+            "obelisk.public-sdk-v1-stable-sdk-remaining-blockers.v1",
+        )
+        self.assertTrue(stable_blockers["status_report_only"])
+        self.assertFalse(stable_blockers["ready"])
+        self.assertFalse(stable_blockers["complete_sdk_ready"])
+        self.assertFalse(stable_blockers["stable_claim_allowed"])
+        self.assertFalse(stable_blockers["stable_sdk_ready"])
+        self.assertFalse(stable_blockers["public_sdk_ready"])
+        self.assertFalse(stable_blockers["runtime_ready"])
+        self.assertEqual(stable_blockers["complete_sdk_progress_ratio"], "0/12")
+        self.assertEqual(stable_blockers["complete_sdk_remaining_for_claim_count"], 12)
+        self.assertEqual(stable_blockers["remaining_sdk_blocker_surface_count"], 12)
+        self.assertEqual(stable_blockers["p0_dependency_chain_progress_ratio"], "0/4")
+        self.assertEqual(stable_blockers["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(stable_blockers["remaining_p0_dependency_chain_surface_count"], 4)
+        self.assertEqual(
+            stable_blockers["p0_dependency_chain"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
+        self.assertEqual(stable_blockers["current_p0_surface"], "obelisk.player_identity.v1")
+        self.assertEqual(
+            stable_blockers["remaining_sdk_blocker_surfaces"],
+            payload["complete_sdk_blocker_claim_accounting"]["remaining_for_claim_surfaces"],
+        )
+        self.assertEqual(
+            stable_blockers["remaining_p0_dependency_chain_surfaces"],
+            payload["p0_dependency_chain_claim_accounting"]["remaining_for_claim_surfaces"],
+        )
+        self.assertFalse(stable_blockers["package_shape_counts_toward_complete_sdk_claim"])
+        self.assertFalse(
+            stable_blockers[
+                "scoped_non_complete_release_statement_counts_toward_complete_sdk_claim"
+            ]
+        )
+        self.assertFalse(stable_blockers["monitor_context_counts_toward_complete_sdk_claim"])
+        self.assertFalse(stable_blockers["passive_status_counts_toward_complete_sdk_claim"])
+        self.assertFalse(stable_blockers["beta_notice_counts_toward_complete_sdk_claim"])
+        self.assertFalse(stable_blockers["copied_log_only_counts_toward_complete_sdk_claim"])
+        self.assertEqual(stable_blockers["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(stable_blockers["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertIn("copied-log-only artifacts do not satisfy", stable_blockers["non_claim"])
+        self.assertEqual(payload["v1_sdk_progress"]["stable_sdk_remaining_blockers"], stable_blockers)
+        self.assertIn("v1_required_dependency_chain_unpromoted", payload["blockers"])
+        self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_explicit_durable_scoped_statement_satisfies_bookkeeping_without_progress(self) -> None:
+        result = self.run_checker(
+            "--release-statement",
+            str(DEFAULT_SCOPED_RELEASE_STATEMENT),
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+        scoped_rows = [
+            row
+            for row in payload["v1_sdk_blocker_outcomes"]
+            if row["release_statement_scoped_non_complete_bookkeeping"] is True
+        ]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["release_statement"], str(DEFAULT_SCOPED_RELEASE_STATEMENT))
+        self.assertEqual(payload["release_statement_source"], "explicit")
+        self.assertFalse(payload["default_scoped_release_statement_used"])
+        self.assertIn("explicit --release-statement", payload["release_statement_auto_discovery"])
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(payload["scoped_release_statement_required_outcome_count"], 8)
+        self.assertEqual(payload["scoped_release_statement_missing_required_outcome_count"], 0)
+        self.assertEqual(
+            payload["scoped_release_statement_missing_required_outcome_surfaces"],
+            [],
+        )
+        self.assertEqual(payload["scoped_release_statement_satisfied_outcome_count"], 8)
+        self.assertEqual(
+            payload["scoped_release_statement_allowed_surface_records"],
+            EXPECTED_SCOPED_NON_COMPLETE_REQUIRED_BLOCKER_OUTCOMES,
+        )
+        self.assertEqual(payload["scoped_release_statement_unexpected_surface_records"], [])
+        self.assertEqual(
+            [
+                record["surface"]
+                for record in payload["release_statement_surface_records"]
+            ],
+            EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES,
+        )
+        self.assertEqual(
+            payload["release_statement_scoped_non_complete_bookkeeping_blocker_count"],
+            8,
+        )
+        self.assertEqual(len(scoped_rows), 8)
+        for row in scoped_rows:
+            with self.subTest(surface=row["surface"]):
+                self.assertFalse(row["is_p0_dependency_chain"])
+                self.assertIn(row["release_statement_outcome"], {"excluded", "post-v1"})
+                if row["status"] == "planning":
+                    self.assertIsNone(row["manifest_outcome"])
+                else:
+                    self.assertIn(row["manifest_outcome"], {"excluded", "post-v1"})
+                self.assertFalse(row["scoped_release_statement_counts_toward_complete_sdk_claim"])
+                self.assertEqual(row["scoped_release_statement_claim_progress_contribution"], 0)
+                self.assertFalse(row["counts_toward_complete_sdk_claim"])
+
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["scoped_release_statement_counts_toward_complete_sdk_claim"])
+        self.assertEqual(payload["scoped_release_statement_claim_progress_contribution"], 0)
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["complete_sdk_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(
+            payload["v1_sdk_progress"]["p0_release_statement_scoped_non_complete_outcome_count"],
+            0,
+        )
+        self.assertIn("v1_required_dependency_chain_unpromoted", payload["blockers"])
+        self.assertEqual(
+            payload["p0_dependency_chain_claim_accounting"]["remaining_for_claim_surfaces"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
+
+    def test_validate_release_statement_scope_uses_durable_default_without_completion_progress(self) -> None:
+        result = self.run_checker(
+            "--validate-release-statement-scope",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+        scoped_rows = [
+            row
+            for row in payload["v1_sdk_blocker_outcomes"]
+            if row["release_statement_scoped_non_complete_bookkeeping"] is True
+        ]
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(payload["release_statement"], str(DEFAULT_SCOPED_RELEASE_STATEMENT))
+        self.assertEqual(payload["release_statement_source"], "default_scoped_release_statement")
+        self.assertTrue(payload["default_scoped_release_statement_used"])
+        self.assertIn(
+            "enabled for fail-closed scoped bookkeeping",
+            payload["release_statement_auto_discovery"],
+        )
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertFalse(payload["scoped_release_statement"]["counts_toward_complete_sdk_claim"])
+        self.assertEqual(payload["scoped_release_statement"]["complete_sdk_claim_progress_contribution"], 0)
+        self.assertTrue(payload["scoped_release_statement"]["scoped_non_complete_bookkeeping_only"])
+        self.assertEqual(
+            payload["scoped_release_statement"]["current_route_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertEqual(
+            payload["scoped_release_statement"]["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertFalse(
+            payload["scoped_release_statement"][
+                "approved_runtime_principal_lifecycle_evidence_bundle_accepted"
+            ]
+        )
+        self.assertEqual(
+            payload["scoped_release_statement"]["release_statement_source"],
+            "default_scoped_release_statement",
+        )
+        self.assertTrue(payload["scoped_release_statement"]["default_scoped_release_statement_used"])
+        self.assertEqual(
+            payload["scoped_release_statement"]["missing_required_outcome_surfaces"],
+            [],
+        )
+        self.assertFalse(payload["ready"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(
+            payload["release_statement_scoped_non_complete_bookkeeping_blocker_count"],
+            8,
+        )
+        self.assertEqual(len(scoped_rows), 8)
+        for row in scoped_rows:
+            with self.subTest(surface=row["surface"]):
+                self.assertFalse(row["is_p0_dependency_chain"])
+                self.assertIn(row["release_statement_outcome"], {"excluded", "post-v1"})
+                if row["status"] == "planning":
+                    self.assertIsNone(row["manifest_outcome"])
+                else:
+                    self.assertIn(row["manifest_outcome"], {"excluded", "post-v1"})
+                self.assertFalse(row["scoped_release_statement_counts_toward_complete_sdk_claim"])
+                self.assertEqual(row["scoped_release_statement_claim_progress_contribution"], 0)
+                self.assertFalse(row["counts_toward_complete_sdk_claim"])
+                self.assertIn("scoped_non_complete_outcome", row["non_counting_reasons"])
+        self.assertFalse(
+            payload["v1_sdk_blocker_outcome_summary"][
+                "release_statement_scoped_non_complete_counts_toward_complete_sdk_claim"
+            ]
+        )
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"][
+                "release_statement_scoped_non_complete_claim_progress_contribution"
+            ],
+            0,
+        )
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["complete_sdk_blockers_remaining_for_claim_count"], 12)
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(
+            payload["v1_sdk_progress"]["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
+            8,
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"]["p0_release_statement_scoped_non_complete_outcome_count"],
+            0,
+        )
+
+    def test_fastest_next_sdk_unblock_is_prioritization_only_with_p0_zero_of_four(self) -> None:
+        result = self.run_checker(
+            "--validate-release-statement-scope",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+        fastest_unblock = payload["fastest_next_sdk_unblock"]
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(payload["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(fastest_unblock["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(
+            fastest_unblock["current_route_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertEqual(
+            fastest_unblock["unblock_kind"],
+            "approved_copied_runtime_principal_lifecycle_evidence",
+        )
+        self.assertTrue(fastest_unblock["prioritization_only"])
+        self.assertFalse(fastest_unblock["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(fastest_unblock["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(fastest_unblock["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(fastest_unblock["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertNotIn(
+            fastest_unblock["surface"],
+            payload["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_surfaces"],
+        )
+        self.assertNotIn(
+            fastest_unblock["surface"],
+            payload["p0_dependency_chain_claim_accounting"]["promoted_for_claim_surfaces"],
+        )
+
+    def test_ragnarok_passive_triplet_path_is_non_evidence_without_progress(self) -> None:
+        result = self.run_checker(
+            "--validate-release-statement-scope",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+        paths = payload["fastest_next_sdk_unblock"]["actionable_paths"]
+        ragnarok = paths[
+            "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"
+        ]
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        for readiness_key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "public_abi_ready",
+            "runtime_ready",
+            "complete_sdk_ready",
+            "v1_completion_ready",
+        ):
+            with self.subTest(readiness_key=readiness_key):
+                self.assertFalse(payload[readiness_key])
+
+        self.assertEqual(ragnarok["authorization"], "non-authorizing")
+        self.assertFalse(ragnarok["authorizes_runtime_work"])
+        self.assertFalse(ragnarok["authorizes_server_work"])
+        self.assertFalse(ragnarok["authorizes_workspace_work"])
+        self.assertFalse(ragnarok["authorizes_server_operations"])
+        self.assertFalse(ragnarok["authorizes_workspace_writes"])
+        self.assertFalse(ragnarok["reads_live_logs"])
+        self.assertFalse(ragnarok["counts_as_approved_runtime_evidence"])
+        self.assertFalse(ragnarok["passive_snapshot_evidence_allowed"])
+        self.assertFalse(ragnarok["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(ragnarok["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(ragnarok["claim_progress_contribution"], 0)
+        self.assertEqual(ragnarok["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(ragnarok["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertEqual(
+            ragnarok["present_event_roles"],
+            ["session_start", "session_start_rejected", "session_end"],
+        )
+        self.assertEqual(ragnarok["missing_event_roles"], [])
+
+    def test_release_statement_pass_wording_is_rejected_while_p0_zero_of_four(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        for claim in (
+            "Complete SDK passes.",
+            "Full SDK passes.",
+            "Production SDK passes.",
+            "Stable SDK passes.",
+            "Complete SDK claim passes while P0 is 0/4.",
+            "P0 is 0/4 and current blocker is approved_runtime_evidence_missing; "
+            "complete/full/production/stable SDK passes.",
+        ):
+            with self.subTest(claim=claim):
+                self.assertTrue(module.release_statement_forbidden_broad_claims(claim))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                DEFAULT_SCOPED_RELEASE_STATEMENT.read_text(encoding="utf-8")
+                + "\n"
+                "P0 is 0/4 and current blocker is approved_runtime_evidence_missing; "
+                "complete/full/production/stable SDK passes.\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertTrue(
+            any(
+                "complete/full/production/stable SDK passes" in claim
+                for claim in payload["release_statement_forbidden_broad_claims"]
+            )
+        )
+
+    def test_normalized_summary_completion_sections_remain_non_claim_when_route_blocked(self) -> None:
+        blockers = ["approved_runtime_evidence_missing"]
+        sdk_remaining = [
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+            "obelisk.inventory_items_mutation.v1",
+            "obelisk.lifecycle_ops_recovery.v1",
+            "obelisk.structure_census.v1",
+            "obelisk.mission_transfer_dino_tribe.v1",
+            "obelisk.object_identity_resource_handle.v1",
+            "obelisk.player_services_economy_mobility.v1",
+            "obelisk.operator_ingress_storage.v1",
+            "obelisk.gameplay_tick_callbacks.v1",
+        ]
+        p0_remaining = sdk_remaining[:4]
+
+        summary = normalized_completion_summary(
+            status="blocked",
+            ready=False,
+            blockers=blockers,
+            current_route_blocker="approved_runtime_evidence_missing",
+            remaining_route_blockers=blockers,
+            stable_claim_allowed=False,
+            manifest_stable_claim_allowed=False,
+            complete_sdk_blocker_claim_accounting={
+                "total": 12,
+                "promoted_for_claim_count": 0,
+                "remaining_for_claim_count": 12,
+                "promoted_for_claim_ratio": "0/12",
+                "promoted_for_claim_surfaces": [],
+                "remaining_for_claim_surfaces": sdk_remaining,
+            },
+            p0_dependency_chain_claim_accounting={
+                "total": 4,
+                "promoted_for_claim_count": 0,
+                "remaining_for_claim_count": 4,
+                "promoted_for_claim_ratio": "0/4",
+                "promoted_for_claim_surfaces": [],
+                "remaining_for_claim_surfaces": p0_remaining,
+                "route_gate_current_blockers": blockers,
+            },
+        )
+
+        sdk_completion = summary["sdk_completion"]
+        p0_completion = summary["p0_completion"]
+        self.assertEqual(summary["status"], "blocked")
+        self.assertFalse(summary["ready"])
+        self.assertFalse(summary["stable_claim_allowed"])
+        self.assertEqual(summary["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(summary["remaining_route_blockers"], blockers)
+        self.assertTrue(summary["route_gate_blocked"])
+        self.assertIn("does not authorize stable", summary["non_claim"])
+
+        self.assertEqual(sdk_completion["status"], "blocked")
+        self.assertFalse(sdk_completion["ready"])
+        self.assertFalse(sdk_completion["claim_ready"])
+        self.assertFalse(sdk_completion["claim_allowed"])
+        self.assertEqual(sdk_completion["promoted_for_claim_count"], 0)
+        self.assertEqual(sdk_completion["remaining_for_claim_count"], 12)
+        self.assertEqual(sdk_completion["progress_ratio"], "0/12")
+        self.assertEqual(sdk_completion["promoted_for_claim_surfaces"], [])
+        self.assertEqual(sdk_completion["remaining_for_claim_surfaces"], sdk_remaining)
+
+        self.assertEqual(p0_completion["status"], "blocked")
+        self.assertFalse(p0_completion["ready"])
+        self.assertEqual(p0_completion["promoted_for_claim_count"], 0)
+        self.assertEqual(p0_completion["remaining_for_claim_count"], 4)
+        self.assertEqual(p0_completion["progress_ratio"], "0/4")
+        self.assertEqual(p0_completion["promoted_for_claim_surfaces"], [])
+        self.assertEqual(p0_completion["remaining_for_claim_surfaces"], p0_remaining)
+        self.assertEqual(p0_completion["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(p0_completion["remaining_route_blockers"], blockers)
+        self.assertTrue(p0_completion["route_gate_blocked"])
+        self.assertEqual(p0_completion["route_gate_current_blockers"], blockers)
+        self.assertNotIn("claim_ready", p0_completion)
+        self.assertNotIn("claim_allowed", p0_completion)
+        self.assertNotIn("stable_claim_allowed", p0_completion)
+
+    def test_normalized_summary_route_blocker_keeps_p0_blocked_despite_full_counts(self) -> None:
+        blockers = ["approved_runtime_evidence_missing"]
+        p0_surfaces = [
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        ]
+
+        summary = normalized_completion_summary(
+            status="blocked",
+            ready=False,
+            blockers=blockers,
+            current_route_blocker="approved_runtime_evidence_missing",
+            remaining_route_blockers=blockers,
+            stable_claim_allowed=False,
+            manifest_stable_claim_allowed=False,
+            complete_sdk_blocker_claim_accounting={
+                "total": 12,
+                "promoted_for_claim_count": 4,
+                "remaining_for_claim_count": 8,
+                "promoted_for_claim_ratio": "4/12",
+                "promoted_for_claim_surfaces": p0_surfaces,
+                "remaining_for_claim_surfaces": ["obelisk.inventory_items_mutation.v1"],
+            },
+            p0_dependency_chain_claim_accounting={
+                "total": 4,
+                "promoted_for_claim_count": 4,
+                "remaining_for_claim_count": 0,
+                "promoted_for_claim_ratio": "4/4",
+                "promoted_for_claim_surfaces": p0_surfaces,
+                "remaining_for_claim_surfaces": [],
+                "route_gate_current_blockers": blockers,
+            },
+        )
+
+        p0_completion = summary["p0_completion"]
+        self.assertTrue(summary["route_gate_blocked"])
+        self.assertFalse(summary["stable_claim_allowed"])
+        self.assertEqual(p0_completion["progress_ratio"], "4/4")
+        self.assertEqual(p0_completion["promoted_for_claim_count"], 4)
+        self.assertEqual(p0_completion["remaining_for_claim_count"], 0)
+        self.assertEqual(p0_completion["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertTrue(p0_completion["route_gate_blocked"])
+        self.assertEqual(p0_completion["status"], "blocked")
+        self.assertFalse(p0_completion["ready"])
+        self.assertNotIn("claim_allowed", p0_completion)
+
+    def test_fastest_next_sdk_unblock_names_runtime_evidence_without_readiness_claim(self) -> None:
+        payload = fastest_next_sdk_unblock(
+            current_route_blocker="approved_runtime_evidence_missing",
+            remaining_route_blockers=["approved_runtime_evidence_missing"],
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                ],
+            },
+        )
+
+        self.assertEqual(payload["schema"], "obelisk.public-sdk-v1-fastest-next-unblock.v1")
+        self.assertEqual(payload["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(payload["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(
+            payload["unblock_kind"],
+            "approved_copied_runtime_principal_lifecycle_evidence",
+        )
+        self.assertEqual(
+            payload["required_event_roles"],
+            ["session_start", "session_start_rejected", "session_end"],
+        )
+        self.assertEqual(
+            payload["next_route_blocker_after_acceptance"],
+            "identity_public_contract_gate_missing",
+        )
+        self.assertFalse(payload["active_runtime_window_requires_current_turn_scope"])
+        self.assertTrue(payload["active_runtime_window_requires_standing_or_current_scope"])
+        self.assertTrue(payload["standing_launch_authority_recorded"])
+        self.assertTrue(payload["standing_launch_authority_satisfies_runtime_window_scope"])
+        self.assertTrue(payload["runtime_window_can_be_prepared_under_standing_authority"])
+        self.assertFalse(
+            payload["runtime_window_preparation_counts_as_approved_runtime_evidence"]
+        )
+        self.assertFalse(payload["runtime_window_preparation_counts_toward_sdk"])
+        self.assertFalse(payload["standing_launch_authority_counts_as_runtime_evidence"])
+        self.assertFalse(
+            payload["standing_launch_authority_counts_toward_complete_sdk_claim"]
+        )
+        self.assertIn(
+            "prepare necessary ObeliskSDK runtime windows",
+            payload["runtime_window_scope_requirement"],
+        )
+        for key in (
+            "counts_toward_complete_sdk_claim_now",
+            "counts_toward_p0_dependency_chain_claim_now",
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "stable_claim_allowed",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(payload[key])
+        self.assertEqual(payload["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertTrue(payload["prioritization_only"])
+        self.assertIn("Prioritization only", payload["non_claim"])
+        for key in ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS:
+            with self.subTest(root_false_key=key):
+                self.assertIn(key, payload)
+                self.assertFalse(payload[key])
+        for key in ACTIONABLE_PATH_ZERO_KEYS:
+            with self.subTest(root_zero_key=key):
+                self.assertIn(key, payload)
+                self.assertEqual(payload[key], 0)
+
+        approved_in_game = approved_in_game_evidence_completion_status(
+            current_route_blocker="approved_runtime_evidence_missing",
+            fastest_next_unblock=payload,
+        )
+
+        self.assertFalse(approved_in_game["approved_in_game_evidence_ready"])
+        self.assertFalse(approved_in_game["approved_runtime_evidence"])
+        self.assertTrue(
+            approved_in_game["complete_lifecycle_event_triplet_observed_diagnostic_only"]
+        )
+        self.assertEqual(
+            approved_in_game["diagnostic_complete_triplet_path_ids"],
+            ["active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"],
+        )
+        self.assertEqual(
+            approved_in_game["missing_role_path_ids"],
+            ["active_genesis2_passive_missing_roles"],
+        )
+        self.assertEqual(
+            approved_in_game["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertFalse(approved_in_game["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(approved_in_game["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(approved_in_game["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(approved_in_game["p0_dependency_chain_claim_progress_contribution"], 0)
+
+    def test_approved_in_game_status_fails_closed_when_source_omits_required_artifacts(self) -> None:
+        approved_in_game = approved_in_game_evidence_completion_status(
+            current_route_blocker="approved_runtime_evidence_missing",
+            fastest_next_unblock={
+                "schema": "obelisk.public-sdk-v1-fastest-next-unblock.v1",
+                "current_route_blocker": "approved_runtime_evidence_missing",
+                "actionable_paths": {
+                    "partial_status_report": {
+                        "path_type": "status_report_non_evidence",
+                        "present_event_roles": [
+                            "session_start",
+                            "session_start_rejected",
+                            "session_end",
+                        ],
+                        "missing_event_roles": [],
+                        "evidence_status": "diagnostic_passive_non_evidence",
+                    }
+                },
+            },
+        )
+
+        self.assertFalse(approved_in_game["approved_in_game_evidence_ready"])
+        self.assertFalse(approved_in_game["approved_runtime_evidence_ready"])
+        self.assertEqual(
+            approved_in_game["next_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            approved_in_game["missing_required_artifact"],
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertEqual(
+            approved_in_game["diagnostic_complete_triplet_path_ids"],
+            ["partial_status_report"],
+        )
+        self.assertFalse(approved_in_game["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(approved_in_game["counts_toward_p0_dependency_chain_claim_now"])
+
+    def test_fastest_next_sdk_unblock_lists_non_authorizing_runtime_paths(self) -> None:
+        payload = fastest_next_sdk_unblock(
+            current_route_blocker="approved_runtime_evidence_missing",
+            remaining_route_blockers=["approved_runtime_evidence_missing"],
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                ],
+            },
+        )
+
+        self.assertEqual(payload["current_route_blocker"], "approved_runtime_evidence_missing")
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(payload["complete_sdk_claim_progress_contribution"], 0)
+        paths = payload["actionable_paths"]
+        self.assertEqual(
+            set(paths),
+            {
+                "historical_theisland_candidate_missing_sidecars",
+                "active_genesis2_passive_missing_roles",
+                "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle",
+                "player_notice_action",
+                "multi_surface_beta_capture_candidate_queue",
+            },
+        )
+        beta_queue = paths["multi_surface_beta_capture_candidate_queue"]
+        self.assertTrue(beta_queue["visible_as_next_action"])
+        self.assertFalse(
+            beta_queue["candidate_queue_artifact_family_counts_as_approved_runtime_evidence"]
+        )
+        self.assertFalse(beta_queue["candidate_queue_artifact_family_counts_toward_sdk"])
+        self.assertFalse(
+            beta_queue["candidate_queue_artifact_family_counts_toward_p0_dependency_chain"]
+        )
+        self.assertEqual(beta_queue["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(beta_queue["p0_dependency_chain_claim_progress_contribution"], 0)
+
+        theisland = paths["historical_theisland_candidate_missing_sidecars"]
+        self.assertEqual(theisland["authorization"], "non-authorizing")
+        self.assertEqual(theisland["target"], {"instance": "arkserver2", "map": "TheIsland"})
+        self.assertEqual(
+            theisland["helper_path"],
+            "scripts/prepare_player_principal_lifecycle_evidence_closure_request.py",
+        )
+        self.assertIn("window-manifest.env", theisland["required_closure_artifacts"])
+        self.assertIn("preflight-post.json", theisland["required_closure_artifacts"])
+        self.assertIn(
+            "approved-bundle/approved-runtime-principal-lifecycle-evidence.json",
+            theisland["required_closure_artifacts"],
+        )
+
+        genesis2 = paths["active_genesis2_passive_missing_roles"]
+        self.assertEqual(genesis2["authorization"], "non-authorizing")
+        self.assertEqual(genesis2["target"], {"instance": "arkserver3", "map": "Genesis2"})
+        self.assertEqual(genesis2["source_scope"], "historical_documented_passive_context")
+        self.assertEqual(genesis2["freshness"], "not_current_runtime_evidence")
+        self.assertFalse(genesis2["current_live_capture"])
+        self.assertFalse(genesis2["current_posture_input"])
+        self.assertTrue(genesis2["active_path_label_is_historical_compatibility_alias"])
+        self.assertIn("retained for compatibility", genesis2["path_label_note"])
+        self.assertTrue(
+            any("historical diagnostic context" in item for item in genesis2["requirements"])
+        )
+        self.assertEqual(genesis2["missing_event_roles"], ["session_end"])
+        self.assertIn("missing_role_triplet:session_end", genesis2["paths"])
+
+        ragnarok = paths[
+            "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"
+        ]
+        self.assertEqual(ragnarok["authorization"], "non-authorizing")
+        self.assertEqual(ragnarok["target"], {"instance": "arkserver", "map": "Ragnarok"})
+        self.assertEqual(
+            ragnarok["present_event_roles"],
+            ["session_start", "session_start_rejected", "session_end"],
+        )
+        self.assertEqual(ragnarok["missing_event_roles"], [])
+        self.assertFalse(ragnarok["counts_as_approved_runtime_evidence"])
+        self.assertFalse(ragnarok["passive_snapshot_evidence_allowed"])
+        self.assertIn("approved_bundle_missing", ragnarok["paths"])
+        self.assertTrue(
+            any(
+                "complete passive Ragnarok triplet" in requirement
+                and "diagnostic/non-evidence" in requirement
+                for requirement in ragnarok["requirements"]
+            )
+        )
+
+        notice = paths["player_notice_action"]
+        self.assertEqual(notice["authorization"], "non-authorizing")
+        self.assertTrue(notice["player_notice_action_required"])
+        self.assertFalse(notice["notice_action_authorized"])
+        self.assertFalse(notice["player_notice_action_authorized"])
+        self.assertFalse(notice["authorizes_discord"])
+        self.assertFalse(notice["discord_authorized"])
+        self.assertFalse(notice["notice_sent"])
+        self.assertFalse(notice["notice_dry_run_accepted"])
+        self.assertFalse(notice["notice_bundle_accepted"])
+        self.assertIn("player_notice_action", notice["paths"])
+        self.assertTrue(
+            any("does not authorize Discord" in requirement for requirement in notice["requirements"])
+        )
+        self.assertTrue(
+            any("do not satisfy approved runtime evidence" in requirement for requirement in notice["requirements"])
+        )
+        self.assertEqual(payload["required_actions"], ["player_notice_action"])
+        self.assertTrue(payload["player_notice_action_required"])
+        self.assertFalse(payload["discord_authorized"])
+        self.assertFalse(payload["notice_action_authorized"])
+
+        for path_id, path in paths.items():
+            with self.subTest(path_id=path_id):
+                self.assertFalse(path["authorizes_runtime_work"])
+                self.assertFalse(path["authorizes_server_operations"])
+                self.assertFalse(path["authorizes_workspace_writes"])
+                self.assertFalse(path["reads_live_logs"])
+                self.assertFalse(path["counts_toward_complete_sdk_claim_now"])
+                self.assertFalse(path["counts_toward_p0_dependency_chain_claim_now"])
+                self.assertEqual(path["complete_sdk_claim_progress_contribution"], 0)
+                self.assertEqual(path["p0_dependency_chain_claim_progress_contribution"], 0)
+                self.assertEqual(
+                    path["required_event_roles"],
+                    ["session_start", "session_start_rejected", "session_end"],
+                )
+                for key in ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS:
+                    with self.subTest(path_id=path_id, false_key=key):
+                        self.assertIn(key, path)
+                        self.assertFalse(path[key])
+                for key in ACTIONABLE_PATH_ZERO_KEYS:
+                    with self.subTest(path_id=path_id, zero_key=key):
+                        self.assertIn(key, path)
+                        self.assertEqual(path[key], 0)
+
+    def test_fastest_next_sdk_unblock_after_runtime_evidence_points_to_contract_review(self) -> None:
+        payload = fastest_next_sdk_unblock(
+            current_route_blocker="identity_public_contract_gate_missing",
+            remaining_route_blockers=["identity_public_contract_gate_missing"],
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                ],
+            },
+        )
+
+        self.assertEqual(payload["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(payload["current_route_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(payload["unblock_kind"], "reviewed_identity_public_contract")
+        self.assertEqual(payload["required_event_roles"], [])
+        self.assertFalse(payload["active_runtime_window_requires_current_turn_scope"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertIn("identity public contract", payload["recommended_next_action"])
+
     def test_scoped_release_statement_builder_rejects_generated_broad_claims(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
         for surface in manifest["surfaces"]:
@@ -378,7 +1856,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 surface["v1_decision_contract"] = {
                     "exclusion_requires": [
                         "the v1 release statement names obelisk.inventory_items_mutation.v1 as post-v1",
-                        "the v1 release statement states that the complete SDK is ready",
+                        "the v1 release statement states that public SDK is ready",
                     ],
                 }
                 break
@@ -403,6 +1881,51 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(build_result.returncode, 2)
         self.assertIn("forbidden broad claim", build_result.stderr)
 
+    def test_scoped_release_statement_builder_rejects_scoped_detail_claim_tokens(self) -> None:
+        cases = {
+            "promoted": "the v1 release statement states that surface is promoted for scoped bookkeeping",
+            "excluded-promoted": "the v1 release statement states that surface is promoted for scoped bookkeeping",
+            "stable": "the v1 release statement states that stable outcome bookkeeping is recorded",
+            "complete": "the v1 release statement states that complete outcome bookkeeping is recorded",
+            "support-tier": "the v1 release statement states that support-tier active bookkeeping is recorded",
+            "release-supported": "the v1 release statement states that release-supported seed bookkeeping is recorded",
+            "v1-ready": "the v1 release statement states that the scoped outcome is v1-ready",
+        }
+        for label, detail_requirement in cases.items():
+            with self.subTest(label=label):
+                manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+                for surface in manifest["surfaces"]:
+                    if surface["id"] == "obelisk.inventory_items_mutation.v1":
+                        status = "excluded" if label == "excluded-promoted" else "post-v1"
+                        surface["status"] = status
+                        surface["v1_decision_contract"] = {
+                            "exclusion_requires": [
+                                f"the v1 release statement names obelisk.inventory_items_mutation.v1 as {status}",
+                                detail_requirement,
+                            ],
+                        }
+                        break
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    build_result = subprocess.run(
+                        [
+                            "python3",
+                            str(SCOPED_RELEASE_STATEMENT_BUILDER),
+                            "--manifest",
+                            str(manifest_path),
+                        ],
+                        cwd=REPO_ROOT,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+
+                self.assertEqual(build_result.returncode, 2)
+                self.assertIn("forbidden scoped claim token", build_result.stderr)
+
     def test_release_statement_forbids_scoped_outcome_progress_claims(self) -> None:
         import importlib.util
 
@@ -413,18 +1936,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         spec.loader.exec_module(module)
 
         for statement in (
-            "Release statement outcomes 7/7 ready as bookkeeping only.",
-            "Scoped release-statement bookkeeping 7/7 complete.",
-            "All seven non-P0 release-statement outcomes are ready.",
-            "All seven non-P0 release-statement outcomes pass scope review.",
+            "Release statement outcomes 8/8 ready as bookkeeping only.",
+            "Scoped release-statement bookkeeping 8/8 complete.",
+            "All eight non-P0 release-statement outcomes are ready.",
+            "All eight non-P0 release-statement outcomes pass scope review.",
             "Post-v1 and excluded bookkeeping records pass as scoped outcomes.",
         ):
             with self.subTest(statement=statement):
                 self.assertTrue(module.release_statement_forbidden_broad_claims(statement))
 
-        allowed = (
-            "7/7 scoped release-statement outcomes recorded; stable SDK remains blocked."
-        )
+        allowed = "8/8 scoped release-statement outcomes recorded; stable SDK remains blocked."
         self.assertEqual(module.release_statement_forbidden_broad_claims(allowed), [])
 
     def test_scoped_release_statement_builder_rejects_generated_outcome_progress_claim(self) -> None:
@@ -717,6 +2238,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "v1_dependency_chain_position": 1,
             "required_by_surface": "obelisk.permissions_admin.v1",
             "required_by_v1_dependency_chain_position": 2,
+            "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+            "reviewed_artifact_hash_policy": (
+                "must match the reviewed surface record hash carried by the certificate"
+            ),
+            "missing_mismatched_or_stale_certificate_counts": False,
             "evidence": identity_artifacts,
         }
         payload.update(overrides)
@@ -752,6 +2278,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "v1_dependency_chain_position": position,
             "required_by_surface": required_by_surface,
             "required_by_v1_dependency_chain_position": required_by_position,
+            "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+            "reviewed_artifact_hash_policy": (
+                "must match the reviewed surface record hash carried by the certificate"
+            ),
+            "missing_mismatched_or_stale_certificate_counts": False,
             "evidence": evidence,
         }
         payload.update(overrides)
@@ -793,6 +2324,56 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             required_by_surface="obelisk.commands_replies.v1",
             required_by_position=4,
             evidence=command_response_artifacts,
+            **overrides,
+        )
+
+    def attach_current_command_response_certificate(
+        self,
+        module: object,
+        root: Path,
+        manifest: dict,
+    ) -> dict[str, str]:
+        response_surface: dict[str, object] | None = None
+        for candidate in manifest["surfaces"]:
+            if (
+                isinstance(candidate, dict)
+                and candidate.get("id") == "obelisk.command_chat_response_path.v1"
+            ):
+                candidate["status"] = "promoted"
+                candidate["evidence"] = {"source_marker": "reviewed-command-response"}
+                response_surface = candidate
+                break
+        self.assertIsNotNone(response_surface)
+        assert response_surface is not None
+        reviewed_hash = module.surface_record_sha256_for_certificate(
+            response_surface,
+            "command_response_promotion_certificate",
+        )
+        binding = self.write_command_response_promotion_certificate(
+            root / "command_response_promotion_certificate.json",
+            {
+                "reviewed_artifact_hash": reviewed_hash,
+                "reviewed_surface_record_sha256": reviewed_hash,
+            },
+        )
+        assert isinstance(response_surface["evidence"], dict)
+        response_surface["evidence"]["command_response_promotion_certificate"] = binding
+        return binding
+
+    def write_commands_replies_promotion_certificate(
+        self,
+        path: Path,
+        commands_replies_artifacts: dict[str, object],
+        **overrides: object,
+    ) -> dict[str, str]:
+        return self.write_dependency_promotion_certificate(
+            path,
+            schema="obelisk.commands-replies-promotion-certificate.v1",
+            surface_id="obelisk.commands_replies.v1",
+            position=4,
+            required_by_surface="",
+            required_by_position=0,
+            evidence=commands_replies_artifacts,
             **overrides,
         )
 
@@ -897,6 +2478,25 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         return path
 
+    def strict_approved_runtime_lifecycle_report(self) -> dict[str, object]:
+        return {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "input_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+            "ready_scope": "runtime_evidence_only",
+            "approved_runtime_evidence_present": True,
+            "runtime_evidence_ready": True,
+            "promotion_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "public_sdk_ready": False,
+            "v1_completion_ready": False,
+            "runtime_ready": False,
+            "stable_claim_allowed": False,
+            "complete_sdk_allowed": False,
+            "complete_sdk_ready": False,
+            "next_blocker": "identity_public_contract_gate_missing",
+        }
+
     def write_fake_resource_handle_checker(self, path: Path, **overrides: object) -> Path:
         payload = {
             "schema": "obelisk.object-identity-resource-handle-public-contract-readiness-check.v1",
@@ -908,6 +2508,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "runtime_ready": False,
             "public_resource_handle_ready": False,
             "post_callback_resource_handle_ready": False,
+            "serialPolicyReady": False,
+            "resourceLookupReady": False,
+            "postCallbackHandleReady": False,
+            "objectIdentityReady": False,
+            "runtimeSampleReady": False,
+            "strict_next_blocker": (
+                "rejected runtime object samples plus runtime serial reuse/wraparound "
+                "semantics under future approved live-ops brief"
+            ),
+            "offline_serial_post_callback_artifacts": "candidate-only",
+            "offline_artifacts_unlock_public_lookup_identity_runtime_sdk": False,
             "blockers": [],
         }
         payload.update(overrides)
@@ -931,6 +2542,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "ready": True,
             "surface": "obelisk.inventory_item_copied_signals.v1",
             "summary": summary,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress": 0,
+            "stable_claim_allowed": False,
             "blockers": [],
         }
         payload.update(overrides)
@@ -1025,9 +2640,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "complete_sdk_allowed",
             "complete_sdk_progress_percent",
             "complete_sdk_progress_ratio",
+            "counts_toward_p0_dependency_chain_claim",
             "full_api_supported",
             "p0_chain_promoted_count",
+            "p0_chain_progress_ratio",
             "p0_chain_promoted_ratio",
+            "p0_dependency_chain_claim_progress_ratio",
+            "p0_dependency_chain_progress_ratio",
             "p0_dependency_chain_promoted_for_claim_count",
             "p0_dependency_chain_promoted_for_claim_ratio",
             "package_shape_release_ready",
@@ -1104,6 +2723,30 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "progress.complete_sdk_claim_progress_percent",
                 "progress.complete_sdk_progress_percent",
                 "progress.promoted_for_claim_ratio",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_owner_token_struct_size_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "candidate_contract": {
+                "structSizeReady": "passed",
+                "abiLayoutClaimAllowed": True,
+                "podLayoutComplete": "complete",
+                "ownerTokenRegistrationReady": "supported",
+                "owner_token_sdk_consumer": {"ready": "approved"},
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "candidate_contract.abiLayoutClaimAllowed",
+                "candidate_contract.ownerTokenRegistrationReady",
+                "candidate_contract.owner_token_sdk_consumer.ready",
+                "candidate_contract.podLayoutComplete",
+                "candidate_contract.structSizeReady",
             ],
         )
 
@@ -1239,7 +2882,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "summary": "SDK v1 stable claim allowed.",
                 "notes": [
                     "Complete SDK claim progress is 2/12.",
-                    "7/7 scoped release-statement outcomes recorded; stable SDK remains blocked.",
+                    "8/8 scoped release-statement outcomes recorded; stable SDK remains blocked.",
                 ],
             },
             "command": "python3 scripts/check_public_sdk_v1_completion.py --json",
@@ -1253,6 +2896,515 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "delegated_route_gate_report.summary:positive_completion_text",
             ],
         )
+
+    def test_handoff_context_aliases_are_non_counting(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "handoff_checkpoint": {
+                "schema": "obelisk.worker-handoff.v1",
+                "status": "ready",
+                "ready": True,
+                "countsTowardSdk": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        self.assertIn("handoff_checkpoint.status", violations)
+        self.assertIn("handoff_checkpoint.ready", violations)
+        self.assertIn("handoff_checkpoint.countsTowardSdk", violations)
+        self.assertIn(
+            "handoff_checkpoint.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn(
+            "handoff_checkpoint.p0DependencyChainClaimProgressContribution",
+            violations,
+        )
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("handoff_checkpoint.status", claims)
+        self.assertIn("handoff_checkpoint.ready", claims)
+        self.assertIn("handoff_checkpoint.countsTowardSdk", claims)
+        self.assertIn(
+            "handoff_checkpoint.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn(
+            "handoff_checkpoint.p0DependencyChainClaimProgressContribution",
+            claims,
+        )
+
+    def test_secondary_report_scanner_ignores_metadata_schema_paths_but_rejects_summary_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "delegated_route_gate_report": {
+                "schema": "obelisk.public-sdk-v1-completion-ready-schema-id.v1",
+                "expected_schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                "report_schema": "obelisk.commands-replies-public-readiness-check.v1",
+                "input_schema": "obelisk.player-principal-passive-snapshot.v1",
+                "source_schema": "obelisk.scoped-non-complete-v1-release-statement.v1",
+                "schema_ids": [
+                    "obelisk.command-chat-response-public-readiness-check.v1",
+                    "obelisk.commands-replies-public-readiness-check.v1",
+                ],
+                "argv": [
+                    "python3",
+                    "scripts/check_public_sdk_v1_completion.py",
+                    "--command-response-readiness",
+                    "/tmp/command-chat-response-public-readiness.json",
+                ],
+                "summary": "SDK v1 stable claim allowed.",
+                "flags": {"stable_claim_allowed": True},
+            },
+        }
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+
+        self.assertEqual(
+            claims,
+            [
+                "delegated_route_gate_report.flags.stable_claim_allowed",
+                "delegated_route_gate_report.summary:positive_completion_text",
+            ],
+        )
+
+    def test_secondary_report_scanner_ignores_diagnostic_budget_pressure_metadata_but_rejects_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "diagnostic_budget_pressure": {
+                "captured_at_utc": "2026-06-04T08:51:19Z",
+                "evidence_classification": "passive_snapshot_non_evidence",
+                "accepted_count": 0,
+                "rejected_count": 0,
+                "diagnostic_candidate_count": 17,
+                "diagnostic_log_budget_reached": True,
+                "diagnostic_log_limits": [10],
+                "diagnostic_candidate_target_counts": {
+                    "GameMode.K2_PostLogin": 3,
+                    "ShooterGameMode.CheckJoinInProgress": 2,
+                    "ShooterGameMode.HandleNewPlayer": 7,
+                    "ShooterGameMode.OnLogout": 5,
+                },
+                "notes": [
+                    "public SDK remains blocked; diagnostic budget pressure is non-evidence",
+                ],
+                "nested_review": {
+                    "stable_claim_allowed": True,
+                },
+            },
+        }
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+
+        self.assertEqual(
+            claims,
+            [
+                "diagnostic_budget_pressure.nested_review.stable_claim_allowed",
+            ],
+        )
+
+    def test_checkjoininprogress_session_start_rejected_offline_aliases_stay_non_public(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "checkJoinInProgressOfflineAcceptance": {
+                "source_kind": "ShooterGameMode.CheckJoinInProgress offline acceptance",
+                "target_set": "session_start_rejected_candidate_only",
+                "status": "candidate_only_accepted",
+                "ready": True,
+                "publicSdkReady": True,
+                "stableClaimAllowed": True,
+                "v1CompletionReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressRatio": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        self.assertIn("checkJoinInProgressOfflineAcceptance.status", violations)
+        self.assertIn("checkJoinInProgressOfflineAcceptance.ready", violations)
+        self.assertIn(
+            "checkJoinInProgressOfflineAcceptance.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn(
+            "checkJoinInProgressOfflineAcceptance.p0DependencyChainClaimProgressRatio",
+            violations,
+        )
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("checkJoinInProgressOfflineAcceptance.status", claims)
+        self.assertIn("checkJoinInProgressOfflineAcceptance.ready", claims)
+        self.assertIn(
+            "checkJoinInProgressOfflineAcceptance.completeSdkClaimProgressContribution",
+            claims,
+        )
+
+        runtime_report = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "ready_scope": "checkjoininprogress_offline_acceptance",
+            "source_kind": "offline_session_start_rejected_acceptance",
+            "approved_runtime_evidence_accepted": True,
+            "evidence_bundle_accepted": True,
+            "approved_runtime_evidence_ready": True,
+        }
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            runtime_report,
+            "approved_runtime_evidence_report",
+        )
+        self.assertIn(
+            (
+                "approved_runtime_evidence_report:"
+                "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"
+            ),
+            reasons,
+        )
+
+        route_gate = {
+            "approved_runtime_evidence": runtime_report,
+            "blockers": [],
+        }
+        self.assertFalse(
+            completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                route_gate
+            )
+        )
+        self.assertIsNone(
+            completion_checker.command_permission_route_gate_current_blocker(route_gate)
+        )
+
+    def test_runtime_evidence_binding_start_end_standing_and_checkjoin_planning_aliases_are_non_counting(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "approvedRuntimeEvidenceBinding": {
+                "schema": "obelisk.approved-runtime-evidence-binding.v1",
+                "status": "accepted",
+                "approvedRuntimeEvidenceBinding": True,
+                "approvedRuntimeEvidenceBindingReady": True,
+                "countsAsApprovedRuntimeEvidence": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+                "pluginHubReady": True,
+                "publicSdkReady": True,
+                "runtimeReady": True,
+                "stableClaimAllowed": True,
+                "completeSdkReady": True,
+            },
+            "startEndOnlyEvidence": {
+                "schema": "obelisk.start-end-only-evidence.v1",
+                "status": "complete",
+                "startEndEvidence": True,
+                "sessionStartEndEvidenceReady": True,
+                "countsAsApprovedRuntimeEvidence": True,
+                "publicSdkReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "standingAuthorityReport": {
+                "schema": "obelisk.standing-authority-report.v1",
+                "status": "accepted",
+                "standingAuthority": True,
+                "standingAuthorityCountsTowardSdk": True,
+                "standingAuthorityCountsTowardP0DependencyChain": True,
+                "standingAuthorityCountsTowardCompleteSdkClaim": True,
+                "pluginHubReady": True,
+                "runtimeReady": True,
+            },
+            "checkJoinInProgress10PlanningAcceptance": {
+                "schema": "obelisk.checkjoininprogress-1-0-planning-acceptance.v1",
+                "status": "accepted",
+                "checkJoinInProgress10PlanningAcceptance": True,
+                "planningAcceptance": True,
+                "approvedRuntimeEvidenceReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        expected_violations = (
+            "approvedRuntimeEvidenceBinding.status",
+            "approvedRuntimeEvidenceBinding.approvedRuntimeEvidenceBinding",
+            "approvedRuntimeEvidenceBinding.countsAsApprovedRuntimeEvidence",
+            "approvedRuntimeEvidenceBinding.completeSdkClaimProgressContribution",
+            "approvedRuntimeEvidenceBinding.pluginHubReady",
+            "startEndOnlyEvidence.status",
+            "startEndOnlyEvidence.startEndEvidence",
+            "startEndOnlyEvidence.sessionStartEndEvidenceReady",
+            "startEndOnlyEvidence.publicSdkReady",
+            "standingAuthorityReport.status",
+            "standingAuthorityReport.standingAuthority",
+            "standingAuthorityReport.standingAuthorityCountsTowardSdk",
+            "standingAuthorityReport.standingAuthorityCountsTowardP0DependencyChain",
+            "standingAuthorityReport.standingAuthorityCountsTowardCompleteSdkClaim",
+            "standingAuthorityReport.pluginHubReady",
+            "checkJoinInProgress10PlanningAcceptance.status",
+            "checkJoinInProgress10PlanningAcceptance.checkJoinInProgress10PlanningAcceptance",
+            "checkJoinInProgress10PlanningAcceptance.planningAcceptance",
+            "checkJoinInProgress10PlanningAcceptance.approvedRuntimeEvidenceReady",
+            "checkJoinInProgress10PlanningAcceptance.completeSdkClaimProgressContribution",
+        )
+        for path in expected_violations:
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for path in expected_violations:
+            with self.subTest(claim_path=path):
+                self.assertIn(path, claims)
+
+        runtime_cases = (
+            (
+                {
+                    "source_kind": "approved_runtime_evidence_binding",
+                    "approved_runtime_evidence_binding": True,
+                },
+                "approved_runtime_evidence_binding_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "source_kind": "start_end_only_evidence",
+                    "start_end_evidence": True,
+                },
+                "start_end_only_evidence_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "ready_scope": "principal_start_end_contract_input",
+                    "source_kind": "principal_start_end_contract_input",
+                    "startEndContractInputReady": True,
+                    "sourceReady": True,
+                },
+                "start_end_contract_input_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "source_kind": "standing_launch_authority",
+                    "standing_launch_authority": True,
+                },
+                "standing_launch_authority_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "source_kind": "CheckJoinInProgress(1,0) planning acceptance",
+                    "checkJoinInProgress10PlanningAcceptance": True,
+                },
+                "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence",
+            ),
+        )
+        for runtime_report, expected_reason in runtime_cases:
+            with self.subTest(expected_reason=expected_reason):
+                runtime_report = {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "approved_runtime_evidence_ready": True,
+                    **runtime_report,
+                }
+                reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                    runtime_report,
+                    "approved_runtime_evidence_report",
+                )
+                self.assertIn(
+                    f"approved_runtime_evidence_report:{expected_reason}",
+                    reasons,
+                )
+
+    def test_partial_lifecycle_event_aliases_do_not_accept_runtime_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "partialLifecycleEventProof": {
+                "schema": "obelisk.partial-lifecycle-event-proof.v1",
+                "source_kind": "partial_lifecycle_event_proof",
+                "status": "complete_triplet_present",
+                "ready": True,
+                "runtimeReady": True,
+                "publicSdkReady": True,
+                "stableClaimAllowed": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        self.assertIn("partialLifecycleEventProof.status", violations)
+        self.assertIn("partialLifecycleEventProof.ready", violations)
+        self.assertIn("partialLifecycleEventProof.runtimeReady", violations)
+        self.assertIn("partialLifecycleEventProof.publicSdkReady", violations)
+        self.assertIn(
+            "partialLifecycleEventProof.completeSdkClaimProgressContribution",
+            violations,
+        )
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("partialLifecycleEventProof.status", claims)
+        self.assertIn("partialLifecycleEventProof.ready", claims)
+        self.assertIn(
+            "partialLifecycleEventProof.completeSdkClaimProgressContribution",
+            claims,
+        )
+
+        runtime_report = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "source_kind": "partial_lifecycle_event_proof",
+            "accepted_lifecycle_event_count": 2,
+            "approved_runtime_evidence_accepted": True,
+            "evidence_bundle_accepted": True,
+            "approved_runtime_evidence_ready": True,
+        }
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            runtime_report,
+            "approved_runtime_evidence_report",
+        )
+        self.assertIn(
+            (
+                "approved_runtime_evidence_report:"
+                "partial_lifecycle_events_not_approved_runtime_evidence"
+            ),
+            reasons,
+        )
+
+        route_gate = {
+            "approved_runtime_evidence": runtime_report,
+            "blockers": [],
+        }
+        self.assertFalse(
+            completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                route_gate
+            )
+        )
+        self.assertIsNone(
+            completion_checker.command_permission_route_gate_current_blocker(route_gate)
+        )
+
+    def test_runtime_live_progress_aliases_do_not_count_before_approved_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "installedRuntimeStatus": {
+                "schema": "obelisk.runtime-live-status.v1",
+                "status": "ok",
+                "ready": True,
+                "runtimeReady": True,
+                "countsTowardP0DependencyChain": True,
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+            "broadcastOk": {
+                "status": "sent_ok",
+                "publicSdkReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "rconOk": {
+                "status": "ok",
+                "permissionsReady": True,
+                "commandsReady": True,
+                "countsTowardCompleteSdkClaim": True,
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        for path in (
+            "installedRuntimeStatus.status",
+            "installedRuntimeStatus.ready",
+            "installedRuntimeStatus.runtimeReady",
+            "installedRuntimeStatus.countsTowardP0DependencyChain",
+            "installedRuntimeStatus.p0DependencyChainClaimProgressContribution",
+            "broadcastOk.status",
+            "broadcastOk.publicSdkReady",
+            "broadcastOk.completeSdkClaimProgressContribution",
+            "rconOk.status",
+            "rconOk.permissionsReady",
+            "rconOk.commandsReady",
+            "rconOk.countsTowardCompleteSdkClaim",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+
+        runtime_report = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "source_kind": "installed_runtime_status",
+            "runtime_installed_status": "ok",
+            "broadcast_status": "sent_ok",
+            "rcon_status": "ok",
+            "accepted_lifecycle_event_count": 2,
+            "approved_runtime_evidence_accepted": True,
+            "evidence_bundle_accepted": True,
+            "approved_runtime_evidence_ready": True,
+        }
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            runtime_report,
+            "approved_runtime_evidence_report",
+        )
+
+        self.assertIn(
+            "approved_runtime_evidence_report:installed_runtime_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:broadcast_status_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:rcon_status_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:partial_lifecycle_events_not_approved_runtime_evidence",
+            reasons,
+        )
+
+    def test_closed_agent_notes_and_rcon_counts_are_non_counting_contexts(self) -> None:
+        payload = {
+            "closedAgentNotes": {
+                "schema": "obelisk.closed-agent-notes.v1",
+                "status": "ready",
+                "ready": True,
+                "publicSdkReady": True,
+                "runtimeReady": True,
+                "stableClaimAllowed": True,
+                "pluginHubReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+            "rconCounts": {
+                "schema": "obelisk.rcon-counts.v1",
+                "status": "ok",
+                "ready": True,
+                "rconPlayerCount": 3,
+                "publicSdkReady": True,
+                "runtimeReady": True,
+                "pluginHubReadinessClaimAllowed": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        for path in (
+            "closedAgentNotes.status",
+            "closedAgentNotes.ready",
+            "closedAgentNotes.publicSdkReady",
+            "closedAgentNotes.runtimeReady",
+            "closedAgentNotes.stableClaimAllowed",
+            "closedAgentNotes.pluginHubReady",
+            "closedAgentNotes.completeSdkClaimProgressContribution",
+            "closedAgentNotes.p0DependencyChainClaimProgressContribution",
+            "rconCounts.status",
+            "rconCounts.ready",
+            "rconCounts.publicSdkReady",
+            "rconCounts.runtimeReady",
+            "rconCounts.pluginHubReadinessClaimAllowed",
+            "rconCounts.completeSdkClaimProgressContribution",
+            "rconCounts.p0DependencyChainClaimProgressContribution",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
 
     def test_secondary_report_scanner_rejects_public_package_and_pluginhub_text_claims(self) -> None:
         payload = {
@@ -1275,6 +3427,87 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_route_package_scoped_status_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "package_shape_note": "Package shape is release-supported seed.",
+            "installed_headers": "The installed headers prove v1 support.",
+            "public_header_note": "ObeliskApi.h proves runtime readiness.",
+            "cmake_package_note": "CMake package validates support tier activation.",
+            "installed_sdk_consumer_note": "Installed SDK consumer tests count toward v1 completion.",
+            "route_status": "Route-check acceptance unlocks complete SDK status.",
+            "route_check_acceptance": "accepted",
+            "scoped_outcomes": "Scoped non-complete outcomes are ready.",
+            "scoped_statement": "Scoped release statement accepted for v1 completion.",
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "cmake_package_note:positive_completion_text",
+                "installed_headers:positive_completion_text",
+                "installed_sdk_consumer_note:positive_completion_text",
+                "package_shape_note:positive_completion_text",
+                "public_header_note:positive_completion_text",
+                "route_check_acceptance",
+                "route_status:positive_completion_text",
+                "scoped_outcomes:positive_completion_text",
+                "scoped_statement:positive_completion_text",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_publication_artifact_structured_status_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "public_header": {"ready": True},
+            "cmake_package": {"status": "ready"},
+            "installed_sdk_consumer_tests": {"result": "passed"},
+            "installed_sdk_package_shape": {"supportTierReady": True},
+            "plugin_hub_wording": {"state": "published"},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "cmake_package.status",
+                "installed_sdk_consumer_tests.result",
+                "installed_sdk_package_shape.supportTierReady",
+                "plugin_hub_wording.state",
+                "public_header.ready",
+            ],
+        )
+
+        self.assertEqual(
+            side_lane_completion_accounting_alias_violations(payload),
+            [
+                "cmake_package.status",
+                "installed_sdk_consumer_tests.result",
+                "installed_sdk_package_shape.supportTierReady",
+                "plugin_hub_wording.state",
+                "public_header.ready",
+            ],
+        )
+
+    def test_secondary_report_scanner_allows_negated_route_package_scoped_status_boundaries(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "notes": [
+                "Package shape is not release-supported seed.",
+                "The installed headers do not prove v1 support.",
+                "ObeliskApi.h does not prove runtime readiness.",
+                "CMake package does not validate support tier activation.",
+                "Installed SDK consumer tests do not count toward v1 completion.",
+                "Route-check acceptance does not unlock complete SDK status.",
+                "Scoped non-complete outcomes are not ready.",
+                "Scoped release statement is not complete.",
+            ],
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
     def test_secondary_report_scanner_allows_negative_not_sufficient_for_text(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",
@@ -1284,6 +3517,20 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "Plugin Hub seed/package publication",
                 "stable SDK claim approval",
             ],
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
+    def test_secondary_report_scanner_allows_required_before_unlocking_text(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "identity_public_contract_decision_record_required": {
+                "required_before_unlocking": [
+                    "approved runtime lifecycle evidence before public SDK readiness",
+                    "reviewed owner-token ABI and struct_size checks before v1 completion",
+                ],
+            },
         }
 
         self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
@@ -1484,6 +3731,607 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_side_lane_accounting_aliases_reject_named_c_worker_counts(self) -> None:
+        cases = (
+            (
+                "transfer_scriptstruct_readiness",
+                {
+                    "transfer_scriptstruct_readiness": {
+                        "counts_toward_complete_sdk": True,
+                        "complete_sdk_claim_progress_contribution": 1,
+                    }
+                },
+                [
+                    "transfer_scriptstruct_readiness.complete_sdk_claim_progress_contribution",
+                    "transfer_scriptstruct_readiness.counts_toward_complete_sdk",
+                ],
+            ),
+            (
+                "buff_status_readiness",
+                {
+                    "buff_status_readiness": {
+                        "v1_completion_evidence": True,
+                        "p0_dependency_chain_claim_progress_contribution": "1/4",
+                    }
+                },
+                [
+                    "buff_status_readiness.p0_dependency_chain_claim_progress_contribution",
+                    "buff_status_readiness.v1_completion_evidence",
+                ],
+            ),
+            (
+                "dino_scalar_readiness",
+                {
+                    "dino_scalar_readiness": {
+                        "schema": "obelisk.dino-scalar-readiness-check.v1",
+                        "p0_dependency_chain_accounted": True,
+                        "p0_ready": True,
+                        "v1_complete": True,
+                        "v1_completion_contribution": 1,
+                    }
+                },
+                [
+                    "dino_scalar_readiness.p0_dependency_chain_accounted",
+                    "dino_scalar_readiness.p0_ready",
+                    "dino_scalar_readiness.v1_complete",
+                    "dino_scalar_readiness.v1_completion_contribution",
+                ],
+            ),
+            (
+                "tribe_scalar_boundary_readiness",
+                {
+                    "tribe_scalar_boundary_readiness": {
+                        "stable_sdk_ready": "ready",
+                        "progress": "25%",
+                    }
+                },
+                [
+                    "tribe_scalar_boundary_readiness.progress",
+                    "tribe_scalar_boundary_readiness.stable_sdk_ready",
+                ],
+            ),
+        )
+
+        for case_name, payload, expected in cases:
+            with self.subTest(case=case_name):
+                self.assertEqual(side_lane_completion_accounting_alias_violations(payload), expected)
+
+    def test_route_gate_post_evidence_simulation_aliases_must_stay_false_and_zero(self) -> None:
+        payload = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "post_evidence_p0_lock_simulation": {
+                "schema": "obelisk.command-permission-route-post-evidence-p0-lock-simulation.v1",
+                "simulation_only": True,
+                "counts_toward_complete_sdk_claim": True,
+                "counts_toward_p0_dependency_chain_claim": "yes",
+                "complete_sdk_claim_progress_contribution": 1,
+                "p0_dependency_chain_claim_progress_contribution": "1/4",
+                "route_statuses": {
+                    "status": ["blocked", "accepted"],
+                    "ready": ["no", "ready"],
+                },
+                "child_gate": {
+                    "identityLockReady": ["blocked", "ready"],
+                    "countsTowardP0DependencyChainClaim": [False, "yes"],
+                    "completeSdkClaimProgressContribution": ["0/12", "1/12"],
+                },
+            },
+        }
+
+        self.assertEqual(
+            route_gate_post_evidence_p0_lock_simulation_alias_violations(payload),
+            [
+                "post_evidence_p0_lock_simulation.child_gate.completeSdkClaimProgressContribution",
+                "post_evidence_p0_lock_simulation.child_gate.countsTowardP0DependencyChainClaim",
+                "post_evidence_p0_lock_simulation.child_gate.identityLockReady",
+                "post_evidence_p0_lock_simulation.complete_sdk_claim_progress_contribution",
+                "post_evidence_p0_lock_simulation.counts_toward_complete_sdk_claim",
+                "post_evidence_p0_lock_simulation.counts_toward_p0_dependency_chain_claim",
+                "post_evidence_p0_lock_simulation.p0_dependency_chain_claim_progress_contribution",
+                "post_evidence_p0_lock_simulation.route_statuses.ready",
+                "post_evidence_p0_lock_simulation.route_statuses.status",
+            ],
+        )
+
+    def test_non_counting_context_readiness_aliases_must_stay_false_and_zero(self) -> None:
+        payload = {
+            "transferScriptstructReadiness": {
+                "ready": True,
+                "status": "candidate_ready",
+            },
+            "passive_latest_summary": {
+                "ready": True,
+                "progress": "1/12",
+            },
+            "post_evidence_p0_lock_simulation": {
+                "status": "accepted",
+                "live_ops_authorized": True,
+                "progress": 1,
+            },
+            "public_reachability": {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "status": "reachable",
+                "ready": True,
+                "publicReachabilityReady": True,
+            },
+            "approved_bundle_request": {
+                "schema": "obelisk.player-identity-approved-bundle-request.v1",
+                "status": "accepted",
+                "ready": True,
+                "approvedBundleRequestReady": True,
+            },
+            "route_bound_identity_source_forwarding": {
+                "schema": "obelisk.command-permission-route-bound-identity-source-forwarding.v1",
+                "status": "accepted",
+                "ready": True,
+                "routeBoundIdentitySourceForwardingReady": True,
+            },
+            "route_planning_report": {
+                "schema": "obelisk.command-route-planning-report.v1",
+                "state": "completed",
+                "ready": True,
+                "progress": "1/4",
+            },
+            "playerNoticeActionStatus": "sent",
+        }
+
+        self.assertEqual(
+            side_lane_completion_accounting_alias_violations(payload),
+            [
+                "approved_bundle_request.approvedBundleRequestReady",
+                "approved_bundle_request.ready",
+                "approved_bundle_request.status",
+                "passive_latest_summary.progress",
+                "passive_latest_summary.ready",
+                "playerNoticeActionStatus",
+                "post_evidence_p0_lock_simulation.live_ops_authorized",
+                "post_evidence_p0_lock_simulation.progress",
+                "post_evidence_p0_lock_simulation.status",
+                "public_reachability.publicReachabilityReady",
+                "public_reachability.ready",
+                "public_reachability.status",
+                "route_bound_identity_source_forwarding.ready",
+                "route_bound_identity_source_forwarding.routeBoundIdentitySourceForwardingReady",
+                "route_bound_identity_source_forwarding.status",
+                "route_planning_report.progress",
+                "route_planning_report.ready",
+                "route_planning_report.state",
+                "transferScriptstructReadiness.ready",
+                "transferScriptstructReadiness.status",
+            ],
+        )
+
+    def test_negative_non_counting_alias_values_do_not_raise_overclaim_flags(self) -> None:
+        payload = {
+            "scoped_release_statement": {
+                "schema": "obelisk.scoped-release-statement-outcomes.v1",
+                "status": "blocked",
+                "state": "post-v1",
+                "outcome": "excluded",
+                "ready": False,
+                "counts_toward_complete_sdk_claim": "false",
+                "countsTowardP0DependencyChainClaim": "no",
+                "releaseStatementBookkeepingCountsTowardCompletion": "0",
+                "completeSdkClaimProgressContribution": "0/12",
+                "p0DependencyChainClaimProgressContribution": 0,
+                "completionCount": 0,
+                "promotedCount": 0,
+            },
+            "public_reachability": {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "status": "blocked",
+                "ready": False,
+                "publicReachabilityCountsAsRuntimeEvidence": False,
+                "sdkCompletionCount": 0,
+            },
+        }
+
+        self.assertEqual(side_lane_completion_accounting_alias_violations(payload), [])
+
+    def test_positive_bookkeeping_alias_values_raise_overclaim_flags(self) -> None:
+        payload = {
+            "scoped_release_statement": {
+                "schema": "obelisk.scoped-release-statement-outcomes.v1",
+                "status": "blocked",
+                "countsTowardP0DependencyChainClaim": ["no", "yes"],
+                "releaseStatementBookkeepingCountsTowardCompletion": "counts",
+                "completeSdkClaimProgressContribution": ["0/12", "1/12"],
+            }
+        }
+
+        self.assertEqual(
+            side_lane_completion_accounting_alias_violations(payload),
+            [
+                "scoped_release_statement.completeSdkClaimProgressContribution",
+                "scoped_release_statement.countsTowardP0DependencyChainClaim",
+                "scoped_release_statement.releaseStatementBookkeepingCountsTowardCompletion",
+            ],
+        )
+
+    def test_dict_wrapped_non_counting_alias_values_raise_overclaim_flags(self) -> None:
+        payload = {
+            "package_shape_report": {
+                "schema": "obelisk.installed-sdk-package-shape.v1",
+                "publicSdkReady": {"value": True},
+                "stableSdkClaimAllowed": {"value": "yes"},
+                "completeSdkClaimProgressContribution": {"value": "1/12"},
+            },
+            "notice_action": {
+                "schema": "obelisk.player-notice-action.v1",
+                "status": {"value": "accepted"},
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        self.assertIn("package_shape_report.publicSdkReady", violations)
+        self.assertIn("package_shape_report.stableSdkClaimAllowed", violations)
+        self.assertIn(
+            "package_shape_report.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("notice_action.status", violations)
+
+        completion_claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("package_shape_report.publicSdkReady.value", completion_claims)
+        self.assertIn("package_shape_report.stableSdkClaimAllowed.value", completion_claims)
+        self.assertIn(
+            "package_shape_report.completeSdkClaimProgressContribution.value",
+            completion_claims,
+        )
+        self.assertIn("notice_action.status", completion_claims)
+
+        route_claims = command_permission_route_gate_public_or_runtime_claims(
+            {
+                "public_sdk_ready": {"value": True},
+                "runtime_ready": {"value": "ready"},
+                "counts_toward_complete_sdk_claim": {"value": 1},
+            }
+        )
+        self.assertEqual(
+            route_claims,
+            [
+                "counts_toward_complete_sdk_claim",
+                "public_sdk_ready",
+                "runtime_ready",
+            ],
+        )
+
+    def test_completed_status_aliases_are_positive_non_counting_claims(self) -> None:
+        payload = {
+            "package_shape_report": {
+                "schema": "obelisk.installed-sdk-package-shape.v1",
+                "status": "completed",
+            },
+            "passive_latest_summary": {
+                "schema": "obelisk.player-principal-passive-snapshot-latest.v1",
+                "status": "completed",
+            },
+            "public_reachability": {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "status": "completed",
+            },
+            "route_planning_report": {
+                "schema": "obelisk.command-route-planning-report.v1",
+                "state": "completed",
+            },
+            "scoped_release_statement": {
+                "schema": "obelisk.scoped-release-statement-outcomes.v1",
+                "status": "completed",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        completion_claims = secondary_report_completion_claims_without_blocker(payload)
+        route_claims = command_permission_route_gate_public_or_runtime_claims(
+            {"public_sdk_ready": "completed", "runtime_ready": "completed"}
+        )
+
+        for path in (
+            "package_shape_report.status",
+            "passive_latest_summary.status",
+            "public_reachability.status",
+            "route_planning_report.state",
+            "scoped_release_statement.status",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+                self.assertIn(path, completion_claims)
+        self.assertEqual(route_claims, ["public_sdk_ready", "runtime_ready"])
+
+    def test_package_scoped_passive_hub_and_reachability_aliases_are_non_counting(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "package_shape_report": {
+                "schema": "obelisk.installed-sdk-package-shape.v1",
+                "packageShapeCountsTowardCompletion": True,
+                "cmakePackagePassed": True,
+                "publicHeaderValidated": True,
+                "pluginHubCountsTowardV1Completion": True,
+                "pluginHubPublicationEnabled": True,
+                "sdkCompletionCount": 1,
+            },
+            "scoped_release_statement": {
+                "schema": "obelisk.scoped-release-statement-outcomes.v1",
+                "statementAccepted": True,
+                "statementPassed": True,
+                "outcomesSatisfied": True,
+                "releaseStatementBookkeepingCountsTowardCompletion": True,
+                "completionCount": 8,
+                "claimCount": 8,
+                "promotedCount": 1,
+                "completionProgressRatio": "8/8",
+            },
+            "passive_snapshot_rollup": {
+                "schema": "obelisk.player-principal-passive-snapshot-rollup.v1",
+                "countsAsPassiveEvidence": True,
+                "passiveSnapshotCountsAsRuntimeEvidence": True,
+                "evidenceAccepted": True,
+                "tripletValidated": True,
+                "sdkClaimCount": 1,
+            },
+            "public_reachability": {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "publicReachabilityAccepted": True,
+                "publicReachabilityReachable": True,
+                "publicReachabilityCountsAsRuntimeEvidence": True,
+                "sdkCompletionCount": 1,
+            },
+        }
+
+        expected_paths = (
+            "package_shape_report.packageShapeCountsTowardCompletion",
+            "package_shape_report.cmakePackagePassed",
+            "package_shape_report.publicHeaderValidated",
+            "package_shape_report.pluginHubCountsTowardV1Completion",
+            "package_shape_report.pluginHubPublicationEnabled",
+            "package_shape_report.sdkCompletionCount",
+            "scoped_release_statement.statementAccepted",
+            "scoped_release_statement.statementPassed",
+            "scoped_release_statement.outcomesSatisfied",
+            "scoped_release_statement.releaseStatementBookkeepingCountsTowardCompletion",
+            "scoped_release_statement.completionCount",
+            "scoped_release_statement.claimCount",
+            "scoped_release_statement.promotedCount",
+            "scoped_release_statement.completionProgressRatio",
+            "passive_snapshot_rollup.countsAsPassiveEvidence",
+            "passive_snapshot_rollup.passiveSnapshotCountsAsRuntimeEvidence",
+            "passive_snapshot_rollup.evidenceAccepted",
+            "passive_snapshot_rollup.tripletValidated",
+            "passive_snapshot_rollup.sdkClaimCount",
+            "public_reachability.publicReachabilityAccepted",
+            "public_reachability.publicReachabilityReachable",
+            "public_reachability.publicReachabilityCountsAsRuntimeEvidence",
+            "public_reachability.sdkCompletionCount",
+        )
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for path in expected_paths:
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+
+    def test_nested_action_and_route_snapshot_aliases_are_non_counting(self) -> None:
+        payload = {
+            "fastest_next_sdk_unblock": {
+                "schema": "obelisk.public-sdk-v1-fastest-next-unblock.v1",
+                "actionable_paths": {
+                    "generic_candidate_path": {
+                        "path_type": "candidate_path",
+                        "nested": {
+                            "publicSdkStatus": "ready",
+                            "runtimeReady": True,
+                            "stableSdkProgress": "1/12",
+                            "p0DependencyChainClaimProgressRatio": "1/4",
+                        },
+                        "routeSnapshot": {
+                            "status": "accepted",
+                            "routeSnapshotReady": True,
+                        },
+                    }
+                },
+            },
+            "route_snapshot": {
+                "schema": "obelisk.command-permission-route-snapshot.v1",
+                "status": "accepted",
+                "routeSnapshotReady": True,
+                "stableSdkState": "stable",
+                "publicRuntimeProgress": "2/12",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        self.assertIn(
+            "fastest_next_sdk_unblock.actionable_paths.generic_candidate_path.nested.publicSdkStatus",
+            violations,
+        )
+        self.assertIn(
+            "fastest_next_sdk_unblock.actionable_paths.generic_candidate_path.nested.stableSdkProgress",
+            violations,
+        )
+        self.assertIn(
+            "fastest_next_sdk_unblock.actionable_paths.generic_candidate_path.routeSnapshot.routeSnapshotReady",
+            violations,
+        )
+        self.assertIn("route_snapshot.routeSnapshotReady", violations)
+        self.assertIn("route_snapshot.stableSdkState", violations)
+        self.assertIn("route_snapshot.publicRuntimeProgress", violations)
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn(
+            "fastest_next_sdk_unblock.actionable_paths.generic_candidate_path.nested.publicSdkStatus",
+            claims,
+        )
+        self.assertIn(
+            "fastest_next_sdk_unblock.actionable_paths.generic_candidate_path.nested.stableSdkProgress",
+            claims,
+        )
+        self.assertIn("route_snapshot.routeSnapshotReady", claims)
+        self.assertIn("route_snapshot.stableSdkState", claims)
+        self.assertIn("route_snapshot.publicRuntimeProgress", claims)
+
+    def test_notice_and_bundle_status_aliases_do_not_count_as_completion(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "player_notice_action": {
+                "status": "sent",
+                "dry_run_status": "dry_run_accepted",
+            },
+            "notice_bundle": {
+                "status": "bundle_accepted",
+            },
+            "notice_sent": True,
+            "notice_dry_run_accepted": True,
+            "notice_bundle_accepted": True,
+            "accepted_runtime_evidence": True,
+            "approved_runtime_evidence_accepted": True,
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "accepted_runtime_evidence",
+                "approved_runtime_evidence_accepted",
+                "notice_bundle.status",
+                "notice_bundle_accepted",
+                "notice_dry_run_accepted",
+                "notice_sent",
+                "player_notice_action.dry_run_status",
+                "player_notice_action.status",
+            ],
+        )
+
+    def test_notice_status_combined_keys_do_not_count_as_completion(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "playerNoticeActionStatus": "sent",
+            "noticeActionResult": "accepted",
+            "player_notice": {"deliveryStatus": "delivered"},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "noticeActionResult",
+                "playerNoticeActionStatus",
+                "player_notice.deliveryStatus",
+            ],
+        )
+
+    def test_player_notice_action_is_not_approved_runtime_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.player-notice-action.v1",
+            "source_kind": "player_notice_action",
+            "status": "sent",
+            "dry_run_status": "dry_run_accepted",
+        }
+
+        self.assertEqual(
+            approved_runtime_evidence_non_approved_artifact_reasons(
+                payload,
+                "approved_runtime_evidence_report",
+            ),
+            [
+                "approved_runtime_evidence_report:player_notice_action_not_approved_runtime_evidence",
+            ],
+        )
+
+    def test_reachability_bundle_request_and_identity_forwarding_are_not_approved_runtime_evidence(self) -> None:
+        cases = (
+            (
+                {
+                    "schema": "obelisk.player-principal-public-reachability-check.v1",
+                    "source_kind": "public_reachability",
+                    "status": "reachable",
+                },
+                "approved_runtime_evidence_report:public_reachability_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-approved-bundle-request.v1",
+                    "source_kind": "approved_bundle_request",
+                    "status": "accepted",
+                },
+                "approved_runtime_evidence_report:approved_bundle_request_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.command-permission-route-bound-identity-source-forwarding.v1",
+                    "source_kind": "route_bound_identity_source_forwarding",
+                    "status": "accepted",
+                },
+                "approved_runtime_evidence_report:identity_source_forwarding_not_approved_runtime_evidence",
+            ),
+        )
+
+        for payload, expected_reason in cases:
+            with self.subTest(schema=payload["schema"]):
+                self.assertEqual(
+                    approved_runtime_evidence_non_approved_artifact_reasons(
+                        payload,
+                        "approved_runtime_evidence_report",
+                    ),
+                    [expected_reason],
+                )
+
+    def test_route_gate_claim_scanner_rejects_notice_status_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "blockers": [],
+            "player_notice_action": {
+                "status": "sent",
+                "dry_run_status": "dry_run_accepted",
+            },
+            "beta_notice_send_attestation": {
+                "mode": "confirmed_send",
+                "status": "confirmed_send",
+            },
+            "notice_bundle": {
+                "status": "bundle_accepted",
+            },
+            "notice_sent": True,
+            "notice_dry_run_accepted": True,
+            "notice_bundle_accepted": True,
+            "accepted_runtime_evidence": True,
+            "approved_bundle_request_accepted": True,
+            "approved_runtime_bundle_request_accepted": True,
+            "approved_runtime_evidence_accepted": True,
+            "public_reachability": {
+                "publicReachabilityReady": True,
+            },
+            "approved_bundle_request": {
+                "approvedBundleRequestReady": True,
+            },
+            "route_bound_identity_source_forwarding": {
+                "routeBoundIdentitySourceForwardingReady": True,
+            },
+        }
+
+        self.assertEqual(
+            command_permission_route_gate_public_or_runtime_claims(payload),
+            [
+                "accepted_runtime_evidence",
+                "approved_bundle_request.approvedBundleRequestReady",
+                "approved_bundle_request_accepted",
+                "approved_runtime_bundle_request_accepted",
+                "approved_runtime_evidence_accepted",
+                "beta_notice_send_attestation.mode",
+                "beta_notice_send_attestation.status",
+                "notice_bundle.status",
+                "notice_bundle_accepted",
+                "notice_dry_run_accepted",
+                "notice_sent",
+                "player_notice_action.dry_run_status",
+                "player_notice_action.status",
+                "public_reachability.publicReachabilityReady",
+                "route_bound_identity_source_forwarding.routeBoundIdentitySourceForwardingReady",
+            ],
+        )
+
     def test_secondary_report_scanner_allows_split_section_claim_when_report_has_blocker(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",
@@ -1523,10 +4371,30 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "counts_toward.runtime",
                 "counts_toward.v1_completion",
                 "public_route.ready",
+                "public_sdk",
                 "public_sdk.ready",
                 "route.ready",
                 "runtime.ready",
                 "stable_claim.allowed",
+            ],
+        )
+
+    def test_route_gate_claim_scanner_rejects_route_acceptance_status_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "blockers": [],
+            "route_check_acceptance": "accepted",
+            "notes": [
+                "Route-check acceptance unlocks complete SDK status.",
+                "Route-check acceptance does not unlock complete SDK status.",
+            ],
+        }
+
+        self.assertEqual(
+            command_permission_route_gate_public_or_runtime_claims(payload),
+            [
+                "notes[0]:positive_text_claim",
+                "route_check_acceptance",
             ],
         )
 
@@ -1884,6 +4752,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "source_checker_status": "blocked",
                     "source_checker_ready": False,
                     "source_checker_accepted_for_internal_planning": False,
+                    "source_checker_approved_runtime_evidence_manifest": (
+                        self.strict_approved_runtime_lifecycle_report()
+                    ),
                 },
                 route_lock={
                     "locked": True,
@@ -1914,6 +4785,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertTrue(route_gate["completion_gate_accepted"])
+        self.assertTrue(route_gate["approved_runtime_evidence_forwarded"])
+        self.assertTrue(route_gate["accepted_runtime_evidence_contract"])
         self.assertEqual(route_gate["current_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(route_gate["source_checker_primary_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(route_gate["route_lock_blocked_until"], ["reviewed_identity_public_contract"])
@@ -1933,6 +4806,286 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["v1_sdk_report_sections"]["runtime_required_blockers"]["route_gate_current_blockers"],
             ["identity_public_contract_gate_missing"],
         )
+
+    def test_completion_gate_rejects_forwarded_runtime_evidence_without_contract_route_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                checks=[
+                    {
+                        "name": "player_identity_public_contract_gap",
+                        "argv": [
+                            "check_player_identity_public_contract_gap_report.py",
+                            "--approved-runtime-evidence",
+                            str(Path(temp_dir) / "approved-runtime-principal-lifecycle.json"),
+                        ],
+                    }
+                ],
+            )
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        route_gate = payload["command_permission_route_gate"]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(route_gate["approved_runtime_evidence_forwarded"])
+        self.assertFalse(route_gate["completion_gate_accepted"])
+        self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn(
+            "command_permission_route_gate_accepted_runtime_evidence_contract_missing",
+            payload["blockers"],
+        )
+        self.assertFalse(route_gate["accepted_runtime_evidence_contract"])
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+
+    def test_completion_gate_rejects_identity_route_with_forwarded_runtime_evidence_but_no_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                critical_path_phase={
+                    "current_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_next_blocker": None,
+                    "source_checker_status": "blocked",
+                    "source_checker_ready": False,
+                    "source_checker_accepted_for_internal_planning": False,
+                },
+                route_lock={
+                    "locked": True,
+                    "blocked_until": ["reviewed_identity_public_contract"],
+                },
+                checks=[
+                    {
+                        "name": "player_identity_public_contract_gap",
+                        "argv": [
+                            "check_player_identity_public_contract_gap_report.py",
+                            "--approved-runtime-evidence",
+                            str(Path(temp_dir) / "approved-runtime-principal-lifecycle.json"),
+                        ],
+                    }
+                ],
+            )
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        route_gate = payload["command_permission_route_gate"]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(route_gate["approved_runtime_evidence_forwarded"])
+        self.assertFalse(route_gate["accepted_runtime_evidence_contract"])
+        self.assertFalse(route_gate["completion_gate_accepted"])
+        self.assertEqual(route_gate["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertIn(
+            "command_permission_route_gate_accepted_runtime_evidence_contract_missing",
+            payload["blockers"],
+        )
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+
+    def test_accepted_runtime_route_transition_does_not_increment_promoted_p0_accounting(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        p0_surfaces = set(module.CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN)
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] in p0_surfaces:
+                surface["status"] = "promoted"
+                surface["public_contract"] = [f"ObeliskApi.{surface['id']}"]
+                surface["evidence"] = {
+                    "surface_id": surface["id"],
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                }
+        manifest["promoted_surfaces"] = sorted(set(manifest.get("promoted_surfaces", [])) | p0_surfaces)
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest.get("post_v1_or_excluded_surfaces", [])
+            if surface_id not in p0_surfaces
+        ]
+        release_statement = "\n".join(
+            (
+                f"{line.split(':', 1)[0]}: promoted - reviewed ABI and SDK evidence."
+                if line.split(":", 1)[0] in p0_surfaces
+                else line
+            )
+            for line in release_statement.splitlines()
+        ) + "\n"
+        accepted_route_gate = {
+            "path": "synthetic-route-gate.py",
+            "exit_code": 0,
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "public_or_runtime_accounting_allowed": False,
+            "current_route_blocker": "identity_public_contract_gate_missing",
+            "remaining_route_blockers": ["identity_public_contract_gate_missing"],
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_next_blocker": None,
+            "source_checker_status": "blocked",
+            "source_checker_ready": False,
+            "source_checker_accepted_for_internal_planning": False,
+            "route_lock_blocked_until": ["reviewed_identity_public_contract"],
+            "route_lock_locked": True,
+            "approved_runtime_evidence_forwarded": True,
+            "public_or_runtime_claims": [],
+            "completion_claims_without_blocker": [],
+            "blockers": [],
+            "completion_gate_accepted": True,
+            "completion_gate_blockers": [],
+            "stderr": "",
+            "non_claim": "accepted runtime evidence only moved the route blocker",
+        }
+        original_helpers = (
+            module.run_command_permission_route_gate,
+            module.run_inventory_copied_signals_stability,
+            module.run_object_identity_resource_handle_readiness,
+            module.run_mission_transfer_dino_tribe_outcome_accounting,
+            module.run_structure_census_readiness,
+            module.run_structure_build_policy_offline_intake,
+            module.blocked_contract_public_header_symbol_drift,
+            module.missing_required_contract_decision_manifests,
+            module.public_contract_decision_surfaces_for_header,
+            module.manifest_public_header_symbol_drift,
+            module.surface_has_promotion_evidence,
+            module.surface_missing_required_promotion_evidence,
+            module.surface_missing_structured_promotion_evidence,
+        )
+        try:
+            module.run_command_permission_route_gate = lambda *_args, **_kwargs: (accepted_route_gate, [])
+            module.run_inventory_copied_signals_stability = lambda *_args, **_kwargs: ({}, [])
+            module.run_object_identity_resource_handle_readiness = lambda *_args, **_kwargs: ({}, [])
+            module.run_mission_transfer_dino_tribe_outcome_accounting = lambda *_args, **_kwargs: ({}, [])
+            module.run_structure_census_readiness = lambda *_args, **_kwargs: ({}, [])
+            module.run_structure_build_policy_offline_intake = lambda *_args, **_kwargs: ({}, [])
+            module.blocked_contract_public_header_symbol_drift = lambda *_args, **_kwargs: ({}, [])
+            module.missing_required_contract_decision_manifests = lambda *_args, **_kwargs: []
+            module.public_contract_decision_surfaces_for_header = lambda *_args, **_kwargs: set()
+            module.manifest_public_header_symbol_drift = lambda *_args, **_kwargs: ({}, [])
+            module.surface_has_promotion_evidence = lambda surface: surface.get("status") == "promoted"
+            module.surface_missing_required_promotion_evidence = lambda _surface: []
+            module.surface_missing_structured_promotion_evidence = lambda *_args, **_kwargs: []
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                manifest_path = root / "public_sdk_surfaces.json"
+                release_statement_path = root / "RELEASE_STATEMENT.md"
+                header_path = root / "ObeliskApi.h"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                release_statement_path.write_text(release_statement, encoding="utf-8")
+                header_path.write_text("#pragma once\n", encoding="utf-8")
+
+                report = module.build_report(
+                    manifest_path,
+                    release_statement_path,
+                    public_header_path=header_path,
+                )
+        finally:
+            (
+                module.run_command_permission_route_gate,
+                module.run_inventory_copied_signals_stability,
+                module.run_object_identity_resource_handle_readiness,
+                module.run_mission_transfer_dino_tribe_outcome_accounting,
+                module.run_structure_census_readiness,
+                module.run_structure_build_policy_offline_intake,
+                module.blocked_contract_public_header_symbol_drift,
+                module.missing_required_contract_decision_manifests,
+                module.public_contract_decision_surfaces_for_header,
+                module.manifest_public_header_symbol_drift,
+                module.surface_has_promotion_evidence,
+                module.surface_missing_required_promotion_evidence,
+                module.surface_missing_structured_promotion_evidence,
+            ) = original_helpers
+
+        progress = report["v1_sdk_progress"]
+        summary = report["summary"]
+        p0_rows = [
+            row for row in report["v1_sdk_blocker_outcomes"] if row["surface"] in p0_surfaces
+        ]
+
+        self.assertFalse(report["ready"])
+        self.assertIn("p0_dependency_chain_route_gate_locked", report["blockers"])
+        self.assertEqual(report["current_route_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(report["remaining_route_blockers"], ["identity_public_contract_gate_missing"])
+        self.assertEqual(report["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(report["p0_chain_promoted_count"], 0)
+        self.assertEqual(report["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
+        self.assertEqual(progress["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(summary["sdk_completion"]["promoted_for_claim_count"], 0)
+        self.assertEqual(summary["p0_completion"]["promoted_for_claim_count"], 0)
+        self.assertFalse(summary["p0_completion"]["ready"])
+        self.assertEqual(progress["route_gate_non_counting_blockers"], ["identity_public_contract_gate_missing"])
+        self.assertEqual(
+            sorted(progress["route_gate_non_counting_surfaces"]),
+            sorted(p0_surfaces),
+        )
+        for row in p0_rows:
+            self.assertFalse(row["counts_toward_complete_sdk_claim"], row)
+            self.assertFalse(row["route_gate_claim_satisfied"], row)
+            self.assertEqual(row["route_gate_non_counting_blocker"], "identity_public_contract_gate_missing")
+
+    def test_route_gate_empty_remaining_blockers_preserves_current_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                remaining_route_blockers=[],
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        route_gate = payload["command_permission_route_gate"]
+        summary = payload["summary"]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload, field="payload")
+        self.assertApprovedRuntimeEvidenceMissingRoute(route_gate, field="command_permission_route_gate")
+        self.assertTrue(payload["route_gate_blocked"])
+        self.assertTrue(summary["route_gate_blocked"])
+        self.assertApprovedRuntimeEvidenceMissingRoute(summary, field="summary")
+        self.assertApprovedRuntimeEvidenceMissingRoute(
+            summary["p0_completion"],
+            field="summary.p0_completion",
+        )
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
 
     def test_completion_gate_binds_executed_test_artifacts_to_selected_manifest_and_header(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
@@ -1999,10 +5152,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(payload["schema"], "obelisk.public-sdk-v1-completion-check.v1")
         self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["public_abi_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["complete_sdk_ready"])
+        self.assertFalse(payload["v1_completion_ready"])
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload, field="payload")
+        self.assertTrue(payload["route_gate_blocked"])
+        self.assertEqual(payload["summary"]["status"], "blocked")
+        self.assertFalse(payload["summary"]["ready"])
+        self.assertFalse(payload["summary"]["stable_claim_allowed"])
+        self.assertTrue(payload["summary"]["route_gate_blocked"])
+        self.assertApprovedRuntimeEvidenceMissingRoute(payload["summary"], field="summary")
+        self.assertApprovedRuntimeEvidenceMissingRoute(
+            payload["summary"]["p0_completion"],
+            field="summary.p0_completion",
+        )
+        self.assertEqual(payload["summary"]["sdk_completion"]["status"], "blocked")
+        self.assertFalse(payload["summary"]["sdk_completion"]["ready"])
+        self.assertFalse(payload["summary"]["sdk_completion"]["claim_ready"])
+        self.assertFalse(payload["summary"]["p0_completion"]["ready"])
+        self.assertTrue(payload["summary"]["p0_completion"]["route_gate_blocked"])
         self.assertIn("stable_release_contract_claim_not_allowed", payload["blockers"])
         self.assertIn("v1_completion_required_false", payload["blockers"])
         self.assertIn("promoted_experimental_surfaces_unresolved", payload["blockers"])
         self.assertIn("v1_sdk_completion_blockers_unresolved", payload["blockers"])
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(payload["release_statement_scoped_non_complete_bookkeeping_blocker_count"], 8)
         self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
         self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
         self.assertNotIn("required_public_contract_decision_manifest_missing", payload["blockers"])
@@ -2020,6 +5200,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(inventory_stability["resource_kind_contract"], "category-only metadata")
         self.assertFalse(inventory_stability["public_sdk_ready"])
         self.assertFalse(inventory_stability["v1_completion_ready"])
+        self.assertFalse(inventory_stability["counts_toward_complete_sdk_claim"])
+        self.assertFalse(inventory_stability["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(inventory_stability["progress"], 0)
+        self.assertFalse(inventory_stability["stable_claim_allowed"])
+        self.assertEqual(inventory_stability["completion_accounting_alias_violations"], [])
         self.assertNotIn("inventory_copied_signals_stability_invalid", payload["blockers"])
         resource_handle_readiness = payload["object_identity_resource_handle_readiness"]
         self.assertEqual(
@@ -2045,16 +5230,49 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(mission_accounting["surface"], "obelisk.mission_transfer_dino_tribe.v1")
         self.assertTrue(mission_accounting["ready"])
-        self.assertEqual(mission_accounting["accounting_route"], "candidate_only")
-        self.assertTrue(mission_accounting["candidate_only"])
-        self.assertFalse(mission_accounting["v1_accounted"])
+        self.assertEqual(mission_accounting["accounting_route"], "release_statement_umbrella_excluded")
+        self.assertTrue(mission_accounting["source_ready"])
+        self.assertEqual(mission_accounting["source_blockers"], [])
+        self.assertFalse(mission_accounting["helper_blocked_status_normalized"])
+        self.assertFalse(mission_accounting["candidate_only"])
+        self.assertTrue(mission_accounting["v1_accounted"])
         self.assertFalse(mission_accounting["promotion_ready"])
         self.assertFalse(mission_accounting["public_sdk_ready"])
         self.assertFalse(mission_accounting["runtime_ready"])
+        self.assertFalse(mission_accounting["counts_toward_complete_sdk_claim"])
+        self.assertFalse(mission_accounting["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(mission_accounting["progress"], 0)
+        self.assertFalse(mission_accounting["stable_claim_allowed"])
+        self.assertEqual(mission_accounting["completion_accounting_alias_violations"], [])
+        self.assertEqual(mission_accounting["missing_leaf_families"], [])
+        leaf_outcomes = mission_accounting["leaf_outcome_accounting"]
         self.assertEqual(
-            set(mission_accounting["missing_leaf_families"]),
-            {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"},
+            leaf_outcomes["schema"],
+            "obelisk.mission-transfer-dino-tribe-v1-leaf-outcomes.v1",
         )
+        self.assertTrue(leaf_outcomes["all_leaf_outcomes_explicit"])
+        self.assertEqual(leaf_outcomes["missing_or_unresolved_leaf_outcomes"], [])
+        self.assertFalse(leaf_outcomes["counts_toward_complete_sdk_claim"])
+        self.assertFalse(leaf_outcomes["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(leaf_outcomes["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(leaf_outcomes["p0_dependency_chain_claim_progress_contribution"], 0)
+        self.assertEqual(
+            [(leaf["leaf"], leaf["status"], leaf["manifest_outcome"]) for leaf in leaf_outcomes["leaves"]],
+            [
+                ("mission", "planning", None),
+                ("transfer", "planning", None),
+                ("dino_policy", "planning", None),
+                ("tribe_policy", "planning", None),
+                ("buff_status", "planning", None),
+            ],
+        )
+        for leaf in leaf_outcomes["leaves"]:
+            self.assertTrue(leaf["release_statement_excluded"])
+            self.assertEqual(leaf["accounted_by"], "release_statement_leaf_exclusion")
+            self.assertTrue(leaf["scoped_non_complete_bookkeeping_only"])
+            self.assertFalse(leaf["counts_toward_complete_sdk_claim"])
+            self.assertFalse(leaf["counts_toward_p0_dependency_chain_claim"])
+            self.assertEqual(leaf["progress_contribution"], 0)
         self.assertNotIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
         structure_census = payload["structure_census_readiness"]
         self.assertEqual(structure_census["schema"], "obelisk.structure-census-readiness-check.v1")
@@ -2118,22 +5336,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(
             progress["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
-            [],
+            sorted(EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES),
         )
         self.assertEqual(
             progress["completion_blockers_with_release_statement_post_v1_or_excluded_outcome_count"],
-            0,
+            8,
         )
         self.assertIn("obelisk.player_identity.v1", progress["completion_blockers_without_manifest_outcome"])
+        self.assertIn(MISSION_TRANSFER_DINO_TRIBE_SURFACE_ID, progress["completion_blockers_without_manifest_outcome"])
         self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 5)
-        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 5)
+        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 4)
         self.assertFalse(progress["stable_claim_allowed"])
         self.assertIn("status accounting", progress["outcome_accounting_note"])
         self.assertIn("never contribute percentage", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
         self.assertEqual(progress["manifest_outcome_missing_count"], 5)
-        self.assertEqual(progress["release_statement_outcome_missing_count"], 7)
+        self.assertEqual(progress["release_statement_outcome_missing_count"], 0)
         self.assertEqual(progress["dependency_chain_remaining_count"], 4)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["total"], 12)
         self.assertEqual(
@@ -2143,21 +5362,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.permissions_admin.v1",
                 "obelisk.command_chat_response_path.v1",
                 "obelisk.commands_replies.v1",
-                "obelisk.mission_transfer_dino_tribe.v1",
+                MISSION_TRANSFER_DINO_TRIBE_SURFACE_ID,
             ],
         )
 
         self.assertEqual(
             payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing"],
-            [
-                "obelisk.inventory_items_mutation.v1",
-                "obelisk.object_identity_resource_handle.v1",
-                "obelisk.structure_census.v1",
-                "obelisk.lifecycle_ops_recovery.v1",
-                "obelisk.player_services_economy_mobility.v1",
-                "obelisk.operator_ingress_storage.v1",
-                "obelisk.gameplay_tick_callbacks.v1",
-            ],
+            [],
+        )
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"]["release_statement_scoped_non_complete_bookkeeping"],
+            EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES,
         )
         blocker_rows = payload["v1_sdk_blocker_outcomes"]
         self.assertEqual(len(blocker_rows), 12)
@@ -2191,7 +5406,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(
             sections["release_statement_bookkeeping"]["release_statement_post_v1_or_excluded_outcomes"],
-            [],
+            sorted(EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES),
         )
         self.assertEqual(
             sections["release_statement_bookkeeping"]["missing_blocker_outcomes"],
@@ -2239,7 +5454,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["v1_sdk_blocker_outcome_summary"][
                 "active_side_lane_review_release_statement_post_v1_or_excluded"
             ],
-            [],
+            expected_active_side_lanes,
         )
         self.assertEqual(
             progress["active_side_lane_review_promoted_for_claim_count"],
@@ -2318,6 +5533,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ({"summary": {"public_abi_ready": True}}, "inventory_copied_signals_public_or_runtime_claims"),
             ({"summary": {"stable_claim_allowed": True}}, "inventory_copied_signals_public_or_runtime_claims"),
             ({"stable_claim_allowed": True}, "inventory_copied_signals_public_or_runtime_claims"),
+            ({"counts_toward_complete_sdk_claim": True}, "inventory_copied_signals_completion_accounting_alias_not_false"),
+            ({"counts_toward_p0_dependency_chain_claim": True}, "inventory_copied_signals_completion_accounting_alias_not_false"),
+            ({"progress": 1}, "inventory_copied_signals_completion_accounting_alias_not_false"),
+            ({"summary": {"progress": "1/12"}}, "inventory_copied_signals_completion_accounting_alias_not_false"),
             ({"blockers": ["copied_signal_boundary_failed"]}, "inventory_copied_signals_stability_blockers_not_empty"),
         )
         for overrides, expected in cases:
@@ -2484,6 +5703,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("public_sdk_ready", True, "structure_build_policy_public_sdk_ready_not_false"),
             ("runtime_ready", True, "structure_build_policy_runtime_ready_not_false"),
             ("enforcement_ready", True, "structure_build_policy_enforcement_ready_not_false"),
+            (
+                "structure_build_policy_ready",
+                True,
+                "structure_build_policy_structure_build_policy_ready_not_false",
+            ),
+            ("route_ready", True, "structure_build_policy_route_ready_not_false"),
+            ("blocker_resolved", True, "structure_build_policy_blocker_resolved_not_false"),
+            ("side_lane_promoted", True, "structure_build_policy_side_lane_promoted_not_false"),
             ("public_abi_ready", True, "structure_build_policy_public_or_runtime_claims"),
             ("v1_completion_ready", True, "structure_build_policy_public_or_runtime_claims"),
             ("stable_claim_allowed", True, "structure_build_policy_public_or_runtime_claims"),
@@ -2491,6 +5718,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "readiness_flags",
                 {"public_sdk_ready": True},
                 "structure_build_policy_readiness_flags_public_sdk_ready_not_false",
+            ),
+            (
+                "readiness_flags",
+                {"structure_build_policy_ready": True},
+                "structure_build_policy_readiness_flags_structure_build_policy_ready_not_false",
             ),
             (
                 "readiness_flags",
@@ -2562,6 +5794,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress": 0,
+            "stable_claim_allowed": False,
             "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
             "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
             "missing_leaf_families": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
@@ -2574,6 +5810,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("public_abi_ready", "mission_transfer_dino_tribe_public_or_runtime_claims"),
             ("v1_completion_ready", "mission_transfer_dino_tribe_public_or_runtime_claims"),
             ("stable_claim_allowed", "mission_transfer_dino_tribe_public_or_runtime_claims"),
+            ("counts_toward_complete_sdk_claim", "mission_transfer_dino_tribe_completion_accounting_alias_not_false"),
+            ("counts_toward_p0_dependency_chain_claim", "mission_transfer_dino_tribe_completion_accounting_alias_not_false"),
+            ("progress", "mission_transfer_dino_tribe_completion_accounting_alias_not_false"),
             ("summary", "mission_transfer_dino_tribe_public_or_runtime_claims"),
         )
         for key, expected in cases:
@@ -2596,6 +5835,134 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn(expected, report["blockers"])
                 self.assertFalse(report["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_new_side_lane_report_completion_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": True,
+            "accounting_route": "candidate_only",
+            "candidate_only": True,
+            "v1_accounted": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress": 0,
+            "stable_claim_allowed": False,
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "transfer_scriptstruct_readiness": {
+                "schema": "obelisk.transfer-scriptstruct-readiness-check.v1",
+                "ready": True,
+                "counts_toward_complete_sdk_claim": True,
+                "complete_sdk_claim_progress_contribution": 1,
+                "complete_sdk_claim_progress_ratio": "1/12",
+            },
+            "dino_scalar_readiness": {
+                "schema": "obelisk.dino-scalar-readiness-check.v1",
+                "ready": True,
+                "public_dino_sdk_ready": True,
+                "runtime_hook_ready": True,
+                "p0_ready": True,
+                "p0_dependency_chain_accounted": True,
+                "p0_dependency_chain_claim_progress_contribution": "1/4",
+                "p0_dependency_chain_claim_progress_percent": 25,
+                "readiness_counts_toward_v1_accounting": True,
+            },
+            "buff_leaf_blocker_accounting": {
+                "schema": "obelisk.mission-transfer-dino-tribe-v1-buff-leaf-blocker-accounting.v1",
+                "focused_checker": "scripts/check_buff_status_readiness.py",
+                "focused_checker_report": {
+                    "schema": "obelisk.buff-status-readiness-check.v1",
+                    "source_manifest": {
+                        "schema": "obelisk.ufunction-snapshot-manifest.v1",
+                        "source": "offline_core",
+                        "status": "candidate-only",
+                        "bound_target_count": 6,
+                    },
+                    "summary": {
+                        "source_binding_count": 6,
+                        "source_bindings": [
+                            {
+                                "manifest_module": "sdk_buffs",
+                                "fixture_path": "7e7ded49e0c6/sdk_buffs/buff.json",
+                                "evidence_source": "offline_core",
+                                "evidence_status": "candidate-only",
+                                "artifact_kind": "offline_core",
+                            }
+                        ],
+                        "stable_claim_allowed": True,
+                    },
+                },
+            },
+            "blockers": [],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_mission_accounting_checker(
+                Path(temp_dir) / "fake_mission_accounting.py",
+                payload,
+            )
+            result = self.run_checker(
+                "--mission-transfer-dino-tribe-outcome-accounting",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_transfer_dino_tribe_public_or_runtime_claims", report["blockers"])
+        self.assertIn(
+            "mission_transfer_dino_tribe_completion_accounting_alias_not_false",
+            report["blockers"],
+        )
+        self.assertIn(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER, report["blockers"])
+        self.assertEqual(report["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(report["complete_sdk_blocker_claim_accounting"]["promoted_for_claim_ratio"], "0/12")
+        self.assertEqual(report["p0_dependency_chain_claim_accounting"]["promoted_for_claim_count"], 0)
+        self.assertEqual(report["p0_dependency_chain_claim_accounting"]["promoted_for_claim_ratio"], "0/4")
+        self.assertFalse(report["stable_claim_allowed"])
+
+        mission_accounting = report["mission_transfer_dino_tribe_outcome_accounting"]
+        self.assertFalse(mission_accounting["counts_toward_complete_sdk_claim"])
+        self.assertFalse(mission_accounting["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(mission_accounting["progress"], 0)
+        self.assertFalse(mission_accounting["stable_claim_allowed"])
+        self.assertIn(
+            "dino_scalar_readiness.public_dino_sdk_ready",
+            mission_accounting["public_or_runtime_claims"],
+        )
+        self.assertIn(
+            "dino_scalar_readiness.runtime_hook_ready",
+            mission_accounting["public_or_runtime_claims"],
+        )
+        self.assertIn(
+            "transfer_scriptstruct_readiness.counts_toward_complete_sdk_claim",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
+        self.assertIn(
+            "transfer_scriptstruct_readiness.complete_sdk_claim_progress_ratio",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
+        self.assertIn(
+            "dino_scalar_readiness.p0_dependency_chain_claim_progress_contribution",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
+        self.assertIn(
+            "dino_scalar_readiness.p0_dependency_chain_claim_progress_percent",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
+        self.assertIn(
+            "dino_scalar_readiness.readiness_counts_toward_v1_accounting",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
+        self.assertIn(
+            "buff_leaf_blocker_accounting.focused_checker_report.summary.stable_claim_allowed",
+            mission_accounting["completion_accounting_alias_violations"],
+        )
 
     def test_completion_gate_rejects_fake_mission_per_leaf_promoted_summary_without_manifest_evidence(self) -> None:
         payload = {
@@ -2698,8 +6065,28 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("not json", "mission_transfer_dino_tribe_outcome_accounting_output_invalid"),
             ({**base, "schema": "wrong-schema"}, "mission_transfer_dino_tribe_outcome_accounting_schema_mismatch"),
             ({**base, "surface": "wrong-surface"}, "mission_transfer_dino_tribe_outcome_accounting_surface_mismatch"),
-            ({**base, "ready": False}, "mission_transfer_dino_tribe_outcome_accounting_invalid"),
-            ({**base, "blockers": ["release_statement_leaf_exclusions_missing"]}, "mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty"),
+            (
+                {
+                    **base,
+                    "ready": False,
+                    "accounting_route": "per_leaf_promoted",
+                    "candidate_only": False,
+                    "v1_accounted": True,
+                    "promotion_ready": True,
+                    "public_sdk_ready": True,
+                    "runtime_ready": True,
+                    "missing_leaf_families": [],
+                },
+                "mission_transfer_dino_tribe_outcome_accounting_invalid",
+            ),
+            (
+                {
+                    **base,
+                    "public_sdk_ready": True,
+                    "blockers": ["release_statement_leaf_exclusions_missing"],
+                },
+                "mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty",
+            ),
             ({**base, "observed_leaves": ["mission"]}, "mission_transfer_dino_tribe_observed_leaves_mismatch"),
             ({**base, "candidate_only": False}, "mission_transfer_dino_tribe_candidate_only_accounting_mismatch"),
         )
@@ -2722,6 +6109,51 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertIn(expected, report["blockers"])
                 self.assertFalse(report["stable_claim_allowed"])
 
+    def test_mission_candidate_source_blockers_are_status_only_when_fail_closed(self) -> None:
+        payload = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": False,
+            "accounting_route": "candidate_only",
+            "candidate_only": True,
+            "v1_accounted": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "blockers": ["source_candidate_internal_blocker"],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = Path(temp_dir) / "fake_mission_accounting.py"
+            checker_path.write_text(
+                "import json, sys\n"
+                f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n"
+                "sys.exit(1)\n",
+                encoding="utf-8",
+            )
+
+            summary, blockers = completion_checker.run_mission_transfer_dino_tribe_outcome_accounting(
+                checker_path,
+                PUBLIC_SDK_SURFACES,
+                None,
+            )
+
+        self.assertEqual(blockers, [])
+        self.assertTrue(summary["ready"])
+        self.assertFalse(summary["source_ready"])
+        self.assertTrue(summary["helper_blocked_status_normalized"])
+        self.assertEqual(summary["blockers"], ["source_candidate_internal_blocker"])
+        self.assertEqual(summary["source_blockers"], ["source_candidate_internal_blocker"])
+        self.assertFalse(summary["public_sdk_ready"])
+        self.assertFalse(summary["runtime_ready"])
+        self.assertFalse(summary["counts_toward_complete_sdk_claim"])
+        self.assertFalse(summary["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(summary["progress"], 0)
+
     def test_completion_gate_rejects_resource_handle_public_runtime_promotion_overclaims(self) -> None:
         cases = (
             ("promotion_ready", True, "object_identity_resource_handle_promotion_ready_not_false"),
@@ -2739,7 +6171,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ),
             ("public_abi_ready", True, "object_identity_resource_handle_public_or_runtime_claims"),
             ("public_header_allowed", "ready", "object_identity_resource_handle_public_or_runtime_claims"),
-        )
+            ("resourceLookupReady", True, "object_identity_resource_handle_resourceLookupReady_not_false"),
+            ("postCallbackHandleReady", True, "object_identity_resource_handle_postCallbackHandleReady_not_false"),
+            ("objectIdentityReady", True, "object_identity_resource_handle_objectIdentityReady_not_false"),
+            ("runtimeSampleReady", True, "object_identity_resource_handle_runtimeSampleReady_not_false"),
+            ("lookup_ready", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            ("mutation_ready", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            ("crossEventObjectIdentityReady", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            ("persistentObjectIdentityReady", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            ("postCallbackValidityReady", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            (
+                "offline_artifacts_unlock_public_lookup_identity_runtime_sdk",
+                True,
+                "object_identity_resource_handle_offline_artifacts_unlock_public_lookup_identity_runtime_sdk_not_false",
+            ),
+            )
         for key, value, expected in cases:
             with self.subTest(key=key):
                 with tempfile.TemporaryDirectory() as temp_dir:
@@ -2762,6 +6208,44 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertIn(key, payload["object_identity_resource_handle_readiness"]["public_or_runtime_claims"])
                 self.assertFalse(payload["stable_claim_allowed"])
 
+    def test_completion_gate_rejects_nested_resource_handle_alias_overclaims(self) -> None:
+        nested_claims = {
+            "installed_sdk_package_shape_alias": {
+                "objectLookupReady": True,
+                "resourceHandleReady": "supported",
+            },
+            "release_statement_alias": {
+                "persistentObjectIdentityReady": True,
+                "crossEventObjectIdentityReady": "ready",
+                "postCallbackValidityReady": "available",
+            },
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_resource_handle_checker(
+                Path(temp_dir) / "fake_resource_handle_checker.py",
+                aliases=nested_claims,
+            )
+
+            result = self.run_checker(
+                "--object-identity-resource-handle-readiness",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("object_identity_resource_handle_public_or_runtime_claims", payload["blockers"])
+        claims = payload["object_identity_resource_handle_readiness"]["public_or_runtime_claims"]
+        self.assertIn("aliases.installed_sdk_package_shape_alias.objectLookupReady", claims)
+        self.assertIn("aliases.installed_sdk_package_shape_alias.resourceHandleReady", claims)
+        self.assertIn("aliases.release_statement_alias.persistentObjectIdentityReady", claims)
+        self.assertIn("aliases.release_statement_alias.crossEventObjectIdentityReady", claims)
+        self.assertIn("aliases.release_statement_alias.postCallbackValidityReady", claims)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+
     def test_completion_gate_rejects_resource_handle_checker_invalid_or_blocking_report(self) -> None:
         cases = (
             (
@@ -2783,6 +6267,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             (
                 {"blockers": ["surface_status_not_post_v1"]},
                 "object_identity_resource_handle_readiness_blockers_not_empty",
+            ),
+            (
+                {"strict_next_blocker": "offline artifacts are enough"},
+                "object_identity_resource_handle_strict_next_blocker_missing",
+            ),
+            (
+                {"offline_serial_post_callback_artifacts": "accepted"},
+                "object_identity_resource_handle_offline_artifact_policy_not_candidate_only",
             ),
         )
         for overrides, expected in cases:
@@ -2911,14 +6403,29 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("The stable v1 SDK claim remains disabled", result.stdout)
-        self.assertIn("12-blocker outcome accounting: 5 need manifest outcomes; 7 need release-statement outcomes", result.stdout)
+        self.assertIn("12-blocker outcome accounting: 5 need manifest outcomes; 0 need release-statement outcomes", result.stdout)
+        self.assertIn("Complete SDK progress: 0/12; P0 dependency-chain progress: 0/4.", result.stdout)
         self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
         self.assertIn("obelisk.chat_message.v1", result.stdout)
         self.assertIn("P0 route gate: approved_runtime_evidence_missing", result.stdout)
+        self.assertIn(
+            "Approved in-game evidence: ready=false; approved_runtime_evidence=false; "
+            "diagnostic_complete_triplet=true; "
+            "next_required_artifact=approved_runtime_principal_lifecycle_evidence_bundle.",
+            result.stdout,
+        )
+        self.assertIn("Diagnostic complete-triplet paths are non-evidence", result.stdout)
+        self.assertIn("Player-backed paths still missing lifecycle roles", result.stdout)
         self.assertIn("approved_runtime_principal_lifecycle_evidence", result.stdout)
         self.assertIn("reviewed_identity_public_contract", result.stdout)
+        self.assertIn("Fastest next SDK unblock paths", result.stdout)
+        self.assertIn("historical_theisland_candidate_missing_sidecars", result.stdout)
+        self.assertIn("active_genesis2_passive_missing_roles", result.stdout)
+        self.assertIn("active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle", result.stdout)
+        self.assertIn("player_notice_action", result.stdout)
+        self.assertIn("non-authorizing", result.stdout)
         self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("Use --json for the full machine-readable report.", result.stdout)
 
@@ -3002,6 +6509,41 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         }
 
         self.assertEqual(command_permission_route_gate_public_or_runtime_claims(report), [])
+
+    def test_route_gate_claim_scanner_ignores_schema_metadata_but_rejects_summary_and_flags(self) -> None:
+        report = {
+            "checks": [
+                {
+                    "name": "commands_replies_public_readiness",
+                    "argv": [
+                        "check_commands_replies_public_readiness.py",
+                        "--response-path-report",
+                        "/tmp/command-chat-response-public-readiness/command-chat-response-public-readiness.json",
+                    ],
+                    "expected_schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                    "report_schema": "obelisk.commands-replies-public-readiness-check.v1",
+                    "schema": "obelisk.public-sdk-v1-completion-ready-schema-id.v1",
+                    "input_schema": "obelisk.player-principal-passive-snapshot.v1",
+                    "source_schema": "obelisk.scoped-non-complete-v1-release-statement.v1",
+                    "schema_ids": [
+                        "obelisk.command-chat-response-public-readiness-check.v1",
+                        "obelisk.commands-replies-public-readiness-check.v1",
+                    ],
+                    "summary": "reply API is public and ready",
+                    "flags": {"runtime_delivery_allowed": True},
+                }
+            ]
+        }
+
+        claims = command_permission_route_gate_public_or_runtime_claims(report)
+
+        self.assertEqual(
+            claims,
+            [
+                "checks[0].flags.runtime_delivery_allowed",
+                "checks[0].summary:positive_text_claim",
+            ],
+        )
 
     def test_completion_gate_rejects_route_gate_schema_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3235,7 +6777,27 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "command_permission_route_gate_source_ready_overclaim",
             ),
             (
+                {"source_ready": True},
+                "command_permission_route_gate_source_ready_overclaim",
+            ),
+            (
+                {"ready": True},
+                "command_permission_route_gate_source_ready_overclaim",
+            ),
+            (
+                {"status_report_ready": True},
+                "command_permission_route_gate_source_ready_overclaim",
+            ),
+            (
                 {"source_checker_status": "ready"},
+                "command_permission_route_gate_source_status_unexpected",
+            ),
+            (
+                {"source_status": "ready"},
+                "command_permission_route_gate_source_status_unexpected",
+            ),
+            (
+                {"status_report_status": "ready"},
                 "command_permission_route_gate_source_status_unexpected",
             ),
             (
@@ -3968,7 +7530,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
         )
         self.assertTrue(gameplay["v1_decision_contract"]["leaf_split_reviewed"])
+        self.assertEqual(gameplay["status"], "planning")
         self.assertEqual({leaf["status"] for leaf in gameplay["leaf_decision_units"]}, {"planning"})
+        self.assertTrue(
+            all(
+                "explicitly excluded" in leaf["allowed_v1_outcome"]
+                for leaf in gameplay["leaf_decision_units"]
+            )
+        )
         self.assertEqual(
             payload["unresolved_experimental_surfaces"],
             [
@@ -3978,18 +7547,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.inventory_item_copied_signals.v1",
             ],
         )
-        self.assertEqual(
-            payload["release_statement_missing_blocker_outcomes"],
-            [
-                "obelisk.gameplay_tick_callbacks.v1",
-                "obelisk.inventory_items_mutation.v1",
-                "obelisk.lifecycle_ops_recovery.v1",
-                "obelisk.object_identity_resource_handle.v1",
-                "obelisk.operator_ingress_storage.v1",
-                "obelisk.player_services_economy_mobility.v1",
-                "obelisk.structure_census.v1",
-            ],
-        )
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertEqual(payload["release_statement_scoped_non_complete_bookkeeping_blocker_count"], 8)
         self.assertEqual(payload["promoted_surfaces_with_unresolved_dependencies"], {})
         self.assertEqual(payload["promoted_surfaces_without_evidence"], [])
         self.assertEqual(payload["promoted_blockers_without_evidence"], [])
@@ -4219,6 +7778,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 str(build_policy_checker),
                 "--validate-release-statement-scope",
                 "--json",
+                check=False,
             )
         payload = json.loads(result.stdout)
 
@@ -4239,15 +7799,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["v1_sdk_progress"]["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
-            payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+            sorted(EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES),
         )
         self.assertEqual(
             payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
                 "release_statement_post_v1_or_excluded_outcomes"
             ],
-            payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
-                "manifest_post_v1_or_excluded_outcomes"
-            ],
+            sorted(EXPECTED_SCOPED_NON_COMPLETE_BLOCKER_OUTCOMES),
         )
         expected_active_side_lanes = [
             "obelisk.lifecycle_ops_recovery.v1",
@@ -4430,6 +7988,82 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(row["release_statement_contract_satisfied"])
         self.assertFalse(row["counts_toward_complete_sdk_claim"])
         self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_scoped_release_statement_scope_rejects_embedded_p0_outcome_record(self) -> None:
+        surface_id = "obelisk.player_identity.v1"
+        embedded_record = (
+            f"Note: {surface_id}: excluded - dependency-chain outcome remains blocked.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + embedded_record,
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        unexpected_records = payload["scoped_release_statement_unexpected_surface_records"]
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "scoped_release_statement_unexpected_surface_records",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertEqual([record["surface"] for record in unexpected_records], [surface_id])
+        self.assertEqual(unexpected_records[0]["outcome"], "excluded")
+        self.assertEqual(unexpected_records[0]["line"], embedded_record.strip())
+
+    def test_scoped_release_statement_scope_rejects_embedded_promoted_experimental_record(self) -> None:
+        surface_id = "obelisk.chat_message.v1"
+        embedded_record = (
+            f"Note: {surface_id}: promoted - reviewed copied-data seed evidence.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + embedded_record,
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        unexpected_records = payload["scoped_release_statement_unexpected_surface_records"]
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "scoped_release_statement_unexpected_surface_records",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertEqual([record["surface"] for record in unexpected_records], [surface_id])
+        self.assertEqual(unexpected_records[0]["outcome"], "promoted")
+        self.assertEqual(unexpected_records[0]["line"], embedded_record.strip())
 
     def test_structure_excluded_outcome_is_bookkeeping_only_and_requires_exact_wording(self) -> None:
         surface_id = "obelisk.structure_census.v1"
@@ -4853,10 +8487,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--validate-release-statement-scope",
                 "--allow-scoped-release-statement-extra-records",
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
         self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
     def test_scoped_release_statement_scope_rejects_affirmative_not_only_claim(self) -> None:
@@ -5008,7 +8644,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             blocked_payload["v1_sdk_progress"][
                 "non_p0_release_statement_post_v1_or_excluded_outcome_count"
             ],
-            7,
+            8,
         )
         self.assertEqual(
             blocked_payload["v1_sdk_progress"][
@@ -5085,7 +8721,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["v1_sdk_progress"]["non_p0_release_statement_post_v1_or_excluded_outcome_count"],
-            7,
+            8,
         )
         self.assertEqual(
             payload["v1_sdk_progress"]["p0_release_statement_scoped_non_complete_outcome_count"],
@@ -5636,6 +9272,30 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         manifest["installed_sdk_package_shape"]["claimAliases"] = {
             "v1CompletionEquivalentFor": ["obelisk.inventory_items_mutation.v1"],
         }
+        manifest["installed_sdk_package_shape"]["package_alias_lists"] = {
+            "publicPackageReady": ["blocked", "ready"],
+            "packagePublicationReady": [False, "published"],
+            "resourceHandleReady": ["blocked", "ready"],
+            "objectLookupReady": [False, "supported"],
+        }
+        manifest["installed_sdk_package_shape"]["resource_handle_aliases"] = {
+            "persistentObjectIdentityReady": True,
+            "crossEventObjectIdentityReady": "ready",
+            "postCallbackValidityReady": "available",
+            "mutationReady": True,
+        }
+        manifest["installed_sdk_package_shape"]["status_note"] = (
+            "Package shape is release-supported seed."
+        )
+        manifest["installed_sdk_package_shape"]["installed_headers"] = (
+            "The installed headers prove v1 support."
+        )
+        manifest["installed_sdk_package_shape"]["cmake_package_note"] = (
+            "ObeliskConfig.cmake validates support tier activation."
+        )
+        manifest["installed_sdk_package_shape"]["installed_sdk_consumer_tests"] = (
+            "Installed SDK consumer tests count toward v1 completion."
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -5658,6 +9318,54 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn(
             "positive_claim:claimAliases.v1CompletionEquivalentFor",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:package_alias_lists.publicPackageReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:package_alias_lists.packagePublicationReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:package_alias_lists.resourceHandleReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:package_alias_lists.objectLookupReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:resource_handle_aliases.persistentObjectIdentityReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:resource_handle_aliases.crossEventObjectIdentityReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:resource_handle_aliases.postCallbackValidityReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:resource_handle_aliases.mutationReady",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:status_note:positive_completion_text",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:installed_headers:positive_completion_text",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:cmake_package_note:positive_completion_text",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:installed_sdk_consumer_tests:positive_completion_text",
             payload["installed_sdk_package_shape_guardrail_drift"],
         )
 
@@ -6349,6 +10057,78 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertIn(term, forbidden_claims)
         self.assertNotIn("package-shape evidence only", forbidden_claims)
 
+    def test_release_statement_rejects_route_package_scoped_status_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Package shape is release-supported seed.\n"
+            "The installed headers prove v1 support.\n"
+            "Route-check acceptance unlocks complete SDK status.\n"
+            "Route check accepted; public route is ready.\n"
+            "The command permission route check is accepted for public route readiness.\n"
+            "Scoped non-complete outcomes are ready.\n"
+            "Scoped release statement accepted for v1 completion.\n"
+            "Scoped release statement is complete.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Package shape is release-supported seed.",
+            "The installed headers prove v1 support.",
+            "Route-check acceptance unlocks complete SDK status.",
+            "Route check accepted; public route is ready.",
+            "The command permission route check is accepted for public route readiness.",
+            "Scoped non-complete outcomes are ready.",
+            "Scoped release statement accepted for v1 completion.",
+            "Scoped release statement is complete.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
+    def test_release_statement_allows_negated_route_package_scoped_status_boundaries(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Package shape is not release-supported seed.\n"
+            "The installed headers do not prove v1 support.\n"
+            "Route-check acceptance does not unlock complete SDK status.\n"
+            "Scoped non-complete outcomes are not ready.\n"
+            "Scoped release statement is not complete.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
     def test_release_statement_rejects_without_prefixed_affirmative_claims(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (
@@ -6504,14 +10284,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
-        self.assertIn("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty", payload["blockers"])
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
         self.assertIn(
-            "release_statement_leaf_exclusions_missing",
+            "manifest_excluded_route_missing_leaf_exclusions",
             payload["mission_transfer_dino_tribe_outcome_accounting"]["blockers"],
         )
-        self.assertFalse(payload["mission_transfer_dino_tribe_outcome_accounting"]["v1_accounted"])
+        self.assertTrue(payload["mission_transfer_dino_tribe_outcome_accounting"]["v1_accounted"])
 
     def test_release_statement_rejects_duplicate_or_mixed_surface_records(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
@@ -6976,14 +10754,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_core_first_and_copied_seed_terms_do_not_promote_completion_blocker(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7036,14 +10808,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_player_identity_requires_runtime_privacy_abi_and_sdk_evidence_terms(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7102,14 +10868,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_player_identity_required_terms_do_not_replace_structured_promotion_evidence(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7244,14 +11004,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_bundle_builder_ready_scope_does_not_count_as_promotion_evidence(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7274,6 +11028,206 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertFalse(promoted)
+
+    def test_generated_player_identity_certificate_container_does_not_count_as_own_promotion_evidence(self) -> None:
+        with (
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+            surface = {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {
+                    "schema": completion_checker.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "v1_dependency_chain": list(completion_checker.CANONICAL_V1_DEPENDENCY_SEQUENCE),
+                    "v1_dependency_chain_position": 1,
+                    "required_by_surface": "obelisk.permissions_admin.v1",
+                    "required_by_v1_dependency_chain_position": 2,
+                    "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    "terms": list(
+                        completion_checker.PROMOTION_EVIDENCE_REQUIRED_TERMS[
+                            "obelisk.player_identity.v1"
+                        ]
+                    ),
+                },
+            }
+
+            promoted = surface_has_promotion_evidence(surface)
+            missing = completion_checker.surface_missing_structured_promotion_evidence(surface)
+
+        self.assertFalse(promoted)
+        self.assertEqual(
+            missing,
+            ["generated_promotion_certificate_or_builder_report_not_attached"],
+        )
+
+    def test_player_identity_certificate_builder_report_container_does_not_count_as_own_promotion_evidence(self) -> None:
+        self.assert_promotion_certificate_build_report_does_not_count(
+            schema=completion_checker.PLAYER_IDENTITY_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+            surface_id="obelisk.player_identity.v1",
+            binding_key="player_identity_promotion_certificate",
+            binding_valid_key="identity_surface_certificate_binding_valid",
+        )
+
+    def test_downstream_certificate_builder_reports_do_not_count_as_own_promotion_evidence(self) -> None:
+        cases = (
+            (
+                completion_checker.PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+                "obelisk.permissions_admin.v1",
+                "permissions_admin_promotion_certificate",
+                "permissions_admin_surface_certificate_binding_valid",
+            ),
+            (
+                completion_checker.COMMAND_RESPONSE_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+                "obelisk.command_chat_response_path.v1",
+                "command_response_promotion_certificate",
+                "command_response_surface_certificate_binding_valid",
+            ),
+            (
+                "obelisk.commands-replies-promotion-certificate-generation-report.v1",
+                "obelisk.commands_replies.v1",
+                "commands_replies_promotion_certificate",
+                "commands_replies_surface_certificate_binding_valid",
+            ),
+            (
+                "obelisk.commands-replies-promotion-certificate-report.v1",
+                "obelisk.commands_replies.v1",
+                "commands_replies_promotion_certificate",
+                "commands_replies_surface_certificate_binding_valid",
+            ),
+            (
+                "obelisk.commands_replies_promotion_certificate_report.v1",
+                "obelisk.commands_replies.v1",
+                "commands_replies_promotion_certificate",
+                "commands_replies_surface_certificate_binding_valid",
+            ),
+            (
+                "obelisk.commands-replies-promotion-certificate-metadata-report.v1",
+                "obelisk.commands_replies.v1",
+                "commands_replies_promotion_certificate",
+                "commands_replies_surface_certificate_binding_valid",
+            ),
+        )
+        for schema, surface_id, binding_key, binding_valid_key in cases:
+            with self.subTest(schema=schema):
+                self.assert_promotion_certificate_build_report_does_not_count(
+                    schema=schema,
+                    surface_id=surface_id,
+                    binding_key=binding_key,
+                    binding_valid_key=binding_valid_key,
+                )
+
+    def assert_promotion_certificate_build_report_does_not_count(
+        self,
+        *,
+        schema: str,
+        surface_id: str,
+        binding_key: str,
+        binding_valid_key: str,
+    ) -> None:
+        with (
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+            surface = {
+                "id": surface_id,
+                "status": "promoted",
+                "evidence": {
+                    "schema": schema,
+                    binding_valid_key: True,
+                    binding_key: {
+                        "path": "docs/research/player-identity-promotion-certificate.json",
+                        "sha256": "0" * 64,
+                    },
+                    "counts_toward_v1_completion": True,
+                    "sdk_progress": 1,
+                    "surface_id": surface_id,
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    "terms": list(
+                        completion_checker.PROMOTION_EVIDENCE_REQUIRED_TERMS[surface_id]
+                    ),
+                },
+            }
+
+            promoted = surface_has_promotion_evidence(surface)
+            missing = completion_checker.surface_missing_structured_promotion_evidence(surface)
+
+        self.assertFalse(promoted)
+        self.assertEqual(
+            missing,
+            ["generated_promotion_certificate_or_builder_report_not_attached"],
+        )
+
+    def test_certificate_builder_report_container_without_schema_does_not_count(self) -> None:
+        with (
+            self.repo_test_tempdir("core", "CommandsRepliesPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "commands_replies_promotion") as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "CommandsRepliesPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "commands_replies_promotion_plugin.c"
+            certificate = Path(core_dir) / "commands_replies_promotion_certificate.json"
+            core_test.write_text("// promoted commands replies ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted commands replies SDK placeholder\n", encoding="utf-8")
+            certificate.write_text(
+                json.dumps({"schema": completion_checker.COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA}),
+                encoding="utf-8",
+            )
+            surface = {
+                "id": "obelisk.commands_replies.v1",
+                "status": "promoted",
+                "evidence": {
+                    "surface_id": "obelisk.commands_replies.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "commands_replies_surface_certificate_binding_valid": True,
+                    "commands_replies_promotion_certificate": {
+                        "path": str(certificate.relative_to(REPO_ROOT)),
+                        "sha256": sha256_file(certificate),
+                    },
+                    "certificate_artifact_schema": (
+                        completion_checker.COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA
+                    ),
+                    "certificate_binding": {
+                        "path": str(certificate.relative_to(REPO_ROOT)),
+                        "sha256": sha256_file(certificate),
+                    },
+                    "certificate_written": True,
+                    "certificate_sha256": sha256_file(certificate),
+                    "sdk_progress": 1,
+                    "counts_toward_v1_completion": True,
+                    "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    "terms": list(
+                        completion_checker.PROMOTION_EVIDENCE_REQUIRED_TERMS[
+                            "obelisk.commands_replies.v1"
+                        ]
+                    ),
+                },
+            }
+
+            promoted = surface_has_promotion_evidence(surface)
+            missing = completion_checker.surface_missing_structured_promotion_evidence(surface)
+
+        self.assertFalse(promoted)
+        self.assertEqual(
+            missing,
+            ["generated_promotion_certificate_or_builder_report_not_attached"],
+        )
 
     def test_live_ops_sidecars_do_not_count_as_promotion_evidence(self) -> None:
         base_evidence = {
@@ -7491,6 +11445,270 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             missing = player_identity_structured_promotion_evidence_missing(artifacts)
 
         self.assertIn("approved_runtime_evidence_manifest:sha256_mismatch", missing)
+
+    def test_player_identity_structured_promotion_rejects_passive_snapshot_diagnostic_mismatch_runtime_evidence(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            manifest_binding = dict(artifacts["approved_runtime_evidence_manifest"])
+            manifest_path = REPO_ROOT / str(manifest_binding["path"])
+            runtime_report_path = REPO_ROOT / artifacts["approved_runtime_evidence_report"]
+            passive_snapshot_schema = "obelisk.player-principal-passive-snapshot.v1"
+            diagnostic_module = {
+                "accepted_count": 0,
+                "rejected_count": 0,
+                "observed_event_cases": [],
+                "diagnostic_candidate_count": 17,
+                "diagnostic_candidate_target_counts": {
+                    "GameMode.K2_PostLogin": 3,
+                    "ShooterGameMode.CheckJoinInProgress": 2,
+                    "ShooterGameMode.HandleNewPlayer": 7,
+                    "ShooterGameMode.OnLogout": 5,
+                },
+                "diagnostic_candidate_read_status_counts": {"implausible": 7},
+                "diagnostic_candidate_reason_counts": {
+                    "lifecycle_property_FName_mismatch_expected_28411_observed_28418_21314_22968_28516_17724": 4,
+                    "lifecycle_property_FName_mismatch_expected_28543_observed_28550": 3,
+                },
+                "diagnostic_candidate_lifecycle_property_fname_mismatches": [
+                    {
+                        "count": 4,
+                        "expected_name_index": 28411,
+                        "observed_count": 5,
+                        "observed_name_indices": [28418, 21314, 22968, 28516, 17724],
+                        "reason_counts": {
+                            "lifecycle_property_FName_mismatch_expected_28411_observed_28418_21314_22968_28516_17724": 4,
+                        },
+                        "summary": "expected_28411_observed_28418_21314_22968_28516_17724",
+                    },
+                    {
+                        "count": 3,
+                        "expected_name_index": 28543,
+                        "observed_count": 1,
+                        "observed_name_indices": [28550],
+                        "reason_counts": {
+                            "lifecycle_property_FName_mismatch_expected_28543_observed_28550": 3,
+                        },
+                        "summary": "expected_28543_observed_28550",
+                    },
+                ],
+                "diagnostic_log_budget_reached": True,
+                "diagnostic_log_limits": [10],
+                "diagnostic_only_non_evidence": True,
+                "functions": {
+                    "observer_gate": {
+                        "accepted": 0,
+                        "details": {
+                            "dispatch_limit": [0],
+                            "limit": [10],
+                            "principal_claim": ["none"],
+                            "target_set": ["players-lifecycle-anchor-candidates"],
+                        },
+                        "metadata_only": 0,
+                    },
+                },
+            }
+            passive_snapshot = {
+                "schema": passive_snapshot_schema,
+                "all_logs_copied": True,
+                "approved_runtime_evidence": False,
+                "captured_at_utc": "2026-06-04T08:51:19Z",
+                "evidence_classification": "passive_snapshot_non_evidence",
+                "source_kind": "passive_snapshot",
+                "ready_scope": "passive_snapshot_only",
+                "readiness_gate": "none",
+                "ready": False,
+                "accepted_lifecycle_event_count": 0,
+                "accepted_lifecycle_events": [],
+                "target_count": 2,
+                "targets": [
+                    {
+                        "instance": "arkserver",
+                        "map": "Ragnarok",
+                        "ready": False,
+                        "approved_runtime_evidence": False,
+                        "evidence_classification": "passive_snapshot_non_evidence",
+                        "counts": {
+                            "accepted": 0,
+                            "rejected": 0,
+                            "diagnostic_candidates": 17,
+                        },
+                        "analyzer": {
+                            "summary": {
+                                "schema": "obelisk.runtime-observer-log-summary.v1",
+                                "readiness_gate": "none",
+                                "review_scope": "runtime_observer_evidence_summary",
+                                "modules": {
+                                    "player_principal_lifecycle": diagnostic_module,
+                                },
+                            },
+                        },
+                    },
+                    {
+                        "instance": "arkserver2",
+                        "map": "TheIsland",
+                        "ready": False,
+                        "approved_runtime_evidence": False,
+                        "evidence_classification": "passive_snapshot_non_evidence",
+                        "counts": {
+                            "accepted": 0,
+                            "rejected": 0,
+                            "diagnostic_candidates": 0,
+                        },
+                    },
+                ],
+            }
+            data = json.dumps(passive_snapshot, sort_keys=True).encode("utf-8")
+            manifest_path.write_bytes(data)
+            artifacts["approved_runtime_evidence_manifest"] = {
+                "path": str(manifest_path.relative_to(REPO_ROOT)),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+            runtime_report_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "input_schema": passive_snapshot_schema,
+                        "ready_scope": "runtime_evidence_only",
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                        "source_summary": {
+                            "modules": {
+                                "player_principal_lifecycle": diagnostic_module,
+                            },
+                        },
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+            manifest_reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                passive_snapshot,
+                "approved_runtime_evidence_manifest",
+            )
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn(
+            "approved_runtime_evidence_manifest:passive_snapshot_not_approved_runtime_evidence",
+            manifest_reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_manifest:diagnostic_only_mismatch_summary_not_approved_runtime_evidence",
+            manifest_reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_manifest:passive_snapshot_not_approved_runtime_evidence",
+            missing,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_manifest:diagnostic_only_mismatch_summary_not_approved_runtime_evidence",
+            missing,
+        )
+        self.assertIn("approved_runtime_evidence_manifest:validation_failed", missing)
+        self.assertIn(
+            "approved_runtime_evidence_report:passive_snapshot_not_approved_runtime_evidence",
+            missing,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:diagnostic_only_mismatch_summary_not_approved_runtime_evidence",
+            missing,
+        )
+
+    def test_latest_passive_summary_is_not_approved_runtime_evidence(self) -> None:
+        latest_summary = {
+            "schema": "obelisk.player-principal-passive-snapshot-latest.v1",
+            "classification": "passive_snapshot_non_evidence",
+            "source_kind": "passive_snapshot_latest",
+            "ready_scope": "passive_latest_summary_only",
+            "approved_runtime_evidence": False,
+            "ready": False,
+            "latest": {
+                "schema": "obelisk.player-principal-passive-snapshot.v1",
+                "approved_runtime_evidence": False,
+                "ready": False,
+            },
+        }
+
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            latest_summary,
+            "approved_runtime_evidence_report",
+        )
+
+        self.assertIn(
+            "approved_runtime_evidence_report:passive_latest_summary_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:passive_snapshot_not_approved_runtime_evidence",
+            reasons,
+        )
+
+    def test_passive_activity_triage_is_not_approved_runtime_evidence(self) -> None:
+        triage = {
+            "schema": "obelisk.player-principal-passive-activity-triage.v1",
+            "classification": "passive_activity_triage_non_evidence",
+            "source_kind": "passive_activity_triage",
+            "ready_scope": "passive_activity_triage_only",
+            "approved_runtime_evidence": False,
+            "ready": False,
+            "new_presence_targets": ["arkserver2:TheIsland:7777"],
+            "diagnostic_targets": ["arkserver:Ragnarok:7777"],
+            "non_claim": (
+                "passive activity triage fields remain non-evidence diagnostic pointers only"
+            ),
+        }
+
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            triage,
+            "approved_runtime_evidence_report",
+        )
+
+        self.assertIn(
+            "approved_runtime_evidence_report:passive_activity_triage_not_approved_runtime_evidence",
+            reasons,
+        )
+
+    def test_player_identity_structured_promotion_rejects_diagnostic_budget_metadata_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            runtime_report_path = REPO_ROOT / artifacts["approved_runtime_evidence_report"]
+            runtime_report = json.loads(runtime_report_path.read_text(encoding="utf-8"))
+            runtime_report["source_summary"] = {
+                "modules": {
+                    "player_principal_lifecycle": {
+                        "accepted_count": 0,
+                        "rejected_count": 0,
+                        "diagnostic_candidate_count": 17,
+                        "diagnostic_log_budget_reached": True,
+                        "diagnostic_log_limits": [10],
+                        "diagnostic_only_non_evidence": True,
+                        "diagnostic_budget_pressure": {
+                            "captured_at_utc": "2026-06-04T08:51:19Z",
+                            "evidence_classification": "passive_snapshot_non_evidence",
+                            "notes": [
+                                "public SDK remains blocked; diagnostic budget pressure is non-evidence",
+                            ],
+                            "stable_claim_allowed": True,
+                        },
+                    },
+                },
+            }
+            runtime_report_path.write_text(json.dumps(runtime_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn(
+            "approved_runtime_evidence_report:public_or_runtime_claim_without_blocker",
+            missing,
+        )
+        self.assertIn(
+            "approved_runtime_evidence_report:completion_claim_without_blocker",
+            missing,
+        )
 
     def test_identity_structured_contract_report_rejects_public_surface_openings(self) -> None:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
@@ -7804,14 +12022,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_static_orientation_schema_does_not_promote_completion_blocker(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7858,14 +12070,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_lifecycle_anchor_and_principal_policy_schemas_do_not_promote_player_identity(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7922,14 +12128,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_lifecycle_anchor_report_alone_does_not_promote_player_identity(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
         ):
             core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
             sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
@@ -7995,14 +12195,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_principal_invalidation_policy_schema_does_not_promote_permissions_readiness(self) -> None:
         with (
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "core",
-                prefix="PlayerIdentityPromotion",
-            ) as identity_core_dir,
-            tempfile.TemporaryDirectory(
-                dir=REPO_ROOT / "tests" / "sdk_consumer",
-                prefix="player_identity_promotion",
-            ) as identity_sdk_dir,
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as identity_core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as identity_sdk_dir,
             tempfile.TemporaryDirectory(
                 dir=REPO_ROOT / "tests" / "core",
                 prefix="PermissionsAdminPromotion",
@@ -8141,13 +12335,90 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             cases = (
                 ("evidence_scope", "request_pack_only"),
                 ("claim_scope", "preflight-only"),
+                ("ready_scope", "accepted_artifact_class"),
+                ("readiness_scope", "accepted-artifact-class-report-only"),
+                ("ready_scope", "binding_required"),
+                ("readiness_scope", "binding-required-report-only"),
                 ("artifactScope", "window_manifest_only"),
+                ("artifactScope", "helper-only"),
+                ("ready_scope", "diagnostic_only"),
                 ("validation_scope", "operator-approval-receipt-only"),
                 ("source_scope", "runtime-replay-fixture-only"),
                 ("ready_scope", "post-window-replay"),
+                ("ready_scope", "observer_event_triage_only"),
+                ("readiness_scope", "observer-event-triage-non-evidence"),
+                ("readyScope", "passiveSnapshotOnly"),
+                ("ready_scope", "passive_snapshot_latest_only"),
+                ("readiness_scope", "passive-latest-summary-only"),
+                ("ready_scope", "passive_activity_triage_only"),
+                ("ready_scope", "package_shape_only"),
+                ("readiness_scope", "package-shape-evidence-only"),
+                ("ready_scope", "installed_sdk_only"),
+                ("readiness_scope", "installed-sdk-package-shape-only"),
+                ("source_scope", "install-evidence-only"),
+                ("ready_scope", "route_planning_only"),
+                ("readiness_scope", "command-chat-response-route-planning-only"),
+                ("ready_scope", "planning-route-only"),
+                ("readiness_scope", "planning-route-report-only"),
+                ("ready_scope", "scoped_non_complete"),
+                ("readiness_scope", "scoped-non-complete-only"),
+                ("ready_scope", "contract_review_input_only"),
+                ("readiness_scope", "contract-review-only"),
+                ("ready_scope", "player_notice_action"),
+                ("readiness_scope", "notice-dry-run-only"),
+                ("ready_scope", "transfer_scriptstruct_readiness"),
+                ("readiness_scope", "transfer-script-struct-readiness-only"),
+                ("ready_scope", "transfer-baccept-readiness"),
+                ("readiness_scope", "buff-status-readiness-only"),
+                ("ready_scope", "tribe-scalar-boundary-readiness"),
+                ("readiness_scope", "scalar-boundary-readiness-only"),
+                ("ready_scope", "post-evidence-p0-lock-simulation"),
+                ("readiness_scope", "route-gate-post-evidence-p0-lock-simulation-only"),
+                ("ready_scope", "public_reachability"),
+                ("readiness_scope", "public-reachability-only"),
+                ("ready_scope", "approved_bundle_request"),
+                ("readiness_scope", "approved-runtime-bundle-request-only"),
+                ("ready_scope", "route_bound_identity_source_forwarding"),
+                ("readiness_scope", "identity-source-forwarding-only"),
             )
             for key, value in cases:
                 with self.subTest(scope_key=key):
+                    surface = json.loads(json.dumps(base_surface))
+                    surface["evidence"][key] = value
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+
+            for key in (
+                "candidate_only",
+                "planning_only",
+                "accepted_for_internal_planning",
+                "accepted_for_offline_planning",
+                "accepted_for_contract_review",
+                "accepted_for_runtime_evidence_preconditions",
+                "accepted_runtime_evidence_preconditions",
+                "accepted_artifact_class_ready",
+                "binding_required_ready",
+                "player_notice_action_required",
+                "notice_dry_run_accepted",
+                "notice_sent",
+                "transfer_scriptstruct_ready",
+                "buff_status_candidate_ready",
+                "tribe_scalar_boundary_ready",
+                "post_evidence_p0_lock_simulation",
+                "public_reachability_ready",
+                "approved_bundle_request_ready",
+                "route_bound_identity_source_forwarding_ready",
+                "simulation_only",
+            ):
+                with self.subTest(non_promotional_flag=key):
+                    surface = json.loads(json.dumps(base_surface))
+                    surface["evidence"][key] = True
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+
+            for key, value in (
+                ("approved_evidence_claim", "none"),
+                ("approvedRuntimeEvidenceClaim", False),
+            ):
+                with self.subTest(no_approved_evidence_claim=key):
                     surface = json.loads(json.dumps(base_surface))
                     surface["evidence"][key] = value
                     self.assertFalse(surface_has_promotion_evidence(surface))
@@ -8186,20 +12457,374 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ("sourceKind", "approvedRuntime"),
                 ("sourceKind", "approved-runtime"),
                 ("sourceKind", "approved_runtime_principal_lifecycle_evidence"),
+                ("sourceKind", "acceptedRuntimeEvidencePreconditions"),
+                ("sourceKind", "acceptedArtifactClass"),
+                ("schema", "obelisk.accepted-artifact-class.v1"),
+                ("sourceKind", "bindingRequired"),
+                ("schema", "obelisk.binding-required.v1"),
                 ("sourceKind", "runtime_lifecycle_evidence"),
+                ("sourceKind", "observerEventTriage"),
+                ("evidenceKind", "observer_event_triage_non_evidence"),
+                ("sourceKind", "passiveSnapshot"),
+                ("sourceKind", "passiveSnapshotLatest"),
+                ("sourceKind", "passiveActivityTriage"),
+                ("evidenceKind", "latest_summary"),
+                ("evidenceKind", "passive_activity_triage_non_evidence"),
+                ("sourceKind", "diagnosticOnlyLifecycle"),
+                ("sourceKind", "helperArtifact"),
                 ("evidenceKind", "identityContract"),
                 ("evidenceKind", "identity-contract"),
                 ("evidenceKind", "identity_public_contract_gate_missing"),
+                ("evidenceKind", "contractReviewInput"),
+                ("sourceKind", "contractReviewOnly"),
+                ("sourceKind", "playerNoticeAction"),
+                ("evidenceKind", "notice-dry-run"),
+                ("schema", "obelisk.player-notice-action.v1"),
+                ("sourceKind", "scopedNonComplete"),
+                ("sourceKind", "scoped-non-complete-only"),
                 ("sourceTargetSets", ["preflight"]),
                 ("evidenceKinds", ["live_ops_sidecar"]),
                 ("evidenceKinds", ["approved-runtime-evidence"]),
+                ("evidenceKinds", ["accepted-runtime-evidence-preconditions"]),
+                ("evidenceKinds", ["request-helper-artifact"]),
+                ("schemas", ["obelisk.player-principal-passive-snapshot.v1"]),
+                ("schemas", ["obelisk.player-principal-passive-snapshot-latest.v1"]),
+                ("schema", "obelisk.player-principal-passive-snapshot-diff.v1"),
+                ("schema", "obelisk.player-principal-passive-activity-triage.v1"),
+                ("schema", "obelisk.observer-event-triage.v1"),
+                ("classification", "passive_activity_triage_non_evidence"),
+                ("classification", "observerEventTriageNonEvidence"),
+                ("evidenceClassification", "passiveActivityTriageNonEvidence"),
+                ("schemas", ["obelisk.player-principal-diagnostic-lifecycle.v1"]),
+                ("schema", "obelisk.player-identity-helper-artifact.v1"),
+                ("schema", "obelisk.installed-sdk-package-shape.v1"),
+                ("schemas", ["obelisk.scoped-non-complete-v1-release-statement.v1"]),
+                ("schema", "obelisk.contract-review-only.v1"),
+                ("schema", "obelisk.scoped-non-complete.v1"),
                 ("sourceKinds", [{"kind": "identity-contract"}]),
+                ("sourceKind", "transferScriptStructReadiness"),
+                ("evidenceKind", "transfer-baccept-readiness"),
+                ("schema", "obelisk.transfer-scriptstruct-readiness-check.v1"),
+                ("schema", "obelisk.transfer-baccept-readiness-check.v1"),
+                ("sourceKind", "dinoScalarReadiness"),
+                ("evidenceKind", "dino-scalar-readiness"),
+                ("schema", "obelisk.dino-scalar-readiness-check.v1"),
+                ("sourceKind", "buffStatusReadiness"),
+                ("schema", "obelisk.buff-status-readiness-check.v1"),
+                ("sourceKind", "tribeScalarBoundaryReadiness"),
+                ("schema", "obelisk.tribe-scalar-boundary-readiness-check.v1"),
+                ("sourceKind", "postEvidenceP0LockSimulation"),
+                (
+                    "schema",
+                    "obelisk.command-permission-route-post-evidence-p0-lock-simulation.v1",
+                ),
+                ("sourceKind", "publicReachability"),
+                ("schema", "obelisk.player-principal-public-reachability-check.v1"),
+                ("sourceKind", "approvedBundleRequest"),
+                ("schema", "obelisk.player-identity-approved-bundle-request.v1"),
+                ("sourceKind", "routeBoundIdentitySourceForwarding"),
+                (
+                    "schema",
+                    "obelisk.command-permission-route-bound-identity-source-forwarding.v1",
+                ),
             )
             for key, value in cases:
                 with self.subTest(marker_key=key):
                     surface = json.loads(json.dumps(base_surface))
                     surface["evidence"][key] = value
                     self.assertFalse(surface_has_promotion_evidence(surface))
+
+    def test_non_promotional_artifact_references_do_not_promote_blockers(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+            base_surface = {
+                "id": "obelisk.structure_census.v1",
+                "status": "promoted",
+                "public_contract": ["ObeliskApi.RegisterStructureCensusCallback"],
+                "evidence": {
+                    "surface_id": "obelisk.structure_census.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                },
+            }
+            self.assertTrue(surface_has_promotion_evidence(base_surface))
+
+            cases = (
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/player-principal-passive-snapshot-latest.json",
+                        }
+                    ],
+                },
+                {
+                    "readiness_artifact": {
+                        "path": "docs/research/player-principal-passive-snapshot-diff.json",
+                    },
+                },
+                {
+                    "passive_activity_triage": {
+                        "schema": "obelisk.player-principal-passive-activity-triage.v1",
+                        "classification": "passive_activity_triage_non_evidence",
+                    },
+                },
+                {
+                    "observer_event_triage": {
+                        "schema": "obelisk.observer-event-triage.v1",
+                        "classification": "observer_event_triage_non_evidence",
+                    },
+                },
+                {
+                    "player_notice_action": {
+                        "schema": "obelisk.player-notice-action.v1",
+                        "status": "sent",
+                        "dry_run_status": "dry_run_accepted",
+                    },
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/player-notice-action-dry-run.json",
+                        }
+                    ],
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/runtime-window-executor-closure-report.json",
+                        }
+                    ],
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/confirmed-notice-report.json",
+                        }
+                    ],
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/accepted-artifact-class-report.json",
+                        }
+                    ],
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/binding-required-report.json",
+                        }
+                    ],
+                },
+                {
+                    "evidence_closure_report": {
+                        "status": "closed",
+                        "ready": True,
+                        "closureComplete": True,
+                    },
+                },
+                {
+                    "diagnostic_summary_path": (
+                        "docs/research/player-principal-diagnostic-only-runtime-summary.json"
+                    ),
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "release/v1/public-sdk/installed-sdk-package-shape.json",
+                        }
+                    ],
+                },
+                {
+                    "installed_sdk_package_shape": {
+                        "status": "package-shape-evidence-only",
+                    },
+                },
+                {
+                    "installEvidence": {
+                        "component": "SDK",
+                        "claim": "package shape reviewed",
+                    },
+                },
+                {
+                    "route_planning_artifact": {
+                        "output_name": "command-chat-response-route-planning-readiness.json",
+                    },
+                },
+                {
+                    "planningRouteReport": {
+                        "target": "command response route map",
+                        "result": "planning accepted",
+                    },
+                },
+                {
+                    "producer": {
+                        "script": "scripts/compare_reflection_snapshots.py",
+                        "argv": [
+                            "--target-set",
+                            "command-chat-response-route-planning",
+                        ],
+                    },
+                },
+                {
+                    "nested_report": {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "planning_only": True,
+                        "target_set": "command-chat-response-route-planning",
+                    },
+                },
+                {
+                    "source_artifacts": [
+                        {
+                            "path": "docs/research/transfer-scriptstruct-readiness.json",
+                        }
+                    ],
+                },
+                {
+                    "transfer_readiness_report": {
+                        "schema": "obelisk.transfer-baccept-readiness-check.v1",
+                        "accepted_for_internal_planning": True,
+                    },
+                },
+                {
+                    "dino_scalar_readiness": {
+                        "schema": "obelisk.dino-scalar-readiness-check.v1",
+                        "scalar_only_ready": True,
+                    },
+                },
+                {
+                    "buff_status_readiness": {
+                        "schema": "obelisk.buff-status-readiness-check.v1",
+                        "buff_status_candidate_ready": True,
+                    },
+                },
+                {
+                    "buff_status_source_bindings": {
+                        "source_manifest": {
+                            "schema": "obelisk.ufunction-snapshot-manifest.v1",
+                            "source": "offline_core",
+                            "status": "candidate-only",
+                            "bound_target_count": 6,
+                        },
+                        "summary": {
+                            "source_binding_count": 6,
+                            "source_bindings": [
+                                {
+                                    "manifest_module": "sdk_buffs",
+                                    "fixture_path": "7e7ded49e0c6/sdk_buffs/buff.json",
+                                    "evidence_source": "offline_core",
+                                    "evidence_status": "candidate-only",
+                                    "artifact_kind": "offline_core",
+                                }
+                            ],
+                        },
+                    },
+                },
+                {
+                    "current_evidence": ["tribe-scalar-boundary-readiness"],
+                },
+                {
+                    "post_evidence_p0_lock_simulation": {
+                        "schema": (
+                            "obelisk.command-permission-route-post-evidence-p0-lock-simulation.v1"
+                        ),
+                        "simulation_only": True,
+                        "counts_toward_complete_sdk_claim": False,
+                        "complete_sdk_claim_progress_contribution": 0,
+                    },
+                },
+            )
+            for extra_evidence in cases:
+                with self.subTest(extra_evidence=extra_evidence):
+                    surface = json.loads(json.dumps(base_surface))
+                    surface["evidence"].update(extra_evidence)
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+
+    def test_passive_snapshot_and_scoped_statement_paths_do_not_promote_blockers(self) -> None:
+        cases = (
+            (
+                "passive_snapshot",
+                "StructureCensusPassiveSnapshotTests.cpp",
+                "structure_census_passive_snapshot_plugin.c",
+            ),
+            (
+                "passive_activity_triage",
+                "StructureCensusPassiveActivityTriageTests.cpp",
+                "structure_census_passive_activity_triage_plugin.c",
+            ),
+            (
+                "passive_latest_summary",
+                "StructureCensusLatestSummaryTests.cpp",
+                "structure_census_latest_summary_plugin.c",
+            ),
+            (
+                "scoped_non_complete",
+                "StructureCensusScopedNonCompleteTests.cpp",
+                "structure_census_scoped_non_complete_plugin.c",
+            ),
+            (
+                "contract_review_input",
+                "StructureCensusContractReviewInputTests.cpp",
+                "structure_census_contract_review_input_plugin.c",
+            ),
+            (
+                "helper",
+                "StructureCensusHelperTests.cpp",
+                "structure_census_helper_plugin.c",
+            ),
+            (
+                "diagnostic",
+                "StructureCensusDiagnosticLifecycleTests.cpp",
+                "structure_census_diagnostic_lifecycle_plugin.c",
+            ),
+        )
+        for case_name, abi_filename, sdk_filename in cases:
+            with self.subTest(case=case_name):
+                with (
+                    tempfile.TemporaryDirectory(
+                        dir=REPO_ROOT / "tests" / "core",
+                        prefix="StructureCensusPromotion",
+                    ) as core_dir,
+                    tempfile.TemporaryDirectory(
+                        dir=REPO_ROOT / "tests" / "sdk_consumer",
+                        prefix="structure_census_promotion",
+                    ) as sdk_dir,
+                ):
+                    abi_test = Path(core_dir) / abi_filename
+                    sdk_test = Path(sdk_dir) / sdk_filename
+                    abi_test.write_text("// non-promotional artifact marker fixture\n", encoding="utf-8")
+                    sdk_test.write_text("// non-promotional artifact marker fixture\n", encoding="utf-8")
+
+                    promoted = surface_has_promotion_evidence(
+                        {
+                            "id": "obelisk.structure_census.v1",
+                            "status": "promoted",
+                            "public_contract": ["ObeliskApi.RegisterStructureCensusCallback"],
+                            "evidence": {
+                                "surface_id": "obelisk.structure_census.v1",
+                                "promotion_status": "promoted",
+                                "public_sdk_ready": True,
+                                "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                                "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                            },
+                        }
+                    )
+
+                self.assertFalse(promoted)
 
     def test_promoted_completion_blocker_rejects_core_test_as_sdk_consumer_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()
@@ -8223,6 +12848,66 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
+
+    def test_installed_sdk_consumer_success_does_not_promote_completion_blocker(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_installed_consumer",
+                prefix="StructureCensusInstalledConsumer",
+            ) as installed_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            installed_consumer_test = (
+                Path(installed_dir) / "StructureCensusInstalledConsumerPlugin.cpp"
+            )
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            installed_consumer_test.write_text(
+                "// installed consumer success is package-shape evidence only\n",
+                encoding="utf-8",
+            )
+
+            manifest, _ = complete_excluded_manifest()
+            target_surface = next(
+                surface
+                for surface in manifest["surfaces"]
+                if surface["id"] == "obelisk.structure_census.v1"
+            )
+            target_surface["status"] = "promoted"
+            target_surface["public_contract"] = ["ObeliskApi.RegisterStructureCensusCallback"]
+            target_surface["evidence"] = {
+                "surface_id": "obelisk.structure_census.v1",
+                "promotion_status": "promoted",
+                "public_sdk_ready": True,
+                "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                "sdk_consumer_tests": [str(installed_consumer_test.relative_to(REPO_ROOT))],
+                "installed_sdk_consumer_tests": [
+                    str(installed_consumer_test.relative_to(REPO_ROOT))
+                ],
+            }
+            manifest["promoted_surfaces"].append("obelisk.structure_census.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.structure_census.v1"
+            ]
+
+            self.assertFalse(surface_has_promotion_evidence(target_surface))
+
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertFalse(payload["stable_claim_allowed"])
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
 
@@ -9828,6 +14513,159 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("route_gate_blocker:identity_public_contract_gate_missing", row["non_counting_reasons"])
         self.assertFalse(row["counts_toward_complete_sdk_claim"])
 
+    def test_bare_accepted_runtime_bundle_alias_without_real_report_does_not_advance_route(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        route_gate = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "stable_claim_allowed": True,
+            "approved_runtime_evidence": {
+                "approved_runtime_evidence_accepted": True,
+                "evidence_bundle_accepted": True,
+                "approved_runtime_evidence_ready": True,
+                "approved_runtime_evidence_present": True,
+            },
+            "blockers": [],
+        }
+
+        self.assertFalse(
+            module.accepted_approved_runtime_principal_lifecycle_bundle_aliases(route_gate)
+        )
+        current_blocker = module.command_permission_route_gate_current_blocker(route_gate)
+        remaining_blockers = module.command_permission_route_gate_remaining_route_blockers(
+            route_gate
+        )
+        self.assertIsNone(current_blocker)
+        self.assertEqual(remaining_blockers, [])
+
+        original_surface_has_promotion_evidence = module.surface_has_promotion_evidence
+        original_missing_required = module.surface_missing_required_promotion_evidence
+        original_missing_structured = module.surface_missing_structured_promotion_evidence
+        try:
+            module.surface_has_promotion_evidence = lambda surface: True
+            module.surface_missing_required_promotion_evidence = lambda surface: []
+            module.surface_missing_structured_promotion_evidence = (
+                lambda surface, manifest_path=PUBLIC_SDK_SURFACES, public_header_path=PUBLIC_HEADER: []
+            )
+
+            row = module.completion_blocker_outcome_rows(
+                ["obelisk.player_identity.v1"],
+                {
+                    "obelisk.player_identity.v1": {
+                        "id": "obelisk.player_identity.v1",
+                        "status": "promoted",
+                        "evidence": {},
+                    }
+                },
+                set(),
+                "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.\n",
+                route_gate,
+            )[0]
+        finally:
+            module.surface_has_promotion_evidence = original_surface_has_promotion_evidence
+            module.surface_missing_required_promotion_evidence = original_missing_required
+            module.surface_missing_structured_promotion_evidence = original_missing_structured
+
+        self.assertIsNone(row["route_gate_current_blocker"])
+        self.assertFalse(row["route_gate_claim_satisfied"])
+        self.assertIsNone(row["route_gate_non_counting_blocker"])
+        self.assertNotIn("route_gate_blocker:identity_public_contract_gate_missing", row["non_counting_reasons"])
+        self.assertFalse(row["counts_toward_complete_sdk_claim"])
+
+        fastest = module.fastest_next_sdk_unblock(
+            current_route_blocker=current_blocker,
+            remaining_route_blockers=remaining_blockers,
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": ["obelisk.player_identity.v1"],
+            },
+        )
+        self.assertEqual(fastest["unblock_kind"], "p0_dependency_chain_promotion")
+        self.assertEqual(
+            fastest["required_artifacts"],
+            ["promoted_surface_evidence_and_matching_sdk_consumer_tests"],
+        )
+        self.assertFalse(fastest["promotion_ready"])
+        self.assertFalse(fastest["public_sdk_ready"])
+        self.assertFalse(fastest["runtime_ready"])
+        self.assertFalse(fastest["stable_claim_allowed"])
+        self.assertFalse(fastest["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(fastest["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(fastest["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(fastest["p0_dependency_chain_claim_progress_contribution"], 0)
+
+    def test_canonical_approved_runtime_report_advances_only_to_identity_contract_gate(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        route_gate = {
+            "approved_runtime_evidence": {
+                "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                "input_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                "ready_scope": "runtime_evidence_only",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_header_allowed": False,
+                "public_abi_ready": False,
+                "public_sdk_ready": False,
+                "v1_completion_ready": False,
+                "runtime_ready": False,
+                "stable_claim_allowed": False,
+                "complete_sdk_allowed": False,
+                "complete_sdk_ready": False,
+                "next_blocker": "identity_public_contract_gate_missing",
+            },
+            "blockers": [],
+        }
+
+        self.assertTrue(
+            module.accepted_approved_runtime_principal_lifecycle_bundle_aliases(route_gate)
+        )
+        current_blocker = module.command_permission_route_gate_current_blocker(route_gate)
+        remaining_blockers = module.command_permission_route_gate_remaining_route_blockers(
+            route_gate
+        )
+        self.assertEqual(current_blocker, "identity_public_contract_gate_missing")
+        self.assertEqual(remaining_blockers, ["identity_public_contract_gate_missing"])
+
+        fastest = module.fastest_next_sdk_unblock(
+            current_route_blocker=current_blocker,
+            remaining_route_blockers=remaining_blockers,
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": ["obelisk.player_identity.v1"],
+            },
+        )
+        self.assertEqual(fastest["unblock_kind"], "reviewed_identity_public_contract")
+        self.assertEqual(
+            fastest["required_artifacts"],
+            ["reviewed_player_identity_public_contract_decision"],
+        )
+        self.assertEqual(
+            fastest["current_route_blocker"],
+            "identity_public_contract_gate_missing",
+        )
+        self.assertFalse(fastest["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(fastest["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertEqual(fastest["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(fastest["p0_dependency_chain_claim_progress_contribution"], 0)
+
     def test_route_gate_summary_aliases_do_not_count_as_public_identity_contract(self) -> None:
         import importlib.util
 
@@ -10091,6 +14929,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "command_response_permissions_admin_executed_test_report:missing",
                 "command_response_public_readiness_report:missing",
                 "command_response_executed_test_report:missing",
+                "commands_replies_promotion_certificate:missing",
                 "public_readiness_report:missing",
                 "executed_test_report:missing",
             ],
@@ -10546,6 +15385,609 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertIn("command_response_promotion_certificate:surface_record_sha256_mismatch", missing)
 
+    def test_commands_replies_terminal_certificate_must_match_active_surface(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesTerminalCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surface: dict[str, object] | None = None
+            for candidate in manifest["surfaces"]:
+                if isinstance(candidate, dict) and candidate.get("id") == "obelisk.commands_replies.v1":
+                    candidate["status"] = "promoted"
+                    candidate["evidence"] = {"source_marker": "reviewed"}
+                    surface = candidate
+                    break
+            self.assertIsNotNone(surface)
+            assert surface is not None
+            command_response_binding = self.attach_current_command_response_certificate(
+                module,
+                root,
+                manifest,
+            )
+            reviewed_hash = module.surface_record_sha256_for_certificate(
+                surface,
+                "commands_replies_promotion_certificate",
+            )
+            certificate = self.write_commands_replies_promotion_certificate(
+                root / "commands_replies_promotion_certificate.json",
+                {
+                    "reviewed_artifact_hash": reviewed_hash,
+                    "reviewed_surface_record_sha256": reviewed_hash,
+                },
+                input_bindings={
+                    "command_response_promotion_certificate": command_response_binding,
+                },
+            )
+            assert isinstance(surface["evidence"], dict)
+            surface["evidence"]["commands_replies_promotion_certificate"] = certificate
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.commands_replies_promotion_certificate_missing(
+                    {"commands_replies_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+            surface["evidence"]["source_marker"] = "mutated"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                stale_missing = module.commands_replies_promotion_certificate_missing(
+                    {"commands_replies_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+
+        self.assertEqual(missing, [])
+        self.assertIn(
+            "commands_replies_promotion_certificate:reviewed_surface_record_sha256_mismatch",
+            stale_missing,
+        )
+        self.assertIn(
+            "commands_replies_promotion_certificate:reviewed_artifact_hash_mismatch",
+            stale_missing,
+        )
+
+    def test_commands_replies_terminal_certificate_rejects_blocked_non_authorizing_certificate(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesTerminalCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surface: dict[str, object] | None = None
+            for candidate in manifest["surfaces"]:
+                if isinstance(candidate, dict) and candidate.get("id") == "obelisk.commands_replies.v1":
+                    candidate["status"] = "promoted"
+                    candidate["evidence"] = {"source_marker": "reviewed"}
+                    surface = candidate
+                    break
+            self.assertIsNotNone(surface)
+            assert surface is not None
+            command_response_binding = self.attach_current_command_response_certificate(
+                module,
+                root,
+                manifest,
+            )
+            reviewed_hash = module.surface_record_sha256_for_certificate(
+                surface,
+                "commands_replies_promotion_certificate",
+            )
+            certificate = self.write_commands_replies_promotion_certificate(
+                root / "commands_replies_promotion_certificate.json",
+                {
+                    "reviewed_artifact_hash": reviewed_hash,
+                    "reviewed_surface_record_sha256": reviewed_hash,
+                },
+                certificate_status="built",
+                planning_only=True,
+                non_authorizing=True,
+                promotion_status="blocked_copied_command_payload_public_abi_contract",
+                input_bindings={
+                    "command_response_promotion_certificate": command_response_binding,
+                },
+            )
+            assert isinstance(surface["evidence"], dict)
+            surface["evidence"]["commands_replies_promotion_certificate"] = certificate
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.commands_replies_promotion_certificate_missing(
+                    {"commands_replies_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn("commands_replies_promotion_certificate:fields_invalid", missing)
+        self.assertIn(
+            "commands_replies_promotion_certificate:non_authorizing_or_blocked_certificate",
+            missing,
+        )
+
+    def test_commands_replies_terminal_certificate_requires_current_command_response_binding(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesTerminalCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surface: dict[str, object] | None = None
+            for candidate in manifest["surfaces"]:
+                if isinstance(candidate, dict) and candidate.get("id") == "obelisk.commands_replies.v1":
+                    candidate["status"] = "promoted"
+                    candidate["evidence"] = {"source_marker": "reviewed"}
+                    surface = candidate
+                    break
+            self.assertIsNotNone(surface)
+            assert surface is not None
+            reviewed_hash = module.surface_record_sha256_for_certificate(
+                surface,
+                "commands_replies_promotion_certificate",
+            )
+            certificate = self.write_commands_replies_promotion_certificate(
+                root / "commands_replies_promotion_certificate.json",
+                {
+                    "reviewed_artifact_hash": reviewed_hash,
+                    "reviewed_surface_record_sha256": reviewed_hash,
+                },
+            )
+            assert isinstance(surface["evidence"], dict)
+            surface["evidence"]["commands_replies_promotion_certificate"] = certificate
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            missing = module.commands_replies_promotion_certificate_missing(
+                {"commands_replies_promotion_certificate": certificate},
+                manifest_path,
+            )
+
+        self.assertIn(
+            (
+                "commands_replies_promotion_certificate:current_"
+                "command_response_promotion_certificate:current_surface_record_missing_or_unpromoted"
+            ),
+            missing,
+        )
+
+    def test_commands_replies_terminal_certificate_rejects_stale_command_response_binding(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesTerminalCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surface: dict[str, object] | None = None
+            for candidate in manifest["surfaces"]:
+                if isinstance(candidate, dict) and candidate.get("id") == "obelisk.commands_replies.v1":
+                    candidate["status"] = "promoted"
+                    candidate["evidence"] = {"source_marker": "reviewed"}
+                    surface = candidate
+                    break
+            self.assertIsNotNone(surface)
+            assert surface is not None
+            command_response_binding = self.attach_current_command_response_certificate(
+                module,
+                root,
+                manifest,
+            )
+            stale_command_response_binding = {
+                "path": command_response_binding["path"],
+                "sha256": "0" * 64,
+            }
+            reviewed_hash = module.surface_record_sha256_for_certificate(
+                surface,
+                "commands_replies_promotion_certificate",
+            )
+            certificate = self.write_commands_replies_promotion_certificate(
+                root / "commands_replies_promotion_certificate.json",
+                {
+                    "reviewed_artifact_hash": reviewed_hash,
+                    "reviewed_surface_record_sha256": reviewed_hash,
+                },
+                input_bindings={
+                    "command_response_promotion_certificate": stale_command_response_binding,
+                },
+            )
+            assert isinstance(surface["evidence"], dict)
+            surface["evidence"]["commands_replies_promotion_certificate"] = certificate
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.commands_replies_promotion_certificate_missing(
+                    {"commands_replies_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn(
+            (
+                "commands_replies_promotion_certificate:"
+                "current_command_response_promotion_certificate_binding_missing_or_mismatch"
+            ),
+            missing,
+        )
+
+    def test_commands_replies_terminal_certificate_rejects_downstream_required_by_scope(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesTerminalCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surface: dict[str, object] | None = None
+            for candidate in manifest["surfaces"]:
+                if isinstance(candidate, dict) and candidate.get("id") == "obelisk.commands_replies.v1":
+                    candidate["status"] = "promoted"
+                    candidate["evidence"] = {"source_marker": "reviewed"}
+                    surface = candidate
+                    break
+            self.assertIsNotNone(surface)
+            assert surface is not None
+            command_response_binding = self.attach_current_command_response_certificate(
+                module,
+                root,
+                manifest,
+            )
+            reviewed_hash = module.surface_record_sha256_for_certificate(
+                surface,
+                "commands_replies_promotion_certificate",
+            )
+            certificate = self.write_dependency_promotion_certificate(
+                root / "commands_replies_promotion_certificate.json",
+                schema="obelisk.commands-replies-promotion-certificate.v1",
+                surface_id="obelisk.commands_replies.v1",
+                position=4,
+                required_by_surface="obelisk.public_sdk.v1",
+                required_by_position=5,
+                evidence={
+                    "reviewed_artifact_hash": reviewed_hash,
+                    "reviewed_surface_record_sha256": reviewed_hash,
+                },
+                input_bindings={
+                    "command_response_promotion_certificate": command_response_binding,
+                },
+            )
+            assert isinstance(surface["evidence"], dict)
+            surface["evidence"]["commands_replies_promotion_certificate"] = certificate
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.command_response_structured_promotion_evidence_missing
+            try:
+                module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.commands_replies_promotion_certificate_missing(
+                    {"commands_replies_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.command_response_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn("commands_replies_promotion_certificate:terminal_scope_invalid", missing)
+
+    def test_promotion_certificate_bindings_require_canonical_repo_relative_path_only(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PromotionCertificateBindingPath",
+        ) as core_dir:
+            root = Path(core_dir)
+            artifact_path = root / "certificate.json"
+            artifact_path.write_text(json.dumps({"schema": "test.certificate.v1"}), encoding="utf-8")
+            relative = str(artifact_path.relative_to(REPO_ROOT))
+            sha256 = sha256_file(artifact_path)
+
+            _, absolute_errors = module.load_hash_bound_json_artifact_binding(
+                {"path": str(artifact_path), "sha256": sha256},
+                "test_certificate",
+            )
+            _, traversal_errors = module.load_hash_bound_json_artifact_binding(
+                {"path": f"{root.relative_to(REPO_ROOT)}/../{root.name}/certificate.json", "sha256": sha256},
+                "test_certificate",
+            )
+            _, dot_segment_errors = module.load_hash_bound_json_artifact_binding(
+                {"path": f"{root.relative_to(REPO_ROOT)}/./certificate.json", "sha256": sha256},
+                "test_certificate",
+            )
+            _, inline_errors = module.load_hash_bound_json_artifact_binding(
+                {"path": relative, "sha256": sha256, "schema": "test.inline-binding.v1"},
+                "test_certificate",
+            )
+            _, package_shape_errors = module.load_hash_bound_json_artifact_binding(
+                {
+                    "path": relative,
+                    "sha256": sha256,
+                    "status": "ready",
+                    "packageShapeReady": True,
+                },
+                "test_certificate",
+            )
+            _, inline_shaped_errors = module.load_hash_bound_json_artifact_binding(
+                {
+                    "surface_id": "obelisk.commands_replies.v1",
+                    "promotion_status": "promoted",
+                    "evidence": {},
+                },
+                "test_certificate",
+            )
+
+        self.assertEqual(absolute_errors, ["test_certificate:path_must_be_canonical_repo_relative"])
+        self.assertEqual(traversal_errors, ["test_certificate:path_must_not_traverse"])
+        self.assertEqual(dot_segment_errors, ["test_certificate:path_must_be_canonical_repo_relative"])
+        self.assertEqual(inline_errors, ["test_certificate:inline_certificate_binding_not_allowed"])
+        self.assertEqual(package_shape_errors, ["test_certificate:binding_keys_mismatch"])
+        self.assertEqual(inline_shaped_errors, ["test_certificate:inline_certificate_binding_not_allowed"])
+
+    def test_downstream_dependency_certificate_hash_binding_ignores_own_certificate_key(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        cases = (
+            (
+                "permissions_admin_promotion_certificate",
+                "obelisk.permissions_admin.v1",
+                self.write_permissions_admin_promotion_certificate,
+                module.permissions_admin_promotion_certificate_missing,
+                "permissions_admin_structured_promotion_evidence_missing",
+            ),
+            (
+                "command_response_promotion_certificate",
+                "obelisk.command_chat_response_path.v1",
+                self.write_command_response_promotion_certificate,
+                module.command_response_promotion_certificate_missing,
+                "command_response_structured_promotion_evidence_missing",
+            ),
+        )
+        for certificate_key, surface_id, writer, checker, dependency_name in cases:
+            with self.subTest(certificate_key=certificate_key), tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="DownstreamCertificateSurface",
+            ) as core_dir:
+                root = Path(core_dir)
+                manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+                surface: dict[str, object] | None = None
+                for candidate in manifest["surfaces"]:
+                    if isinstance(candidate, dict) and candidate.get("id") == surface_id:
+                        candidate["status"] = "promoted"
+                        candidate["evidence"] = {"source_marker": "reviewed"}
+                        surface = candidate
+                        break
+                self.assertIsNotNone(surface)
+                assert surface is not None
+                reviewed_hash = module.surface_record_sha256_for_certificate(
+                    surface,
+                    certificate_key,
+                )
+                certificate = writer(
+                    root / f"{certificate_key}.json",
+                    {
+                        "reviewed_artifact_hash": reviewed_hash,
+                        "reviewed_surface_record_sha256": reviewed_hash,
+                    },
+                )
+                assert isinstance(surface["evidence"], dict)
+                surface["evidence"][certificate_key] = certificate
+                manifest_path = root / "public_sdk_surfaces.json"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                original_dependency = getattr(module, dependency_name)
+                try:
+                    setattr(module, dependency_name, lambda *_args, **_kwargs: [])
+                    missing = checker({certificate_key: certificate}, manifest_path)
+
+                    surface["evidence"]["source_marker"] = "mutated"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    stale_missing = checker({certificate_key: certificate}, manifest_path)
+                finally:
+                    setattr(module, dependency_name, original_dependency)
+
+            self.assertNotIn(f"{certificate_key}:surface_record_sha256_mismatch", missing)
+            self.assertIn(f"{certificate_key}:surface_record_sha256_mismatch", stale_missing)
+
+    def test_player_identity_certificate_requires_hash_binding_policy(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PlayerIdentityCertificatePolicy",
+        ) as core_dir:
+            root = Path(core_dir)
+            certificate_path = root / "player_identity_promotion_certificate.json"
+            certificate = self.write_player_identity_promotion_certificate(
+                certificate_path,
+                {
+                    "reviewed_artifact_hash": "a" * 64,
+                    "reviewed_surface_record_sha256": "a" * 64,
+                },
+            )
+            payload = json.loads(certificate_path.read_text(encoding="utf-8"))
+            payload.pop("required_reviewed_artifact_hash", None)
+            payload["reviewed_artifact_hash_policy"] = "any reviewed artifact counts"
+            payload["missing_mismatched_or_stale_certificate_counts"] = True
+            certificate_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+            certificate = {
+                "path": str(certificate_path.relative_to(REPO_ROOT)),
+                "sha256": sha256_file(certificate_path),
+            }
+
+            manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["evidence"] = {}
+                    break
+            manifest_path = root / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            original_dependency = module.player_identity_structured_promotion_evidence_missing
+            try:
+                module.player_identity_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                missing = module.player_identity_promotion_certificate_missing(
+                    {"player_identity_promotion_certificate": certificate},
+                    manifest_path,
+                )
+            finally:
+                module.player_identity_structured_promotion_evidence_missing = original_dependency
+
+        self.assertIn(
+            "player_identity_promotion_certificate:required_reviewed_artifact_hash_invalid",
+            missing,
+        )
+        self.assertIn(
+            "player_identity_promotion_certificate:reviewed_artifact_hash_policy_invalid",
+            missing,
+        )
+        self.assertIn(
+            "player_identity_promotion_certificate:missing_mismatched_or_stale_certificate_counts_not_false",
+            missing,
+        )
+
+    def test_downstream_dependency_certificates_require_hash_binding_policy(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        cases = (
+            (
+                "permissions_admin_promotion_certificate",
+                self.write_permissions_admin_promotion_certificate,
+                module.permissions_admin_promotion_certificate_missing,
+                module.permissions_admin_structured_promotion_evidence_missing,
+                "permissions_admin",
+                "obelisk.permissions_admin.v1",
+            ),
+            (
+                "command_response_promotion_certificate",
+                self.write_command_response_promotion_certificate,
+                module.command_response_promotion_certificate_missing,
+                module.command_response_structured_promotion_evidence_missing,
+                "command_response",
+                "obelisk.command_chat_response_path.v1",
+            ),
+        )
+        for certificate_key, writer, checker, dependency_attr, prefix, surface_id in cases:
+            with self.subTest(certificate_key=certificate_key), tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="DownstreamCertificatePolicy",
+            ) as core_dir:
+                root = Path(core_dir)
+                evidence = {"reviewed_surface_record_sha256": "a" * 64, "reviewed_artifact_hash": "a" * 64}
+                certificate = writer(root / f"{certificate_key}.json", evidence)
+                payload = json.loads((root / f"{certificate_key}.json").read_text(encoding="utf-8"))
+                payload.pop("required_reviewed_artifact_hash", None)
+                payload["reviewed_artifact_hash_policy"] = "any reviewed artifact counts"
+                payload["missing_mismatched_or_stale_certificate_counts"] = True
+                (root / f"{certificate_key}.json").write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+                certificate = {
+                    "path": str((root / f"{certificate_key}.json").relative_to(REPO_ROOT)),
+                    "sha256": sha256_file(root / f"{certificate_key}.json"),
+                }
+
+                manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+                for surface in manifest["surfaces"]:
+                    if surface["id"] == surface_id:
+                        surface["status"] = "promoted"
+                        surface["evidence"] = {}
+                        break
+                manifest_path = root / "public_sdk_surfaces.json"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                original_dependency = dependency_attr
+                try:
+                    if prefix == "permissions_admin":
+                        module.permissions_admin_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                    else:
+                        module.command_response_structured_promotion_evidence_missing = lambda *_args, **_kwargs: []
+                    missing = checker({certificate_key: certificate}, manifest_path)
+                finally:
+                    if prefix == "permissions_admin":
+                        module.permissions_admin_structured_promotion_evidence_missing = original_dependency
+                    else:
+                        module.command_response_structured_promotion_evidence_missing = original_dependency
+
+            self.assertIn(f"{certificate_key}:required_reviewed_artifact_hash_invalid", missing)
+            self.assertIn(f"{certificate_key}:reviewed_artifact_hash_policy_invalid", missing)
+            self.assertIn(
+                f"{certificate_key}:missing_mismatched_or_stale_certificate_counts_not_false",
+                missing,
+            )
+
     def test_permissions_admin_structured_promotion_requires_identity_promotion_certificate(self) -> None:
         with tempfile.TemporaryDirectory(
             dir=REPO_ROOT / "tests" / "core",
@@ -10661,7 +16103,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             valid_missing,
             [
                 "player_identity_promotion_certificate:surface_record_missing_or_unpromoted",
+                "player_identity_approved_runtime_evidence_manifest:checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:window_manifest_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:operator_receipt_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:preflight_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:request_pack_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:lifecycle_event_split_summary_not_approved_runtime_evidence",
+                "player_identity_approved_runtime_evidence_manifest:partial_lifecycle_events_not_approved_runtime_evidence",
                 "player_identity_approved_runtime_evidence_manifest:validation_failed",
+                "player_identity_approved_runtime_evidence_report:checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence",
                 "player_identity_approved_runtime_evidence_report:fields_invalid",
                 "player_identity_public_contract_readiness_report:promotion_blockers_remaining",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_candidate_only",
@@ -10989,6 +16439,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "command_response_permissions_admin_query_failclosed_report:missing",
                 "command_response_permissions_admin_public_readiness_report:missing",
                 "command_response_permissions_admin_executed_test_report:missing",
+                "commands_replies_promotion_certificate:missing",
             ],
         )
 
@@ -11410,7 +16861,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 module.permissions_admin_promotion_certificate_missing = original_certificate_dependency
                 module.current_repo_head = original_current_head
 
-        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+        self.assertEqual(
+            missing,
+            [
+                "public_readiness_report:not_promoted_evidence",
+            ],
+        )
 
     def test_command_response_structured_promotion_rejects_nested_readiness_overclaims(self) -> None:
         import importlib.util
@@ -11705,7 +17161,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 module.command_response_promotion_certificate_missing = original_certificate_dependency
                 module.current_repo_head = original_current_head
 
-        self.assertEqual(missing, ["public_readiness_report:not_promoted_evidence"])
+        self.assertEqual(
+            missing,
+            [
+                "commands_replies_promotion_certificate:missing",
+                "public_readiness_report:not_promoted_evidence",
+            ],
+        )
 
     def test_commands_replies_structured_promotion_rejects_nested_readiness_overclaims(self) -> None:
         import importlib.util
@@ -11945,6 +17407,2500 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(outcome_by_surface["obelisk.permissions_admin.v1"]["dependency_claims_satisfied"])
         self.assertFalse(outcome_by_surface["obelisk.permissions_admin.v1"]["counts_toward_complete_sdk_claim"])
 
+    def test_passive_activity_triage_metadata_does_not_count_complete_sdk_progress(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+
+            manifest, release_statement = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.structure_census.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterStructureCensusCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.structure_census.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "classification": "passive_activity_triage_non_evidence",
+                        "passive_activity_triage": {
+                            "schema": "obelisk.player-principal-passive-activity-triage.v1",
+                            "classification": "passive_activity_triage_non_evidence",
+                            "ready_scope": "passive_activity_triage_only",
+                        },
+                    }
+                    break
+            if "obelisk.structure_census.v1" not in manifest["promoted_surfaces"]:
+                manifest["promoted_surfaces"].append("obelisk.structure_census.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.structure_census.v1"
+            ]
+            release_statement = "\n".join(
+                (
+                    "obelisk.structure_census.v1: promoted - reviewed ABI and SDK evidence."
+                    if line.startswith("obelisk.structure_census.v1:")
+                    else line
+                )
+                for line in release_statement.splitlines()
+            ) + "\n"
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(core_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        structure_census = outcome_by_surface["obelisk.structure_census.v1"]
+        self.assertFalse(structure_census["promotion_evidence_satisfied"])
+        self.assertFalse(structure_census["counts_toward_complete_sdk_claim"])
+        self.assertIn("promotion_evidence_missing", structure_census["non_counting_reasons"])
+
+    def test_observer_triage_and_no_approved_claim_do_not_count_complete_sdk_progress(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+
+            cases = (
+                (
+                    "observer_event_triage",
+                    {
+                        "observer_event_triage": {
+                            "schema": "obelisk.observer-event-triage.v1",
+                            "classification": "observer_event_triage_non_evidence",
+                            "ready_scope": "observer_event_triage_only",
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "approved_evidence_claim_none",
+                    {
+                        "approved_evidence_claim": "none",
+                    },
+                    "approved_evidence_claim_none",
+                    "promotion_evidence_explicit_no_approved_claim",
+                ),
+                (
+                    "package_shape_reference",
+                    {
+                        "source_artifacts": [
+                            {
+                                "path": "release/v1/public-sdk/installed-sdk-package-shape.json",
+                            }
+                        ],
+                    },
+                    "non_promotional_artifact_reference",
+                    "promotion_evidence_non_promotional_artifact_reference",
+                ),
+                (
+                    "package_exact_reference",
+                    {
+                        "source_artifacts": [
+                            {
+                                "path": "release/v1/public-sdk/installed-sdk-package-exact.json",
+                            }
+                        ],
+                    },
+                    "non_promotional_artifact_reference",
+                    "promotion_evidence_non_promotional_artifact_reference",
+                ),
+                (
+                    "package_non_exact_ready_scope",
+                    {
+                        "ready_scope": "package_non_exact",
+                    },
+                    "non_promotional_ready_scope",
+                    "promotion_evidence_forbidden_ready_scope",
+                ),
+                (
+                    "copied_log_only_artifact",
+                    {
+                        "source_artifacts": [
+                            {
+                                "path": "docs/research/player-principal-copied-log-only-artifact.json",
+                                "artifact_scope": "copied_log_only",
+                            }
+                        ],
+                    },
+                    "non_promotional_artifact_reference",
+                    "promotion_evidence_non_promotional_artifact_reference",
+                ),
+                (
+                    "accepted_runtime_evidence_preconditions",
+                    {
+                        "accepted_for_internal_planning": True,
+                        "accepted_runtime_evidence_preconditions": True,
+                    },
+                    "non_promotional_readiness_only",
+                    "promotion_evidence_limited_to_non_promotional_readiness",
+                ),
+                (
+                    "approved_runtime_evidence_binding_scope",
+                    {
+                        "ready_scope": "approved_runtime_evidence_binding",
+                        "approved_runtime_evidence_binding": True,
+                    },
+                    "non_promotional_ready_scope",
+                    "promotion_evidence_forbidden_ready_scope",
+                ),
+                (
+                    "start_end_only_evidence_source",
+                    {
+                        "source_kind": "start_end_only_evidence",
+                        "start_end_evidence": True,
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "start_end_only_evidence_source_value",
+                    {
+                        "source_value": "start_end_only_evidence",
+                        "start_end_evidence": True,
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "standing_launch_authority_source",
+                    {
+                        "source_kind": "standing_launch_authority",
+                        "standingLaunchAuthority": True,
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "standing_launch_authority_source_values",
+                    {
+                        "source_values": ["standing_launch_authority"],
+                        "standingLaunchAuthority": True,
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "checkjoininprogress_1_0_planning_acceptance_source",
+                    {
+                        "source_kind": "CheckJoinInProgress(1,0) planning acceptance",
+                        "checkJoinInProgress10PlanningAcceptance": True,
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "activation_preconditions_report",
+                    {
+                        "activation_preconditions_report": {
+                            "schema": "obelisk.player-principal-lifecycle-activation-preconditions.v1",
+                            "ready": True,
+                            "activation_preconditions_met": True,
+                            "ready_scope": "offline_pre_activation_consistency_only",
+                        },
+                    },
+                    "non_promotional_ready_scope",
+                    "promotion_evidence_forbidden_ready_scope",
+                ),
+                (
+                    "runtime_window_plan",
+                    {
+                        "runtime_window_plan_report": {
+                            "schema": "obelisk.player-principal-lifecycle-runtime-window-plan.v1",
+                            "status": "planned_offline_only",
+                            "ready": True,
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "runtime_window_executor",
+                    {
+                        "executor_report": {
+                            "schema": "obelisk.player-principal-lifecycle-runtime-window-executor.v1",
+                            "status": "executed",
+                            "ready": True,
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "runtime_window_executor_closure",
+                    {
+                        "runtime_window_executor_closure_artifact": {
+                            "schema": "obelisk.player-principal-lifecycle-runtime-window-executor-closure.v1",
+                            "status": "closed",
+                            "ready": True,
+                            "closureComplete": True,
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "confirmed_notice_report",
+                    {
+                        "confirmed_notice_report": {
+                            "schema": "obelisk.player-principal-confirmed-notice-report.v1",
+                            "status": "confirmed_send",
+                            "deliveryConfirmed": True,
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+                (
+                    "approved_runtime_manifest_reference",
+                    {
+                        "source_artifacts": [
+                            {
+                                "approved_runtime_manifest": (
+                                    "approved-bundle/approved-runtime-principal-lifecycle-evidence.json"
+                                ),
+                            }
+                        ],
+                    },
+                    "non_promotional_artifact_reference",
+                    "promotion_evidence_non_promotional_artifact_reference",
+                ),
+                (
+                    "player_notice_action",
+                    {
+                        "player_notice_action": {
+                            "schema": "obelisk.player-notice-action.v1",
+                            "status": "sent",
+                            "dry_run_status": "dry_run_accepted",
+                        },
+                    },
+                    "non_promotional_schema_marker",
+                    "promotion_evidence_non_promotional_schema_marker",
+                ),
+            )
+            for case_name, extra_evidence, expected_reason, expected_flag in cases:
+                with self.subTest(case=case_name):
+                    manifest, release_statement = complete_excluded_manifest()
+                    for surface in manifest["surfaces"]:
+                        if surface["id"] == "obelisk.structure_census.v1":
+                            surface["status"] = "promoted"
+                            surface["public_contract"] = ["ObeliskApi.RegisterStructureCensusCallback"]
+                            surface["evidence"] = {
+                                "surface_id": "obelisk.structure_census.v1",
+                                "promotion_status": "promoted",
+                                "public_sdk_ready": True,
+                                "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                                "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                                **extra_evidence,
+                            }
+                            break
+                    if "obelisk.structure_census.v1" not in manifest["promoted_surfaces"]:
+                        manifest["promoted_surfaces"].append("obelisk.structure_census.v1")
+                    manifest["post_v1_or_excluded_surfaces"] = [
+                        surface_id
+                        for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                        if surface_id != "obelisk.structure_census.v1"
+                    ]
+                    release_statement = "\n".join(
+                        (
+                            "obelisk.structure_census.v1: promoted - reviewed ABI and SDK evidence."
+                            if line.startswith("obelisk.structure_census.v1:")
+                            else line
+                        )
+                        for line in release_statement.splitlines()
+                    ) + "\n"
+                    manifest_path = Path(core_dir) / f"{case_name}_public_sdk_surfaces.json"
+                    statement_path = Path(core_dir) / f"{case_name}_RELEASE_STATEMENT.md"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    statement_path.write_text(release_statement, encoding="utf-8")
+                    result = self.run_checker(
+                        "--manifest",
+                        str(manifest_path),
+                        "--release-statement",
+                        str(statement_path),
+                        "--json",
+                        check=False,
+                    )
+
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+                    self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+                    self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+                    self.assertFalse(payload["stable_claim_allowed"])
+                    outcome_by_surface = {
+                        row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+                    }
+                    structure_census = outcome_by_surface["obelisk.structure_census.v1"]
+                    self.assertFalse(structure_census["promotion_evidence_satisfied"])
+                    self.assertFalse(structure_census["counts_toward_complete_sdk_claim"])
+                    self.assertIn("promotion_evidence_missing", structure_census["non_counting_reasons"])
+                    self.assertIn(expected_reason, structure_census["non_counting_reasons"])
+                    self.assertIs(structure_census[expected_flag], True)
+
+    def test_activation_preconditions_and_non_evidence_aliases_are_non_counting(self) -> None:
+        payload = {
+            "activation_preconditions_report": {
+                "schema": "obelisk.player-principal-lifecycle-activation-preconditions.v1",
+                "ready": True,
+                "activation_preconditions_met": True,
+                "ready_scope": "offline_pre_activation_consistency_only",
+                "counts_toward_sdk": True,
+                "counts_toward_p0_dependency_chain": True,
+            },
+            "beta_notice_send_attestation": {
+                "schema": "obelisk.player-principal-lifecycle-beta-notice-prep.v1",
+                "ready": True,
+                "status": "prepared",
+                "mode": "confirmed_send",
+                "discord_sent": True,
+                "counts_as_approved_runtime_evidence": True,
+            },
+            "request_check_readiness": {
+                "schema": "obelisk.player-principal-lifecycle-window-request-check.v1",
+                "ready": True,
+                "request_pack_ready": True,
+                "route_ready": True,
+                "complete_sdk_claim_progress_contribution": "1/12",
+            },
+            "runtime_window_activation": {
+                "schema": "obelisk.player-principal-lifecycle-runtime-window-activation.v1",
+                "status": "prepared",
+                "runtimeWindowPrepared": True,
+                "runtime_window_authorized": True,
+                "runtime_window_activation_ready_under_recorded_standing_launch_authority": True,
+                "standing_launch_authority_counts_as_approved_runtime_evidence": True,
+            },
+            "runtime_window_plan_report": {
+                "schema": "obelisk.player-principal-lifecycle-runtime-window-plan.v1",
+                "status": "planned_offline_only",
+                "ready": True,
+                "runtimeWindowPlanReady": True,
+                "approvedRuntimeEvidenceReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "executor_report": {
+                "status": "executed",
+                "ready": True,
+                "runtimeWindowExecutorReady": True,
+                "countsTowardSdk": True,
+                "p0DependencyChainClaimProgressContribution": 1,
+            },
+            "runtime_window_executor_closure_artifact": {
+                "schema": "obelisk.player-principal-lifecycle-runtime-window-executor-closure.v1",
+                "status": "closed",
+                "ready": True,
+                "closureComplete": True,
+                "runtimeWindowClosureReady": True,
+                "runtimeWindowExecutorClosureReady": True,
+                "countsTowardCompleteSdkClaim": True,
+                "sdkCompletionCount": 1,
+            },
+            "evidence_closure_report": {
+                "status": "closed",
+                "ready": True,
+                "evidenceClosureReady": True,
+                "closureAccepted": True,
+                "runtimeEvidenceReady": True,
+                "approvedRuntimeEvidencePresent": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "preactivation_report": {
+                "status": "passed",
+                "ready": True,
+                "preactivationReady": True,
+                "progress": "1/4",
+            },
+            "confirmed_notice_report": {
+                "schema": "obelisk.player-principal-confirmed-notice-report.v1",
+                "status": "confirmed_send",
+                "ready": True,
+                "deliveryConfirmed": True,
+                "noticeConfirmed": True,
+                "confirmedNoticeSent": True,
+                "countsAsApprovedRuntimeEvidence": True,
+                "progress": "1/12",
+            },
+            "approved_runtime_manifest": {
+                "status": "present",
+                "ready": True,
+                "approvedRuntimeManifestPresent": True,
+                "approvedRuntimeManifestReferenced": True,
+                "approvedRuntimeEvidence": True,
+                "runtimeEvidenceReady": True,
+            },
+            "package_exact_install_report": {
+                "schema": "obelisk.installed-sdk-package-exact.v1",
+                "status": "unblocked",
+                "packageExactUnblocked": True,
+                "sdkCredits": 1,
+            },
+            "package_non_exact_install_report": {
+                "schema": "obelisk.installed-sdk-package-non-exact.v1",
+                "state": "allowed",
+                "packageNonExactAllowed": True,
+                "completeSdkCredit": "1/12",
+            },
+            "public_reachability": {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "status": "reachable",
+                "ready": True,
+                "publicReachabilityReady": True,
+            },
+            "approved_bundle_request": {
+                "schema": "obelisk.player-identity-approved-bundle-request.v1",
+                "status": "accepted",
+                "ready": True,
+                "approvedBundleRequestReady": True,
+            },
+            "route_bound_identity_source_forwarding": {
+                "schema": "obelisk.command-permission-route-bound-identity-source-forwarding.v1",
+                "status": "accepted",
+                "ready": True,
+                "routeBoundIdentitySourceForwardingReady": True,
+            },
+            "route_simulation": {
+                "schema": "obelisk.command-permission-route-simulation.v1",
+                "simulation_only": True,
+                "status": "accepted",
+                "counts_toward_v1_completion": True,
+            },
+            "post_evidence_identity_lock": {
+                "schema": "obelisk.command-permission-route-post-evidence-identity-lock.v1",
+                "status": "unlocked",
+                "identity_lock_ready": True,
+                "p0_dependency_chain_progress_contribution": 1,
+            },
+            "copied_log_only_artifact": {
+                "schema": "obelisk.player-principal-copied-log-only-artifact.v1",
+                "artifact_scope": "copied_log_only",
+                "copiedLogOnlyReady": True,
+                "copiedLogOnlyStatus": "accepted",
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "accepted_artifact_class_report": {
+                "schema": "obelisk.accepted-artifact-class.v1",
+                "artifact_class": "accepted_artifact_class",
+                "status": "accepted",
+                "acceptedArtifactClassReady": True,
+                "p0DependencyChainClaimProgressContribution": 1,
+            },
+            "binding_required_report": {
+                "schema": "obelisk.binding-required.v1",
+                "binding_required": True,
+                "status": "ready",
+                "bindingRequiredReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "delegated_route_gate_report": {
+                "schema": "obelisk.delegated-route-gate-report.v1",
+                "status": "ready",
+                "ready": True,
+                "delegatedRouteGateReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "structure_build_policy_offline_intake": {
+                "schema": "obelisk.structure-build-policy-offline-intake-check.v1",
+                "status": "accepted_planning_only",
+                "planning_only": True,
+                "blockers": [],
+                "routeReady": True,
+                "blockerResolved": True,
+                "sideLanePromoted": True,
+                "structureBuildPolicyReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "active_notice_report": {
+                "schema": "obelisk.active-notice-report.v1",
+                "status": "sent",
+                "activeNoticeAccepted": True,
+                "activeNoticeReady": True,
+                "activeNoticeSent": True,
+                "activeNoticeCountsTowardCompleteSdkClaim": True,
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        self.assertIn("activation_preconditions_report.activation_preconditions_met", violations)
+        self.assertIn("beta_notice_send_attestation.discord_sent", violations)
+        self.assertIn("beta_notice_send_attestation.status", violations)
+        self.assertIn("request_check_readiness.request_pack_ready", violations)
+        self.assertIn("runtime_window_activation.status", violations)
+        self.assertIn("runtime_window_activation.runtimeWindowPrepared", violations)
+        self.assertIn("runtime_window_activation.runtime_window_authorized", violations)
+        self.assertIn(
+            "runtime_window_activation.runtime_window_activation_ready_under_recorded_standing_launch_authority",
+            violations,
+        )
+        self.assertIn(
+            "runtime_window_activation.standing_launch_authority_counts_as_approved_runtime_evidence",
+            violations,
+        )
+        self.assertIn("runtime_window_plan_report.ready", violations)
+        self.assertIn("runtime_window_plan_report.runtimeWindowPlanReady", violations)
+        self.assertIn(
+            "runtime_window_plan_report.approvedRuntimeEvidenceReady",
+            violations,
+        )
+        self.assertIn(
+            "runtime_window_plan_report.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("executor_report.ready", violations)
+        self.assertIn("executor_report.runtimeWindowExecutorReady", violations)
+        self.assertIn("executor_report.countsTowardSdk", violations)
+        self.assertIn(
+            "executor_report.p0DependencyChainClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("runtime_window_executor_closure_artifact.status", violations)
+        self.assertIn("runtime_window_executor_closure_artifact.ready", violations)
+        self.assertIn("runtime_window_executor_closure_artifact.closureComplete", violations)
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.runtimeWindowClosureReady",
+            violations,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.runtimeWindowExecutorClosureReady",
+            violations,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.countsTowardCompleteSdkClaim",
+            violations,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.sdkCompletionCount",
+            violations,
+        )
+        self.assertIn("evidence_closure_report.status", violations)
+        self.assertIn("evidence_closure_report.ready", violations)
+        self.assertIn("evidence_closure_report.evidenceClosureReady", violations)
+        self.assertIn("evidence_closure_report.closureAccepted", violations)
+        self.assertIn("evidence_closure_report.runtimeEvidenceReady", violations)
+        self.assertIn("evidence_closure_report.approvedRuntimeEvidencePresent", violations)
+        self.assertIn(
+            "evidence_closure_report.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("preactivation_report.status", violations)
+        self.assertIn("preactivation_report.ready", violations)
+        self.assertIn("preactivation_report.preactivationReady", violations)
+        self.assertIn("preactivation_report.progress", violations)
+        self.assertIn("confirmed_notice_report.status", violations)
+        self.assertIn("confirmed_notice_report.ready", violations)
+        self.assertIn("confirmed_notice_report.deliveryConfirmed", violations)
+        self.assertIn("confirmed_notice_report.noticeConfirmed", violations)
+        self.assertIn("confirmed_notice_report.confirmedNoticeSent", violations)
+        self.assertIn("confirmed_notice_report.countsAsApprovedRuntimeEvidence", violations)
+        self.assertIn("confirmed_notice_report.progress", violations)
+        self.assertIn("approved_runtime_manifest.status", violations)
+        self.assertIn("approved_runtime_manifest.ready", violations)
+        self.assertIn("approved_runtime_manifest.approvedRuntimeManifestPresent", violations)
+        self.assertIn("approved_runtime_manifest.approvedRuntimeManifestReferenced", violations)
+        self.assertIn("approved_runtime_manifest.approvedRuntimeEvidence", violations)
+        self.assertIn("approved_runtime_manifest.runtimeEvidenceReady", violations)
+        self.assertIn("package_exact_install_report.status", violations)
+        self.assertIn("package_exact_install_report.packageExactUnblocked", violations)
+        self.assertIn("package_exact_install_report.sdkCredits", violations)
+        self.assertIn("package_non_exact_install_report.state", violations)
+        self.assertIn("package_non_exact_install_report.packageNonExactAllowed", violations)
+        self.assertIn("package_non_exact_install_report.completeSdkCredit", violations)
+        self.assertIn("public_reachability.status", violations)
+        self.assertIn("public_reachability.publicReachabilityReady", violations)
+        self.assertIn("approved_bundle_request.status", violations)
+        self.assertIn("approved_bundle_request.approvedBundleRequestReady", violations)
+        self.assertIn("route_bound_identity_source_forwarding.status", violations)
+        self.assertIn(
+            "route_bound_identity_source_forwarding.routeBoundIdentitySourceForwardingReady",
+            violations,
+        )
+        self.assertIn("route_simulation.status", violations)
+        self.assertIn("post_evidence_identity_lock.identity_lock_ready", violations)
+        self.assertIn("copied_log_only_artifact.copiedLogOnlyReady", violations)
+        self.assertIn("copied_log_only_artifact.copiedLogOnlyStatus", violations)
+        self.assertIn(
+            "copied_log_only_artifact.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("accepted_artifact_class_report.status", violations)
+        self.assertIn(
+            "accepted_artifact_class_report.acceptedArtifactClassReady",
+            violations,
+        )
+        self.assertIn(
+            "accepted_artifact_class_report.p0DependencyChainClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("binding_required_report.status", violations)
+        self.assertIn("binding_required_report.bindingRequiredReady", violations)
+        self.assertIn(
+            "binding_required_report.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("delegated_route_gate_report.status", violations)
+        self.assertIn("structure_build_policy_offline_intake.routeReady", violations)
+        self.assertIn("structure_build_policy_offline_intake.blockerResolved", violations)
+        self.assertIn("structure_build_policy_offline_intake.sideLanePromoted", violations)
+        self.assertIn(
+            "structure_build_policy_offline_intake.structureBuildPolicyReady",
+            violations,
+        )
+        self.assertIn(
+            "structure_build_policy_offline_intake.completeSdkClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("active_notice_report.status", violations)
+        self.assertIn("active_notice_report.activeNoticeAccepted", violations)
+        self.assertIn("active_notice_report.activeNoticeReady", violations)
+        self.assertIn("active_notice_report.activeNoticeSent", violations)
+        self.assertIn(
+            "active_notice_report.activeNoticeCountsTowardCompleteSdkClaim",
+            violations,
+        )
+        self.assertIn(
+            "active_notice_report.p0DependencyChainClaimProgressContribution",
+            violations,
+        )
+        self.assertIn("delegated_route_gate_report.ready", violations)
+        self.assertIn("delegated_route_gate_report.delegatedRouteGateReady", violations)
+        self.assertIn(
+            "delegated_route_gate_report.completeSdkClaimProgressContribution",
+            violations,
+        )
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("activation_preconditions_report.activation_preconditions_met", claims)
+        self.assertIn("beta_notice_send_attestation.discord_sent", claims)
+        self.assertIn("beta_notice_send_attestation.mode", claims)
+        self.assertIn("beta_notice_send_attestation.status", claims)
+        self.assertIn("request_check_readiness.route_ready", claims)
+        self.assertIn("runtime_window_activation.status", claims)
+        self.assertIn("runtime_window_activation.runtimeWindowPrepared", claims)
+        self.assertIn("runtime_window_activation.runtime_window_authorized", claims)
+        self.assertIn(
+            "runtime_window_activation.runtime_window_activation_ready_under_recorded_standing_launch_authority",
+            claims,
+        )
+        self.assertIn(
+            "runtime_window_activation.standing_launch_authority_counts_as_approved_runtime_evidence",
+            claims,
+        )
+        self.assertIn("runtime_window_plan_report.ready", claims)
+        self.assertIn("runtime_window_plan_report.runtimeWindowPlanReady", claims)
+        self.assertIn(
+            "runtime_window_plan_report.approvedRuntimeEvidenceReady",
+            claims,
+        )
+        self.assertIn(
+            "runtime_window_plan_report.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("executor_report.ready", claims)
+        self.assertIn("executor_report.runtimeWindowExecutorReady", claims)
+        self.assertIn("executor_report.countsTowardSdk", claims)
+        self.assertIn(
+            "executor_report.p0DependencyChainClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("runtime_window_executor_closure_artifact.status", claims)
+        self.assertIn("runtime_window_executor_closure_artifact.ready", claims)
+        self.assertIn("runtime_window_executor_closure_artifact.closureComplete", claims)
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.runtimeWindowClosureReady",
+            claims,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.runtimeWindowExecutorClosureReady",
+            claims,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.countsTowardCompleteSdkClaim",
+            claims,
+        )
+        self.assertIn(
+            "runtime_window_executor_closure_artifact.sdkCompletionCount",
+            claims,
+        )
+        self.assertIn("evidence_closure_report.status", claims)
+        self.assertIn("evidence_closure_report.ready", claims)
+        self.assertIn("evidence_closure_report.evidenceClosureReady", claims)
+        self.assertIn("evidence_closure_report.closureAccepted", claims)
+        self.assertIn("evidence_closure_report.runtimeEvidenceReady", claims)
+        self.assertIn(
+            "evidence_closure_report.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("preactivation_report.ready", claims)
+        self.assertIn("preactivation_report.preactivationReady", claims)
+        self.assertIn("preactivation_report.progress", claims)
+        self.assertIn("confirmed_notice_report.status", claims)
+        self.assertIn("confirmed_notice_report.ready", claims)
+        self.assertIn("confirmed_notice_report.deliveryConfirmed", claims)
+        self.assertIn("confirmed_notice_report.noticeConfirmed", claims)
+        self.assertIn("confirmed_notice_report.confirmedNoticeSent", claims)
+        self.assertIn("confirmed_notice_report.countsAsApprovedRuntimeEvidence", claims)
+        self.assertIn("confirmed_notice_report.progress", claims)
+        self.assertIn("approved_runtime_manifest.status", claims)
+        self.assertIn("approved_runtime_manifest.ready", claims)
+        self.assertIn("approved_runtime_manifest.approvedRuntimeManifestPresent", claims)
+        self.assertIn("approved_runtime_manifest.approvedRuntimeManifestReferenced", claims)
+        self.assertIn("approved_runtime_manifest.runtimeEvidenceReady", claims)
+        self.assertIn("package_exact_install_report.status", claims)
+        self.assertIn("package_exact_install_report.packageExactUnblocked", claims)
+        self.assertIn("package_exact_install_report.sdkCredits", claims)
+        self.assertIn("package_non_exact_install_report.state", claims)
+        self.assertIn("package_non_exact_install_report.packageNonExactAllowed", claims)
+        self.assertIn("package_non_exact_install_report.completeSdkCredit", claims)
+        self.assertIn("public_reachability.publicReachabilityReady", claims)
+        self.assertIn("approved_bundle_request.approvedBundleRequestReady", claims)
+        self.assertIn(
+            "route_bound_identity_source_forwarding.routeBoundIdentitySourceForwardingReady",
+            claims,
+        )
+        self.assertIn("copied_log_only_artifact.copiedLogOnlyReady", claims)
+        self.assertIn("copied_log_only_artifact.copiedLogOnlyStatus", claims)
+        self.assertIn(
+            "copied_log_only_artifact.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("accepted_artifact_class_report.status", claims)
+        self.assertIn(
+            "accepted_artifact_class_report.acceptedArtifactClassReady",
+            claims,
+        )
+        self.assertIn(
+            "accepted_artifact_class_report.p0DependencyChainClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("binding_required_report.status", claims)
+        self.assertIn("binding_required_report.bindingRequiredReady", claims)
+        self.assertIn(
+            "binding_required_report.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("delegated_route_gate_report.status", claims)
+        self.assertIn("structure_build_policy_offline_intake.routeReady", claims)
+        self.assertIn("structure_build_policy_offline_intake.blockerResolved", claims)
+        self.assertIn("structure_build_policy_offline_intake.sideLanePromoted", claims)
+        self.assertIn(
+            "structure_build_policy_offline_intake.structureBuildPolicyReady",
+            claims,
+        )
+        self.assertIn(
+            "structure_build_policy_offline_intake.completeSdkClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("active_notice_report.status", claims)
+        self.assertIn("active_notice_report.activeNoticeAccepted", claims)
+        self.assertIn("active_notice_report.activeNoticeReady", claims)
+        self.assertIn("active_notice_report.activeNoticeSent", claims)
+        self.assertIn(
+            "active_notice_report.activeNoticeCountsTowardCompleteSdkClaim",
+            claims,
+        )
+        self.assertIn(
+            "active_notice_report.p0DependencyChainClaimProgressContribution",
+            claims,
+        )
+        self.assertIn("delegated_route_gate_report.ready", claims)
+        self.assertIn("delegated_route_gate_report.delegatedRouteGateReady", claims)
+        self.assertIn(
+            "delegated_route_gate_report.completeSdkClaimProgressContribution",
+            claims,
+        )
+
+    def test_multi_surface_beta_capture_queue_is_visible_but_non_counting(self) -> None:
+        fastest = fastest_next_sdk_unblock(
+            current_route_blocker="approved_runtime_evidence_missing",
+            remaining_route_blockers=[],
+            p0_dependency_chain_claim_accounting={
+                "remaining_for_claim_surfaces": list(
+                    completion_checker.CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
+                ),
+            },
+        )
+
+        self.assertEqual(
+            fastest["required_artifacts"][0],
+            completion_checker.APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE,
+        )
+        self.assertEqual(
+            fastest["current_route_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertEqual(fastest["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(fastest["p0_dependency_chain_claim_progress_contribution"], 0)
+
+        action = fastest["actionable_paths"]["multi_surface_beta_capture_candidate_queue"]
+        self.assertTrue(action["visible_as_next_action"])
+        self.assertEqual(action["prior_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(
+            action["required_first_artifact"],
+            completion_checker.APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE,
+        )
+        self.assertIn("player_principal_lifecycle", action["safe_candidate_surfaces"])
+        self.assertIn("permissions_admin", action["safe_candidate_surfaces"])
+        self.assertIn("commands_replies", action["safe_candidate_surfaces"])
+        self.assertIn("dino_policy", action["safe_candidate_surfaces"])
+        self.assertIn("tribe_policy", action["safe_candidate_surfaces"])
+        self.assertIn("buff_status", action["safe_candidate_surfaces"])
+        self.assertIn("inventory_items_mutation", action["safe_candidate_surfaces"])
+        self.assertIn("transfer", action["safe_candidate_surfaces"])
+        self.assertIn("mission", action["safe_candidate_surfaces"])
+        self.assertEqual(
+            action["recognized_candidate_queue_artifact_schemas"],
+            list(
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_SCHEMAS
+            ),
+        )
+        self.assertEqual(
+            action["recognized_candidate_queue_artifact_names"],
+            list(
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES
+            ),
+        )
+        self.assertEqual(
+            action["candidate_queue_artifact_family_status"],
+            "visible_non_counting_candidate_queue_material",
+        )
+        self.assertFalse(
+            action[
+                "candidate_queue_artifact_family_counts_as_approved_runtime_evidence"
+            ]
+        )
+        self.assertFalse(action["candidate_queue_artifact_family_counts_toward_sdk"])
+        self.assertFalse(
+            action["candidate_queue_artifact_family_counts_toward_p0_dependency_chain"]
+        )
+        for key in ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS:
+            with self.subTest(false_key=key):
+                self.assertIs(action[key], False)
+        for key in ACTIONABLE_PATH_ZERO_KEYS:
+            with self.subTest(zero_key=key):
+                self.assertEqual(action[key], 0)
+
+        approved_in_game = approved_in_game_evidence_completion_status(
+            current_route_blocker="approved_runtime_evidence_missing",
+            fastest_next_unblock=fastest,
+        )
+        self.assertFalse(approved_in_game["approved_runtime_evidence_ready"])
+        self.assertEqual(approved_in_game["complete_sdk_claim_progress_contribution"], 0)
+        self.assertEqual(
+            approved_in_game["p0_dependency_chain_claim_progress_contribution"],
+            0,
+        )
+        queue_summary = approved_in_game["path_summaries"][
+            "multi_surface_beta_capture_candidate_queue"
+        ]
+        self.assertTrue(queue_summary["candidate_presence_visible"])
+        self.assertEqual(
+            queue_summary["recognized_candidate_queue_artifact_schemas"],
+            list(
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_SCHEMAS
+            ),
+        )
+        self.assertEqual(
+            queue_summary["recognized_candidate_queue_artifact_names"],
+            list(
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES
+            ),
+        )
+        self.assertFalse(queue_summary["approved_runtime_evidence"])
+        self.assertFalse(
+            queue_summary[
+                "candidate_queue_artifact_family_counts_as_approved_runtime_evidence"
+            ]
+        )
+        self.assertFalse(queue_summary["counts_toward_complete_sdk_claim_now"])
+        self.assertFalse(queue_summary["counts_toward_p0_dependency_chain_claim_now"])
+        self.assertFalse(
+            queue_summary["candidate_queue_artifact_family_counts_toward_sdk"]
+        )
+        self.assertFalse(
+            queue_summary[
+                "candidate_queue_artifact_family_counts_toward_p0_dependency_chain"
+            ]
+        )
+
+    def test_multi_surface_beta_capture_positive_aliases_are_non_counting(self) -> None:
+        payload = {
+            "multi_surface_beta_capture_plan_queue": {
+                "schema": "obelisk.multi-surface-beta-capture-plan-queue.v1",
+                "ready_scope": "multi_surface_beta_capture_plan_queue",
+                "status": "ready",
+                "queueStatus": "ready",
+                "approvedRuntimeEvidenceMissingCleared": True,
+                "approvedRuntimeEvidenceMissingResolved": True,
+                "clearsApprovedRuntimeEvidenceMissing": True,
+                "approvedRuntimeEvidenceReady": True,
+                "runtimeReady": True,
+                "runtimeReadinessReady": True,
+                "publicSdkReady": True,
+                "publicSdkReadinessReady": True,
+                "pluginHubReady": True,
+                "pluginHubReadinessReady": True,
+                "pluginHubReadinessClaimAllowed": True,
+                "sdkAccountingCountsAsCompletedSurface": True,
+                "p0AccountingCountsAsPromotedSurface": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "completeSdkClaimProgressRatio": "1/12",
+                "sdkCompletionProgressRatio": "1/12",
+                "p0DependencyChainClaimProgressContribution": 1,
+                "p0DependencyChainClaimProgressRatio": "1/4",
+                "candidate_surfaces": [
+                    {
+                        "surface": "dino_policy",
+                        "captureReady": True,
+                        "countsTowardSdk": True,
+                    },
+                    {
+                        "surface": "mission",
+                        "status": "ready",
+                        "publicSdkReady": True,
+                    },
+                ],
+            }
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        expected_aliases = (
+            "status",
+            "queueStatus",
+            "approvedRuntimeEvidenceMissingCleared",
+            "approvedRuntimeEvidenceMissingResolved",
+            "clearsApprovedRuntimeEvidenceMissing",
+            "approvedRuntimeEvidenceReady",
+            "runtimeReady",
+            "runtimeReadinessReady",
+            "publicSdkReady",
+            "publicSdkReadinessReady",
+            "pluginHubReady",
+            "pluginHubReadinessReady",
+            "pluginHubReadinessClaimAllowed",
+            "sdkAccountingCountsAsCompletedSurface",
+            "p0AccountingCountsAsPromotedSurface",
+            "completeSdkClaimProgressContribution",
+            "completeSdkClaimProgressRatio",
+            "sdkCompletionProgressRatio",
+            "p0DependencyChainClaimProgressContribution",
+            "p0DependencyChainClaimProgressRatio",
+            "candidate_surfaces[0].captureReady",
+            "candidate_surfaces[0].countsTowardSdk",
+            "candidate_surfaces[1].status",
+            "candidate_surfaces[1].publicSdkReady",
+        )
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                self.assertIn(f"multi_surface_beta_capture_plan_queue.{alias}", violations)
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                self.assertIn(f"multi_surface_beta_capture_plan_queue.{alias}", claims)
+
+    def test_status_report_source_ready_aliases_are_non_counting(self) -> None:
+        payload = {
+            "runtime_evidence_status_report": {
+                "schema": "obelisk.player-principal-lifecycle-runtime-evidence-status.v1",
+                "sourceReady": True,
+                "sourcesReady": True,
+                "sourceStatus": "ready",
+                "statusReportReady": True,
+                "statusReportStatus": "ready",
+                "ready": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            }
+        }
+
+        expected_aliases = (
+            "sourceReady",
+            "sourcesReady",
+            "sourceStatus",
+            "statusReportReady",
+            "statusReportStatus",
+            "ready",
+            "completeSdkClaimProgressContribution",
+        )
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                path = f"runtime_evidence_status_report.{alias}"
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+
+        route_claims = command_permission_route_gate_public_or_runtime_claims(
+            {
+                "critical_path_phase": {
+                    "sourceReady": True,
+                    "statusReportReady": True,
+                    "sourceStatus": "ready",
+                }
+            }
+        )
+        self.assertIn("critical_path_phase.sourceReady", route_claims)
+        self.assertIn("critical_path_phase.statusReportReady", route_claims)
+        self.assertIn("critical_path_phase.sourceStatus", route_claims)
+
+        runtime_report = {
+            "schema": "obelisk.sdk-status-report.v1",
+            "source_kind": "runtime_evidence_status_report",
+            "approved_runtime_evidence_accepted": True,
+            "evidence_bundle_accepted": True,
+            "approved_runtime_evidence_ready": True,
+            "runtime_evidence_ready": True,
+            "sourceReady": True,
+        }
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            runtime_report,
+            "approved_runtime_evidence",
+        )
+        self.assertIn(
+            "approved_runtime_evidence:status_report_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "approved_runtime_evidence:source_ready_status_report_not_approved_runtime_evidence",
+            reasons,
+        )
+        route_gate = {"approved_runtime_evidence": runtime_report}
+        self.assertFalse(
+            completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                route_gate
+            )
+        )
+        self.assertIsNone(
+            completion_checker.command_permission_route_gate_current_blocker(route_gate)
+        )
+
+    def test_post_runtime_p0_shortcut_reports_are_non_counting_aliases(self) -> None:
+        payload = {
+            "player_identity_public_header_gate_report": {
+                "schema": "obelisk.player-identity-public-header-gate-check.v1",
+                "status": "ready",
+                "publicHeaderAllowed": True,
+                "publicSdkReady": True,
+                "countsTowardP0DependencyChainClaim": True,
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+            "public_contract_gap_report": {
+                "schema": "obelisk.player-identity-public-contract-gap-report.v1",
+                "status": "resolved",
+                "postRuntimeContractGapResolved": True,
+                "publicContractReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "decision_record_template": {
+                "schema": "obelisk.player-identity-public-contract-decision-record-template.v1",
+                "status": "reviewed",
+                "reviewedIdentityPublicContractReady": True,
+                "publicSdkReady": True,
+            },
+            "reviewed_decision_record": {
+                "schema": "obelisk.player-identity-reviewed-decision-record.v1",
+                "status": "reviewed",
+                "publicSdkReady": True,
+                "p0DependencyChainReady": True,
+            },
+            "offline_hardening_report": {
+                "schema": "obelisk.sdk-offline-hardening-report.v1",
+                "status": "accepted",
+                "runtimeReady": True,
+                "publicSdkReady": True,
+                "stableSdkReady": True,
+                "pluginHubReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "promotion_certificate_metadata": {
+                "schema": "obelisk.player-identity-promotion-certificate-metadata.v1",
+                "certificateStatus": "built",
+                "p0DependencyChainPromotedForClaimCount": 1,
+            },
+            "generated_cert_report": {
+                "schema": "obelisk.player-identity-generated-cert-report.v1",
+                "certStatus": "generated",
+                "stableSdkReady": True,
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+            "beta_capture_pack": {
+                "schema": "obelisk.beta-capture-pack.v1",
+                "status": "ready",
+                "sdkCompletionProgressRatio": "1/12",
+            },
+            "package_shape_scoped_release_metadata": {
+                "schema": "obelisk.package-shape-scoped-release-metadata.v1",
+                "packageShapeReady": True,
+                "scopedReleaseStatementReady": True,
+                "supportTier": "release-supported",
+                "p0DependencyChainReady": True,
+            },
+            "public_debug_boundary_fix": {
+                "schema": "obelisk.public-debug-boundary-fix-report.v1",
+                "status": "ready",
+                "publicDebugBoundaryReady": True,
+                "runtimeReady": True,
+                "publicSdkReady": True,
+                "pluginHubReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "principal_start_end_report": {
+                "schema": "obelisk.players-identity-runtime-principal-start-end-evidence-check.v1",
+                "status": "ready",
+                "startEndOnlyEvidenceReady": True,
+                "approvedRuntimeEvidenceReady": True,
+                "countsTowardP0DependencyChainClaim": True,
+            },
+            "source_overclaim_zero_report": {
+                "schema": "obelisk.source-overclaim-diagnostics.v1",
+                "sourceOverclaimTotal": 0,
+                "sourceReady": True,
+                "status": "ready",
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "active_passive_monitor_session": {
+                "schema": "obelisk.active-passive-monitor-session.v1",
+                "source_kind": "active_passive_monitor",
+                "status": "active",
+                "publicSdkReady": True,
+                "p0DependencyChainReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+        }
+
+        expected_paths = (
+            "player_identity_public_header_gate_report.status",
+            "player_identity_public_header_gate_report.publicHeaderAllowed",
+            "player_identity_public_header_gate_report.publicSdkReady",
+            "player_identity_public_header_gate_report.countsTowardP0DependencyChainClaim",
+            "player_identity_public_header_gate_report.p0DependencyChainClaimProgressContribution",
+            "public_contract_gap_report.status",
+            "public_contract_gap_report.postRuntimeContractGapResolved",
+            "public_contract_gap_report.publicContractReady",
+            "public_contract_gap_report.completeSdkClaimProgressContribution",
+            "decision_record_template.status",
+            "decision_record_template.reviewedIdentityPublicContractReady",
+            "decision_record_template.publicSdkReady",
+            "reviewed_decision_record.status",
+            "reviewed_decision_record.publicSdkReady",
+            "reviewed_decision_record.p0DependencyChainReady",
+            "offline_hardening_report.status",
+            "offline_hardening_report.runtimeReady",
+            "offline_hardening_report.publicSdkReady",
+            "offline_hardening_report.stableSdkReady",
+            "offline_hardening_report.pluginHubReady",
+            "offline_hardening_report.completeSdkClaimProgressContribution",
+            "promotion_certificate_metadata.certificateStatus",
+            "promotion_certificate_metadata.p0DependencyChainPromotedForClaimCount",
+            "generated_cert_report.certStatus",
+            "generated_cert_report.stableSdkReady",
+            "generated_cert_report.p0DependencyChainClaimProgressContribution",
+            "beta_capture_pack.status",
+            "beta_capture_pack.sdkCompletionProgressRatio",
+            "package_shape_scoped_release_metadata.packageShapeReady",
+            "package_shape_scoped_release_metadata.scopedReleaseStatementReady",
+            "package_shape_scoped_release_metadata.supportTier",
+            "package_shape_scoped_release_metadata.p0DependencyChainReady",
+            "public_debug_boundary_fix.status",
+            "public_debug_boundary_fix.publicDebugBoundaryReady",
+            "public_debug_boundary_fix.runtimeReady",
+            "public_debug_boundary_fix.publicSdkReady",
+            "public_debug_boundary_fix.pluginHubReady",
+            "public_debug_boundary_fix.completeSdkClaimProgressContribution",
+            "principal_start_end_report.status",
+            "principal_start_end_report.startEndOnlyEvidenceReady",
+            "principal_start_end_report.approvedRuntimeEvidenceReady",
+            "principal_start_end_report.countsTowardP0DependencyChainClaim",
+            "source_overclaim_zero_report.sourceReady",
+            "source_overclaim_zero_report.status",
+            "source_overclaim_zero_report.completeSdkClaimProgressContribution",
+            "active_passive_monitor_session.publicSdkReady",
+            "active_passive_monitor_session.p0DependencyChainReady",
+            "active_passive_monitor_session.completeSdkClaimProgressContribution",
+        )
+
+        violations = set(side_lane_completion_accounting_alias_violations(payload))
+        claims = set(secondary_report_completion_claims_without_blocker(payload))
+        for path in expected_paths:
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+        self.assertNotIn("source_overclaim_zero_report.sourceOverclaimTotal", violations)
+        self.assertNotIn("source_overclaim_zero_report.sourceOverclaimTotal", claims)
+
+        route_claims = set(
+            command_permission_route_gate_public_or_runtime_claims(
+                {
+                    "critical_path_phase": {
+                        "source_kind": "player_identity_public_header_gate_report",
+                        "sourceOverclaimTotal": 0,
+                        "publicSdkReady": True,
+                    }
+                }
+            )
+        )
+        self.assertIn("critical_path_phase.source_kind", route_claims)
+        self.assertIn("critical_path_phase.publicSdkReady", route_claims)
+
+    def test_post_runtime_p0_shortcut_artifacts_do_not_satisfy_runtime_or_promotion_evidence(
+        self,
+    ) -> None:
+        cases = (
+            (
+                {
+                    "schema": "obelisk.player-identity-public-header-gate-check.v1",
+                    "source_kind": "player_identity_public_header_gate_report",
+                    "ready_scope": "public_header_gate_report",
+                },
+                "public_header_gate_report_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-public-contract-gap-report.v1",
+                    "source_kind": "public_contract_gap_report",
+                    "ready_scope": "public_contract_gap_report",
+                },
+                "public_contract_gap_report_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                    "source_kind": "public_contract_readiness_report",
+                    "ready_scope": "public_contract_readiness_report",
+                },
+                "public_contract_review_status_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-public-contract-decision-record-template.v1",
+                    "source_kind": "decision_record_template",
+                    "ready_scope": "decision_record_template",
+                },
+                "decision_record_template_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-reviewed-decision-record.v1",
+                    "source_kind": "reviewed_decision_record",
+                    "ready_scope": "reviewed_decision_record",
+                },
+                "decision_record_template_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.sdk-offline-hardening-report.v1",
+                    "source_kind": "offline_hardening_report",
+                    "ready_scope": "offline_hardening_report",
+                },
+                "offline_hardening_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-promotion-certificate-template.v1",
+                    "source_kind": "promotion_certificate_template",
+                    "ready_scope": "promotion_certificate_template",
+                },
+                "promotion_certificate_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-identity-generated-cert-report.v1",
+                    "source_kind": "generated_cert_report",
+                    "ready_scope": "generated_cert_report",
+                },
+                "generated_cert_report_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.beta-capture-pack.v1",
+                    "source_kind": "beta_capture_pack",
+                    "ready_scope": "beta_capture_pack",
+                },
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON,
+            ),
+            (
+                {
+                    "schema": "obelisk.package-shape-scoped-release-metadata.v1",
+                    "source_kind": "package_shape_scoped_release_metadata",
+                    "ready_scope": "package_shape_scoped_release_metadata",
+                },
+                "package_shape_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.public-debug-boundary-fix-report.v1",
+                    "source_kind": "public_debug_boundary_fix",
+                    "ready_scope": "public_debug_boundary_fix",
+                },
+                "public_debug_boundary_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-start-end-evidence-check.v1",
+                    "source_kind": "principal_start_end_report",
+                    "ready_scope": "principal_start_end_report",
+                },
+                "start_end_only_evidence_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.sdk-status-report.v1",
+                    "source_kind": "sdk_status_report",
+                    "ready_scope": "sdk_status_report",
+                },
+                "status_report_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.source-overclaim-diagnostics.v1",
+                    "source_kind": "source_overclaim_zero_report",
+                    "ready_scope": "source_overclaim_zero_report",
+                    "source_overclaim_total": 0,
+                },
+                "source_overclaim_zero_not_approved_runtime_evidence",
+            ),
+        )
+
+        with (
+            self.repo_test_tempdir("core", "PlayerIdentityPromotion") as core_dir,
+            self.repo_test_tempdir("sdk_consumer", "player_identity_promotion") as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+            abi_tests = [str(core_test.relative_to(REPO_ROOT))]
+            sdk_tests = [str(sdk_test.relative_to(REPO_ROOT))]
+
+            for artifact, reason in cases:
+                with self.subTest(reason=reason):
+                    runtime_artifact = {
+                        **artifact,
+                        "approved_runtime_evidence_accepted": True,
+                        "evidence_bundle_accepted": True,
+                        "approved_runtime_evidence_ready": True,
+                        "runtime_evidence_ready": True,
+                    }
+                    reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                        runtime_artifact,
+                        "approved_runtime_evidence",
+                    )
+                    self.assertIn(f"approved_runtime_evidence:{reason}", reasons)
+                    route_gate = {"approved_runtime_evidence": runtime_artifact}
+                    self.assertFalse(
+                        completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                            route_gate
+                        )
+                    )
+                    self.assertIsNone(
+                        completion_checker.command_permission_route_gate_current_blocker(
+                            route_gate
+                        )
+                    )
+
+                    surface = {
+                        "id": "obelisk.player_identity.v1",
+                        "status": "promoted",
+                        "evidence": {
+                            **artifact,
+                            "surface_id": "obelisk.player_identity.v1",
+                            "promotion_status": "promoted",
+                            "public_sdk_ready": True,
+                            "abi_tests": abi_tests,
+                            "sdk_consumer_tests": sdk_tests,
+                        },
+                    }
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+
+    def test_recent_diagnostic_split_and_route_sample_aliases_are_non_counting(
+        self,
+    ) -> None:
+        payload = {
+            "ready_log_evidence_split": {
+                "schema": "obelisk.player-principal-ready-log-evidence-split.v1",
+                "status": "ready",
+                "ready": True,
+                "readyLogEvidenceSplitReady": True,
+                "approvedRuntimeEvidenceMissingCleared": True,
+                "runtimeReady": True,
+                "publicSdkReady": True,
+                "packageShapeReady": True,
+                "supportTier": "release-supported",
+                "pluginHubReady": True,
+                "p0DependencyChainClaimProgressContribution": "1/4",
+            },
+            "player_principal_lifecycle_event_split_summary": {
+                "schema": "obelisk.player-principal-lifecycle-event-split-summary.v1",
+                "status": "complete_triplet_present",
+                "lifecycleEventSplitReady": True,
+                "completeTripletReady": True,
+                "countsTowardP0DependencyChainClaim": True,
+            },
+            "post_runtime_contract_gap_diagnostic": {
+                "schema": "obelisk.post-runtime-contract-gap-diagnostic.v1",
+                "status": "resolved",
+                "postRuntimeContractGapResolved": True,
+                "postRuntimeContractReady": True,
+                "publicContractReady": True,
+                "v1CompletionReady": True,
+            },
+            "route_samples": {
+                "schema": "obelisk.command-permission-route-samples.v1",
+                "status": "accepted",
+                "routeSamplesReady": True,
+                "publicRouteReady": True,
+                "routeReady": True,
+                "p0DependencyChainProgressRatio": "1/4",
+            },
+        }
+
+        expected_paths = (
+            "ready_log_evidence_split.status",
+            "ready_log_evidence_split.ready",
+            "ready_log_evidence_split.readyLogEvidenceSplitReady",
+            "ready_log_evidence_split.approvedRuntimeEvidenceMissingCleared",
+            "ready_log_evidence_split.runtimeReady",
+            "ready_log_evidence_split.publicSdkReady",
+            "ready_log_evidence_split.packageShapeReady",
+            "ready_log_evidence_split.supportTier",
+            "ready_log_evidence_split.pluginHubReady",
+            "ready_log_evidence_split.p0DependencyChainClaimProgressContribution",
+            "player_principal_lifecycle_event_split_summary.status",
+            "player_principal_lifecycle_event_split_summary.lifecycleEventSplitReady",
+            "player_principal_lifecycle_event_split_summary.completeTripletReady",
+            "player_principal_lifecycle_event_split_summary.countsTowardP0DependencyChainClaim",
+            "post_runtime_contract_gap_diagnostic.status",
+            "post_runtime_contract_gap_diagnostic.postRuntimeContractGapResolved",
+            "post_runtime_contract_gap_diagnostic.postRuntimeContractReady",
+            "post_runtime_contract_gap_diagnostic.publicContractReady",
+            "post_runtime_contract_gap_diagnostic.v1CompletionReady",
+            "route_samples.status",
+            "route_samples.routeSamplesReady",
+            "route_samples.publicRouteReady",
+            "route_samples.routeReady",
+            "route_samples.p0DependencyChainProgressRatio",
+        )
+
+        violations = set(side_lane_completion_accounting_alias_violations(payload))
+        claims = set(secondary_report_completion_claims_without_blocker(payload))
+        for path in expected_paths:
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+
+        route_claims = set(
+            command_permission_route_gate_public_or_runtime_claims(
+                {
+                    "critical_path_phase": {
+                        "source_kind": "post_runtime_contract_gap_diagnostic",
+                        "postRuntimeContractGapResolved": True,
+                        "pluginHubReady": True,
+                    }
+                }
+            )
+        )
+        self.assertIn("critical_path_phase.source_kind", route_claims)
+        self.assertIn("critical_path_phase.postRuntimeContractGapResolved", route_claims)
+        self.assertIn("critical_path_phase.pluginHubReady", route_claims)
+
+    def test_recent_diagnostic_split_artifacts_cannot_satisfy_runtime_or_promotion_evidence(
+        self,
+    ) -> None:
+        cases = (
+            (
+                {
+                    "schema": "obelisk.player-principal-ready-log-evidence-split.v1",
+                    "source_kind": "ready_log_evidence_split",
+                    "ready_scope": "ready_log_evidence_split",
+                    "approved_runtime_evidence_ready": True,
+                    "evidence_bundle_accepted": True,
+                },
+                "ready_log_evidence_split_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.player-principal-lifecycle-event-split-summary.v1",
+                    "source_kind": "player_principal_lifecycle_event_split_summary",
+                    "ready_scope": "player_principal_lifecycle_event_split_summary",
+                    "approved_runtime_evidence_ready": True,
+                    "evidence_bundle_accepted": True,
+                },
+                "lifecycle_event_split_summary_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.post-runtime-contract-gap-diagnostic.v1",
+                    "source_kind": "post_runtime_contract_gap_diagnostic",
+                    "ready_scope": "post_runtime_contract_gap_diagnostic",
+                    "approved_runtime_evidence_ready": True,
+                    "evidence_bundle_accepted": True,
+                },
+                "post_runtime_contract_gap_diagnostic_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.command-permission-route-samples.v1",
+                    "source_kind": "route_samples",
+                    "ready_scope": "route_samples",
+                    "approved_runtime_evidence_ready": True,
+                    "evidence_bundle_accepted": True,
+                },
+                "route_sample_not_approved_runtime_evidence",
+            ),
+        )
+
+        for artifact, reason in cases:
+            with self.subTest(reason=reason):
+                reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                    artifact,
+                    "approved_runtime_evidence",
+                )
+                self.assertIn(f"approved_runtime_evidence:{reason}", reasons)
+                self.assertFalse(
+                    completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                        {"approved_runtime_evidence": artifact}
+                    )
+                )
+                self.assertIsNone(
+                    completion_checker.command_permission_route_gate_current_blocker(
+                        {"approved_runtime_evidence": artifact}
+                    )
+                )
+
+                surface = {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        **artifact,
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": ["tests/abi/AbiLayoutTests.cpp"],
+                        "sdk_consumer_tests": ["tests/sdk_consumer/MinimalPlugin.cpp"],
+                    },
+                }
+                self.assertFalse(surface_has_promotion_evidence(surface))
+
+    def test_multi_surface_beta_capture_cannot_satisfy_runtime_evidence_blocker(
+        self,
+    ) -> None:
+        payload = {
+            "schema": "obelisk.multi-surface-beta-capture-plan-queue.v1",
+            "ready_scope": "multi_surface_beta_capture_plan_queue",
+            "approved_runtime_evidence_accepted": True,
+            "evidence_bundle_accepted": True,
+            "approved_runtime_evidence_ready": True,
+        }
+
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            payload,
+            "approved_runtime_evidence",
+        )
+        self.assertIn(
+            (
+                "approved_runtime_evidence:"
+                "multi_surface_beta_capture_not_approved_runtime_evidence"
+            ),
+            reasons,
+        )
+        self.assertIsNone(
+            completion_checker.command_permission_route_gate_current_blocker(
+                {"approved_runtime_evidence": payload}
+            )
+        )
+
+    def test_multi_surface_beta_capture_pack_family_positive_aliases_are_non_counting(
+        self,
+    ) -> None:
+        payload = {
+            "multi_surface_beta_capture_pack": {
+                "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                "status": "ready",
+                "artifact_names": list(
+                    completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES
+                ),
+                "approvedRuntimeEvidenceMissingCleared": True,
+                "clearsApprovedRuntimeEvidenceMissing": True,
+                "completeSdkClaimProgressContribution": "1/12",
+                "p0DependencyChainClaimProgressContribution": "1/4",
+                "checker_command_matrix": {
+                    "schema": "obelisk.multi-surface-beta-capture-checker-matrix.v1",
+                    "status": "ready",
+                    "countsTowardSdk": True,
+                },
+                "non_claim_manifest": {
+                    "schema": "obelisk.multi-surface-beta-capture-non-claim-manifest.v1",
+                    "publicSdkReady": True,
+                },
+                "operator_runbook": {
+                    "path": "operator-runbook.md",
+                    "runtimeReady": True,
+                },
+                "manifest": {
+                    "name": "manifest.json",
+                    "p0DependencyChainClaimProgressRatio": "1/4",
+                },
+            }
+        }
+
+        expected_aliases = (
+            "status",
+            "approvedRuntimeEvidenceMissingCleared",
+            "clearsApprovedRuntimeEvidenceMissing",
+            "completeSdkClaimProgressContribution",
+            "p0DependencyChainClaimProgressContribution",
+            "checker_command_matrix.status",
+            "checker_command_matrix.countsTowardSdk",
+            "non_claim_manifest.publicSdkReady",
+            "operator_runbook.runtimeReady",
+            "manifest.p0DependencyChainClaimProgressRatio",
+        )
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                path = f"multi_surface_beta_capture_pack.{alias}"
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+
+    def test_multi_surface_beta_capture_pack_family_cannot_satisfy_runtime_evidence_blocker(
+        self,
+    ) -> None:
+        for schema in completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_SCHEMAS:
+            with self.subTest(schema=schema):
+                payload = {
+                    "schema": schema,
+                    "ready_scope": "multi_surface_beta_capture_pack",
+                    "status": "ready",
+                    "artifact_names": list(
+                        completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES
+                    ),
+                    "approved_runtime_evidence_accepted": True,
+                    "evidence_bundle_accepted": True,
+                    "approved_runtime_evidence_ready": True,
+                    "approved_runtime_evidence_present": True,
+                    "clears_approved_runtime_evidence_missing": True,
+                    "counts_as_sdk_progress": True,
+                    "counts_as_p0_progress": True,
+                }
+
+                reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                    payload,
+                    "approved_runtime_evidence",
+                )
+                self.assertIn(
+                    (
+                        "approved_runtime_evidence:"
+                        f"{completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON}"
+                    ),
+                    reasons,
+                )
+                self.assertFalse(
+                    completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                        {"approved_runtime_evidence": payload}
+                    )
+                )
+                self.assertIsNone(
+                    completion_checker.command_permission_route_gate_current_blocker(
+                        {"approved_runtime_evidence": payload}
+                    )
+                )
+
+    def test_public_contract_review_artifact_aliases_are_non_counting(self) -> None:
+        payload = {
+            "public_contract_review_report": {
+                "schema": "obelisk.player-identity-public-contract-review-artifact.v1",
+                "status": "reviewed",
+                "ready": True,
+                "acceptedForContractReview": True,
+                "contractReviewArtifactReady": True,
+                "contractReviewReady": True,
+                "contractReviewStatus": "reviewed",
+                "publicContractAllowed": True,
+                "publicContractArtifactReady": True,
+                "publicContractReady": True,
+                "publicContractReviewReady": True,
+                "publicContractState": "ready",
+                "reviewedPublicContract": True,
+                "reviewedPublicContractReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            }
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        expected_aliases = (
+            "status",
+            "ready",
+            "acceptedForContractReview",
+            "contractReviewArtifactReady",
+            "contractReviewReady",
+            "contractReviewStatus",
+            "publicContractAllowed",
+            "publicContractArtifactReady",
+            "publicContractReady",
+            "publicContractReviewReady",
+            "publicContractState",
+            "reviewedPublicContract",
+            "reviewedPublicContractReady",
+            "completeSdkClaimProgressContribution",
+        )
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                self.assertIn(f"public_contract_review_report.{alias}", violations)
+
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        self.assertIn("public_contract_review_report.status", claims)
+        self.assertIn("public_contract_review_report.contractReviewStatus", claims)
+        self.assertIn("public_contract_review_report.publicContractState", claims)
+        self.assertIn("public_contract_review_report.publicContractReviewReady", claims)
+        self.assertIn("public_contract_review_report.reviewedPublicContract", claims)
+        self.assertIn(
+            "public_contract_review_report.completeSdkClaimProgressContribution",
+            claims,
+        )
+
+        runtime_artifact = {
+            "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+            "source_kind": "reviewed_identity_public_contract",
+            "approved_runtime_evidence_ready": True,
+            "runtime_evidence_ready": True,
+        }
+        reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+            runtime_artifact,
+            "approved_runtime_evidence",
+        )
+        self.assertIn(
+            (
+                "approved_runtime_evidence:"
+                "public_contract_review_status_not_approved_runtime_evidence"
+            ),
+            reasons,
+        )
+        self.assertFalse(
+            completion_checker.accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+                {"approved_runtime_evidence": runtime_artifact}
+            )
+        )
+
+    def test_public_contract_readiness_report_cannot_count_as_generic_promotion(
+        self,
+    ) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            abi_test = core_path / "StructureCensusPromotionTests.cpp"
+            sdk_test = sdk_path / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+            manifest, release_statement = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.structure_census.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterStructureCensusCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.structure_census.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "public_contract_readiness_report": (
+                            "docs/research/player-identity-public-contract-status.json"
+                        ),
+                    }
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+                    break
+            if "obelisk.structure_census.v1" not in manifest["promoted_surfaces"]:
+                manifest["promoted_surfaces"].append("obelisk.structure_census.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.structure_census.v1"
+            ]
+            release_statement = "\n".join(
+                (
+                    "obelisk.structure_census.v1: promoted - reviewed ABI and SDK evidence."
+                    if line.startswith("obelisk.structure_census.v1:")
+                    else line
+                )
+                for line in release_statement.splitlines()
+            ) + "\n"
+            manifest_path = core_path / "public_sdk_surfaces.json"
+            statement_path = core_path / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+        self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+        self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(
+            payload["command_permission_route_gate"]["current_route_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        structure_census = outcome_by_surface["obelisk.structure_census.v1"]
+        self.assertFalse(structure_census["promotion_evidence_satisfied"])
+        self.assertFalse(structure_census["counts_toward_complete_sdk_claim"])
+        self.assertTrue(
+            structure_census[
+                "promotion_evidence_public_contract_review_status_reference"
+            ]
+        )
+        self.assertIn(
+            "public_contract_review_status_artifact_without_identity_gate",
+            structure_census["non_counting_reasons"],
+        )
+
+    def test_package_shape_support_aliases_are_non_counting_even_when_blocked(self) -> None:
+        payload = {
+            "package_shape_report": {
+                "schema": "obelisk.installed-sdk-package-shape.v1",
+                "blockers": ["package_shape_evidence_only"],
+                "status": "package-shape-evidence-only",
+                "abiLayoutReady": True,
+                "cmakeConfigReady": True,
+                "cmakePackageReady": True,
+                "componentsSdkReady": True,
+                "installedHeadersReady": True,
+                "obeliskConfigCmakeReady": True,
+                "obeliskTargetsCmakeReady": True,
+                "ownerTokenRegistrationReady": True,
+                "ownerTokenSdkConsumerReady": True,
+                "packageShapeReady": True,
+                "packageShapeV1CompletionReady": True,
+                "pluginHubPackagePublished": True,
+                "publicHeadersReady": True,
+                "publicHeaderAllowed": True,
+                "publicHeaderAvailable": True,
+                "publicHeadersAvailable": True,
+                "installedSdkConsumerTestsReady": True,
+                "publicModuleSdkCoverageReady": True,
+                "publicModuleSdkCovered": True,
+                "publicSdkCoverageReady": True,
+                "releaseStatementReady": True,
+                "runtimeLiveOpApprovalAllowed": True,
+                "runtimeReadinessClaimAllowed": True,
+                "scopedReleaseStatementCountsTowardCompleteSdkClaim": True,
+                "scopedReleaseStatementReady": True,
+                "sdkCoverageComplete": True,
+                "structSizeReady": True,
+                "structSizeValidated": True,
+                "supportTierActivated": True,
+                "supportTierAllowed": True,
+                "supportTierReady": True,
+                "supportTierSupported": True,
+                "supportTier": "release-supported",
+                "packageShapeStatus": "published",
+                "packageExactStatus": "unblocked",
+                "packageNonExactAllowed": True,
+                "sdkPackageState": "ready",
+                "packageExactCredits": "1/12",
+                "packageNonExactCredit": 1,
+                "pluginHubReady": True,
+                "pluginHubPublicationAllowed": True,
+                "pluginHubPublicationReady": True,
+                "pluginHubReadinessStatus": "ready",
+                "pluginHubSeedReady": True,
+                "pluginHubSupportTierReady": True,
+                "pluginHubCredits": 1,
+                "packageShapeClaimAllowed": True,
+                "publicPackageReady": True,
+                "p0DependencyChainPromotedForClaimCount": 1,
+                "p0DependencyChainReady": True,
+                "supportTierActivationReady": True,
+                "v1CompletionClaimAllowed": True,
+            }
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        expected_aliases = (
+            "abiLayoutReady",
+            "cmakeConfigReady",
+            "cmakePackageReady",
+            "componentsSdkReady",
+            "installedHeadersReady",
+            "obeliskConfigCmakeReady",
+            "obeliskTargetsCmakeReady",
+            "ownerTokenRegistrationReady",
+            "ownerTokenSdkConsumerReady",
+            "packageShapeReady",
+            "packageShapeV1CompletionReady",
+            "pluginHubPackagePublished",
+            "publicHeadersReady",
+            "publicHeaderAllowed",
+            "publicHeaderAvailable",
+            "publicHeadersAvailable",
+            "installedSdkConsumerTestsReady",
+            "publicModuleSdkCoverageReady",
+            "publicModuleSdkCovered",
+            "publicSdkCoverageReady",
+            "releaseStatementReady",
+            "runtimeLiveOpApprovalAllowed",
+            "runtimeReadinessClaimAllowed",
+            "scopedReleaseStatementCountsTowardCompleteSdkClaim",
+            "scopedReleaseStatementReady",
+            "sdkCoverageComplete",
+            "structSizeReady",
+            "structSizeValidated",
+            "supportTierActivated",
+            "supportTierAllowed",
+            "supportTierReady",
+            "supportTierSupported",
+            "supportTier",
+            "packageShapeStatus",
+            "packageExactStatus",
+            "packageNonExactAllowed",
+            "sdkPackageState",
+            "packageExactCredits",
+            "packageNonExactCredit",
+            "pluginHubReady",
+            "pluginHubPublicationAllowed",
+            "pluginHubPublicationReady",
+            "pluginHubReadinessStatus",
+            "pluginHubSeedReady",
+            "pluginHubSupportTierReady",
+            "pluginHubCredits",
+            "packageShapeClaimAllowed",
+            "publicPackageReady",
+            "p0DependencyChainPromotedForClaimCount",
+            "p0DependencyChainReady",
+            "supportTierActivationReady",
+            "v1CompletionClaimAllowed",
+        )
+        for alias in expected_aliases:
+            with self.subTest(alias=alias):
+                self.assertIn(f"package_shape_report.{alias}", violations)
+
+    def test_recent_bridge_package_and_abi_guardrail_aliases_are_non_counting(self) -> None:
+        payload = {
+            "discord_beta_bridge_bot_notice": {
+                "schema": "obelisk.discord-beta-bridge-bot-notice.v1",
+                "confirmed_send": True,
+                "sendPerformed": True,
+                "http_status": 200,
+                "publicSdkReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "multi_surface_beta_pack": {
+                "schema": "obelisk.multi-surface-beta-pack.v1",
+                "status": "ready",
+                "publicSdkReady": True,
+                "completeSdkClaimProgressContribution": "1/12",
+            },
+            "install_package_check": {
+                "schema": "obelisk.installed-sdk-package-check.v1",
+                "findPackageSucceeded": True,
+                "componentSdkFound": True,
+                "packageInstallSuccess": True,
+                "v1CompletionReady": True,
+            },
+            "abi_consumer_guardrails": {
+                "schema": "obelisk.sdk-consumer-abi-guardrails.v1",
+                "postInitCallProcessEventSkipped": True,
+                "callProcessEventPostInitRejected": True,
+                "sdkConsumerGuardrailPassed": True,
+                "completeSdkClaimProgressContribution": 1,
+            },
+        }
+
+        expected_paths = (
+            "discord_beta_bridge_bot_notice.confirmed_send",
+            "discord_beta_bridge_bot_notice.sendPerformed",
+            "discord_beta_bridge_bot_notice.http_status",
+            "discord_beta_bridge_bot_notice.publicSdkReady",
+            "discord_beta_bridge_bot_notice.completeSdkClaimProgressContribution",
+            "multi_surface_beta_pack.status",
+            "multi_surface_beta_pack.publicSdkReady",
+            "multi_surface_beta_pack.completeSdkClaimProgressContribution",
+            "install_package_check.findPackageSucceeded",
+            "install_package_check.componentSdkFound",
+            "install_package_check.packageInstallSuccess",
+            "install_package_check.v1CompletionReady",
+            "abi_consumer_guardrails.postInitCallProcessEventSkipped",
+            "abi_consumer_guardrails.callProcessEventPostInitRejected",
+            "abi_consumer_guardrails.sdkConsumerGuardrailPassed",
+            "abi_consumer_guardrails.completeSdkClaimProgressContribution",
+        )
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+        claims = secondary_report_completion_claims_without_blocker(payload)
+        for path in expected_paths:
+            with self.subTest(path=path):
+                self.assertIn(path, violations)
+                self.assertIn(path, claims)
+
+    def test_recent_non_claim_artifacts_cannot_satisfy_runtime_or_promotion_evidence(self) -> None:
+        cases = (
+            (
+                {
+                    "schema": "obelisk.discord-beta-bridge-bot-notice.v1",
+                    "source_kind": "discord_beta_bridge_bot_notice",
+                    "approved_runtime_evidence_ready": True,
+                },
+                "discord_beta_bridge_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.multi-surface-beta-pack.v1",
+                    "source_kind": "multi_surface_beta_pack",
+                    "approved_runtime_evidence_ready": True,
+                },
+                completion_checker.MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON,
+            ),
+            (
+                {
+                    "schema": "obelisk.installed-sdk-package-check.v1",
+                    "source_kind": "find_package",
+                    "approved_runtime_evidence_ready": True,
+                },
+                "package_shape_not_approved_runtime_evidence",
+            ),
+            (
+                {
+                    "schema": "obelisk.sdk-consumer-abi-guardrails.v1",
+                    "source_kind": "post_init_call_process_event",
+                    "approved_runtime_evidence_ready": True,
+                },
+                "post_init_call_process_event_not_approved_runtime_evidence",
+            ),
+        )
+
+        for artifact, reason in cases:
+            with self.subTest(reason=reason):
+                reasons = approved_runtime_evidence_non_approved_artifact_reasons(
+                    artifact,
+                    "approved_runtime_evidence",
+                )
+                self.assertIn(f"approved_runtime_evidence:{reason}", reasons)
+                surface = {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        **artifact,
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                    },
+                }
+                self.assertFalse(surface_has_promotion_evidence(surface))
+
+    def test_internal_module_readiness_aliases_are_non_counting(self) -> None:
+        payload = {
+            "side_lanes": {
+                "mission_leaf_internal_module": {
+                    "schema": "obelisk.internal-module-readiness.v1",
+                    "ready_scope": "internal_only",
+                    "moduleSdkReady": True,
+                    "publicModuleReady": True,
+                    "publicModuleSdkReady": True,
+                }
+            }
+        }
+
+        violations = side_lane_completion_accounting_alias_violations(payload)
+
+        self.assertIn(
+            "side_lanes.mission_leaf_internal_module.moduleSdkReady",
+            violations,
+        )
+        self.assertIn(
+            "side_lanes.mission_leaf_internal_module.publicModuleReady",
+            violations,
+        )
+        self.assertIn(
+            "side_lanes.mission_leaf_internal_module.publicModuleSdkReady",
+            violations,
+        )
+
+    def test_mission_copied_bool_fixture_boundary_artifacts_do_not_count_complete_sdk_progress(self) -> None:
+        required_leaves = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="MissionTransferDinoTribePromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="mission_transfer_dino_tribe_promotion",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            top_abi = core_path / "MissionTransferDinoTribePromotionTests.cpp"
+            top_sdk = sdk_path / "mission_transfer_dino_tribe_promotion_plugin.c"
+            top_abi.write_text("// promoted mission umbrella ABI placeholder\n", encoding="utf-8")
+            top_sdk.write_text("// promoted mission umbrella SDK placeholder\n", encoding="utf-8")
+            leaf_paths: dict[str, tuple[Path, Path]] = {}
+            for leaf_id in required_leaves:
+                leaf_abi = core_path / f"mission_transfer_dino_tribe_{leaf_id}_promotion_tests.cpp"
+                leaf_sdk = sdk_path / f"mission_transfer_dino_tribe_{leaf_id}_promotion_plugin.c"
+                leaf_abi.write_text(f"// promoted {leaf_id} ABI placeholder\n", encoding="utf-8")
+                leaf_sdk.write_text(f"// promoted {leaf_id} SDK placeholder\n", encoding="utf-8")
+                leaf_paths[leaf_id] = (leaf_abi, leaf_sdk)
+
+            def repo_path(path: Path) -> str:
+                return str(path.relative_to(REPO_ROOT))
+
+            def mission_surface(manifest: dict[str, object]) -> dict[str, object]:
+                for surface in manifest["surfaces"]:  # type: ignore[index]
+                    if isinstance(surface, dict) and surface.get("id") == "obelisk.mission_transfer_dino_tribe.v1":
+                        return surface
+                raise AssertionError("mission surface missing from test manifest")
+
+            def promoted_mission_manifest() -> tuple[dict[str, object], str, dict[str, object]]:
+                manifest, release_statement = complete_excluded_manifest()
+                surface = mission_surface(manifest)
+                surface["status"] = "promoted"
+                surface["support_tier"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterMissionTransferDinoTribeCallback"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.mission_transfer_dino_tribe.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [repo_path(top_abi)],
+                    "sdk_consumer_tests": [repo_path(top_sdk)],
+                }
+                leaves = surface.get("leaf_decision_units")
+                self.assertIsInstance(leaves, list)
+                for leaf in leaves:  # type: ignore[union-attr]
+                    self.assertIsInstance(leaf, dict)
+                    leaf_id = leaf["id"]
+                    self.assertIn(leaf_id, required_leaves)
+                    leaf_abi, leaf_sdk = leaf_paths[str(leaf_id)]
+                    leaf["status"] = "promoted"
+                    leaf["public_contract"] = [
+                        f"ObeliskApi.RegisterMissionTransferDinoTribe{str(leaf_id).title()}Callback"
+                    ]
+                    leaf["evidence"] = {
+                        "promotion_status": "promoted",
+                        "promotion_ready": True,
+                        "public_sdk_ready": True,
+                        "runtime_ready": True,
+                        "abi_tests": [repo_path(leaf_abi)],
+                        "sdk_consumer_tests": [repo_path(leaf_sdk)],
+                        "second_source_evidence": [f"reviewed_second_source_{leaf_id}"],
+                    }
+                promoted_surfaces = manifest.setdefault("promoted_surfaces", [])
+                if "obelisk.mission_transfer_dino_tribe.v1" not in promoted_surfaces:
+                    promoted_surfaces.append("obelisk.mission_transfer_dino_tribe.v1")
+                for list_name in ("post_v1_or_excluded_surfaces", "planning_surfaces"):
+                    if isinstance(manifest.get(list_name), list):
+                        manifest[list_name] = [
+                            surface_id
+                            for surface_id in manifest[list_name]  # type: ignore[index]
+                            if surface_id != "obelisk.mission_transfer_dino_tribe.v1"
+                        ]
+                release_statement = "\n".join(
+                    (
+                        "obelisk.mission_transfer_dino_tribe.v1: promoted - "
+                        "reviewed ABI and SDK evidence for all Mission, Transfer, Dino, "
+                        "Tribe, and Buff leaf units."
+                    )
+                    if line.startswith("obelisk.mission_transfer_dino_tribe.v1:")
+                    else line
+                    for line in release_statement.splitlines()
+                ) + "\n"
+                return manifest, release_statement, surface
+
+            _, _, base_surface = promoted_mission_manifest()
+            self.assertTrue(surface_has_promotion_evidence(base_surface))
+
+            def add_current_evidence_copied_bool(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["current_evidence"] = ["mission-copied-bool-policy-slice"]
+
+            def add_fixture_boundary_report(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["source_artifacts"] = [
+                    {
+                        "schema": "obelisk.mission-copied-bool-fixture-boundary-report.v1",
+                        "path": "docs/research/mission-copied-bool-fixture-boundary-report.json",
+                    }
+                ]
+
+            def add_readiness_only_report(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["ready_scope"] = "readiness_only"
+                evidence["report_only"] = True
+
+            def add_leaf_scoped_fixture_boundary(surface: dict[str, object]) -> None:
+                leaves = surface["leaf_decision_units"]
+                self.assertIsInstance(leaves, list)
+                leaf = leaves[0]
+                self.assertIsInstance(leaf, dict)
+                evidence = leaf["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["ready_scope"] = "internal_fixture_boundary_only"
+                evidence["source_artifacts"] = [
+                    {
+                        "path": "docs/research/mission-scoped-non-complete-report-only.json",
+                    }
+                ]
+
+            def add_transfer_scriptstruct_readiness(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["transfer_scriptstruct_readiness"] = {
+                    "schema": "obelisk.transfer-scriptstruct-readiness-check.v1",
+                    "ready_scope": "transfer-script-struct-readiness",
+                    "counts_toward_complete_sdk_claim": False,
+                    "complete_sdk_claim_progress_contribution": 0,
+                }
+
+            def add_dino_scalar_readiness(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["dino_scalar_readiness"] = {
+                    "schema": "obelisk.dino-scalar-readiness-check.v1",
+                    "ready_scope": "dino-scalar-readiness",
+                    "scalar_only_ready": True,
+                    "precall_scalar_ready": True,
+                    "counts_toward_complete_sdk_claim": False,
+                    "p0_dependency_chain_claim_progress_contribution": 0,
+                }
+
+            def add_buff_status_readiness(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["buff_status_readiness"] = {
+                    "schema": "obelisk.buff-status-readiness-check.v1",
+                    "buff_status_candidate_ready": True,
+                    "v1_completion_ready": False,
+                    "stable_claim_allowed": False,
+                }
+
+            def add_buff_status_source_bindings(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["buff_status_source_bindings"] = {
+                    "source_manifest": {
+                        "schema": "obelisk.ufunction-snapshot-manifest.v1",
+                        "source": "offline_core",
+                        "status": "candidate-only",
+                        "bound_target_count": 6,
+                    },
+                    "summary": {
+                        "source_binding_count": 6,
+                        "source_bindings": [
+                            {
+                                "manifest_module": "sdk_buffs",
+                                "fixture_path": "7e7ded49e0c6/sdk_buffs/buff.json",
+                                "evidence_source": "offline_core",
+                                "evidence_status": "candidate-only",
+                                "artifact_kind": "offline_core",
+                            }
+                        ],
+                    },
+                }
+
+            def add_tribe_scalar_boundary_readiness(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["current_evidence"] = [
+                    "tribe-scalar-boundary-readiness",
+                ]
+
+            def add_route_gate_post_evidence_simulation(surface: dict[str, object]) -> None:
+                evidence = surface["evidence"]
+                self.assertIsInstance(evidence, dict)
+                evidence["post_evidence_p0_lock_simulation"] = {
+                    "schema": (
+                        "obelisk.command-permission-route-post-evidence-p0-lock-simulation.v1"
+                    ),
+                    "simulation_only": True,
+                    "counts_toward_complete_sdk_claim": False,
+                    "counts_toward_p0_dependency_chain_claim": False,
+                    "complete_sdk_claim_progress_contribution": 0,
+                    "p0_dependency_chain_claim_progress_contribution": 0,
+                    "stable_claim_allowed": False,
+                }
+
+            cases = (
+                (
+                    "current_evidence_copied_bool_policy_slice",
+                    add_current_evidence_copied_bool,
+                    ["non_promotional_artifact_reference"],
+                ),
+                (
+                    "fixture_boundary_report_artifact",
+                    add_fixture_boundary_report,
+                    [
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "readiness_only_report",
+                    add_readiness_only_report,
+                    [
+                        "non_promotional_ready_scope",
+                        "non_promotional_readiness_only",
+                    ],
+                ),
+                (
+                    "leaf_scoped_fixture_boundary_report",
+                    add_leaf_scoped_fixture_boundary,
+                    [],
+                ),
+                (
+                    "transfer_scriptstruct_readiness_report",
+                    add_transfer_scriptstruct_readiness,
+                    [
+                        "non_promotional_ready_scope",
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "dino_scalar_readiness_report",
+                    add_dino_scalar_readiness,
+                    [
+                        "non_promotional_ready_scope",
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "buff_status_readiness_report",
+                    add_buff_status_readiness,
+                    [
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "buff_status_source_bindings",
+                    add_buff_status_source_bindings,
+                    [
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "tribe_scalar_boundary_readiness_report",
+                    add_tribe_scalar_boundary_readiness,
+                    [
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+                (
+                    "route_gate_post_evidence_p0_lock_simulation_report",
+                    add_route_gate_post_evidence_simulation,
+                    [
+                        "non_promotional_schema_marker",
+                        "non_promotional_artifact_reference",
+                    ],
+                ),
+            )
+
+            for case_name, mutate, expected_reasons in cases:
+                with self.subTest(case=case_name):
+                    manifest, release_statement, surface = promoted_mission_manifest()
+                    mutate(surface)
+                    self.assertFalse(surface_has_promotion_evidence(surface))
+                    manifest_path = core_path / f"{case_name}_public_sdk_surfaces.json"
+                    statement_path = core_path / f"{case_name}_RELEASE_STATEMENT.md"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    statement_path.write_text(release_statement, encoding="utf-8")
+                    result = self.run_checker(
+                        "--manifest",
+                        str(manifest_path),
+                        "--release-statement",
+                        str(statement_path),
+                        "--json",
+                        check=False,
+                    )
+
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(payload["complete_sdk_claim_progress_ratio"], "0/12")
+                    self.assertEqual(payload["p0_dependency_chain_claim_progress_ratio"], "0/4")
+                    self.assertEqual(payload["complete_sdk_blockers_promoted_for_claim_count"], 0)
+                    self.assertEqual(payload["p0_dependency_chain_promoted_for_claim_count"], 0)
+                    self.assertFalse(payload["stable_claim_allowed"])
+                    self.assertEqual(
+                        payload["command_permission_route_gate"]["current_route_blocker"],
+                        "approved_runtime_evidence_missing",
+                    )
+                    outcome_by_surface = {
+                        row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+                    }
+                    mission = outcome_by_surface["obelisk.mission_transfer_dino_tribe.v1"]
+                    self.assertFalse(mission["promotion_evidence_satisfied"])
+                    self.assertFalse(mission["counts_toward_complete_sdk_claim"])
+                    self.assertIn("promotion_evidence_missing", mission["non_counting_reasons"])
+                    for expected_reason in expected_reasons:
+                        self.assertIn(expected_reason, mission["non_counting_reasons"])
+
     def test_planning_completion_blocker_requires_exclusion_contract(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["v1_completion_required"] = False
@@ -11978,10 +19934,19 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+            payload = completion_checker.build_report(
+                manifest_path,
+                None,
+                completion_checker.DEFAULT_PUBLIC_HEADER,
+                completion_checker.DEFAULT_CONTRACT_DECISIONS_DIR,
+                completion_checker.DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
+                completion_checker.DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
+                completion_checker.DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS,
+                completion_checker.DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING,
+                completion_checker.DEFAULT_STRUCTURE_CENSUS_READINESS,
+                completion_checker.DEFAULT_STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE,
+            )
 
-        payload = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_required_for_v1_completion", payload["blockers"])
 
 

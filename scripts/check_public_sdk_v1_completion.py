@@ -15,10 +15,14 @@ from pathlib import Path
 from typing import Any
 
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
+from native_prototype_guardrails import native_prototype_header_symbols
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+DEFAULT_SCOPED_RELEASE_STATEMENT = (
+    REPO_ROOT / "docs" / "SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md"
+)
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
 DEFAULT_COMMAND_PERMISSION_ROUTE_GATE = REPO_ROOT / "scripts" / "check_command_permission_route_gate.py"
@@ -56,16 +60,66 @@ COMMANDS_REPLIES_RESPONSE_PATH_REPORT_NAME = "command-chat-response-public-readi
 COMMAND_RESPONSE_READINESS_PRODUCER_SCRIPT = "scripts/compare_reflection_snapshots.py"
 COMMAND_RESPONSE_READINESS_OUTPUT_NAME = "command-chat-response-route-planning-readiness.json"
 COMMAND_RESPONSE_READINESS_TARGET_SET = "command-chat-response-route-planning"
+REQUIRED_PRINCIPAL_LIFECYCLE_EVENT_ROLES = (
+    "session_start",
+    "session_start_rejected",
+    "session_end",
+)
+APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE = (
+    "approved_runtime_principal_lifecycle_evidence_bundle"
+)
+APPROVED_RUNTIME_EVIDENCE_MISSING_BLOCKER = "approved_runtime_evidence_missing"
+IDENTITY_PUBLIC_CONTRACT_GATE_MISSING_BLOCKER = "identity_public_contract_gate_missing"
+STANDING_LAUNCH_AUTHORITY_RECORDED = True
+STANDING_LAUNCH_AUTHORITY_SOURCE = "2026-06-06_operator_standing_launch_authority"
+STANDING_OR_CURRENT_SCOPE_REQUIREMENT = (
+    "recorded standing launch authority can prepare necessary ObeliskSDK runtime "
+    "windows; otherwise an exact current-turn operator approval is required; "
+    "this completion report grants no evidence, readiness, publication, or SDK progress"
+)
 OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME = (
     "object_identity_resource_handle_public_contract_decisions.json"
 )
-MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES = {
+MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES_ORDER = (
     "mission",
     "transfer",
     "dino_policy",
     "tribe_policy",
     "buff_status",
-}
+)
+MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES = set(
+    MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES_ORDER
+)
+MULTI_SURFACE_BETA_CAPTURE_TARGETS = (
+    "player_principal_lifecycle",
+    "permissions_admin",
+    "command_chat_response_path",
+    "commands_replies",
+    "inventory_item_copied_signals",
+    "inventory_items_mutation",
+    "transfer",
+    "mission",
+    "dino_policy",
+    "tribe_policy",
+    "buff_status",
+)
+MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_SCHEMAS = (
+    "obelisk.multi-surface-beta-capture-plan.v1",
+    "obelisk.multi-surface-beta-capture-pack.v1",
+    "obelisk.multi-surface-beta-capture-checker-matrix.v1",
+    "obelisk.multi-surface-beta-capture-non-claim-manifest.v1",
+)
+MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES = (
+    "multi-surface-capture-plan.json",
+    "checker-command-matrix.json",
+    "non-claim-manifest.json",
+    "operator-runbook.md",
+    "manifest.json",
+    "README.md",
+)
+MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON = (
+    "multi_surface_beta_capture_pack_not_approved_runtime_evidence"
+)
 PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = (
     "obelisk.player-identity-promotion-certificate.v1"
 )
@@ -74,6 +128,92 @@ PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_SCHEMA = (
 )
 COMMAND_RESPONSE_PROMOTION_CERTIFICATE_SCHEMA = (
     "obelisk.command-chat-response-path-promotion-certificate.v1"
+)
+COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA = (
+    "obelisk.commands-replies-promotion-certificate.v1"
+)
+REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH = (
+    "evidence.reviewed_surface_record_sha256"
+)
+REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH_POLICY = (
+    "must match the reviewed surface record hash carried by the certificate"
+)
+PLAYER_IDENTITY_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA = (
+    "obelisk.player-identity-promotion-certificate-build-report.v1"
+)
+PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA = (
+    "obelisk.permissions-admin-promotion-certificate-build-report.v1"
+)
+COMMAND_RESPONSE_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA = (
+    "obelisk.command-chat-response-path-promotion-certificate-build-report.v1"
+)
+COMMANDS_REPLIES_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA = (
+    "obelisk.commands-replies-promotion-certificate-build-report.v1"
+)
+PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMAS = frozenset(
+    (
+        PLAYER_IDENTITY_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+        PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+        COMMAND_RESPONSE_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+        COMMANDS_REPLIES_PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMA,
+    )
+)
+PROMOTION_CERTIFICATE_BINDING_INLINE_SHAPE_KEYS = frozenset(
+    (
+        "schema",
+        "surface_id",
+        "promotion_status",
+        "certificate_status",
+        "planning_only",
+        "non_authorizing",
+        "v1_dependency_chain",
+        "v1_dependency_chain_position",
+        "required_by_surface",
+        "required_by_v1_dependency_chain_position",
+        "required_prior_surface",
+        "required_prior_certificate_schema",
+        "required_reviewed_artifact_hash",
+        "reviewed_artifact_hash_policy",
+        "missing_mismatched_or_stale_certificate_counts",
+        "evidence",
+        "input_bindings",
+        "certificate_binding",
+        "certificate_written",
+        "certificate_sha256",
+        "certificate_path",
+        "certificate_artifact_schema",
+        "output_certificate",
+        "output_certificate_path",
+        "sdk_progress",
+        "counts_toward_v1_completion",
+    )
+)
+PROMOTION_CERTIFICATE_BINDING_VALID_KEYS = frozenset(
+    (
+        "identity_surface_certificate_binding_valid",
+        "permissions_admin_surface_certificate_binding_valid",
+        "command_response_surface_certificate_binding_valid",
+        "commands_replies_surface_certificate_binding_valid",
+    )
+)
+PROMOTION_CERTIFICATE_REPORT_CONTAINER_KEYS = frozenset(
+    (
+        "certificate_artifact_schema",
+        "certificate_binding",
+        "certificate_path",
+        "certificate_sha256",
+        "certificate_written",
+        "output_certificate",
+        "output_certificate_path",
+    )
+)
+PROMOTION_CERTIFICATE_HASH_BINDING_REFERENCE_KEYS = frozenset(
+    (
+        "player_identity_promotion_certificate",
+        "permissions_admin_promotion_certificate",
+        "command_response_promotion_certificate",
+        "commands_replies_promotion_certificate",
+    )
 )
 PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "runtime.lifecycle_evidence",
@@ -224,33 +364,117 @@ INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS = (
     "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED",
     "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED",
     "Obelisk_V1_COMPLETION_CLAIM_ALLOWED",
+    "abi_layout_ready",
+    "abi_layout_validated",
     "counts_toward_complete_sdk_claim",
+    "cmake_config_ready",
+    "cmake_package_ready",
+    "cmake_package_support_tier_ready",
+    "cmake_package_v1_completion_ready",
+    "cmake_targets_ready",
+    "components_sdk_ready",
+    "headers_count_toward_complete_sdk_claim",
+    "installed_headers_ready",
+    "installed_sdk_consumer_tests_ready",
+    "installed_sdk_consumer_tests_v1_completion_ready",
     "installed_sdk_package_ready",
     "installed_sdk_release_ready",
+    "obelisk_config_cmake_ready",
+    "obelisk_targets_cmake_ready",
+    "owner_token_registration_ready",
+    "owner_token_sdk_consumer_ready",
+    "cross_event_identity_ready",
+    "cross_event_object_identity_ready",
+    "lookup_ready",
+    "mutation_ready",
+    "object_identity_ready",
+    "object_lookup_ready",
+    "object_mutation_ready",
     "package_available",
     "package_publication_allowed",
     "package_publication_ready",
     "package_published",
     "package_shape_counts_toward_release",
     "package_shape_release_ready",
+    "package_shape_ready",
+    "package_shape_v1_completion_ready",
+    "package_shape_counts_toward_completion",
+    "package_shape_counts_toward_public_sdk",
+    "package_shape_counts_toward_v1_completion",
     "public_package_available",
     "public_package_published",
     "public_package_ready",
     "plugin_hub_publication_allowed",
+    "plugin_hub_counts_toward_completion",
+    "plugin_hub_counts_toward_public_sdk",
+    "plugin_hub_counts_toward_v1_completion",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_readiness_allowed",
+    "plugin_hub_readiness_ready",
+    "plugin_hub_ready",
+    "plugin_hub_package_published",
+    "plugin_hub_seed_ready",
     "plugin_hub_seed_package_publication",
+    "plugin_hub_support_tier_ready",
     "promoted_for_claim_count",
     "promotion_ready",
+    "public_abi_available",
+    "public_header_allowed",
+    "public_header_available",
     "public_module_sdk_coverage_claim_allowed",
+    "public_module_sdk_coverage_ready",
+    "public_module_sdk_covered",
+    "public_header_ready",
+    "public_headers_ready",
+    "public_headers_available",
+    "public_lookup_ready",
+    "public_mutation_ready",
+    "public_sdk_coverage_ready",
     "public_sdk_ready",
+    "persistent_handle_ready",
+    "persistent_identity_ready",
+    "persistent_object_identity_ready",
+    "post_callback_handle_ready",
+    "post_callback_object_validity_ready",
+    "post_callback_resource_handle_ready",
+    "post_callback_validity_ready",
+    "release_statement_ready",
     "release_package_allowed",
     "release_package_available",
     "release_package_published",
     "release_package_ready",
     "release_packaged",
+    "release_statement_bookkeeping_counts_toward_completion",
+    "release_statement_counts_toward_completion",
+    "release_statement_outcomes_satisfy_completion",
     "sdk_package_available",
     "sdk_package_published",
     "sdk_package_ready",
+    "sdk_consumer_tests_count_toward_complete_sdk_claim",
+    "sdk_consumer_tests_ready",
+    "sdk_coverage_complete",
+    "resource_handle_ready",
+    "resource_lookup_ready",
+    "runtime_object_negative_samples_ready",
+    "runtime_sample_ready",
+    "serial_policy_ready",
+    "serial_reuse_ready",
+    "serial_wraparound_ready",
     "stable_claim_allowed",
+    "stable_sdk_ready",
+    "struct_size_ready",
+    "struct_size_validated",
+    "scoped_release_statement_counts_toward_complete_sdk_claim",
+    "scoped_release_statement_counts_toward_completion",
+    "scoped_release_statement_outcomes_satisfy_completion",
+    "scoped_release_statement_ready",
+    "runtime_live_op_approval_allowed",
+    "runtime_readiness_claim_allowed",
+    "support_tier_activation_allowed",
+    "support_tier_activated",
+    "support_tier_allowed",
+    "support_tier_ready",
+    "support_tier_supported",
     "stable_release_contract_claim_allowed",
     "v1_completion_claim_allowed",
     "v1_completion_ready",
@@ -259,6 +483,162 @@ INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS = (
 INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_ALIAS_KEYS = (
     "promoted_demand_family_equivalents",
     "v1_completion_equivalent_for",
+)
+NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS = {
+    "accepted_bundle",
+    "accepted_notice_action",
+    "accepted_player_notice_action",
+    "active_notice_accepted",
+    "active_notice_action_accepted",
+    "active_notice_action_sent",
+    "active_notice_sent",
+    "accepted_runtime_evidence",
+    "approved_bundle_accepted",
+    "approved_bundle_request_accepted",
+    "approved_notice_action",
+    "approved_player_notice_action",
+    "approved_runtime_bundle_request_accepted",
+    "approved_runtime_evidence_accepted",
+    "beta_notice_send_attested",
+    "beta_notice_sent",
+    "beta_notice_sent_attested",
+    "bot_notice_send_performed",
+    "bot_notice_sent",
+    "bundle_accepted",
+    "confirmed_send",
+    "confirmed_beta_notice_sent",
+    "confirmed_notice_sent",
+    "discord_beta_bridge_bot_notice_sent",
+    "discord_beta_bridge_notice_sent",
+    "discord_beta_bridge_send_performed",
+    "discord_beta_bot_notice_sent",
+    "discord_bot_notice_sent",
+    "discord_sent",
+    "discord_notice_sent",
+    "evidence_bundle_accepted",
+    "notice_action_accepted",
+    "notice_action_bundle_accepted",
+    "notice_action_dry_run_accepted",
+    "notice_action_sent",
+    "notice_bundle_accepted",
+    "notice_delivery_accepted",
+    "notice_dry_run_accepted",
+    "notice_dry_run_sent",
+    "notice_sent",
+    "player_notice_action_accepted",
+    "player_notice_action_bundle_accepted",
+    "player_notice_action_dry_run_accepted",
+    "player_notice_action_sent",
+    "player_notice_bundle_accepted",
+    "player_notice_delivery_accepted",
+    "player_notice_dry_run_accepted",
+    "player_notice_dry_run_sent",
+    "player_notice_sent",
+    "send_performed",
+}
+NOTICE_OR_BUNDLE_STATUS_CONTAINER_KEYS = {
+    "accepted_notice_action",
+    "active_notice",
+    "active_notice_action",
+    "active_notice_report",
+    "approved_notice_action",
+    "approved_bundle",
+    "beta_notice",
+    "beta_notice_attestation",
+    "beta_notice_send",
+    "beta_notice_send_attestation",
+    "bot_notice",
+    "bundle_acceptance",
+    "confirmed_beta_notice_report",
+    "confirmed_notice_report",
+    "discord_beta_bridge",
+    "discord_beta_bridge_bot_notice",
+    "discord_beta_bot_notice",
+    "discord_bot_notice",
+    "discord_notice",
+    "evidence_bundle",
+    "notice_report",
+    "notice_action",
+    "notice_bundle",
+    "notice_dry_run",
+    "player_notice",
+    "player_notice_action",
+    "player_notice_bundle",
+    "player_notice_dry_run",
+    "runtime_evidence_bundle",
+}
+NOTICE_OR_BUNDLE_STATUS_KEYS = {
+    "acceptance",
+    "bundle_status",
+    "delivery_status",
+    "dry_run_status",
+    "mode",
+    "notice_status",
+    "outcome",
+    "result",
+    "state",
+    "status",
+}
+NOTICE_OR_BUNDLE_POSITIVE_STATUS_VALUES = {
+    "accepted",
+    "accepted_bundle",
+    "approved",
+    "bundle_accepted",
+    "closed",
+    "confirmed_send",
+    "delivered",
+    "delivery_accepted",
+    "dry_run_accepted",
+    "dry_run_passed",
+    "dry_run_sent",
+    "notice_sent",
+    "passed",
+    "present",
+    "prepared",
+    "referenced",
+    "ready_to_send",
+    "send_ready",
+    "sent",
+    "sent_ok",
+}
+SOURCE_READY_STATUS_ALIAS_KEYS = (
+    "runtime_evidence_status",
+    "runtime_evidence_status_ready",
+    "sdk_status_ready",
+    "sdk_status_report_ready",
+    "source_binding_ready",
+    "source_bindings_ready",
+    "source_checker_ready",
+    "source_checker_status",
+    "source_ready",
+    "source_readiness_ready",
+    "source_readiness_status",
+    "source_state",
+    "source_status",
+    "sources_ready",
+    "status_artifact_ready",
+    "status_report_ready",
+    "status_report_state",
+    "status_report_status",
+    "status_snapshot_ready",
+)
+RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS = (
+    "event_split_accepted",
+    "event_split_ready",
+    "lifecycle_event_split_accepted",
+    "lifecycle_event_split_ready",
+    "player_principal_lifecycle_event_split_accepted",
+    "player_principal_lifecycle_event_split_ready",
+    "post_runtime_contract_gap_accepted",
+    "post_runtime_contract_gap_ready",
+    "post_runtime_contract_gap_resolved",
+    "post_runtime_contract_ready",
+    "ready_log_evidence_split_accepted",
+    "ready_log_evidence_split_ready",
+    "route_sample_accepted",
+    "route_sample_ready",
+    "route_samples_accepted",
+    "route_samples_ready",
 )
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "command_permission_route_gate_blockers_not_empty",
@@ -277,28 +657,148 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
 }
 COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "contract_reviewed",
+    "contract_review_artifact_ready",
+    "contract_review_ready",
     "identity_contract_ready",
     "identity_header_allowed",
     "principal_handle_abi_ready",
+    "public_contract_allowed",
+    "public_contract_artifact_ready",
+    "public_contract_ready",
+    "public_contract_review_ready",
     "public_identity_ready",
+    "reviewed_public_contract",
+    "reviewed_public_contract_ready",
     "promotion_ready",
     "public_sdk_ready",
+    "public_sdk_readiness_allowed",
+    "public_sdk_readiness_ready",
     "public_sdk",
+    "module_sdk_ready",
+    "sdk_ready",
+    "dino_sdk_ready",
+    "mission_sdk_ready",
+    "transfer_sdk_ready",
+    "tribe_sdk_ready",
+    "buff_sdk_ready",
+    "buff_status_sdk_ready",
+    "public_module_ready",
+    "public_module_sdk_ready",
+    "public_dino_sdk_ready",
+    "public_mission_sdk_ready",
+    "public_transfer_sdk_ready",
+    "public_tribe_sdk_ready",
+    "public_buff_sdk_ready",
+    "public_buff_status_sdk_ready",
     "public_abi_ready",
     "public_abi_available",
     "public_abi_allowed",
+    "public_api_ready",
+    "public_callback_ready",
+    "public_descriptor_ready",
+    "public_capability_ready",
     "public_reply_abi_ready",
     "public_response_path_ready",
+    "callback_ready",
+    "descriptor_ready",
+    "capability_ready",
+    "dispatcher_ready",
     "runtime_ready",
+    "runtime_readiness_allowed",
+    "runtime_readiness_ready",
     "runtime_v1_ready",
+    "runtime_hook_ready",
+    "runtime_hook_wiring_ready",
+    "runtime_wiring_ready",
+    "runtime_observer_approved",
+    "runtime_validated",
+    "runtime_validation_ready",
+    "runtime_work_authorized",
     "send_chat_ready",
+    "activation_preconditions_met",
+    "approved_runtime_evidence_ready",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_acceptance",
+    "approved_runtime_evidence_binding_present",
+    "approved_runtime_evidence_binding_ready",
+    "approved_runtime_evidence_binding_counts_as_approved_runtime_evidence",
+    "start_end_evidence",
+    "start_end_evidence_accepted",
+    "start_end_evidence_acceptance",
+    "start_end_evidence_ready",
+    "start_end_only_evidence",
+    "start_end_only_evidence_accepted",
+    "start_end_only_evidence_acceptance",
+    "start_end_only_evidence_ready",
+    "session_start_end_evidence",
+    "session_start_end_evidence_accepted",
+    "session_start_end_evidence_acceptance",
+    "session_start_end_evidence_ready",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_accepted",
+    "session_start_and_end_evidence_acceptance",
+    "session_start_and_end_evidence_ready",
+    "complete_sdk_claim_allowed",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "blocker_cleared",
+    "blocker_resolved",
+    "clears_approved_runtime_evidence_missing",
+    "current_route_blocker_cleared",
+    "current_route_blocker_resolved",
+    "remaining_route_blockers_cleared",
+    "remaining_route_blockers_resolved",
+    "route_blocker_cleared",
+    "route_blocker_resolved",
+    "route_lock_cleared",
+    "route_lock_resolved",
+    "sdk_route_blocker_cleared",
+    "sdk_route_blocker_resolved",
+    "resolves_approved_runtime_evidence_missing",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_sdk",
+    "counts_toward_p0_dependency_chain",
+    "counts_toward_p0_dependency_chain_claim",
     "counts_toward_public_sdk",
     "counts_toward_runtime",
     "counts_toward_v1_completion",
+    *NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS,
+    "p0_ready",
+    "p0_dependency_ready",
+    "p0_dependency_chain_accounted",
+    "p0_accounting_counts_as_promoted_surface",
+    "sdk_accounting_counts_as_completed_surface",
+    "p0_dependency_chain_ready",
+    "plugin_hub_ready",
+    "plugin_hub_readiness_allowed",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_readiness_ready",
     "public_or_runtime_accounting_allowed",
     "public_header_allowed",
     "public_header_ready",
     "public_readiness_ready",
+    "request_check_ready",
+    "request_pack_ready",
+    "approved_bundle_request_accepted",
+    "approved_bundle_request_ready",
+    "approved_runtime_bundle_request_accepted",
+    "approved_runtime_bundle_request_ready",
+    *SOURCE_READY_STATUS_ALIAS_KEYS,
+    "public_reachability_counts_as_approved_runtime_evidence",
+    "public_reachability_counts_as_evidence",
+    "public_reachability_counts_as_runtime_evidence",
+    "public_reachability_counts_as_sdk_evidence",
+    "public_reachability_counts_toward_runtime_evidence",
+    "public_reachability_counts_toward_sdk_evidence",
+    "public_reachability_accepted",
+    "public_reachability_ready",
+    "public_reachability_reachable",
+    "public_reachability_satisfies_runtime_evidence",
+    "public_reachability_unlock_allowed",
+    "route_bound_identity_source_forwarding_ready",
+    "identity_source_forwarding_ready",
     "public_route_ready",
     "public_bridge_abi_allowed",
     "public_command_router_allowed",
@@ -323,29 +823,104 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "runtime_readiness_allowed",
     "route_ready",
     "route_readiness_ready",
+    "route_check_accepted",
+    "route_check_acceptance",
+    "route_gate_accepted",
+    "route_gate_acceptance",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
     "public_response_path_allowed",
     "v1_completion_evidence",
     "v1_completion_ready",
     "stable_claim_allowed",
+    "authorizes_discord",
+    "discord_authorized",
+    "discord_notice_authorized",
+    "authorizes_server_work",
+    "authorizes_server_operations",
+    "authorizes_workspace_work",
+    "authorizes_workspace_writes",
+    "workspace_writes_authorized",
+    "live_ops_authorized",
+    "runtime_capture_authorized",
+    "reads_live_logs",
+    "read_live_logs",
+    "runtime_window_authorized",
+    "runtime_window_activation_ready_under_recorded_standing_launch_authority",
+    "runtime_window_preparation_counts_as_approved_runtime_evidence",
+    "runtime_window_preparation_counts_as_runtime_evidence",
+    "runtime_window_preparation_counts_toward_sdk",
+    "runtime_window_preparation_counts_toward_p0_dependency_chain",
+    "runtime_window_preparation_counts_toward_complete_sdk_claim",
+    "standing_authority",
+    "standing_authority_accepted",
+    "standing_authority_acceptance",
+    "standing_authority_ready",
+    "standing_authority_counts_as_approved_runtime_evidence",
+    "standing_authority_counts_as_runtime_evidence",
+    "standing_authority_counts_toward_sdk",
+    "standing_authority_counts_toward_p0_dependency_chain",
+    "standing_authority_counts_toward_complete_sdk_claim",
+    "standing_launch_authority",
+    "standing_launch_authority_accepted",
+    "standing_launch_authority_acceptance",
+    "standing_launch_authority_ready",
+    "standing_launch_authority_counts_as_approved_runtime_evidence",
+    "standing_launch_authority_counts_as_runtime_evidence",
+    "standing_launch_authority_counts_toward_sdk",
+    "standing_launch_authority_counts_toward_p0_dependency_chain",
+    "standing_launch_authority_counts_toward_complete_sdk_claim",
     "operator_approval_granted",
     "runtime_approval",
     "runtime_approval_granted",
     "runtime_work_authorized",
+    "marker_env_changes_authorized",
+    "publication_authorized",
+    "discord_authorized_by_request",
+    "discord_authorized_by_this_report",
     "server_operations_authorized",
+    "side_lane_promoted",
+    "structure_build_policy_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_release_ready",
+    *SOURCE_READY_STATUS_ALIAS_KEYS,
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
 )
 COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_KEYS = {
     "approved_runtime_evidence_source",
     "authority_claim_source",
     "authz_principal_source",
+    "claim_source",
+    "claim_sources",
     "command_principal_source",
+    "diagnostic_source",
     "evidence_source",
+    "evidence_sources",
     "identity_claim_source",
+    "planning_source",
     "permission_principal_source",
     "principal_claim_source",
     "principal_source",
+    "principal_sources",
     "public_identity_source",
+    "readiness_source",
+    "readiness_sources",
     "runtime_evidence_source",
+    "runtime_evidence_sources",
     "runtime_identity_source",
+    "source",
+    "sources",
+    "source_kind",
+    "source_kinds",
+    "source_value",
+    "source_values",
+    "status_source",
 }
 COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE = re.compile(
     r"(?:"
@@ -358,11 +933,67 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE = re.compile(
     r"identity_public_contract|"
     r"(?:players?_?)?identity_?lifecycle_?anchor_?candidates?|"
     r"lifecycle_?anchor_?(?:candidates?|report|evidence)|"
+    r"check_?join_?in_?progress(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))*|"
+    r"(?:session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source|check_?join_?in_?progress))+|"
+    r"(?:diagnostic|offline|candidate(?:_?only)?|planning)(?:_?(?:check_?join_?in_?progress|session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))?)+|"
+    r"(?:session_?start(?:_?and)?_?end|start_?end)(?:_?only)?_?evidence|"
+    r"activation_?preconditions?|"
+    r"pre_?activation(?:_?(?:consistency|report|status|readiness|ready))?|"
+    r"(?:runtime_?window_?|evidence_?|approved_?runtime_?)closure(?:_?(?:artifact|artifacts|bundle|bundles|request|requests|report|reports|output|outputs|summary|summaries|status|execution|executor))?|"
+    r"closure_?(?:artifact|artifacts|bundle|bundles|request|requests|report|reports|output|outputs|summary|summaries|status|execution|executor)|"
+    r"(?:runtime_?window_?)?(?:planner|executor)(?:_?(?:artifact|output|report|status))?|"
+    r"beta_?notice(?:_?(?:prep|send|sent|attestation|confirmed))?|"
+    r"(?:discord_?)?beta_?bridge(?:_?(?:bot_?)?notice|_?config|_?events?|_?plans?|_?reports?|_?status)?|"
+    r"discord_?beta_?bot_?notice|discord_?bot_?notice|bot_?notice|"
+    r"(?:multi_?surface_?)?beta_?capture(?:_?(?:candidates?|intake|plan|plans|queue|queues|readiness|report|reports|session|sessions|status|surface|surfaces))?|"
+    r"multi_?surface_?beta_?packs?|"
+    r"multi_?surface(?:_?beta)?(?:_?(?:capture|candidate|candidates|intake|plan|plans|queue|queues|surface|surfaces))(?:_?(?:capture|candidate|candidates|intake|plan|plans|queue|queues|readiness|report|reports|session|sessions|status))?|"
+    r"(?:player_?principal|permissions?_?admin|admin|commands?|command_?chat_?response|commands_?replies|dino|dino_?policy|tribe|tribe_?policy|buff|buff_?status|inventory|transfer|mission)(?:_?surface)?_?beta_?capture(?:_?(?:candidate|candidates|plan|plans|queue|queues|readiness|report|reports|status))?|"
     r"request_?pack|"
+    r"request_?check|"
+    r"(?:approved_?)?(?:runtime_?)?bundle_?requests?|"
+    r"public_?reachability|"
+    r"(?:route_?bound_?)?identity_?source(?:_?(?:forward|forwarded|forwarding))?|"
+    r"(?:offline_?)?hardening(?:_?(?:artifact|metadata|report|status|summary))?|"
+    r"ready_?log_?evidence_?splits?(?:_?(?:diagnostic|evidence|readiness|ready|reports?|status|summary|summaries))?|"
+    r"(?:player_?principal_?)?lifecycle_?event_?splits?(?:_?(?:diagnostic|evidence|readiness|ready|reports?|status|summary|summaries))?|"
+    r"post_?runtime_?contract_?gap(?:_?(?:diagnostic|readiness|ready|reports?|status|summary|summaries))?|"
+    r"route_?samples?(?:_?(?:diagnostic|evidence|readiness|ready|reports?|status|summary|summaries))?|"
     r"preflight(?:_?sidecar)?|"
     r"operator_?(?:approval_?)?receipts?|"
     r"(?:live_?)?(?:validation|ops)_?sidecars?|"
+    r"players?_?notice_?actions?|"
+    r"players?_?notices?|"
+    r"confirmed_?(?:beta_?)?notice(?:_?(?:report|reports|sent|status|attestation|confirmation|confirmed))?|"
+    r"notice_?reports?|"
+    r"notice_?(?:actions?|dry_?runs?|bundles?|sent|accepted)|"
+    r"discord_?notices?|"
+    r"(?:discord_?)?beta_?bridge(?:_?(?:bot_?)?notice|_?config|_?events?|_?plans?|_?reports?|_?status)?|"
+    r"discord_?beta_?bot_?notice|discord_?bot_?notice|bot_?notice|"
+    r"runtime_?window(?:_?(?:activation|executor|execution|manifest|plan|planner|preflight|prepar(?:ed|ation)?|readiness|ready|request|status))?|"
+    r"standing_?(?:launch_?)?authority|"
+    r"(?:sdk_?)?status_?reports?|"
+    r"(?:runtime_?evidence_?)?status_?reports?|"
+    r"(?:source|sources|source_?readiness|status_?report)(?:_?(?:ready|readiness|state|status))?|"
+    r"(?:principal_?)?start_?end_?contract_?inputs?|"
+    r"(?:session_?start(?:_?and)?_?end|start_?end)(?:_?only)?_?contract_?inputs?|"
+    r"install(?:ed)?_?runtime(?:_?(?:checks?|ok|ready|reports?|status))?|"
+    r"runtime_?install(?:ed)?(?:_?(?:checks?|ok|ready|reports?|status))?|"
+    r"(?:install|installed|package)_?(?:sdk_?)?(?:package|shape|check|evidence|layout|success|succeed(?:ed)?|install|installed)(?:_?(?:checks?|ok|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"find_?package(?:_?(?:obelisk|sdk|components?|success|succeed(?:ed)?|found|ready|reports?|status))?|"
+    r"cmake_?(?:package|config|components?)(?:_?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"component_?sdk(?:_?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"broadcasts?(?:_?(?:checks?|ok|reports?|sent|status|notices?))?|"
+    r"rcon(?:_?(?:checks?|commands?|counts?|player_?counts?|ok|ready|reachable|reports?|service|status))?|"
     r"window_?manifests?|"
+    r"window_?request_?checks?|"
+    r"route_?planning(?:_?(?:reports?|readiness|snapshots?|status|simulations?))?|"
+    r"planning_?route(?:_?(?:reports?|readiness|snapshots?|status|simulations?))?|"
+    r"route_?(?:simulations?|lock_?simulations?|check_?readiness|readiness)|"
+    r"post_?evidence_?identity_?locks?|"
+    r"identity_?locks?|"
+    r"(?:generated_?)?(?:promotion_?)?cert(?:ificate)?(?:_?(?:artifact|binding|build|builder|generation|metadata|output|report|status|summary))?|"
+    r"(?:public_?debug|debug_?public)_?boundary(?:_?(?:fix|fixes|metadata|report|status|summary))?|"
     r"placeholder_?(?:runtime_?)?evidence|"
     r"public_identity"
     r")"
@@ -372,19 +1003,115 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "complete_sdk_blockers_promoted_count",
     "complete_sdk_blockers_promoted_for_claim_count",
     "complete_sdk_blockers_promoted_for_claim_ratio",
+    "claim_progress_contribution",
+    "complete_sdk_claim_count",
+    "complete_sdk_claim_progress_contribution",
     "complete_sdk_claim_progress_percent",
     "complete_sdk_claim_progress_ratio",
     "complete_sdk_allowed",
+    "complete_sdk_progress_contribution",
     "complete_sdk_progress_percent",
     "complete_sdk_progress_ratio",
+    "complete_sdk_completion_count",
+    "counts_toward_p0_dependency_chain_claim",
     "p0_chain_promoted_count",
+    "p0_chain_progress_ratio",
     "p0_chain_promoted_ratio",
+    "p0_ready",
+    "p0_dependency_ready",
+    "p0_dependency_chain_accounted",
+    "p0_dependency_chain_ready",
+    "p0_accounting_counts_as_promoted_surface",
+    "p0_dependency_chain_claim_progress_ratio",
+    "p0_dependency_chain_claim_count",
+    "p0_dependency_chain_progress_ratio",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
     "p0_dependency_chain_promoted_for_claim_count",
     "p0_dependency_chain_promoted_for_claim_ratio",
+    "p0_dependency_chain_promoted_count",
+    "activation_preconditions_met",
+    "approved_runtime_evidence_ready",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_acceptance",
+    "approved_runtime_evidence_binding_present",
+    "approved_runtime_evidence_binding_ready",
+    "approved_runtime_evidence_binding_counts_as_approved_runtime_evidence",
+    "start_end_evidence",
+    "start_end_evidence_accepted",
+    "start_end_evidence_acceptance",
+    "start_end_evidence_ready",
+    "start_end_only_evidence",
+    "start_end_only_evidence_accepted",
+    "start_end_only_evidence_acceptance",
+    "start_end_only_evidence_ready",
+    "session_start_end_evidence",
+    "session_start_end_evidence_accepted",
+    "session_start_end_evidence_acceptance",
+    "session_start_end_evidence_ready",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_accepted",
+    "session_start_and_end_evidence_acceptance",
+    "session_start_and_end_evidence_ready",
+    "runtime_window_authorized",
+    "runtime_window_activation_ready_under_recorded_standing_launch_authority",
+    "runtime_window_preparation_counts_as_approved_runtime_evidence",
+    "runtime_window_preparation_counts_as_runtime_evidence",
+    "runtime_window_preparation_counts_toward_sdk",
+    "runtime_window_preparation_counts_toward_p0_dependency_chain",
+    "runtime_window_preparation_counts_toward_complete_sdk_claim",
+    "standing_authority",
+    "standing_authority_accepted",
+    "standing_authority_acceptance",
+    "standing_authority_ready",
+    "standing_authority_counts_as_approved_runtime_evidence",
+    "standing_authority_counts_as_runtime_evidence",
+    "standing_authority_counts_toward_sdk",
+    "standing_authority_counts_toward_p0_dependency_chain",
+    "standing_authority_counts_toward_complete_sdk_claim",
+    "standing_launch_authority",
+    "standing_launch_authority_accepted",
+    "standing_launch_authority_acceptance",
+    "standing_launch_authority_ready",
+    "standing_launch_authority_counts_as_approved_runtime_evidence",
+    "standing_launch_authority_counts_as_runtime_evidence",
+    "standing_launch_authority_counts_toward_sdk",
+    "standing_launch_authority_counts_toward_p0_dependency_chain",
+    "standing_launch_authority_counts_toward_complete_sdk_claim",
     "promoted_for_claim_ratio",
+    "abi_ready",
+    "abi_layout_accepted",
+    "abi_layout_approved",
+    "abi_layout_claim_allowed",
+    "abi_layout_complete",
+    "abi_layout_ready",
     "api_ready",
+    "callback_ready",
+    "capability_ready",
+    "complete_sdk_claim_allowed",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "clears_approved_runtime_evidence_missing",
+    "resolves_approved_runtime_evidence_missing",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_sdk",
+    "counts_toward_p0_dependency_chain",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    *NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS,
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
+    "descriptor_ready",
+    "dino_sdk_ready",
+    "dispatcher_ready",
+    "contract_review_artifact_ready",
+    "contract_review_ready",
     "identity_contract_ready",
     "identity_public_contract_ready",
+    "module_ready",
+    "module_sdk_ready",
     "object_identity_allowed",
     "object_identity_available",
     "object_identity_public",
@@ -393,6 +1120,10 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "object_lookup_available",
     "object_lookup_public",
     "object_lookup_ready",
+    "owner_token_identity_ready",
+    "owner_token_lifecycle_ready",
+    "owner_token_registration_ready",
+    "owner_token_sdk_consumer_ready",
     "player_identity_allowed",
     "player_identity_available",
     "player_identity_public",
@@ -405,6 +1136,28 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "principal_handle_available",
     "principal_handle_public",
     "principal_handle_ready",
+    "pod_layout_accepted",
+    "pod_layout_approved",
+    "pod_layout_claim_allowed",
+    "pod_layout_complete",
+    "pod_layout_ready",
+    "public_contract_allowed",
+    "public_contract_artifact_ready",
+    "public_contract_ready",
+    "public_contract_review_ready",
+    "public_api_ready",
+    "public_callback_ready",
+    "public_capability_ready",
+    "public_descriptor_ready",
+    "public_dino_sdk_ready",
+    "public_mission_sdk_ready",
+    "public_transfer_sdk_ready",
+    "public_tribe_sdk_ready",
+    "public_buff_sdk_ready",
+    "public_buff_status_sdk_ready",
+    "public_module_ready",
+    "public_module_sdk_ready",
+    "public_or_runtime_accounting_allowed",
     "support_ready",
     "sdk_ready",
     "production_grade",
@@ -420,26 +1173,88 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "release_grade_ready",
     "release_ready",
     "release_readiness_ready",
+    "reviewed_public_contract",
+    "reviewed_public_contract_ready",
     "resource_handle_allowed",
     "resource_handle_available",
     "resource_handle_public",
     "resource_handle_ready",
     "route_ready",
     "route_readiness_ready",
+    "route_check_accepted",
+    "route_check_acceptance",
+    "route_gate_accepted",
+    "route_gate_acceptance",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    "request_check_ready",
+    "request_pack_ready",
+    "approved_bundle_request_accepted",
+    "approved_bundle_request_ready",
+    "approved_runtime_bundle_request_accepted",
+    "approved_runtime_bundle_request_ready",
+    "public_reachability_counts_as_approved_runtime_evidence",
+    "public_reachability_ready",
+    "public_reachability_satisfies_runtime_evidence",
+    "public_reachability_unlock_allowed",
+    "route_bound_identity_source_forwarding_ready",
+    "identity_source_forwarding_ready",
     "runtime_v1_ready",
+    "runtime_readiness_allowed",
+    "runtime_readiness_ready",
+    "runtime_hook_ready",
+    "runtime_hook_wiring_ready",
+    "runtime_observer_approved",
+    "runtime_validated",
+    "runtime_validation_ready",
+    "runtime_wiring_ready",
     "v1_completion_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_release_ready",
     "stable_claim_allowed",
+    "stable_sdk_claim_allowed",
     "stable_v1_sdk",
     "stable_ready",
+    "plugin_hub_ready",
+    "plugin_hub_readiness_allowed",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_readiness_ready",
+    "struct_size_accepted",
+    "struct_size_approved",
+    "struct_size_claim_allowed",
+    "struct_size_complete",
+    "struct_size_public_abi_ready",
+    "struct_size_ready",
+    "struct_size_validated",
+    "struct_size_verified",
     "v1_stable_sdk",
     "v1_sdk_stable",
     "public_sdk_ready",
+    "public_sdk_readiness_allowed",
+    "public_sdk_readiness_ready",
     "promotion_ready",
     "runtime_ready",
+    "runtime_work_authorized",
+    "marker_env_changes_authorized",
+    "publication_authorized",
+    "discord_authorized_by_request",
+    "discord_authorized_by_this_report",
+    "p0_accounting_counts_as_promoted_surface",
+    "sdk_accounting_counts_as_completed_surface",
     "sdk_completion_progress_percent",
     "sdk_completion_progress_ratio",
+    "sdk_completion_count",
+    "v1_completion_contribution",
+    "v1_completion_count",
     "v1_completion_progress_percent",
     "v1_completion_progress_ratio",
+    *SOURCE_READY_STATUS_ALIAS_KEYS,
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
 )
 SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS = {
     "aliases",
@@ -508,12 +1323,16 @@ SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS = {
     "values",
 }
 SECONDARY_REPORT_COMPLETION_PROGRESS_VALUE_KEYS = {
+    "claim_count",
+    "completion_count",
     "count",
     "counted",
     "progress",
     "progress_count",
     "progress_percent",
     "progress_ratio",
+    "promoted_count",
+    "promoted_for_claim_count",
     "ratio",
 }
 SECONDARY_REPORT_SPLIT_COMPLETION_DESCRIPTOR_RE = re.compile(
@@ -535,7 +1354,10 @@ BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS = {
 }
 SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS = {
     "complete",
+    "completed",
+    "found",
     "full",
+    "generated",
     "production_grade",
     "production_ready",
     "release_grade",
@@ -544,6 +1366,9 @@ SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS = {
     "release_supported_seed",
     "stable",
     "stable_sdk",
+    "success",
+    "succeeded",
+    "unblocked",
     "v1_completion",
     "v1_sdk_stable",
     "v1_stable_sdk",
@@ -556,18 +1381,18 @@ SECONDARY_REPORT_STANDALONE_COMPLETION_CONTEXT_RE = re.compile(
 SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_RE = re.compile(
     r"\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
     r"(?:sdk|api|support)\b.{0,80}"
-    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"\b(?:allow(?:ed)?|available|complete(?:d)?|count(?:ed|s)?|enabled|progress|"
     r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
-    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
-    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"satisf(?:y|ies|ied)|unblocked|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
+    r"\b(?:allow(?:ed)?|available|complete(?:d)?|count(?:ed|s)?|enabled|progress|"
     r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
-    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b"
+    r"satisf(?:y|ies|ied)|unblocked|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b"
     r".{0,80}\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
     r"(?:sdk|api|support)\b|"
     r"\bv1(?:\.0)?\s+(?:stable|completion|(?:sdk|api|support))\b.{0,80}"
-    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"\b(?:allow(?:ed)?|available|complete(?:d)?|count(?:ed|s)?|enabled|progress|"
     r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
-    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
+    r"satisf(?:y|ies|ied)|unblocked|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
     r"\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
     r"(?:sdk|api|support)\s+(?:claim\s+)?progress\b"
     r"|"
@@ -576,19 +1401,50 @@ SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_RE = re.compile(
     r"runtime\s+(?:readiness|ready|delivery|v1)|route\s+(?:readiness|ready)|"
     r"public\s+route|(?:sdk|api|support)\s+v?1(?:\.?0)?|"
     r"v1(?:\.?0)?\s+(?:sdk|api|support))\b.{0,80}"
-    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"\b(?:allow(?:ed)?|available|complete(?:d)?|count(?:ed|s)?|enabled|progress|"
     r"promoted|public|publish(?:ed)?|ready|release(?:d)?|ship(?:ped|s)?|"
-    r"support(?:ed)?|satisf(?:y|ies|ied)|unlocked|"
+    r"support(?:ed)?|satisf(?:y|ies|ied)|unblocked|unlocked|"
     r"[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
-    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"\b(?:allow(?:ed)?|available|complete(?:d)?|count(?:ed|s)?|enabled|progress|"
     r"promoted|public|publish(?:ed)?|ready|release(?:d)?|ship(?:ped|s)?|"
-    r"support(?:ed)?|satisf(?:y|ies|ied)|unlocked|"
+    r"support(?:ed)?|satisf(?:y|ies|ied)|unblocked|unlocked|"
     r"[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b"
     r".{0,80}\b(?:public\s+(?:sdk|api|abi|header|package|module\s+sdk(?:\s+coverage)?)|"
     r"(?:installed|release|sdk)\s+package|plugin\s+hub|pluginhub|support\s+tier|"
     r"runtime\s+(?:readiness|ready|delivery|v1)|route\s+(?:readiness|ready)|"
     r"public\s+route|(?:sdk|api|support)\s+v?1(?:\.?0)?|"
-    r"v1(?:\.?0)?\s+(?:sdk|api|support))\b",
+    r"v1(?:\.?0)?\s+(?:sdk|api|support))\b|"
+    r"\b(?:package[-_ ]?shape|installed[-_ ]?(?:headers?|sdk[-_ ]?headers?))\b.{0,80}"
+    r"\b(?:is|are|declares?|proves?|validates?|unlock(?:ed|s)?|satisf(?:y|ies)|enables?)\b.{0,80}"
+    r"\b(?:v1(?:\.?0)?[-_ ]?support|support[-_ ]?tier|release[-_ ]?supported|sdk[-_ ]?support|"
+    r"complete[-_ ]?(?:sdk|api)|stable[-_ ]?(?:sdk|api|support)|public[-_ ]?(?:sdk|api|support)|"
+    r"production[-_ ]?ready[-_ ]?(?:sdk|api|support))\b|"
+    r"\b(?:public[-_ ]+headers?|installed[-_ ]+headers?|obelisk[-_ ]*api(?:\.h|[-_ ]+h)?|"
+    r"cmake[-_ ]+package|cmake[-_ ]+config|"
+    r"obelisk[-_ ]*config(?:\.cmake|[-_ ]+cmake)?|obelisk[-_ ]*targets(?:\.cmake|[-_ ]+cmake)?|"
+    r"installed[-_ ]+sdk[-_ ]+consumer[-_ ]+tests?|sdk[-_ ]+consumer[-_ ]+tests?)\b.{0,80}"
+    r"\b(?:is|are|declares?|proves?|validates?|unlock(?:ed|s)?|satisf(?:y|ies)|enables?|counts?)\b.{0,80}"
+    r"\b(?:runtime[-_ ]+readiness|public[-_ ]+sdk|public[-_ ]+abi|support[-_ ]+tier|"
+    r"v1(?:\.?0)?[-_ ]?(?:completion|support)|complete[-_ ]+(?:sdk|api)|"
+    r"stable[-_ ]+(?:sdk|api|support)|production[-_ ]?ready[-_ ]?(?:sdk|api|support))\b|"
+    r"\b(?:runtime[-_ ]+readiness|public[-_ ]+sdk|public[-_ ]+abi|support[-_ ]+tier|"
+    r"v1(?:\.?0)?[-_ ]?(?:completion|support)|complete[-_ ]+(?:sdk|api)|"
+    r"stable[-_ ]+(?:sdk|api|support)|production[-_ ]?ready[-_ ]?(?:sdk|api|support))\b.{0,80}"
+    r"\b(?:is|are|declares?|proves?|validates?|unlock(?:ed|s)?|satisf(?:y|ies)|enables?|counts?)\b.{0,80}"
+    r"\b(?:public[-_ ]+headers?|installed[-_ ]+headers?|obelisk[-_ ]*api(?:\.h|[-_ ]+h)?|"
+    r"cmake[-_ ]+package|cmake[-_ ]+config|"
+    r"obelisk[-_ ]*config(?:\.cmake|[-_ ]+cmake)?|obelisk[-_ ]*targets(?:\.cmake|[-_ ]+cmake)?|"
+    r"installed[-_ ]+sdk[-_ ]+consumer[-_ ]+tests?|sdk[-_ ]+consumer[-_ ]+tests?)\b|"
+    r"\b(?:route[-_ ]?check|route[-_ ]?gate|command[-_ ]?permission[-_ ]?route(?:[-_ ]?(?:check|gate))?)\b.{0,80}"
+    r"\b(?:accept(?:ed|ance)|pass(?:es|ed)?|green|satisf(?:y|ies|ied)|unlock(?:ed|s)?|"
+    r"validates?|enables?)\b.{0,80}"
+    r"\b(?:complete[-_ ]?(?:sdk|api)|full[-_ ]?(?:sdk|api)|production[-_ ]?ready[-_ ]?(?:sdk|api|support)|"
+    r"stable[-_ ]?(?:sdk|api|support)|public[-_ ]?sdk|public[-_ ]?route|route[-_ ]?readiness|"
+    r"sdk[-_ ]?completion|v1[-_ ]?completion|support|status)\b|"
+    r"\b(?:scoped[-_ ]?non[-_ ]?complete(?:[-_ ]?outcomes?)?|"
+    r"scoped[-_ ]?(?:v1[-_ ]?)?release[-_ ]?statements?|release[-_ ]?statement[-_ ]?bookkeeping)\b.{0,80}"
+    r"\b(?:accept(?:ed|ance)|complete(?:d)?|ready|green|pass(?:es|ed)?|"
+    r"satisf(?:y|ies|ied)|unlock(?:ed|s)?|counts?|counted|progress)\b",
     re.IGNORECASE,
 )
 SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_NEGATORS = re.compile(
@@ -612,29 +1468,1031 @@ BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r")$"
 )
 ROUTE_GATE_OVERRIDE_TEST_ENV = "OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS"
+SUBPROCESS_CACHE_DIR_TEST_ENV = "OBELISK_PUBLIC_SDK_V1_COMPLETION_SUBPROCESS_CACHE_DIR"
+HELPER_SUBPROCESS_TIMEOUT_ENV = "OBELISK_PUBLIC_SDK_V1_COMPLETION_HELPER_TIMEOUT_SECONDS"
+HELPER_SUBPROCESS_TIMEOUT_SECONDS = 60.0
 SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER = (
     "secondary_report_completion_claim_without_blocker"
 )
+POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE = re.compile(
+    r"(?:"
+    r"(?:players?_identity_)?public_header_gate(?:_(?:proposal|check|readiness|report|status))?|"
+    r"(?:players?_identity_)?public_contract(?:_(?:gap|readiness|review|decision_record|decision_record_template))(?:_(?:check|report|status|template))?|"
+    r"(?:reviewed_)?identity_public_contract(?:_(?:gap|readiness|decision_record|gate|record|report|review|status|template))?|"
+    r"(?:public_)?contract_gap(?:_(?:check|readiness|report|status))?|"
+    r"(?:public_)?contract_readiness(?:_(?:check|report|status))?|"
+    r"decision_record(?:_(?:draft|skeleton|template))?|"
+    r"(?:reviewed_)?decision_record_template|"
+    r"(?:offline_?)?hardening(?:_(?:artifact|metadata|report|status|summary))?|"
+    r"(?:player_identity|permissions_admin|command_chat_response_path|commands_replies)?_?promotion_certificate"
+    r"(?:_(?:build|builder|generation|metadata|report|template)(?:_report)?)?|"
+    r"(?:player_identity|permissions_admin|command_chat_response_path|commands_replies)?_?"
+    r"(?:generated_?)?(?:promotion_?)?cert(?:ificate)?"
+    r"(?:_(?:artifact|binding|build|builder|generation|metadata|output|report|status|summary)(?:_report)?)?|"
+    r"(?:multi_surface_)?beta_capture_pack(?:_(?:check|metadata|report|status))?|"
+    r"multi_surface_beta_pack(?:_(?:check|metadata|report|status))?|"
+    r"active_?notice(?:_?(?:action|accepted|ready|report|sent|status|updated?))?|"
+    r"(?:installed_sdk_|sdk_)?package_shape(?:_(?:check|evidence|metadata|report|status))?|"
+    r"package_shape_scoped_release_metadata|"
+    r"structure_?build_?policy(?:_?offline_?intake)?(?:_(?:check|evidence|metadata|report|status))?|"
+    r"(?:public_?debug|debug_?public)_?boundary(?:_?(?:fix|fixes|metadata|report|status|summary))?|"
+    r"scoped_release(?:_(?:metadata|statement_metadata|package_metadata|report|status))?|"
+    r"scoped_non_complete(?:_(?:metadata|release_statement_metadata|report|status))?|"
+    r"(?:principal_)?start_end(?:_only)?(?:_evidence)?(?:_(?:artifact|bundle|check|manifest|report|status))?|"
+    r"session_start_end(?:_only)?(?:_evidence)?(?:_(?:artifact|bundle|check|manifest|report|status))?|"
+    r"(?:sdk_|runtime_evidence_|source_ready_)?status_report(?:_(?:ready|state|status))?|"
+    r"status_report_only|"
+    r"source_overclaim(?:_(?:component_count|diagnostic|diagnostics|report|summary|total|zero))?"
+    r")",
+    re.IGNORECASE,
+)
+SOURCE_OVERCLAIM_MARKER_KEYS = frozenset(
+    (
+        "source_overclaim_total",
+        "source_overclaim_total_flag_count",
+        "source_overclaim_component_count",
+        "source_overclaim_count",
+    )
+)
+POST_RUNTIME_P0_CHAIN_RUNTIME_FORBIDDEN_MARKERS = (
+    ("public_header_gate", "public_header_gate_report_not_approved_runtime_evidence"),
+    ("public_contract_gap", "public_contract_gap_report_not_approved_runtime_evidence"),
+    ("public_contract_readiness", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("identity_public_contract", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("decision_record", "decision_record_template_not_approved_runtime_evidence"),
+    ("offline_hardening", "offline_hardening_not_approved_runtime_evidence"),
+    ("promotion_certificate", "promotion_certificate_not_approved_runtime_evidence"),
+    ("generated_cert", "generated_cert_report_not_approved_runtime_evidence"),
+    ("generated_certificate", "generated_cert_report_not_approved_runtime_evidence"),
+    ("promotion_cert", "promotion_certificate_not_approved_runtime_evidence"),
+    ("beta_capture_pack", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_beta_pack", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("active_notice", "active_notice_not_approved_runtime_evidence"),
+    ("package_shape", "package_shape_not_approved_runtime_evidence"),
+    ("structure_build_policy", "structure_build_policy_offline_intake_not_approved_runtime_evidence"),
+    ("scoped_release", "scoped_release_metadata_not_approved_runtime_evidence"),
+    ("scoped_non_complete", "scoped_release_metadata_not_approved_runtime_evidence"),
+    ("public_debug_boundary", "public_debug_boundary_not_approved_runtime_evidence"),
+    ("debug_public_boundary", "public_debug_boundary_not_approved_runtime_evidence"),
+    ("start_end", "start_end_only_evidence_not_approved_runtime_evidence"),
+    ("status_report", "status_report_not_approved_runtime_evidence"),
+    ("source_overclaim", "source_overclaim_zero_not_approved_runtime_evidence"),
+)
+SIDE_LANE_COMPLETION_ACCOUNTING_FALSE_ALIAS_KEYS = {
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_acceptance",
+    "approved_runtime_evidence_binding_present",
+    "approved_runtime_evidence_binding_ready",
+    "approved_runtime_evidence_binding_counts_as_approved_runtime_evidence",
+    "authorizes_runtime_work",
+    "authorizes_server_work",
+    "authorizes_server_operations",
+    "authorizes_workspace_work",
+    "authorizes_workspace_writes",
+    "complete_sdk_allowed",
+    "complete_sdk_claim_allowed",
+    "complete_sdk_ready",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "blocker_cleared",
+    "blocker_resolved",
+    "clears_approved_runtime_evidence_missing",
+    "current_route_blocker_cleared",
+    "current_route_blocker_resolved",
+    "remaining_route_blockers_cleared",
+    "remaining_route_blockers_resolved",
+    "route_blocker_cleared",
+    "route_blocker_resolved",
+    "route_lock_cleared",
+    "route_lock_resolved",
+    "sdk_route_blocker_cleared",
+    "sdk_route_blocker_resolved",
+    "resolves_approved_runtime_evidence_missing",
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
+    "activation_preconditions_met",
+    "counts_as_approved_runtime_evidence",
+    "counts_as_passive_evidence",
+    "counts_as_passive_snapshot_evidence",
+    "counts_as_runtime_evidence",
+    "counts_as_sdk_evidence",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_sdk",
+    "counts_toward_p0_dependency_chain",
+    "counts_toward_complete_sdk_claim_now",
+    "counts_toward_p0_dependency_chain_claim_now",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_v1_completion",
+    "public_or_runtime_accounting_allowed",
+    "readiness_counts_toward_v1_accounting",
+    *NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS,
+    "live_ops_authorized",
+    "marker_env_changes_authorized",
+    "p0_dependency_chain_accounted",
+    "p0_accounting_counts_as_promoted_surface",
+    "sdk_accounting_counts_as_completed_surface",
+    "p0_dependency_chain_ready",
+    "p0_dependency_ready",
+    "p0_ready",
+    "passive_snapshot_evidence_allowed",
+    "passive_snapshot_counts_as_evidence",
+    "passive_snapshot_counts_as_runtime_evidence",
+    "passive_snapshot_counts_as_sdk_evidence",
+    "read_live_logs",
+    "reads_live_logs",
+    "runtime_capture_authorized",
+    "runtime_work_authorized",
+    "runtime_evidence_present",
+    "runtime_evidence_ready",
+    "start_end_evidence",
+    "start_end_evidence_accepted",
+    "start_end_evidence_acceptance",
+    "start_end_evidence_ready",
+    "start_end_only_evidence",
+    "start_end_only_evidence_accepted",
+    "start_end_only_evidence_acceptance",
+    "start_end_only_evidence_ready",
+    "session_start_end_evidence",
+    "session_start_end_evidence_accepted",
+    "session_start_end_evidence_acceptance",
+    "session_start_end_evidence_ready",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_accepted",
+    "session_start_and_end_evidence_acceptance",
+    "session_start_and_end_evidence_ready",
+    "runtime_window_authorized",
+    "runtime_window_activation_ready_under_recorded_standing_launch_authority",
+    "runtime_window_preparation_counts_as_approved_runtime_evidence",
+    "runtime_window_preparation_counts_as_runtime_evidence",
+    "runtime_window_preparation_counts_toward_sdk",
+    "runtime_window_preparation_counts_toward_p0_dependency_chain",
+    "runtime_window_preparation_counts_toward_complete_sdk_claim",
+    "standing_authority",
+    "standing_authority_accepted",
+    "standing_authority_acceptance",
+    "standing_authority_ready",
+    "standing_authority_counts_as_approved_runtime_evidence",
+    "standing_authority_counts_as_runtime_evidence",
+    "standing_authority_counts_toward_sdk",
+    "standing_authority_counts_toward_p0_dependency_chain",
+    "standing_authority_counts_toward_complete_sdk_claim",
+    "standing_launch_authority",
+    "standing_launch_authority_accepted",
+    "standing_launch_authority_acceptance",
+    "standing_launch_authority_ready",
+    "sdk_evidence_ready",
+    "standing_launch_authority_counts_as_approved_runtime_evidence",
+    "standing_launch_authority_counts_as_runtime_evidence",
+    "standing_launch_authority_counts_toward_sdk",
+    "standing_launch_authority_counts_toward_p0_dependency_chain",
+    "standing_launch_authority_counts_toward_complete_sdk_claim",
+    "server_operations_authorized",
+    "stable_claim_allowed",
+    "stable_sdk_claim_allowed",
+    "stable_sdk_ready",
+    "abi_layout_ready",
+    "abi_layout_validated",
+    "cmake_config_ready",
+    "cmake_targets_ready",
+    "components_sdk_ready",
+    "installed_headers_ready",
+    "module_ready",
+    "module_sdk_ready",
+    "obelisk_config_cmake_ready",
+    "obelisk_targets_cmake_ready",
+    "owner_token_registration_ready",
+    "owner_token_sdk_consumer_ready",
+    "package_shape_ready",
+    "package_shape_v1_completion_ready",
+    "package_shape_counts_toward_completion",
+    "package_shape_counts_toward_public_sdk",
+    "package_shape_counts_toward_v1_completion",
+    "plugin_hub_package_published",
+    "plugin_hub_counts_toward_completion",
+    "plugin_hub_counts_toward_public_sdk",
+    "plugin_hub_counts_toward_v1_completion",
+    "plugin_hub_ready",
+    "plugin_hub_readiness_allowed",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_readiness_ready",
+    "plugin_hub_seed_ready",
+    "plugin_hub_support_tier_ready",
+    "public_abi_available",
+    "public_header_allowed",
+    "public_header_available",
+    "public_headers_available",
+    "public_module_ready",
+    "public_module_sdk_ready",
+    "public_module_sdk_coverage_ready",
+    "public_module_sdk_covered",
+    "public_sdk_coverage_ready",
+    "public_sdk_readiness_allowed",
+    "public_sdk_readiness_ready",
+    "release_statement_ready",
+    "release_statement_bookkeeping_counts_toward_completion",
+    "release_statement_counts_toward_completion",
+    "release_statement_outcomes_satisfy_completion",
+    "runtime_live_op_approval_allowed",
+    "runtime_readiness_claim_allowed",
+    "runtime_readiness_allowed",
+    "runtime_readiness_ready",
+    "scoped_release_statement_counts_toward_complete_sdk_claim",
+    "scoped_release_statement_counts_toward_completion",
+    "scoped_release_statement_outcomes_satisfy_completion",
+    "scoped_release_statement_ready",
+    "sdk_coverage_complete",
+    "struct_size_ready",
+    "struct_size_validated",
+    "support_tier_activated",
+    "support_tier_allowed",
+    "support_tier_supported",
+    "v1_complete",
+    "v1_completion_claim_allowed",
+    "v1_completion",
+    "v1_completion_evidence",
+    "v1_completion_ready",
+    "v1_release_ready",
+    "v1_ready",
+    "workspace_writes_authorized",
+    "discord_authorized_by_request",
+    "discord_authorized_by_this_report",
+    "publication_authorized",
+    "request_pack_ready",
+    "route_ready",
+    "side_lane_promoted",
+    "structure_build_policy_ready",
+    "active_notice_ready",
+    "active_notice_sent",
+    "active_notice_accepted",
+    "active_notice_updated",
+    "active_notice_counts_toward_sdk",
+    "active_notice_counts_toward_p0_dependency_chain",
+    "active_notice_counts_toward_complete_sdk_claim",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    "approved_bundle_request_accepted",
+    "approved_bundle_request_ready",
+    "approved_runtime_bundle_request_accepted",
+    "approved_runtime_bundle_request_ready",
+    "public_reachability_counts_as_approved_runtime_evidence",
+    "public_reachability_counts_as_evidence",
+    "public_reachability_counts_as_runtime_evidence",
+    "public_reachability_counts_as_sdk_evidence",
+    "public_reachability_counts_toward_runtime_evidence",
+    "public_reachability_counts_toward_sdk_evidence",
+    "public_reachability_accepted",
+    "public_reachability_ready",
+    "public_reachability_reachable",
+    "public_reachability_satisfies_runtime_evidence",
+    "public_reachability_unlock_allowed",
+    "route_bound_identity_source_forwarding_ready",
+    "identity_source_forwarding_ready",
+}
+SIDE_LANE_COMPLETION_ACCOUNTING_ZERO_ALIAS_KEYS = {
+    "claim_progress_contribution",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_claim_progress_percent",
+    "complete_sdk_claim_progress_ratio",
+    "credit",
+    "credits",
+    "claim_count",
+    "claim_credit",
+    "claim_credits",
+    "completion_count",
+    "complete_sdk_progress_contribution",
+    "complete_sdk_progress_percent",
+    "complete_sdk_progress_ratio",
+    "complete_sdk_credit",
+    "complete_sdk_credits",
+    "complete_sdk_claim_credit",
+    "complete_sdk_claim_credits",
+    "complete_sdk_blockers_promoted_for_claim_count",
+    "complete_sdk_blockers_promoted_for_claim_ratio",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_claim_progress_percent",
+    "p0_dependency_chain_claim_progress_ratio",
+    "p0_dependency_chain_credit",
+    "p0_dependency_chain_credits",
+    "p0_dependency_chain_promoted_for_claim_count",
+    "p0_dependency_chain_promoted_for_claim_ratio",
+    "p0_dependency_chain_progress_contribution",
+    "p0_dependency_chain_progress_percent",
+    "p0_dependency_chain_progress_ratio",
+    "p0_chain_promoted_count",
+    "p0_chain_promoted_ratio",
+    "p0_dependency_progress_contribution",
+    "p0_credit",
+    "p0_credits",
+    "promoted_count",
+    "promoted_for_claim_count",
+    "promoted_for_claim_ratio",
+    "progress",
+    "public_sdk_progress_contribution",
+    "release_statement_complete_sdk_progress_contribution",
+    "runtime_progress_contribution",
+    "sdk_credit",
+    "sdk_credits",
+    "sdk_completion_credit",
+    "sdk_completion_credits",
+    "scoped_release_statement_claim_progress_contribution",
+    "scoped_release_statement_complete_sdk_progress_contribution",
+    *SOURCE_OVERCLAIM_MARKER_KEYS,
+    "v1_completion_contribution",
+    "v1_completion_credit",
+    "v1_completion_credits",
+}
+ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS = (
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_acceptance",
+    "approved_runtime_evidence_binding_present",
+    "approved_runtime_evidence_binding_ready",
+    "authorizes_runtime_work",
+    "authorizes_server_work",
+    "authorizes_server_operations",
+    "server_operations_authorized",
+    "runtime_work_authorized",
+    "authorizes_workspace_work",
+    "authorizes_workspace_writes",
+    "workspace_writes_authorized",
+    "live_ops_authorized",
+    "marker_env_changes_authorized",
+    "runtime_capture_authorized",
+    "reads_live_logs",
+    "read_live_logs",
+    "authorizes_discord",
+    "discord_authorized",
+    "discord_authorized_by_request",
+    "discord_authorized_by_this_report",
+    "discord_notice_authorized",
+    "publication_authorized",
+    "notice_action_authorized",
+    "player_notice_action_authorized",
+    "counts_as_approved_runtime_evidence",
+    "counts_as_passive_evidence",
+    "counts_as_passive_snapshot_evidence",
+    "counts_as_runtime_evidence",
+    "counts_as_sdk_evidence",
+    "counts_as_public_sdk",
+    "counts_as_runtime",
+    "counts_as_v1_completion",
+    "counts_toward_sdk",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_p0_dependency_chain",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_complete_sdk_claim_now",
+    "counts_toward_p0_dependency_chain_claim_now",
+    "public_or_runtime_accounting_allowed",
+    "passive_snapshot_evidence_allowed",
+    "passive_snapshot_counts_as_evidence",
+    "passive_snapshot_counts_as_runtime_evidence",
+    "passive_snapshot_counts_as_sdk_evidence",
+    "runtime_evidence_present",
+    "runtime_evidence_ready",
+    "start_end_evidence",
+    "start_end_evidence_accepted",
+    "start_end_evidence_acceptance",
+    "start_end_evidence_ready",
+    "start_end_only_evidence",
+    "start_end_only_evidence_accepted",
+    "start_end_only_evidence_acceptance",
+    "start_end_only_evidence_ready",
+    "session_start_end_evidence",
+    "session_start_end_evidence_accepted",
+    "session_start_end_evidence_acceptance",
+    "session_start_end_evidence_ready",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_accepted",
+    "session_start_and_end_evidence_acceptance",
+    "session_start_and_end_evidence_ready",
+    "sdk_evidence_ready",
+    "runtime_window_authorized",
+    "runtime_window_activation_ready_under_recorded_standing_launch_authority",
+    "runtime_window_preparation_counts_as_approved_runtime_evidence",
+    "runtime_window_preparation_counts_as_runtime_evidence",
+    "runtime_window_preparation_counts_toward_sdk",
+    "runtime_window_preparation_counts_toward_p0_dependency_chain",
+    "runtime_window_preparation_counts_toward_complete_sdk_claim",
+    "standing_authority",
+    "standing_authority_accepted",
+    "standing_authority_acceptance",
+    "standing_authority_ready",
+    "standing_authority_counts_as_approved_runtime_evidence",
+    "standing_authority_counts_as_runtime_evidence",
+    "standing_authority_counts_toward_sdk",
+    "standing_authority_counts_toward_p0_dependency_chain",
+    "standing_authority_counts_toward_complete_sdk_claim",
+    "standing_launch_authority",
+    "standing_launch_authority_accepted",
+    "standing_launch_authority_acceptance",
+    "standing_launch_authority_ready",
+    "standing_launch_authority_counts_as_approved_runtime_evidence",
+    "standing_launch_authority_counts_as_runtime_evidence",
+    "standing_launch_authority_counts_toward_sdk",
+    "standing_launch_authority_counts_toward_p0_dependency_chain",
+    "standing_launch_authority_counts_toward_complete_sdk_claim",
+    "ready",
+    "complete_sdk_allowed",
+    "complete_sdk_claim_allowed",
+    "complete_sdk_ready",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "clears_approved_runtime_evidence_missing",
+    "resolves_approved_runtime_evidence_missing",
+    "activation_preconditions_met",
+    "promotion_ready",
+    "request_pack_ready",
+    "route_ready",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    "public_sdk_ready",
+    "public_sdk_readiness_allowed",
+    "public_sdk_readiness_ready",
+    "public_abi_ready",
+    "public_header_allowed",
+    "runtime_ready",
+    "runtime_readiness_allowed",
+    "runtime_readiness_ready",
+    "plugin_hub_ready",
+    "plugin_hub_readiness_allowed",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_readiness_ready",
+    "stable_claim_allowed",
+    "stable_sdk_claim_allowed",
+    "stable_sdk_ready",
+    "v1_completion",
+    "v1_completion_ready",
+    *NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS,
+    "approved_bundle_request_accepted",
+    "approved_bundle_request_ready",
+    "approved_runtime_bundle_request_accepted",
+    "approved_runtime_bundle_request_ready",
+    "public_reachability_counts_as_approved_runtime_evidence",
+    "public_reachability_ready",
+    "public_reachability_satisfies_runtime_evidence",
+    "public_reachability_unlock_allowed",
+    "route_bound_identity_source_forwarding_ready",
+    "identity_source_forwarding_ready",
+)
+ACTIONABLE_PATH_ZERO_KEYS = (
+    "claim_progress_contribution",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress_contribution",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
+    "p0_dependency_progress_contribution",
+    "public_sdk_progress_contribution",
+    "runtime_progress_contribution",
+    "v1_completion_contribution",
+    "progress",
+)
+NON_COUNTING_COMPLETION_CONTEXT_RE = re.compile(
+    r"(?:"
+    r"(?:player_?)?notice(?:_?(?:action|bundle|dry_run|sent|accepted))?|"
+    r"active_?notice(?:_?(?:action|accepted|ready|report|sent|status|updated?))?|"
+    r"confirmed_?(?:beta_?)?notice(?:_?(?:report|reports|sent|status|attestation|confirmation|confirmed))?|"
+    r"beta_?notice(?:_?(?:prep|send|sent|attestation|confirmed))?|"
+    r"discord_?notice|"
+    r"(?:discord_?)?beta_?bridge(?:_?(?:bot_?)?notice|_?config|_?events?|_?plans?|_?reports?|_?status)?|"
+    r"discord_?beta_?bot_?notice|discord_?bot_?notice|bot_?notice|"
+    r"passive(?:_?(?:snapshot|observation|activity|latest|capture|triplet))?|"
+    r"passive_?monitors?|"
+    r"diagnostic(?:_?(?:only|summary|triage|observer))?|"
+    r"(?:player_?principal_?)?lifecycle_?(?:event|events|role|roles|triplet|proof|"
+    r"artifact|evidence|observer|status|report|summary|partial|candidate|diagnostic|observed)(?:_?(?:artifact|evidence|proof|ready|status|summary|observed))*|"
+    r"(?:partial_?)?(?:role|event)_?triplet(?:_?(?:artifact|evidence|proof|ready|status|summary))?|"
+    r"(?:partial_?)?lifecycle_?(?:event|role)s?(?:_?(?:artifact|evidence|proof|ready|status|summary|observed))?|"
+    r"ready_?log_?evidence_?splits?(?:_?(?:diagnostic|evidence|readiness|ready|report|status|summary))?|"
+    r"(?:player_?principal_?)?lifecycle_?event_?splits?(?:_?(?:diagnostic|evidence|readiness|ready|report|status|summary))?|"
+    r"post_?runtime_?contract_?gap(?:_?(?:diagnostic|readiness|ready|report|status|summary))?|"
+    r"route_?samples?(?:_?(?:diagnostic|evidence|readiness|ready|report|status|summary))?|"
+    r"(?:session_?start|session_?end|handle_?new_?player|on_?logout)(?:_?(?:observed|proof|ready|status|artifact|evidence))?|"
+    r"(?:session_?start(?:_?and)?_?end|start_?end)(?:_?only)?_?evidence|"
+    r"(?:principal_?)?start_?end_?contract_?inputs?|"
+    r"(?:session_?start(?:_?and)?_?end|start_?end)(?:_?only)?_?contract_?inputs?|"
+    r"check_?join_?in_?progress(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))*|"
+    r"(?:session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source|check_?join_?in_?progress))+|"
+    r"(?:diagnostic|offline|candidate(?:_?only)?|planning)(?:_?(?:check_?join_?in_?progress|session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))?)+|"
+    r"observer_?event_?triage|"
+    r"(?:delegated_?)?handoff(?:_?(?:checkpoint|context|docs?|report|summary))?|"
+    r"delegated_?(?:agent|artifact|metadata|report|route_?gate|summary|task|worker)(?:_?(?:artifact|metadata|report|reports|status|summary|summaries))?|"
+    r"closed_?(?:agent|worker)(?:_?(?:notes?|report|reports|status|summary|summaries))?|"
+    r"player_?principal_?passive_?snapshot|"
+    r"activation_?preconditions?|"
+    r"pre_?activation(?:_?(?:consistency|report|status|readiness|ready))?|"
+    r"(?:runtime_?window_?|evidence_?|approved_?runtime_?)closure(?:_?(?:artifact|artifacts|bundle|bundles|request|requests|report|reports|output|outputs|summary|summaries|status|execution|executor))?|"
+    r"closure_?(?:artifact|artifacts|bundle|bundles|request|requests|report|reports|output|outputs|summary|summaries|status|execution|executor)|"
+    r"(?:runtime_?window_?)?(?:planner|executor)(?:_?(?:artifact|output|report|status))?|"
+    r"(?:multi_?surface_?)?beta_?capture(?:_?(?:candidates?|intake|plan|plans|queue|queues|readiness|report|reports|session|sessions|status|surface|surfaces))?|"
+    r"multi_?surface_?beta_?packs?|"
+    r"multi_?surface(?:_?beta)?(?:_?(?:capture|candidate|candidates|intake|plan|plans|queue|queues|surface|surfaces))(?:_?(?:capture|candidate|candidates|intake|plan|plans|queue|queues|readiness|report|reports|session|sessions|status))?|"
+    r"(?:player_?principal|permissions?_?admin|admin|commands?|command_?chat_?response|commands_?replies|dino|dino_?policy|tribe|tribe_?policy|buff|buff_?status|inventory|transfer|mission)(?:_?surface)?_?beta_?capture(?:_?(?:candidate|candidates|plan|plans|queue|queues|readiness|report|reports|status))?|"
+    r"request_?(?:pack|check|artifact|preflight|readiness)|"
+    r"(?:fastest_?)?next_?sdk_?unblock(?:_?(?:summary|report))?|"
+    r"action(?:able)?_?paths?|action_?path(?:_?(?:candidate|summary|report|status))?|"
+    r"(?:approved_?)?(?:runtime_?)?bundle_?requests?|"
+    r"approved_?runtime_?evidence_?binding(?:_?(?:accept(?:ed|ance)|present|readiness|ready|report|status|source))?|"
+    r"approved_?runtime_?manifests?|"
+    r"accepted_?artifact_?class(?:_?(?:artifact|artifacts|metadata|report|reports|status))?|"
+    r"binding_?required(?:_?(?:artifact|artifacts|metadata|report|reports|status))?|"
+    r"public_?reachability(?:_?(?:check|ready|report))?|"
+    r"(?:reviewed_?)?(?:identity_?)?public_?contract(?:_?(?:artifact|decision|decisions|input|readiness|ready|record|records|report|review))?|"
+    r"contract_?review(?:_?(?:artifact|decision|decisions|input|readiness|ready|record|records|report))?|"
+    r"(?:offline_?)?hardening(?:_?(?:artifact|metadata|report|status|summary))?|"
+    r"(?:route_?bound_?)?identity_?source(?:_?(?:forward|forwarded|forwarding|readiness|report))?|"
+    r"window_?request_?check|"
+    r"player_?principal_?lifecycle_?window_?request|"
+    r"runtime_?window(?:_?(?:activation|executor|execution|manifest|plan|planner|preflight|prepar(?:ed|ation)?|readiness|ready|request|status))?|"
+    r"standing_?(?:launch_?)?authority|"
+    r"install(?:ed)?_?runtime(?:_?(?:checks?|ok|ready|reports?|status))?|"
+    r"runtime_?install(?:ed)?(?:_?(?:checks?|ok|ready|reports?|status))?|"
+    r"(?:install|installed|package)_?(?:sdk_?)?(?:package|shape|check|evidence|layout|success|succeed(?:ed)?|install|installed)(?:_?(?:checks?|ok|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"find_?package(?:_?(?:obelisk|sdk|components?|success|succeed(?:ed)?|found|ready|reports?|status))?|"
+    r"cmake_?(?:package|config|components?)(?:_?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"component_?sdk(?:_?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"broadcasts?(?:_?(?:checks?|ok|reports?|sent|status|notices?))?|"
+    r"rcon(?:_?(?:checks?|commands?|counts?|player_?counts?|ok|ready|reachable|reports?|service|status))?|"
+    r"(?:public_?|installed_?)?headers?|"
+    r"(?:public_?)?obelisk_?api_?headers?|"
+    r"obeliskapi|obelisk_?api_?h|"
+    r"cmake_?(?:package|config)|"
+    r"obelisk_?config(?:_?cmake)?|obelisk_?targets(?:_?cmake)?|"
+    r"components?_?sdk|"
+    r"(?:installed_?)?sdk_?consumer_?tests?|"
+    r"(?:installed_?)?sdk_?consumer_?guardrails?|"
+    r"(?:public_?)?abi_?consumer_?guardrails?|"
+    r"(?:post_?init|after_?init|outside_?init)_?call_?process_?event(?:_?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"call_?process_?event_?(?:post_?init|after_?init|outside_?init)(?:_?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"tests_?sdk_?(?:installed_?)?consumer|"
+    r"(?:installed_?)?sdk_?package_?shape|"
+    r"(?:sdk_?)?package_?(?:exact|non_?exact)(?:_?(?:check|evidence|install|report|status))?|"
+    r"(?:generated_?)?(?:promotion_?)?cert(?:ificate)?(?:_?(?:artifact|binding|build|builder|generation|metadata|output|report|status|summary))?|"
+    r"(?:public_?debug|debug_?public)_?boundary(?:_?(?:fix|fixes|metadata|report|status|summary))?|"
+    r"package_?shape|"
+    r"plugin_?hub(?:_?(?:wording|seed|package|support|publication|readiness))?|"
+    r"support_?tier|"
+    r"scoped_?non_?complete(?:_?only)?|"
+    r"scoped_?(?:non_?complete_?)?(?:v1_?)?release_?statements?|"
+    r"release_?statement(?:_?bookkeeping)?|"
+    r"route_?planning(?:_?(?:report|readiness|snapshot|status|simulation))?|"
+    r"planning_?route(?:_?(?:report|readiness|snapshot|status|simulation))?|"
+    r"route_?(?:simulation|lock_?simulation|check_?readiness|readiness|snapshot|snapshots|snapshot_?report|status_?snapshot)|"
+    r"status_?(?:snapshot|artifact|report)|"
+    r"(?:sdk_?)?status_?reports?|"
+    r"(?:runtime_?evidence_?)?status_?reports?|"
+    r"copied_?logs?_?only(?:_?(?:artifact|artifacts|report|reports|status))?|"
+    r"post_?evidence_?identity_?lock|"
+    r"identity_?lock(?:_?(?:simulation|readiness|report))?|"
+    r"transfer_?(?:script_?struct|baccept)_?readiness|"
+    r"buff_?status_?readiness|"
+    r"dino_?scalar_?readiness|"
+    r"tribe_?scalar_?boundary_?readiness|"
+    r"scalar_?boundary_?readiness|"
+    r"mission_?transfer_?dino_?tribe(?:_?buff)?_?accounting|"
+    r"structure_?build_?policy(?:_?offline_?intake)?(?:_?(?:check|evidence|metadata|report|status))?|"
+    r"side_?lane|"
+    r"(?:route_?gate_?)?post_?evidence_?p0_?lock_?simulation|"
+    r"simulation_?only"
+    r")",
+    re.IGNORECASE,
+)
+NON_COUNTING_COMPLETION_READINESS_ALIAS_KEYS = {
+    "candidate_ready",
+    "accepted_for_contract_review",
+    "activation_preconditions_met",
+    "activation_ready",
+    "abi_layout_ready",
+    "abi_layout_validated",
+    "abi_consumer_guardrail_passed",
+    "abi_consumer_guardrails_passed",
+    "call_process_event_post_init_guardrail_passed",
+    "call_process_event_post_init_rejected",
+    "call_process_event_post_init_skipped",
+    "call_process_event_post_init_test_passed",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_acceptance",
+    "approved_runtime_evidence_binding_present",
+    "approved_runtime_evidence_binding_ready",
+    "approved_runtime_manifest_present",
+    "approved_runtime_manifest_referenced",
+    "cmake_config_ready",
+    "cmake_package_found",
+    "cmake_package_succeeded",
+    "cmake_package_ready",
+    "cmake_package_support_tier_ready",
+    "cmake_package_v1_completion_ready",
+    "cmake_targets_ready",
+    "closed",
+    "closure_accepted",
+    "closure_complete",
+    "closure_ready",
+    "complete",
+    "complete_triplet_ready",
+    "component_sdk_found",
+    "component_sdk_succeeded",
+    "components_sdk_ready",
+    "confirmed",
+    "confirmed_send",
+    *RECENT_NON_EVIDENCE_DIAGNOSTIC_POSITIVE_ALIAS_KEYS,
+    "counts_as_approved_runtime_evidence",
+    "counts_as_passive_evidence",
+    "counts_as_passive_snapshot_evidence",
+    "counts_as_runtime_evidence",
+    "counts_as_sdk_evidence",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "blocker_cleared",
+    "blocker_resolved",
+    "clears_approved_runtime_evidence_missing",
+    "current_route_blocker_cleared",
+    "current_route_blocker_resolved",
+    "remaining_route_blockers_cleared",
+    "remaining_route_blockers_resolved",
+    "route_blocker_cleared",
+    "route_blocker_resolved",
+    "route_lock_cleared",
+    "route_lock_resolved",
+    "sdk_route_blocker_cleared",
+    "sdk_route_blocker_resolved",
+    "resolves_approved_runtime_evidence_missing",
+    "declared_support_tier",
+    "declared_support_tiers",
+    "delivered",
+    "delivery_confirmed",
+    "evidence_closure_accepted",
+    "evidence_closure_complete",
+    "evidence_closure_ready",
+    "headers_count_toward_complete_sdk_claim",
+    "identity_lock_ready",
+    "contract_review_artifact_ready",
+    "contract_review_ready",
+    "find_package_found",
+    "find_package_succeeded",
+    "installed_headers_ready",
+    "installed_sdk_consumer_tests_ready",
+    "installed_sdk_consumer_tests_v1_completion_ready",
+    "installed_sdk_package_ready",
+    "installed_sdk_release_ready",
+    "obelisk_config_cmake_ready",
+    "obelisk_targets_cmake_ready",
+    "owner_token_registration_ready",
+    "owner_token_sdk_consumer_ready",
+    "outcome",
+    "package_available",
+    "package_check_passed",
+    "package_check_succeeded",
+    "package_install_success",
+    "package_install_succeeded",
+    "package_publication_allowed",
+    "package_publication_ready",
+    "package_published",
+    "package_shape_counts_toward_release",
+    "package_shape_release_ready",
+    "package_shape_ready",
+    "package_shape_v1_completion_ready",
+    "package_shape_counts_toward_completion",
+    "package_shape_counts_toward_public_sdk",
+    "package_shape_counts_toward_v1_completion",
+    "passive_triplet_ready",
+    "passive_snapshot_counts_as_evidence",
+    "passive_snapshot_counts_as_runtime_evidence",
+    "passive_snapshot_counts_as_sdk_evidence",
+    "preconditions_met",
+    "precondition_ready",
+    "post_init_call_process_event_guardrail_passed",
+    "post_init_call_process_event_rejected",
+    "post_init_call_process_event_skipped",
+    "post_init_call_process_event_test_passed",
+    "start_end_evidence",
+    "start_end_evidence_accepted",
+    "start_end_evidence_acceptance",
+    "start_end_evidence_ready",
+    "start_end_only_evidence",
+    "start_end_only_evidence_accepted",
+    "start_end_only_evidence_acceptance",
+    "start_end_only_evidence_ready",
+    "session_start_end_evidence",
+    "session_start_end_evidence_accepted",
+    "session_start_end_evidence_acceptance",
+    "session_start_end_evidence_ready",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_accepted",
+    "session_start_and_end_evidence_acceptance",
+    "session_start_and_end_evidence_ready",
+    "runtime_window_activation_ready_under_recorded_standing_launch_authority",
+    "runtime_window_closure_accepted",
+    "runtime_window_closure_complete",
+    "runtime_window_closure_ready",
+    "runtime_window_preparation_ready",
+    "runtime_window_prepared",
+    "runtime_window_ready",
+    "runtime_readiness_allowed",
+    "runtime_readiness_ready",
+    "plugin_hub_publication_allowed",
+    "plugin_hub_publication_ready",
+    "plugin_hub_counts_toward_completion",
+    "plugin_hub_counts_toward_public_sdk",
+    "plugin_hub_counts_toward_v1_completion",
+    "plugin_hub_readiness_claim_allowed",
+    "plugin_hub_ready",
+    "plugin_hub_package_published",
+    "plugin_hub_seed_ready",
+    "plugin_hub_seed_package_publication",
+    "plugin_hub_support_tier_ready",
+    "public_abi_available",
+    "public_contract_allowed",
+    "public_contract_artifact_ready",
+    "public_contract_ready",
+    "public_contract_review_ready",
+    "public_header_allowed",
+    "public_header_available",
+    "public_header_ready",
+    "public_headers_available",
+    "public_headers_ready",
+    "module_ready",
+    "module_sdk_ready",
+    "public_module_ready",
+    "public_module_sdk_ready",
+    "public_module_sdk_coverage_claim_allowed",
+    "public_module_sdk_coverage_ready",
+    "public_module_sdk_covered",
+    "public_package_available",
+    "public_package_published",
+    "public_package_ready",
+    "public_sdk_coverage_ready",
+    "public_sdk_readiness_allowed",
+    "public_sdk_readiness_ready",
+    "readiness_ready",
+    "ready",
+    "reviewed_public_contract",
+    "reviewed_public_contract_ready",
+    "release_statement_ready",
+    "release_package_allowed",
+    "release_package_available",
+    "release_package_published",
+    "release_package_ready",
+    "release_packaged",
+    "release_statement_bookkeeping_counts_toward_completion",
+    "release_statement_counts_toward_completion",
+    "release_statement_outcomes_satisfy_completion",
+    "release_supported",
+    "release_supported_seed",
+    "request_check_ready",
+    "request_pack_ready",
+    "approved_bundle_request_ready",
+    "approved_runtime_bundle_request_ready",
+    "active_notice_ready",
+    "active_notice_sent",
+    "active_notice_accepted",
+    "active_notice_updated",
+    "active_notice_counts_toward_sdk",
+    "active_notice_counts_toward_p0_dependency_chain",
+    "active_notice_counts_toward_complete_sdk_claim",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    "public_reachability_ready",
+    "public_reachability_counts_as_evidence",
+    "public_reachability_counts_as_runtime_evidence",
+    "public_reachability_counts_as_sdk_evidence",
+    "public_reachability_counts_toward_runtime_evidence",
+    "public_reachability_counts_toward_sdk_evidence",
+    "route_bound_identity_source_forwarding_ready",
+    "identity_source_forwarding_ready",
+    "result",
+    "route_ready",
+    "side_lane_promoted",
+    "structure_build_policy_ready",
+    "sdk_consumer_guardrail_passed",
+    "sdk_consumer_guardrails_passed",
+    "sdk_package_available",
+    "sdk_package_published",
+    "sdk_package_ready",
+    "source_binding_ready",
+    *SOURCE_READY_STATUS_ALIAS_KEYS,
+    "state",
+    "status",
+    "struct_size_ready",
+    "struct_size_validated",
+    "support_tier",
+    "support_tier_activated",
+    "support_tier_ready",
+    "support_tier_activation_ready",
+    "support_tier_activation_allowed",
+    "support_tier_allowed",
+    "support_tier_supported",
+    "support_tiers",
+    "send_performed",
+    "scoped_release_statement_counts_toward_complete_sdk_claim",
+    "scoped_release_statement_counts_toward_completion",
+    "scoped_release_statement_outcomes_satisfy_completion",
+    "scoped_release_statement_ready",
+    "sdk_coverage_complete",
+    "standing_authority",
+    "standing_authority_accepted",
+    "standing_authority_acceptance",
+    "standing_authority_ready",
+    "standing_launch_authority",
+    "standing_launch_authority_accepted",
+    "standing_launch_authority_acceptance",
+    "standing_launch_authority_ready",
+    "stable_sdk_ready",
+    "stable_sdk_claim_allowed",
+    "tier",
+    "tiers",
+}
+NON_COUNTING_COMPLETION_READINESS_ALIAS_SUFFIXES = (
+    "_allowed",
+    "_accepted",
+    "_acceptance",
+    "_available",
+    "_closed",
+    "_cleared",
+    "_complete",
+    "_completed",
+    "_confirmed",
+    "_covered",
+    "_enabled",
+    "_met",
+    "_outcome",
+    "_passed",
+    "_prepared",
+    "_published",
+    "_performed",
+    "_reachable",
+    "_rejected",
+    "_readiness",
+    "_ready",
+    "_result",
+    "_resolved",
+    "_satisfied",
+    "_state",
+    "_status",
+    "_skipped",
+    "_supported",
+    "_success",
+    "_succeeded",
+    "_found",
+    "_unblocked",
+    "_unlocked",
+    "_validated",
+)
+NON_COUNTING_COMPLETION_READINESS_ALIAS_EXEMPT_KEYS = {
+    "review_status",
+}
+NON_COUNTING_COMPLETION_PROGRESS_ALIAS_SUFFIXES = (
+    "_claim_progress",
+    "_claim_progress_contribution",
+    "_progress",
+    "_progress_contribution",
+    "_progress_count",
+    "_progress_percent",
+    "_progress_ratio",
+    "_claim_count",
+    "_completion_count",
+    "_credit",
+    "_credits",
+    "_promoted_count",
+)
+NON_COUNTING_COMPLETION_POSITIVE_STATUS_VALUES = NOTICE_OR_BUNDLE_POSITIVE_STATUS_VALUES | {
+    "allowed",
+    "activated",
+    "available",
+    "built",
+    "candidate_only_accepted",
+    "candidate_ready",
+    "closed",
+    "complete",
+    "completed",
+    "complete_triplet",
+    "complete_triplet_present",
+    "covered",
+    "counted",
+    "counts",
+    "enabled",
+    "green",
+    "found",
+    "generated",
+    "live",
+    "met",
+    "ok",
+    "operational",
+    "passive_triplet_complete",
+    "production_grade",
+    "production_ready",
+    "prepared",
+    "present",
+    "promoted",
+    "public",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_header_ready",
+    "public_sdk_ready",
+    "published",
+    "reachable",
+    "ready",
+    "release_grade",
+    "release_ready",
+    "release_supported",
+    "release_supported_seed",
+    "referenced",
+    "reviewed",
+    "resolved",
+    "satisfied",
+    "success",
+    "succeeded",
+    "sdk_ready",
+    "stable",
+    "stable_claim_allowed",
+    "stable_ready",
+    "stable_sdk",
+    "stable_sdk_ready",
+    "supported",
+    "true",
+    "unblocked",
+    "unlocked",
+    "validated",
+    "verified",
+    "v1_completion",
+    "v1_completion_ready",
+    "v1_ready",
+    "v1_sdk_stable",
+    "v1_stable_sdk",
+    "yes",
+}
 OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS = (
     "promotion_ready",
     "public_sdk_ready",
     "runtime_ready",
     "public_resource_handle_ready",
     "post_callback_resource_handle_ready",
+    "serialPolicyReady",
+    "resourceLookupReady",
+    "postCallbackHandleReady",
+    "objectIdentityReady",
+    "runtimeSampleReady",
+    "offline_artifacts_unlock_public_lookup_identity_runtime_sdk",
 )
 OBJECT_IDENTITY_RESOURCE_HANDLE_FORBIDDEN_READY_KEYS = (
     *OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS,
+    "cross_event_identity_ready",
+    "cross_event_object_identity_ready",
+    "lookup_ready",
+    "mutation_ready",
     "object_identity_ready",
     "object_lookup_ready",
+    "object_mutation_ready",
+    "persistent_handle_ready",
+    "persistent_identity_ready",
+    "persistent_object_identity_ready",
+    "post_callback_handle_ready",
+    "post_callback_object_validity_ready",
+    "post_callback_validity_ready",
     "public_abi_ready",
     "public_contract_allowed",
     "public_header_allowed",
+    "public_lookup_ready",
+    "public_mutation_ready",
     "public_object_identity_ready",
     "public_object_lookup_ready",
     "release_ready",
     "resource_handle_ready",
+    "resource_lookup_ready",
+    "runtime_object_negative_samples_ready",
+    "serial_policy_ready",
+    "serial_reuse_ready",
+    "serial_wraparound_ready",
     "v1_completion_ready",
 )
+OBJECT_IDENTITY_RESOURCE_HANDLE_STRICT_NEXT_BLOCKER = (
+    "runtime rejected object samples, runtime serial reuse/wraparound semantics, "
+    "lookup privacy, and ResourceHandle lifetime semantics under future approved live-ops brief"
+)
+OBJECT_IDENTITY_RESOURCE_HANDLE_OFFLINE_ARTIFACT_POLICY = "candidate-only"
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"\b(?:"
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
@@ -645,11 +2503,11 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
-    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b",
+    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unblock(?:ed|s)?|unlock(?:ed|s)?|accepted|live|operational)\b",
     re.IGNORECASE,
 )
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
-    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b"
+    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unblock(?:ed|s)?|unlock(?:ed|s)?|accepted|live|operational)\b"
     r".{0,80}\b(?:"
     r"reply\s+api|reply\s+abi|reply\s+endpoint|send[-\s]?chat\s+api|command\s+router|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|runtime\s+work|"
@@ -677,41 +2535,397 @@ PUBLIC_CONTRACT_REVIEW_READY_SCOPE = "contract_review_input_only"
 BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
 PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
     "approved_runtime",
+    "approved_runtime_binding",
     "approved_runtime_evidence",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_only",
     "approved_runtime_evidence_only",
     "approved_runtime_only",
+    "accepted_runtime_evidence_precondition",
+    "accepted_runtime_evidence_precondition_only",
+    "accepted_runtime_evidence_preconditions",
+    "accepted_runtime_evidence_preconditions_only",
+    "accepted_artifact_class",
+    "accepted_artifact_class_only",
+    "accepted_artifact_class_report",
+    "accepted_artifact_class_report_only",
+    "activation_preconditions",
+    "activation_preconditions_only",
+    "offline_pre_activation_consistency",
+    "offline_pre_activation_consistency_only",
+    "pre_activation_consistency",
+    "pre_activation_consistency_only",
+    "preactivation_consistency",
+    "preactivation_consistency_only",
     "approved_bundle",
     BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    "contract_review",
+    "contract_review_input",
+    PUBLIC_CONTRACT_REVIEW_READY_SCOPE,
+    "contract_review_only",
+    "public_contract_review",
+    "public_contract_review_input",
+    "public_contract_review_input_only",
+    "public_contract_review_only",
+    "reviewed_public_contract",
+    "reviewed_public_contract_only",
+    "diagnostic",
+    "diagnostic_lifecycle",
+    "diagnostic_lifecycle_only",
+    "diagnostic_only",
+    "ready_log_evidence_split",
+    "ready_log_evidence_split_only",
+    "lifecycle_event_split",
+    "lifecycle_event_split_only",
+    "player_principal_lifecycle_event_split_summary",
+    "player_principal_lifecycle_event_split_summary_only",
+    "post_runtime_contract_gap",
+    "post_runtime_contract_gap_only",
+    "post_runtime_contract_gap_diagnostic",
+    "post_runtime_contract_gap_diagnostic_only",
+    "route_sample",
+    "route_sample_only",
+    "route_samples",
+    "route_samples_only",
+    "check_join_in_progress_offline_acceptance",
+    "check_join_in_progress_offline_acceptance_only",
+    "checkjoininprogress_offline_acceptance",
+    "checkjoininprogress_offline_acceptance_only",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance_only",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance_only",
+    "check_join_in_progress10_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance_only",
+    "checkjoininprogress10_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance_only",
+    "check_join_in_progress_planning_acceptance",
+    "check_join_in_progress_planning_acceptance_only",
+    "checkjoininprogress_planning_acceptance",
+    "checkjoininprogress_planning_acceptance_only",
+    "check_join_in_progress_candidate_only",
+    "checkjoininprogress_candidate_only",
+    "session_start_rejected_offline_acceptance",
+    "session_start_rejected_offline_acceptance_only",
+    "offline_session_start_rejected_acceptance",
+    "offline_session_start_rejected_acceptance_only",
+    "candidate_only_session_start_rejected_acceptance",
+    "candidate_only_session_start_rejected_acceptance_only",
+    "session_start_rejected_planning_acceptance",
+    "session_start_rejected_planning_acceptance_only",
+    "rejected_session_start_planning_acceptance",
+    "rejected_session_start_planning_acceptance_only",
+    "start_end_evidence",
+    "start_end_evidence_only",
+    "start_end_only_evidence",
+    "start_end_only_evidence_only",
+    "session_start_end_evidence",
+    "session_start_end_evidence_only",
+    "session_start_and_end_evidence",
+    "session_start_and_end_evidence_only",
+    "standing_authority",
+    "standing_authority_only",
+    "standing_launch_authority",
+    "standing_launch_authority_only",
+    "helper",
+    "helper_artifact",
+    "helper_artifact_only",
+    "helper_only",
     "identity_contract",
     "identity_contract_only",
     "identity_public_contract",
     "identity_public_contract_only",
+    "notice_action",
+    "notice_action_only",
+    "notice_dry_run",
+    "notice_dry_run_only",
+    "beta_notice",
+    "beta_notice_only",
+    "bot_notice",
+    "bot_notice_only",
+    "discord_beta_bot_notice",
+    "discord_beta_bot_notice_only",
+    "discord_beta_bridge",
+    "discord_beta_bridge_bot_notice",
+    "discord_beta_bridge_bot_notice_only",
+    "discord_beta_bridge_config",
+    "discord_beta_bridge_config_only",
+    "discord_beta_bridge_event",
+    "discord_beta_bridge_event_only",
+    "discord_beta_bridge_only",
+    "discord_bot_notice",
+    "discord_bot_notice_only",
+    "beta_capture",
+    "beta_capture_only",
+    "beta_capture_plan",
+    "beta_capture_plan_only",
+    "beta_capture_queue",
+    "beta_capture_queue_only",
+    "multi_surface",
+    "multi_surface_beta_capture",
+    "multi_surface_beta_capture_only",
+    "multi_surface_beta_capture_plan",
+    "multi_surface_beta_capture_plan_only",
+    "multi_surface_beta_capture_plan_queue",
+    "multi_surface_beta_capture_plan_queue_only",
+    "multi_surface_beta_pack",
+    "multi_surface_beta_pack_only",
+    "multi_surface_beta_capture_queue",
+    "multi_surface_beta_capture_queue_only",
+    "multi_surface_candidate_queue",
+    "multi_surface_candidate_queue_only",
+    "confirmed_notice",
+    "confirmed_notice_only",
+    "confirmed_notice_report",
+    "confirmed_notice_report_only",
+    "beta_notice_prep",
+    "beta_notice_prep_only",
+    "beta_notice_send",
+    "beta_notice_send_only",
+    "beta_notice_send_attestation",
+    "beta_notice_send_attestation_only",
+    "player_notice",
+    "player_notice_action",
+    "player_notice_action_only",
+    "player_notice_only",
     "lifecycle_anchor",
     "lifecycle_anchor_candidates",
     "lifecycle_anchor_candidates_only",
     "lifecycle_anchor_only",
     "live_ops_sidecar",
     "live_validation_sidecar",
+    "installed_runtime",
+    "installed_runtime_only",
+    "runtime_install",
+    "runtime_install_only",
+    "runtime_installed",
+    "runtime_installed_only",
+    "broadcast",
+    "broadcast_only",
+    "broadcast_ok",
+    "broadcast_ok_only",
+    "rcon",
+    "rcon_count",
+    "rcon_count_only",
+    "rcon_counts",
+    "rcon_counts_only",
+    "rcon_only",
+    "rcon_ok",
+    "rcon_ok_only",
+    "rcon_player_count",
+    "rcon_player_count_only",
+    "rcon_player_counts",
+    "rcon_player_counts_only",
     "operator_approval_receipt",
     "operator_approval_receipt_only",
     "operator_receipt",
     "operator_receipt_only",
+    "observer_event_triage",
+    "observer_event_triage_non_evidence",
+    "observer_event_triage_only",
+    "passive_observation",
+    "passive_observation_only",
+    "passive_activity_triage",
+    "passive_activity_triage_non_evidence",
+    "passive_activity_triage_only",
+    "passive_latest_summary",
+    "passive_latest_summary_only",
+    "passive_snapshot",
+    "passive_snapshot_diff",
+    "passive_snapshot_diff_only",
+    "passive_snapshot_latest",
+    "passive_snapshot_latest_only",
+    "passive_snapshot_only",
+    "closed_agent_note",
+    "closed_agent_note_only",
+    "closed_agent_notes",
+    "closed_agent_notes_only",
+    "closed_agent_report",
+    "closed_agent_report_only",
+    "closed_agent_summary",
+    "closed_agent_summary_only",
+    "closed_worker_note",
+    "closed_worker_note_only",
+    "closed_worker_notes",
+    "closed_worker_notes_only",
+    "closed_worker_report",
+    "closed_worker_report_only",
+    "closed_worker_summary",
+    "closed_worker_summary_only",
+    "copied_log_only",
+    "copied_log_only_artifact",
+    "copied_log_only_report",
+    "package_shape",
+    "package_shape_evidence",
+    "package_shape_evidence_only",
+    "package_shape_only",
+    "package_check",
+    "package_check_only",
+    "package_install",
+    "package_install_only",
+    "package_exact",
+    "package_exact_only",
+    "package_non_exact",
+    "package_non_exact_only",
+    "sdk_package_shape",
+    "sdk_package_shape_only",
+    "sdk_package_exact",
+    "sdk_package_exact_only",
+    "sdk_package_non_exact",
+    "sdk_package_non_exact_only",
+    "installed_sdk",
+    "installed_sdk_only",
+    "installed_sdk_package_shape",
+    "installed_sdk_package_shape_only",
+    "installed_sdk_package_exact",
+    "installed_sdk_package_exact_only",
+    "installed_sdk_package_non_exact",
+    "installed_sdk_package_non_exact_only",
+    "install_evidence",
+    "install_evidence_only",
+    "install_package",
+    "install_package_only",
+    "installed_sdk_evidence",
+    "installed_sdk_evidence_only",
+    "find_package",
+    "find_package_only",
+    "cmake_package_check",
+    "cmake_package_check_only",
+    "component_sdk_check",
+    "component_sdk_check_only",
+    "route_planning",
+    "route_planning_only",
+    "route_planning_report",
+    "route_planning_report_only",
+    "planning_route",
+    "planning_route_only",
+    "planning_route_report",
+    "planning_route_report_only",
+    "command_chat_response_route_planning",
+    "command_chat_response_route_planning_only",
+    "copied_bool",
+    "copied_bool_only",
+    "copied_bool_policy_slice",
+    "copied_bool_policy_slice_only",
+    "fixture_boundary",
+    "fixture_boundary_only",
     "placeholder_provenance",
     "preflight",
     "preflight_only",
     "post_window_replay",
     "post_window_replay_only",
+    "closure_artifact",
+    "closure_artifact_only",
+    "closure_report",
+    "closure_report_only",
+    "evidence_closure",
+    "evidence_closure_only",
+    "evidence_closure_report",
+    "evidence_closure_report_only",
     "request_pack",
     "request_pack_only",
+    "request_artifact",
+    "request_artifact_only",
+    "request_check",
+    "request_check_only",
+    "request_check_readiness",
+    "request_check_readiness_only",
+    "request_preflight",
+    "request_preflight_only",
+    "approved_bundle_request",
+    "approved_bundle_request_only",
+    "approved_runtime_bundle_request",
+    "approved_runtime_bundle_request_only",
+    "public_reachability",
+    "public_reachability_only",
+    "route_bound_identity_source_forwarding",
+    "route_bound_identity_source_forwarding_only",
+    "identity_source_forwarding",
+    "identity_source_forwarding_only",
+    "window_request_check",
+    "window_request_check_only",
+    RUNTIME_EVIDENCE_READY_SCOPE,
     "runtime_replay",
     "runtime_replay_fixture",
     "runtime_replay_fixture_only",
     "runtime_replay_only",
+    "abi_consumer_guardrail",
+    "abi_consumer_guardrail_only",
+    "abi_consumer_guardrails",
+    "abi_consumer_guardrails_only",
+    "call_process_event_post_init",
+    "call_process_event_post_init_only",
+    "post_init_call_process_event",
+    "post_init_call_process_event_only",
+    "sdk_consumer_guardrail",
+    "sdk_consumer_guardrail_only",
+    "sdk_consumer_guardrails",
+    "sdk_consumer_guardrails_only",
     "runtime_window",
+    "runtime_window_plan",
+    "runtime_window_plan_only",
+    "runtime_window_planner",
+    "runtime_window_planner_only",
+    "runtime_window_executor",
+    "runtime_window_executor_only",
+    "runtime_window_execution",
+    "runtime_window_execution_only",
+    "runtime_window_closure",
+    "runtime_window_closure_only",
+    "runtime_window_executor_closure",
+    "runtime_window_executor_closure_only",
+    "internal_fixture_boundary",
+    "internal_fixture_boundary_only",
+    "internal_only",
     "live_ops_sidecar_only",
     "live_validation_sidecar_only",
+    "mission_copied_bool",
+    "mission_copied_bool_only",
+    "mission_copied_bool_fixture_boundary",
+    "mission_copied_bool_fixture_boundary_only",
+    "readiness_only",
+    "report_only",
+    "scoped_non_complete",
+    "scoped_non_complete_only",
+    "scoped_non_complete_release_statement",
+    "scoped_non_complete_release_statement_only",
+    "scoped_release_statement",
+    "scoped_release_statement_only",
+    "transfer_scriptstruct_readiness",
+    "transfer_scriptstruct_readiness_only",
+    "transfer_script_struct_readiness",
+    "transfer_script_struct_readiness_only",
+    "transfer_baccept_readiness",
+    "transfer_baccept_readiness_only",
+    "dino_scalar_readiness",
+    "dino_scalar_readiness_only",
+    "scalar_only_readiness",
+    "scalar_only_readiness_only",
+    "buff_status_readiness",
+    "buff_status_readiness_only",
+    "tribe_scalar_boundary_readiness",
+    "tribe_scalar_boundary_readiness_only",
+    "scalar_boundary_readiness",
+    "scalar_boundary_readiness_only",
+    "post_evidence_p0_lock_simulation",
+    "post_evidence_p0_lock_simulation_only",
+    "post_evidence_identity_lock",
+    "post_evidence_identity_lock_only",
+    "route_simulation",
+    "route_simulation_only",
+    "route_lock_simulation",
+    "route_lock_simulation_only",
+    "identity_lock",
+    "identity_lock_only",
+    "route_gate_post_evidence_p0_lock_simulation",
+    "route_gate_post_evidence_p0_lock_simulation_only",
+    "simulation_only",
     "window_manifest",
     "window_manifest_only",
+    "binding_required",
+    "binding_required_only",
+    "binding_required_report",
+    "binding_required_report_only",
 }
 PROMOTION_EVIDENCE_SCOPE_KEYS = {
     "accounting_scope",
@@ -772,6 +2986,231 @@ PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS = (
     "runtime readiness",
     "v1 SDK completion",
 )
+APPROVED_RUNTIME_EVIDENCE_CLASSIFICATION_KEYS = {
+    "artifact_status",
+    "evidence_kind",
+    "input_schema",
+    "readiness_classification",
+    "classification",
+    "evidence_classification",
+    "ready_scope",
+    "review_scope",
+    "schema",
+    "source_kind",
+    "source_schema",
+    "source_scope",
+    "source_value",
+    "source_values",
+    "status",
+}
+APPROVED_RUNTIME_EVIDENCE_FORBIDDEN_MARKERS = (
+    ("observer_event_triage", "observer_event_triage_not_approved_runtime_evidence"),
+    ("observer_event_triage_non_evidence", "observer_event_triage_not_approved_runtime_evidence"),
+    ("approved_runtime_evidence_binding", "approved_runtime_evidence_binding_not_approved_runtime_evidence"),
+    ("approved_runtime_binding", "approved_runtime_evidence_binding_not_approved_runtime_evidence"),
+    ("check_join_in_progress_offline", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("checkjoininprogress_offline", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("check_join_in_progress_1_0_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("checkjoininprogress_1_0_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("check_join_in_progress10_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("checkjoininprogress10_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("check_join_in_progress_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("checkjoininprogress_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("check_join_in_progress_candidate", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("checkjoininprogress_candidate", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("session_start_rejected_offline", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("offline_session_start_rejected", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("session_start_rejected_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("rejected_session_start_planning", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("session_start_rejected_candidate", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("candidate_session_start_rejected", "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"),
+    ("principal_start_end_contract_input", "start_end_contract_input_not_approved_runtime_evidence"),
+    ("session_start_end_contract_input", "start_end_contract_input_not_approved_runtime_evidence"),
+    ("session_start_and_end_contract_input", "start_end_contract_input_not_approved_runtime_evidence"),
+    ("start_end_contract_input", "start_end_contract_input_not_approved_runtime_evidence"),
+    ("start_end_only_evidence", "start_end_only_evidence_not_approved_runtime_evidence"),
+    ("start_end_evidence", "start_end_only_evidence_not_approved_runtime_evidence"),
+    ("session_start_end_evidence", "start_end_only_evidence_not_approved_runtime_evidence"),
+    ("session_start_and_end_evidence", "start_end_only_evidence_not_approved_runtime_evidence"),
+    ("standing_launch_authority", "standing_launch_authority_not_approved_runtime_evidence"),
+    ("standing_authority", "standing_launch_authority_not_approved_runtime_evidence"),
+    ("passive_snapshot_latest", "passive_latest_summary_not_approved_runtime_evidence"),
+    ("passive_snapshot_diff", "passive_latest_summary_not_approved_runtime_evidence"),
+    ("passive_activity_triage", "passive_activity_triage_not_approved_runtime_evidence"),
+    ("passive_latest_summary", "passive_latest_summary_not_approved_runtime_evidence"),
+    ("latest_summary", "passive_latest_summary_not_approved_runtime_evidence"),
+    ("active_passive_monitor", "active_monitor_not_approved_runtime_evidence"),
+    ("active_monitor", "active_monitor_not_approved_runtime_evidence"),
+    ("passive_snapshot", "passive_snapshot_not_approved_runtime_evidence"),
+    ("passive_observation", "passive_snapshot_not_approved_runtime_evidence"),
+    ("passive_capture", "passive_snapshot_not_approved_runtime_evidence"),
+    ("player_principal_passive_snapshot", "passive_snapshot_not_approved_runtime_evidence"),
+    ("ready_log_evidence_split", "ready_log_evidence_split_not_approved_runtime_evidence"),
+    ("player_principal_lifecycle_event_split_summary", "lifecycle_event_split_summary_not_approved_runtime_evidence"),
+    ("lifecycle_event_split_summary", "lifecycle_event_split_summary_not_approved_runtime_evidence"),
+    ("lifecycle_event_split", "lifecycle_event_split_summary_not_approved_runtime_evidence"),
+    ("post_runtime_contract_gap_diagnostic", "post_runtime_contract_gap_diagnostic_not_approved_runtime_evidence"),
+    ("post_runtime_contract_gap", "post_runtime_contract_gap_diagnostic_not_approved_runtime_evidence"),
+    ("route_samples", "route_sample_not_approved_runtime_evidence"),
+    ("route_sample", "route_sample_not_approved_runtime_evidence"),
+    ("copied_log_only", "copied_log_only_not_approved_runtime_evidence"),
+    ("window_manifest", "window_manifest_not_approved_runtime_evidence"),
+    ("accepted_artifact_class", "accepted_artifact_class_not_approved_runtime_evidence"),
+    ("binding_required", "binding_required_not_approved_runtime_evidence"),
+    ("request_pack", "request_pack_not_approved_runtime_evidence"),
+    ("request_check", "request_check_not_approved_runtime_evidence"),
+    ("approved_bundle_request", "approved_bundle_request_not_approved_runtime_evidence"),
+    ("public_reachability", "public_reachability_not_approved_runtime_evidence"),
+    ("public_contract_readiness", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("public_contract_review", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("reviewed_public_contract", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("reviewed_identity_public_contract", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("identity_public_contract", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("contract_review", "public_contract_review_status_not_approved_runtime_evidence"),
+    ("offline_hardening", "offline_hardening_not_approved_runtime_evidence"),
+    ("route_bound_identity_source_forwarding", "identity_source_forwarding_not_approved_runtime_evidence"),
+    ("identity_source_forwarding", "identity_source_forwarding_not_approved_runtime_evidence"),
+    ("preflight", "preflight_not_approved_runtime_evidence"),
+    ("activation_preconditions", "activation_preconditions_not_approved_runtime_evidence"),
+    ("closure_report", "closure_report_not_approved_runtime_evidence"),
+    ("evidence_closure", "closure_report_not_approved_runtime_evidence"),
+    ("beta_notice", "beta_notice_not_approved_runtime_evidence"),
+    ("discord_beta_bridge_bot_notice", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("discord_beta_bridge_config", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("discord_beta_bridge_event", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("discord_beta_bridge", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("discord_beta_bot_notice", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("discord_bot_notice", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("bot_notice", "discord_beta_bridge_not_approved_runtime_evidence"),
+    ("multi_surface_beta_capture_pack", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_beta_pack", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_beta_capture_checker_matrix", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_beta_capture_non_claim_manifest", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_capture_plan", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("checker_command_matrix", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("operator_runbook", MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_NON_EVIDENCE_REASON),
+    ("multi_surface_beta_capture", "multi_surface_beta_capture_not_approved_runtime_evidence"),
+    ("multi_surface_candidate_queue", "multi_surface_beta_capture_not_approved_runtime_evidence"),
+    ("beta_capture_plan", "multi_surface_beta_capture_not_approved_runtime_evidence"),
+    ("beta_capture_queue", "multi_surface_beta_capture_not_approved_runtime_evidence"),
+    ("confirmed_notice", "confirmed_notice_not_approved_runtime_evidence"),
+    ("route_simulation", "route_simulation_not_approved_runtime_evidence"),
+    ("post_evidence_identity_lock", "post_evidence_identity_lock_not_approved_runtime_evidence"),
+    ("identity_lock", "identity_lock_not_approved_runtime_evidence"),
+    ("operator_approval_receipt", "operator_receipt_not_approved_runtime_evidence"),
+    ("operator_receipt", "operator_receipt_not_approved_runtime_evidence"),
+    ("live_validation_sidecar", "live_sidecar_not_approved_runtime_evidence"),
+    ("live_ops_sidecar", "live_sidecar_not_approved_runtime_evidence"),
+    ("installed_runtime", "installed_runtime_not_approved_runtime_evidence"),
+    ("runtime_install", "installed_runtime_not_approved_runtime_evidence"),
+    ("runtime_installed", "installed_runtime_not_approved_runtime_evidence"),
+    ("install_package", "package_shape_not_approved_runtime_evidence"),
+    ("package_install", "package_shape_not_approved_runtime_evidence"),
+    ("package_check", "package_shape_not_approved_runtime_evidence"),
+    ("find_package", "package_shape_not_approved_runtime_evidence"),
+    ("cmake_package_check", "package_shape_not_approved_runtime_evidence"),
+    ("component_sdk_check", "package_shape_not_approved_runtime_evidence"),
+    ("generated_cert", "generated_cert_report_not_approved_runtime_evidence"),
+    ("generated_certificate", "generated_cert_report_not_approved_runtime_evidence"),
+    ("promotion_cert", "promotion_certificate_not_approved_runtime_evidence"),
+    ("public_debug_boundary", "public_debug_boundary_not_approved_runtime_evidence"),
+    ("debug_public_boundary", "public_debug_boundary_not_approved_runtime_evidence"),
+    ("abi_consumer_guardrail", "abi_consumer_guardrail_not_approved_runtime_evidence"),
+    ("sdk_consumer_guardrail", "abi_consumer_guardrail_not_approved_runtime_evidence"),
+    ("post_init_call_process_event", "post_init_call_process_event_not_approved_runtime_evidence"),
+    ("call_process_event_post_init", "post_init_call_process_event_not_approved_runtime_evidence"),
+    ("broadcast", "broadcast_status_not_approved_runtime_evidence"),
+    ("rcon", "rcon_status_not_approved_runtime_evidence"),
+    ("player_notice_action", "player_notice_action_not_approved_runtime_evidence"),
+    ("player_notice", "player_notice_action_not_approved_runtime_evidence"),
+    ("notice_dry_run", "player_notice_action_not_approved_runtime_evidence"),
+    ("discord_notice", "player_notice_action_not_approved_runtime_evidence"),
+    ("runtime_window_plan", "runtime_window_plan_not_approved_runtime_evidence"),
+    ("runtime_window_planner", "runtime_window_plan_not_approved_runtime_evidence"),
+    ("runtime_window_closure", "runtime_window_closure_not_approved_runtime_evidence"),
+    ("runtime_window_executor_closure", "runtime_window_closure_not_approved_runtime_evidence"),
+    ("runtime_window_executor", "runtime_window_executor_not_approved_runtime_evidence"),
+    ("runtime_window_execution", "runtime_window_executor_not_approved_runtime_evidence"),
+    ("runtime_evidence_status", "status_report_not_approved_runtime_evidence"),
+    ("sdk_status_report", "status_report_not_approved_runtime_evidence"),
+    ("status_report", "status_report_not_approved_runtime_evidence"),
+    ("source_readiness", "source_ready_status_report_not_approved_runtime_evidence"),
+    ("source_ready", "source_ready_status_report_not_approved_runtime_evidence"),
+    ("sources_ready", "source_ready_status_report_not_approved_runtime_evidence"),
+    ("source_status", "source_ready_status_report_not_approved_runtime_evidence"),
+    ("approved_runtime_manifest", "approved_runtime_manifest_reference_not_approved_runtime_evidence"),
+    ("partial_lifecycle", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("partial_role_triplet", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("partial_event_triplet", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("lifecycle_event_proof", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("lifecycle_role_proof", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("lifecycle_roles_observed", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("session_start_observed", "partial_lifecycle_events_not_approved_runtime_evidence"),
+    ("session_end_observed", "partial_lifecycle_events_not_approved_runtime_evidence"),
+)
+APPROVED_RUNTIME_PARTIAL_LIFECYCLE_MARKERS = (
+    "partial_lifecycle",
+    "partial_role_triplet",
+    "partial_event_triplet",
+    "lifecycle_event_proof",
+    "lifecycle_role_proof",
+    "lifecycle_event_split",
+    "lifecycle_event_split_summary",
+    "player_principal_lifecycle_event_split_summary",
+    "lifecycle_roles_observed",
+    "session_start_observed",
+    "session_end_observed",
+)
+APPROVED_RUNTIME_ACCEPTED_COUNT_KEYS = (
+    "accepted_count",
+    "accepted_event_count",
+    "accepted_lifecycle_event_count",
+    "observed_lifecycle_event_count",
+)
+APPROVED_RUNTIME_ACCEPTED_LIST_KEYS = (
+    "accepted_events",
+    "accepted_lifecycle_events",
+    "observed_event_cases",
+    "observed_lifecycle_event_cases",
+)
+APPROVED_RUNTIME_DIAGNOSTIC_MISMATCH_TEXT_RE = re.compile(
+    r"(?:diagnostic[-_ ]?(?:candidates?|only)|"
+    r"observer[-_ ]?event[-_ ]?triage(?:[-_ ]?non[-_ ]?evidence)?|"
+    r"fname[-_ ]?mismatch|f[-_ ]?name[-_ ]?mismatch|"
+    r"ready[-_ ]?log[-_ ]?evidence[-_ ]?split|"
+    r"(?:player[-_ ]?principal[-_ ]?)?lifecycle[-_ ]?event[-_ ]?split(?:[-_ ]?summary)?|"
+    r"post[-_ ]?runtime[-_ ]?contract[-_ ]?gap(?:[-_ ]?diagnostic)?|"
+    r"route[-_ ]?samples?|"
+    r"HandleNewPlayer.{0,80}(?:mismatch|rejected)|"
+    r"rejected.{0,80}HandleNewPlayer)",
+    re.IGNORECASE,
+)
+NON_PUBLIC_CHECKJOIN_REJECTED_OFFLINE_ACCEPTANCE_RE = re.compile(
+    r"(?:"
+    r"check_?join_?in_?progress(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|non_?evidence|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))+|"
+    r"(?:session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|diagnostic|offline|candidate(?:_?only)?|non_?evidence|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source|check_?join_?in_?progress))+|"
+    r"(?:diagnostic|offline|candidate(?:_?only)?|non_?evidence|planning)(?:_?(?:check_?join_?in_?progress|session_?start_?rejected|rejected_?session_?start)(?:_?(?:1_?0|10|planning|accept(?:ed|ance)|readiness|report|status|evidence|artifacts?|summary|source))?)+"
+    r")",
+    re.IGNORECASE,
+)
+APPROVED_EVIDENCE_CLAIM_KEYS = {
+    "approved_evidence_claim",
+    "approved_runtime_evidence_claim",
+    "evidence_claim",
+    "runtime_evidence_claim",
+}
+APPROVED_EVIDENCE_CLAIM_NONE_VALUES = {
+    "",
+    "0",
+    "absent",
+    "false",
+    "missing",
+    "no",
+    "none",
+    "not_applicable",
+    "not_approved",
+    "unapproved",
+}
 REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     "obelisk.permissions_admin.v1": (
         "obelisk.player_identity.v1",
@@ -814,13 +3253,82 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "approved-bundle",
     "approved_runtime",
     "approved-runtime",
+    "approved_runtime_binding",
+    "approved-runtime-binding",
+    "approved_runtime_evidence_binding",
+    "approved-runtime-evidence-binding",
     "approved_runtime_bundle",
     "approved-runtime-bundle",
+    "approved_bundle_request",
+    "approved-bundle-request",
+    "approved_runtime_bundle_request",
+    "approved-runtime-bundle-request",
+    "accepted_runtime_evidence_precondition",
+    "accepted-runtime-evidence-precondition",
+    "accepted_runtime_evidence_preconditions",
+    "accepted-runtime-evidence-preconditions",
+    "accepted_artifact_class",
+    "accepted-artifact-class",
+    "accepted_artifact_class_report",
+    "accepted-artifact-class-report",
+    "activation_preconditions",
+    "activation-preconditions",
+    "offline_pre_activation_consistency",
+    "offline-pre-activation-consistency",
+    "pre_activation_consistency",
+    "pre-activation-consistency",
     "candidate",
+    "diagnostic",
+    "diagnostic_only",
+    "diagnostic_lifecycle",
+    "check_join_in_progress_offline_acceptance",
+    "checkjoininprogress_offline_acceptance",
+    "check_join_in_progress_1_0_planning_acceptance",
+    "checkjoininprogress_1_0_planning_acceptance",
+    "check_join_in_progress10_planning_acceptance",
+    "checkjoininprogress10_planning_acceptance",
+    "check_join_in_progress_planning_acceptance",
+    "checkjoininprogress_planning_acceptance",
+    "check_join_in_progress_candidate_only",
+    "checkjoininprogress_candidate_only",
+    "session_start_rejected_offline_acceptance",
+    "offline_session_start_rejected_acceptance",
+    "candidate_only_session_start_rejected_acceptance",
+    "session_start_rejected_planning_acceptance",
+    "rejected_session_start_planning_acceptance",
+    "start_end_evidence",
+    "start-end-evidence",
+    "start_end_only_evidence",
+    "start-end-only-evidence",
+    "session_start_end_evidence",
+    "session-start-end-evidence",
+    "session_start_and_end_evidence",
+    "session-start-and-end-evidence",
+    "standing_authority",
+    "standing-authority",
+    "standing_launch_authority",
+    "standing-launch-authority",
+    "helper",
+    "helper_artifact",
+    "helper_only",
     "admin_thunk",
     "admin_thunks",
     "chat_message_event_seed",
     "chat_seed",
+    "contract_review",
+    "contract-review",
+    "contract_review_input",
+    "contract-review-input",
+    "copied_bool",
+    "copied-bool",
+    "copied_bool_policy_slice",
+    "copied-bool-policy-slice",
+    "copied_log_only",
+    "copied-log-only",
+    "copied_log_only_artifact",
+    "copied-log-only-artifact",
+    "copied_log_only_report",
+    "copied-log-only-report",
     "copied_data",
     "core_first",
     "descriptor_catalog",
@@ -844,7 +3352,100 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "identity-contract",
     "identity_public_contract",
     "identity-public-contract",
+    "notice_action",
+    "notice-action",
+    "notice_dry_run",
+    "notice-dry-run",
+    "beta_notice",
+    "beta-notice",
+    "beta_notice_prep",
+    "beta-notice-prep",
+    "beta_notice_send",
+    "beta-notice-send",
+    "beta_notice_send_attestation",
+    "beta-notice-send-attestation",
+    "confirmed_notice",
+    "confirmed-notice",
+    "confirmed_notice_report",
+    "confirmed-notice-report",
+    "confirmed_beta_notice_report",
+    "confirmed-beta-notice-report",
+    "active_passive_monitor",
+    "active-passive-monitor",
+    "active_monitor",
+    "active-monitor",
+    "passive_monitor",
+    "passive-monitor",
+    "notice_report",
+    "notice-report",
+    "player_notice",
+    "player-notice",
+    "player_notice_action",
+    "player-notice-action",
+    "discord_notice",
+    "discord-notice",
+    "bot_notice",
+    "bot-notice",
+    "discord_beta_bridge",
+    "discord-beta-bridge",
+    "discord_beta_bridge_bot_notice",
+    "discord-beta-bridge-bot-notice",
+    "discord_beta_bot_notice",
+    "discord-beta-bot-notice",
+    "discord_bot_notice",
+    "discord-bot-notice",
+    "multi_surface_beta_pack",
+    "multi-surface-beta-pack",
+    "public_reachability",
+    "public-reachability",
+    "route_bound_identity_source_forwarding",
+    "route-bound-identity-source-forwarding",
+    "identity_source_forwarding",
+    "identity-source-forwarding",
+    "fixture_boundary",
+    "fixture-boundary",
+    "internal_fixture_boundary",
+    "internal-fixture-boundary",
     "package_shape",
+    "package_shape_evidence",
+    "package_shape_only",
+    "package_check",
+    "package-check",
+    "package_install",
+    "package-install",
+    "package_exact",
+    "package-exact",
+    "package_non_exact",
+    "package-non-exact",
+    "sdk_package_shape",
+    "sdk_package_exact",
+    "sdk-package-exact",
+    "sdk_package_non_exact",
+    "sdk-package-non-exact",
+    "installed_sdk",
+    "installed_sdk_package_shape",
+    "installed_sdk_package_exact",
+    "installed-sdk-package-exact",
+    "installed_sdk_package_non_exact",
+    "installed-sdk-package-non-exact",
+    "install_evidence",
+    "install_package",
+    "install-package",
+    "installed_sdk_evidence",
+    "find_package",
+    "find-package",
+    "cmake_package_check",
+    "cmake-package-check",
+    "component_sdk_check",
+    "component-sdk-check",
+    "abi_consumer_guardrail",
+    "abi-consumer-guardrail",
+    "sdk_consumer_guardrail",
+    "sdk-consumer-guardrail",
+    "post_init_call_process_event",
+    "post-init-call-process-event",
+    "call_process_event_post_init",
+    "call-process-event-post-init",
     "placeholder",
     "placeholder_provenance",
     "planning",
@@ -852,14 +3453,136 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "pluginhub",
     "plugin_hub_seed",
     "orientation",
+    "passive_observation",
+    "passive-observation",
+    "passive_activity_triage",
+    "passive-activity-triage",
+    "passive_latest_summary",
+    "passive-latest-summary",
+    "passive_snapshot_diff",
+    "passive-snapshot-diff",
+    "passive_snapshot_latest",
+    "passive-snapshot-latest",
+    "passive_snapshot",
+    "passive-snapshot",
+    "latest_summary",
+    "latest-summary",
+    "closed_agent_note",
+    "closed-agent-note",
+    "closed_agent_notes",
+    "closed-agent-notes",
+    "closed_agent_report",
+    "closed-agent-report",
+    "closed_agent_summary",
+    "closed-agent-summary",
+    "closed_worker_note",
+    "closed-worker-note",
+    "closed_worker_notes",
+    "closed-worker-notes",
+    "closed_worker_report",
+    "closed-worker-report",
+    "closed_worker_summary",
+    "closed-worker-summary",
+    "offline_hardening",
+    "offline-hardening",
+    "offline_hardening_report",
+    "offline-hardening-report",
+    "offline_gate_hardening",
+    "offline-gate-hardening",
+    "route_planning",
+    "route-planning",
+    "route_planning_report",
+    "route-planning-report",
+    "planning_route",
+    "planning-route",
+    "planning_route_report",
+    "planning-route-report",
+    "route_planning_readiness",
+    "route-planning-readiness",
+    "command_chat_response_route_planning",
+    "command-chat-response-route-planning",
+    "command_chat_response_route_planning_readiness",
+    "command-chat-response-route-planning-readiness",
     "preflight",
     "preflight-pre",
     "preflight-post",
+    "transfer_scriptstruct_readiness",
+    "transfer-scriptstruct-readiness",
+    "transfer_script_struct_readiness",
+    "transfer-script-struct-readiness",
+    "transfer_baccept_readiness",
+    "transfer-baccept-readiness",
+    "check_transfer_baccept_readiness",
+    "dino_scalar_readiness",
+    "dino-scalar-readiness",
+    "check_dino_scalar_readiness",
+    "scalar_only_readiness",
+    "scalar-only-readiness",
+    "buff_status_readiness",
+    "buff-status-readiness",
+    "check_buff_status_readiness",
+    "tribe_scalar_boundary_readiness",
+    "tribe-scalar-boundary-readiness",
+    "scalar_boundary_readiness",
+    "scalar-boundary-readiness",
+    "check_tribe_scalar_boundary_readiness",
+    "post_evidence_p0_lock_simulation",
+    "post-evidence-p0-lock-simulation",
+    "route_gate_post_evidence_p0_lock_simulation",
+    "route-gate-post-evidence-p0-lock-simulation",
+    "command_permission_route_post_evidence_p0_lock_simulation",
+    "command-permission-route-post-evidence-p0-lock-simulation",
+    "mission_copied_bool",
+    "mission-copied-bool",
+    "mission_copied_bool_fixture_boundary",
+    "mission-copied-bool-fixture-boundary",
+    "request_artifact",
+    "request_check",
+    "request-check",
+    "request_preflight",
+    "request_check_readiness",
+    "request-check-readiness",
+    "window_request_check",
+    "window-request-check",
+    "approved_bundle_request",
+    "approved-bundle-request",
+    "approved_runtime_bundle_request",
+    "approved-runtime-bundle-request",
+    "public_reachability",
+    "public-reachability",
+    "route_bound_identity_source_forwarding",
+    "route-bound-identity-source-forwarding",
+    "identity_source_forwarding",
+    "identity-source-forwarding",
     "post_window_replay",
     "post-window-replay",
     "readiness",
+    "readiness_only",
+    "readiness-only",
+    "report_only",
+    "report-only",
+    "closure_artifact",
+    "closure-artifact",
+    "closure_report",
+    "closure-report",
+    "evidence_closure",
+    "evidence-closure",
+    "evidence_closure_report",
+    "evidence-closure-report",
+    "runtime_window_closure",
+    "runtime-window-closure",
+    "runtime_window_executor_closure",
+    "runtime-window-executor-closure",
     "request_pack",
     "request-pack",
+    "route_simulation",
+    "route-simulation",
+    "route_lock_simulation",
+    "route-lock-simulation",
+    "post_evidence_identity_lock",
+    "post-evidence-identity-lock",
+    "identity_lock",
+    "identity-lock",
     "runtime_replay",
     "runtime-replay",
     "runtime_replay_fixture",
@@ -868,10 +3591,66 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "operator-approval-receipt",
     "operator_receipt",
     "operator-receipt",
+    "observer_event_triage",
+    "observer-event-triage",
+    "observer_event_triage_non_evidence",
+    "observer-event-triage-non-evidence",
     "window_manifest",
     "window-manifest",
+    "binding_required",
+    "binding-required",
+    "binding_required_report",
+    "binding-required-report",
+    "generated_cert_report",
+    "generated-cert-report",
+    "generated_certificate_report",
+    "generated-certificate-report",
+    "promotion_cert_report",
+    "promotion-cert-report",
+    "promotion_certificate_report",
+    "promotion-certificate-report",
+    "public_debug_boundary",
+    "public-debug-boundary",
+    "public_debug_boundary_fix",
+    "public-debug-boundary-fix",
+    "debug_public_boundary",
+    "debug-public-boundary",
     "runtime_window",
     "runtime-window",
+    "runtime_window_plan",
+    "runtime-window-plan",
+    "runtime_window_planner",
+    "runtime-window-planner",
+    "runtime_window_executor",
+    "runtime-window-executor",
+    "runtime_window_execution",
+    "runtime-window-execution",
+    "runtime_window_closure",
+    "runtime-window-closure",
+    "runtime_window_executor_closure",
+    "runtime-window-executor-closure",
+    "approved_runtime_manifest",
+    "approved-runtime-manifest",
+    "approved_runtime_principal_lifecycle_evidence",
+    "approved-runtime-principal-lifecycle-evidence",
+    "ready_log_evidence_split",
+    "ready-log-evidence-split",
+    "lifecycle_event_split",
+    "lifecycle-event-split",
+    "player_principal_lifecycle_event_split_summary",
+    "player-principal-lifecycle-event-split-summary",
+    "post_runtime_contract_gap",
+    "post-runtime-contract-gap",
+    "post_runtime_contract_gap_diagnostic",
+    "post-runtime-contract-gap-diagnostic",
+    "route_sample",
+    "route-sample",
+    "route_samples",
+    "route-samples",
+    "scoped_non_complete",
+    "scoped-non-complete",
+    "scoped_release_statement",
+    "scoped-release-statement",
     "static_candidate",
     "static_target",
     "return_only",
@@ -882,7 +3661,11 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
 )
 STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "artifact_schema",
+    "classification",
+    "classifications",
     "descriptor_preflight",
+    "evidence_classification",
+    "evidence_classifications",
     "evidence_kind",
     "evidence_kinds",
     "evidence_terms",
@@ -891,12 +3674,16 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "pack",
     "packs",
     "promotion_terms",
+    "readiness_classification",
+    "readiness_classifications",
     "release_readiness_target_sets",
     "contract_kind",
     "schema",
     "schemas",
     "source_kind",
     "source_kinds",
+    "source_value",
+    "source_values",
     "status",
     "source_target_sets",
     "target_set",
@@ -908,32 +3695,176 @@ STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS = {
     "evidence_kinds",
     "source_kind",
     "source_kinds",
+    "source_value",
+    "source_values",
     "source_target_sets",
     "target_set",
     "target_sets",
 }
 STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS = re.compile(
     r"(?:approved[-_ ]?runtime(?:[-_ ]?(?:principal[-_ ]?lifecycle)?[-_ ]?evidence)?|"
+    r"approved[-_ ]?runtime[-_ ]?evidence[-_ ]?binding|"
+    r"accepted[-_ ]?runtime[-_ ]?evidence[-_ ]?preconditions?|"
     r"runtime[-_ ]?(?:principal[-_ ]?)?lifecycle[-_ ]?evidence|"
-    r"identity[-_ ]?(?:public[-_ ]?)?contract(?:[-_ ]?gate[-_ ]?missing)?)",
+    r"(?:session[-_ ]?start(?:[-_ ]?and)?[-_ ]?end|start[-_ ]?end)(?:[-_ ]?only)?[-_ ]?evidence|"
+    r"standing[-_ ]?(?:launch[-_ ]?)?authority|"
+    r"diagnostic[-_ ]?(?:only[-_ ]?)?(?:principal[-_ ]?)?lifecycle|"
+    r"ready[-_ ]?log[-_ ]?evidence[-_ ]?splits?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"(?:player[-_ ]?principal[-_ ]?)?lifecycle[-_ ]?event[-_ ]?splits?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"post[-_ ]?runtime[-_ ]?contract[-_ ]?gap(?:[-_ ]?(?:diagnostic|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"route[-_ ]?samples?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"check[-_ ]?join[-_ ]?in[-_ ]?progress(?:[-_ ]?(?:diagnostic|offline|candidate(?:[-_ ]?only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?|"
+    r"(?:session[-_ ]?start[-_ ]?rejected|rejected[-_ ]?session[-_ ]?start)(?:[-_ ]?(?:diagnostic|offline|candidate(?:[-_ ]?only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source|check[-_ ]?join[-_ ]?in[-_ ]?progress))+|"
+    r"(?:diagnostic|offline|candidate(?:[-_ ]?only)?)(?:[-_ ]?(?:check[-_ ]?join[-_ ]?in[-_ ]?progress|session[-_ ]?start[-_ ]?rejected|rejected[-_ ]?session[-_ ]?start)(?:[-_ ]?(?:accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?)+|"
+    r"helpers?|helper[-_ ]?artifacts?|"
+    r"closure[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies))?|evidence[-_ ]?closure(?:[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"activation[-_ ]?preconditions?|pre[-_ ]?activation[-_ ]?consistency|"
+    r"request[-_ ]?(?:checks?|check[-_ ]?readiness|packs?|artifacts?|manifests?|preflights?)|"
+    r"(?:approved[-_ ]?)?(?:runtime[-_ ]?)?bundle[-_ ]?requests?|"
+    r"public[-_ ]?reachability|"
+    r"(?:route[-_ ]?bound[-_ ]?)?identity[-_ ]?source(?:[-_ ]?(?:forward|forwarded|forwarding))?|"
+    r"accepted[-_ ]?artifact[-_ ]?class(?:[-_ ]?(?:artifacts?|metadata|reports?|status))?|"
+    r"binding[-_ ]?required(?:[-_ ]?(?:artifacts?|metadata|reports?|status))?|"
+    r"(?:offline[-_ ]?)?hardening(?:[-_ ]?(?:artifacts?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request[-_ ]?checks?|"
+    r"runtime[-_ ]?window(?:[-_ ]?(?:plans?|planners?|executors?|execution|activations?|manifests?|preflights?|prepar(?:ed|ation)?|readiness|ready|requests?|status))?|"
+    r"approved[-_ ]?runtime[-_ ]?manifests?|"
+    r"identity[-_ ]?(?:public[-_ ]?)?contract(?:[-_ ]?gate[-_ ]?missing)?|"
+    r"contract[-_ ]?review(?:[-_ ]?inputs?)?|"
+    r"(?:players?[-_ ]?)?notice[-_ ]?actions?|"
+    r"confirmed[-_ ]?(?:beta[-_ ]?)?notice(?:[-_ ]?(?:reports?|sent|status|attestations?|confirmation|confirmed))?|"
+    r"notice[-_ ]?reports?|"
+    r"(?:players?[-_ ]?)?notice[-_ ]?dry[-_ ]?runs?|"
+    r"beta[-_ ]?notices?(?:[-_ ]?(?:prep|send|sent|attestation|confirmed))?|"
+    r"discord[-_ ]?notices?|"
+    r"(?:discord[-_ ]?)?beta[-_ ]?bridge(?:[-_ ]?(?:bot[-_ ]?)?notice|[-_ ]?config|[-_ ]?events?|[-_ ]?plans?|[-_ ]?reports?|[-_ ]?status)?|"
+    r"discord[-_ ]?beta[-_ ]?bot[-_ ]?notice|discord[-_ ]?bot[-_ ]?notice|bot[-_ ]?notice|"
+    r"multi[-_ ]?surface[-_ ]?beta[-_ ]?packs?|"
+    r"(?:generated[-_ ]?)?(?:promotion[-_ ]?)?cert(?:ificate)?(?:[-_ ]?(?:artifacts?|bindings?|build|builder|generation|metadata|outputs?|reports?|status|summar(?:y|ies)))?|"
+    r"(?:public[-_ ]?debug|debug[-_ ]?public)[-_ ]?boundary(?:[-_ ]?(?:fix(?:es)?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"(?:install|installed|package)[-_ ]?(?:sdk[-_ ]?)?(?:package|shape|check|evidence|layout|success|succeed(?:ed)?|install|installed)(?:[-_ ]?(?:checks?|ok|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"find[-_ ]?package(?:[-_ ]?(?:obelisk|sdk|components?|success|succeed(?:ed)?|found|ready|reports?|status))?|"
+    r"cmake[-_ ]?(?:package|config|components?)(?:[-_ ]?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"component[-_ ]?sdk(?:[-_ ]?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"(?:abi|sdk)[-_ ]?consumer[-_ ]?guardrails?|"
+    r"(?:post[-_ ]?init|after[-_ ]?init|outside[-_ ]?init)[-_ ]?call[-_ ]?process[-_ ]?event(?:[-_ ]?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"call[-_ ]?process[-_ ]?event[-_ ]?(?:post[-_ ]?init|after[-_ ]?init|outside[-_ ]?init)(?:[-_ ]?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"passive[-_ ]?(?:snapshots?|observations?|captures?)|"
+    r"passive[-_ ]?activity[-_ ]?triage(?:[-_ ]?non[-_ ]?evidence)?|"
+    r"observer[-_ ]?event[-_ ]?triage(?:[-_ ]?non[-_ ]?evidence)?|"
+    r"player[-_ ]?principal[-_ ]?passive[-_ ]?snapshots?|"
+    r"copied[-_ ]?logs?[-_ ]?only(?:[-_ ]?(?:artifacts?|reports?|status))?|"
+    r"(?:mission[-_ ]?)?copied[-_ ]?bool(?:[-_ ]?policy[-_ ]?slices?)?|"
+    r"(?:internal[-_ ]?)?fixture[-_ ]?boundar(?:y|ies)|"
+    r"(?:passive[-_ ]?)?latest[-_ ]?summar(?:y|ies)|"
+    r"passive[-_ ]?snapshot[-_ ]?(?:latest|diff)|"
+    r"closed[-_ ]?(?:agent|worker)(?:[-_ ]?(?:notes?|reports?|status|summar(?:y|ies)))?|"
+    r"transfer[-_ ]?(?:script[-_ ]?struct|baccept)[-_ ]?readiness|"
+    r"dino[-_ ]?scalar[-_ ]?readiness|"
+    r"scalar[-_ ]?only[-_ ]?readiness|"
+    r"buff[-_ ]?status[-_ ]?readiness|"
+    r"tribe[-_ ]?scalar[-_ ]?boundary[-_ ]?readiness|"
+    r"scalar[-_ ]?boundary[-_ ]?readiness|"
+    r"(?:redacted[-_ ]?)?ufunction[-_ ]?(?:chain[-_ ]?)?snapshots?|"
+    r"ufunction[-_ ]?snapshot[-_ ]?manifests?|"
+    r"redacted[-_ ]?ufunction[-_ ]?signatures|"
+    r"(?:route[-_ ]?gate[-_ ]?)?post[-_ ]?evidence[-_ ]?p0[-_ ]?lock[-_ ]?simulation|"
+    r"route[-_ ]?(?:simulations?|lock[-_ ]?simulations?|check[-_ ]?readiness|readiness)|"
+    r"post[-_ ]?evidence[-_ ]?identity[-_ ]?locks?|identity[-_ ]?locks?|"
+    r"report[-_ ]?only|readiness[-_ ]?only|"
+    r"scoped[-_ ]?non[-_ ]?complete(?:[-_ ]?only)?|"
+    r"scoped[-_ ]?(?:non[-_ ]?complete[-_ ]?)?(?:v1[-_ ]?)?release[-_ ]?statements?|"
+    r"non[-_ ]?complete[-_ ]?(?:v1[-_ ]?)?release[-_ ]?statements?)",
     re.IGNORECASE,
 )
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
-    r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
+    r"(?:candidate|placeholder(?:[-_ ]?provenance)?|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|approved[-_ ]?runtime[-_ ]?evidence[-_ ]?binding|accepted[-_ ]?runtime[-_ ]?evidence[-_ ]?preconditions?|accepted[-_ ]?artifact[-_ ]?class(?:[-_ ]?(?:artifacts?|metadata|reports?|status))?|binding[-_ ]?required(?:[-_ ]?(?:artifacts?|metadata|reports?|status))?|plugin[-_ ]?hub|package[-_ ]?shape|package[-_ ]?(?:exact|non[-_ ]?exact)|core[-_ ]?first|"
+    r"activation[-_ ]?preconditions?|pre[-_ ]?activation[-_ ]?consistency|"
+    r"closure[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies))?|evidence[-_ ]?closure(?:[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"contract[-_ ]?review(?:[-_ ]?inputs?)?|"
+    r"diagnostic[-_ ]?(?:only[-_ ]?)?(?:principal[-_ ]?)?lifecycle|"
+    r"ready[-_ ]?log[-_ ]?evidence[-_ ]?splits?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"(?:player[-_ ]?principal[-_ ]?)?lifecycle[-_ ]?event[-_ ]?splits?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"post[-_ ]?runtime[-_ ]?contract[-_ ]?gap(?:[-_ ]?(?:diagnostic|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"route[-_ ]?samples?(?:[-_ ]?(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"check[-_ ]?join[-_ ]?in[-_ ]?progress(?:[-_ ]?(?:diagnostic|offline|candidate(?:[-_ ]?only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?|"
+    r"(?:session[-_ ]?start[-_ ]?rejected|rejected[-_ ]?session[-_ ]?start)(?:[-_ ]?(?:diagnostic|offline|candidate(?:[-_ ]?only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source|check[-_ ]?join[-_ ]?in[-_ ]?progress))+|"
+    r"(?:diagnostic|offline|candidate(?:[-_ ]?only)?)(?:[-_ ]?(?:check[-_ ]?join[-_ ]?in[-_ ]?progress|session[-_ ]?start[-_ ]?rejected|rejected[-_ ]?session[-_ ]?start)(?:[-_ ]?(?:accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?)+|"
+    r"helpers?|helper[-_ ]?artifacts?|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
     r"players?[-_ ]?identity[-_ ]?runtime[-_ ]?principal[-_ ]?lifecycle[-_ ]?evidence|"
     r"players?[-_ ]?identity[-_ ]?lifecycle[-_ ]?anchor[-_ ]?candidates?|"
+    r"(?:session[-_ ]?start(?:[-_ ]?and)?[-_ ]?end|start[-_ ]?end)(?:[-_ ]?only)?[-_ ]?evidence|"
+    r"standing[-_ ]?(?:launch[-_ ]?)?authority|"
+    r"(?:offline[-_ ]?)?hardening(?:[-_ ]?(?:artifacts?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"players?[-_ ]?principal[-_ ]?passive[-_ ]?snapshots?|"
+    r"passive[-_ ]?(?:snapshots?|observations?|captures?)|"
+    r"passive[-_ ]?activity[-_ ]?triage(?:[-_ ]?non[-_ ]?evidence)?|"
+    r"observer[-_ ]?event[-_ ]?triage(?:[-_ ]?non[-_ ]?evidence)?|"
+    r"copied[-_ ]?logs?[-_ ]?only(?:[-_ ]?(?:artifacts?|reports?|status))?|"
+    r"(?:mission[-_ ]?)?copied[-_ ]?bool(?:[-_ ]?policy[-_ ]?slices?)?|"
+    r"(?:internal[-_ ]?)?fixture[-_ ]?boundar(?:y|ies)|"
+    r"(?:passive[-_ ]?)?latest[-_ ]?summar(?:y|ies)|"
+    r"passive[-_ ]?snapshot[-_ ]?(?:latest|diff)|"
+    r"closed[-_ ]?(?:agent|worker)(?:[-_ ]?(?:notes?|reports?|status|summar(?:y|ies)))?|"
+    r"(?:players?[-_ ]?)?notice[-_ ]?actions?|"
+    r"confirmed[-_ ]?(?:beta[-_ ]?)?notice(?:[-_ ]?(?:reports?|sent|status|attestations?|confirmation|confirmed))?|"
+    r"notice[-_ ]?reports?|"
+    r"(?:players?[-_ ]?)?notice[-_ ]?dry[-_ ]?runs?|"
+    r"beta[-_ ]?notices?(?:[-_ ]?(?:prep|send|sent|attestation|confirmed))?|"
+    r"discord[-_ ]?notices?|"
+    r"(?:discord[-_ ]?)?beta[-_ ]?bridge(?:[-_ ]?(?:bot[-_ ]?)?notice|[-_ ]?config|[-_ ]?events?|[-_ ]?plans?|[-_ ]?reports?|[-_ ]?status)?|"
+    r"discord[-_ ]?beta[-_ ]?bot[-_ ]?notice|discord[-_ ]?bot[-_ ]?notice|bot[-_ ]?notice|"
+    r"multi[-_ ]?surface[-_ ]?beta[-_ ]?packs?|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"lifecycle[-_ ]?anchor[-_ ]?candidates?|"
-    r"request[-_ ]?packs?|"
-    r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
+    r"request[-_ ]?(?:checks?|check[-_ ]?readiness|packs?|artifacts?|manifests?|preflights?)|"
+    r"(?:approved[-_ ]?)?(?:runtime[-_ ]?)?bundle[-_ ]?requests?|"
+    r"public[-_ ]?reachability|"
+    r"(?:route[-_ ]?bound[-_ ]?)?identity[-_ ]?source(?:[-_ ]?(?:forward|forwarded|forwarding))?|"
+    r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request[-_ ]?checks?|"
+    r"runtime[-_ ]?window(?:[-_ ]?(?:plans?|planners?|executors?|execution|activations?|manifests?|preflights?|prepar(?:ed|ation)?|readiness|ready|requests?|status))?|"
+    r"runtime[-_ ]?window[-_ ]?closure(?:[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies)|executors?))?|"
+    r"runtime[-_ ]?window[-_ ]?executor[-_ ]?closure(?:[-_ ]?(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"approved[-_ ]?runtime[-_ ]?manifests?|"
     r"operator[-_ ]?(?:approval[-_ ]?)?receipts?|window[-_ ]?manifests?|"
     r"(?:(?:post[-_ ]?window[-_ ]?)?runtime[-_ ]?replay(?:[-_ ]?fixtures?)?|"
     r"post[-_ ]?window[-_ ]?replay(?:[-_ ]?fixtures?)?)|"
+    r"install(?:ed)?[-_ ]?(?:sdk[-_ ]?)?(?:evidence|layout|package|package[-_ ]?shape)|"
+    r"(?:install|installed|package)[-_ ]?(?:sdk[-_ ]?)?(?:package|shape|check|evidence|layout|success|succeed(?:ed)?|install|installed)(?:[-_ ]?(?:checks?|ok|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"(?:generated[-_ ]?)?(?:promotion[-_ ]?)?cert(?:ificate)?(?:[-_ ]?(?:artifacts?|bindings?|build|builder|generation|metadata|outputs?|reports?|status|summar(?:y|ies)))?|"
+    r"(?:public[-_ ]?debug|debug[-_ ]?public)[-_ ]?boundary(?:[-_ ]?(?:fix(?:es)?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"find[-_ ]?package(?:[-_ ]?(?:obelisk|sdk|components?|success|succeed(?:ed)?|found|ready|reports?|status))?|"
+    r"cmake[-_ ]?(?:package|config|components?)(?:[-_ ]?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"component[-_ ]?sdk(?:[-_ ]?(?:check|found|ready|reports?|status|success|succeed(?:ed)?))?|"
+    r"(?:abi|sdk)[-_ ]?consumer[-_ ]?guardrails?|"
+    r"(?:post[-_ ]?init|after[-_ ]?init|outside[-_ ]?init)[-_ ]?call[-_ ]?process[-_ ]?event(?:[-_ ]?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"call[-_ ]?process[-_ ]?event[-_ ]?(?:post[-_ ]?init|after[-_ ]?init|outside[-_ ]?init)(?:[-_ ]?(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"package[-_ ]?(?:exact|non[-_ ]?exact)|"
     r"live[-_ ]?(?:validation|ops)(?:[-_ ]?sidecars?)?|"
+    r"install(?:ed)?[-_ ]?runtime(?:[-_ ]?(?:checks?|ok|ready|reports?|status))?|"
+    r"runtime[-_ ]?install(?:ed)?(?:[-_ ]?(?:checks?|ok|ready|reports?|status))?|"
+    r"broadcasts?(?:[-_ ]?(?:checks?|ok|reports?|sent|status|notices?))?|"
+    r"rcon(?:[-_ ]?(?:checks?|commands?|counts?|player[-_ ]?counts?|ok|ready|reachable|reports?|service|status))?|"
+    r"transfer[-_ ]?(?:script[-_ ]?struct|baccept)[-_ ]?readiness|"
+    r"dino[-_ ]?scalar[-_ ]?readiness|"
+    r"scalar[-_ ]?only[-_ ]?readiness|"
+    r"buff[-_ ]?status[-_ ]?readiness|"
+    r"tribe[-_ ]?scalar[-_ ]?boundary[-_ ]?readiness|"
+    r"scalar[-_ ]?boundary[-_ ]?readiness|"
+    r"(?:redacted[-_ ]?)?ufunction[-_ ]?(?:chain[-_ ]?)?snapshots?|"
+    r"ufunction[-_ ]?snapshot[-_ ]?manifests?|"
+    r"redacted[-_ ]?ufunction[-_ ]?signatures|"
+    r"(?:route[-_ ]?gate[-_ ]?)?post[-_ ]?evidence[-_ ]?p0[-_ ]?lock[-_ ]?simulation|"
+    r"route[-_ ]?(?:simulations?|lock[-_ ]?simulations?|check[-_ ]?readiness|readiness)|"
+    r"post[-_ ]?evidence[-_ ]?identity[-_ ]?locks?|identity[-_ ]?locks?|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
     r"static[-_ ]?(?:orientation|candidate|target|discovery)|native[-_ ]?ufunction[-_ ]?registration[-_ ]?static[-_ ]?discovery|"
     r"admin[-_ ]?thunks?|orientation|preflight|readiness|"
+    r"report[-_ ]?only|readiness[-_ ]?only|"
+    r"scoped[-_ ]?non[-_ ]?complete(?:[-_ ]?only)?|"
+    r"scoped[-_ ]?(?:non[-_ ]?complete[-_ ]?)?(?:v1[-_ ]?)?release[-_ ]?statements?|"
+    r"non[-_ ]?complete[-_ ]?(?:v1[-_ ]?)?release[-_ ]?statements?|"
     r"item[-_ ]?return[-_ ]?only|return[-_ ]?only|descriptor[-_ ]?preflight|"
     r"descriptor[-_ ]?catalog|consume[-_ ]?only|evidence[-_ ]?only)",
     re.IGNORECASE,
@@ -941,6 +3872,230 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
 }
+NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEYS = {
+    "argv",
+    "artifact",
+    "artifacts",
+    "command",
+    "commands",
+    "current_evidence",
+    "fixture_path",
+    "input",
+    "inputs",
+    "manifest",
+    "manifests",
+    "manifest_entry",
+    "output",
+    "outputs",
+    "output_name",
+    "path",
+    "paths",
+    "producer",
+    "producers",
+    "readiness",
+    "readiness_artifact",
+    "readiness_artifacts",
+    "report",
+    "reports",
+    "source",
+    "sources",
+    "source_artifact",
+    "source_artifacts",
+    "source_binding",
+    "source_bindings",
+    "source_manifest",
+    "source_manifests",
+    "source_snapshot",
+    "source_snapshots",
+}
+STRUCTURED_PROMOTION_EVIDENCE_REFERENCE_KEYS = {
+    "public_contract_readiness_report",
+}
+PUBLIC_CONTRACT_REVIEW_STATUS_REFERENCE_KEYS = {
+    "public_contract_readiness_report",
+}
+PUBLIC_CONTRACT_REVIEW_STATUS_REFERENCE_ALLOWED_SURFACE_IDS = {
+    "obelisk.player_identity.v1",
+}
+NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEY_SUFFIXES = (
+    "_artifact",
+    "_artifacts",
+    "_command",
+    "_commands",
+    "_input",
+    "_inputs",
+    "_output",
+    "_outputs",
+    "_path",
+    "_paths",
+    "_readiness",
+    "_report",
+    "_reports",
+    "_snapshot",
+    "_snapshots",
+    "_source",
+    "_sources",
+)
+NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEY_MARKERS = re.compile(
+    r"(?:"
+    r"(?:player_principal_)?passive_snapshot(?:_(?:diff|latest))?|"
+    r"passive_activity_triage(?:_non_evidence)?|"
+    r"observer_event_triage(?:_non_evidence)?|"
+    r"passive_latest_summary|latest_summary|passive_observation|passive_capture|"
+    r"closed_(?:agent|worker)(?:_(?:notes?|reports?|status|summar(?:y|ies)))?|"
+    r"copied_logs?_only(?:_(?:artifacts?|reports?|status))?|"
+    r"diagnostic(?:_only)?(?:_runtime)?(?:_summary|_lifecycle|_candidates?)?|"
+    r"ready_log_evidence_splits?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"(?:player_principal_)?lifecycle_event_splits?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"post_runtime_contract_gap(?:_(?:diagnostic|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"route_samples?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"approved_runtime_evidence_binding|"
+    r"(?:session_start(?:_and)?_end|start_end)(?:_only)?_evidence|"
+    r"standing_(?:launch_)?authority|"
+    r"check_join_in_progress(?:_(?:diagnostic|offline|candidate(?:_only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?|"
+    r"(?:session_start_rejected|rejected_session_start)(?:_(?:diagnostic|offline|candidate(?:_only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source|check_join_in_progress))+|"
+    r"(?:diagnostic|offline|candidate(?:_only)?)(?:_(?:check_join_in_progress|session_start_rejected|rejected_session_start)(?:_(?:accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?)+|"
+    r"activation_preconditions?|pre_activation_consistency|"
+    r"closure_(?:artifacts?|reports?|requests?|summar(?:y|ies))|evidence_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"request_(?:checks?|check_readiness|packs?|artifacts?|manifests?|preflights?)|"
+    r"(?:approved_)?(?:runtime_)?bundle_requests?|"
+    r"accepted_artifact_class(?:_(?:artifacts?|metadata|reports?|status))?|"
+    r"binding_required(?:_(?:artifacts?|metadata|reports?|status))?|"
+    r"public_reachability|"
+    r"(?:reviewed_)?(?:identity_)?public_contract(?:_(?:artifact|decisions?|input|readiness|records?|report|review))?|"
+    r"contract_review(?:_(?:artifact|decisions?|input|readiness|records?|report))?|"
+    r"(?:offline_?)?hardening(?:_?(?:artifacts?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"(?:route_bound_)?identity_source(?:_(?:forward|forwarded|forwarding))?|"
+    r"confirmed_(?:beta_)?notice(?:_(?:reports?|sent|status|attestations?|confirmation|confirmed))?|"
+    r"notice_reports?|"
+    r"window_request_check|"
+    r"player_principal_lifecycle_window_request(?:_check)?|"
+    r"runtime_window(?:_(?:plans?|planners?|executors?|execution|activations?|manifests?|preflights?|prepar(?:ed|ation)?|readiness|ready|requests?|status))?|"
+    r"runtime_window_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)|executors?))?|"
+    r"runtime_window_executor_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"approved_runtime_manifests?|"
+    r"(?:player_)?notice_action|player_notice|notice_dry_run|discord_notice|"
+    r"beta_notice(?:_(?:prep|send|sent|attestation|confirmed))?|"
+    r"(?:discord_)?beta_bridge(?:_(?:bot_?)?notice|_config|_events?|_plans?|_reports?|_status)?|"
+    r"discord_beta_bot_notice|discord_bot_notice|bot_notice|"
+    r"multi_surface_beta_packs?|"
+    r"(?:active_?)?passive_monitors?(?:_(?:session|status|summary|snapshot|tick|ticks))?|"
+    r"active_monitors?(?:_(?:session|status|summary|snapshot|tick|ticks))?|"
+    r"install(?:ed)?_runtime(?:_(?:checks?|ok|ready|reports?|status))?|"
+    r"runtime_install(?:ed)?(?:_(?:checks?|ok|ready|reports?|status))?|"
+    r"broadcasts?(?:_(?:checks?|ok|reports?|sent|status|notices?))?|"
+    r"rcon(?:_(?:checks?|commands?|counts?|player_?counts?|ok|ready|reachable|reports?|service|status))?|"
+    r"(?:installed_sdk_)?package_shape|sdk_package_shape|"
+    r"install(?:ed)?_sdk(?:_package_shape|_evidence|_layout|_package)?|"
+    r"(?:install|installed|package)_(?:sdk_)?(?:package|shape|check|evidence|layout|success|succeeded|install|installed)(?:_(?:checks?|ok|ready|reports?|status|success|succeeded))?|"
+    r"(?:generated_?)?(?:promotion_?)?cert(?:ificate)?(?:_?(?:artifacts?|bindings?|build|builder|generation|metadata|outputs?|reports?|status|summar(?:y|ies)))?|"
+    r"(?:public_?debug|debug_?public)_?boundary(?:_?(?:fix(?:es)?|metadata|reports?|status|summar(?:y|ies)))?|"
+    r"find_package(?:_(?:obelisk|sdk|components?|success|succeeded|found|ready|reports?|status))?|"
+    r"cmake_(?:package|config|components?)(?:_(?:check|found|ready|reports?|status|success|succeeded))?|"
+    r"component_sdk(?:_(?:check|found|ready|reports?|status|success|succeeded))?|"
+    r"(?:abi|sdk)_consumer_guardrails?|"
+    r"(?:post_init|after_init|outside_init)_call_process_event(?:_(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"call_process_event_(?:post_init|after_init|outside_init)(?:_(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"package_(?:exact|non_?exact)|"
+    r"install_evidence|package_shape_evidence|"
+    r"(?:mission_)?copied_bool(?:_policy_slices?)?|"
+    r"(?:internal_)?fixture_boundar(?:y|ies)|"
+    r"report_only|readiness_only|"
+    r"command_chat_response_route_planning|route_planning(?:_report)?|"
+    r"planning_route(?:_report)?|"
+    r"transfer_(?:script_?struct|baccept)_readiness|"
+    r"dino_scalar_readiness|scalar_only_readiness|"
+    r"buff_status_readiness|"
+    r"tribe_scalar_boundary_readiness|scalar_boundary_readiness|"
+    r"source_bindings?|source_manifest|source_snapshot|snapshot_root|fixture_path|"
+    r"ufunction_snapshot|ufunction_chain_snapshot|redacted_ufunction_signatures|"
+    r"(?:route_gate_)?post_evidence_p0_lock_simulation|"
+    r"route_(?:simulation|lock_simulation|check_readiness|readiness)|"
+    r"post_evidence_identity_lock|identity_lock|"
+    r"scoped_non_complete"
+    r")",
+    re.IGNORECASE,
+)
+NON_PROMOTIONAL_ARTIFACT_REFERENCE_VALUE_MARKERS = re.compile(
+    r"(?:"
+    r"(?:player_principal_)?passive_snapshot(?:_(?:diff|latest))?|"
+    r"passive_activity_triage(?:_non_evidence)?|"
+    r"observer_event_triage(?:_non_evidence)?|"
+    r"passive_latest_summary|latest_summary|passive_observation|passive_capture|"
+    r"closed_(?:agent|worker)(?:_(?:notes?|reports?|status|summar(?:y|ies)))?|"
+    r"copied_logs?_only(?:_(?:artifacts?|reports?|status))?|"
+    r"diagnostic(?:_only)?(?:_runtime)?(?:_summary|_lifecycle|_candidates?)|"
+    r"runtime_observer(?:_log)?_diagnostic(?:_only)?_summary|"
+    r"ready_log_evidence_splits?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"(?:player_principal_)?lifecycle_event_splits?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"post_runtime_contract_gap(?:_(?:diagnostic|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"route_samples?(?:_(?:diagnostic|evidence|readiness|ready|reports?|status|summar(?:y|ies)))?|"
+    r"approved_runtime_evidence_binding|"
+    r"(?:session_start(?:_and)?_end|start_end)(?:_only)?_evidence|"
+    r"standing_(?:launch_)?authority|"
+    r"check_join_in_progress(?:_(?:diagnostic|offline|candidate(?:_only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?|"
+    r"(?:session_start_rejected|rejected_session_start)(?:_(?:diagnostic|offline|candidate(?:_only)?|accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source|check_join_in_progress))+|"
+    r"(?:diagnostic|offline|candidate(?:_only)?)(?:_(?:check_join_in_progress|session_start_rejected|rejected_session_start)(?:_(?:accept(?:ed|ance)|readiness|reports?|status|evidence|artifacts?|summar(?:y|ies)|source))?)+|"
+    r"activation_preconditions?|pre_activation_consistency|"
+    r"closure_(?:artifacts?|reports?|requests?|summar(?:y|ies))|evidence_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"request_(?:checks?|check_readiness|packs?|artifacts?|manifests?|preflights?)|"
+    r"(?:approved_)?(?:runtime_)?bundle_requests?|"
+    r"accepted_artifact_class(?:_(?:artifacts?|metadata|reports?|status))?|"
+    r"binding_required(?:_(?:artifacts?|metadata|reports?|status))?|"
+    r"public_reachability|"
+    r"(?:reviewed_)?(?:identity_)?public_contract(?:_(?:artifact|decisions?|input|readiness|records?|report|review))?|"
+    r"contract_review(?:_(?:artifact|decisions?|input|readiness|records?|report))?|"
+    r"(?:route_bound_)?identity_source(?:_(?:forward|forwarded|forwarding))?|"
+    r"confirmed_(?:beta_)?notice(?:_(?:reports?|sent|status|attestations?|confirmation|confirmed))?|"
+    r"notice_reports?|"
+    r"window_request_check|"
+    r"player_principal_lifecycle_window_request(?:_check)?|"
+    r"runtime_window(?:_(?:plans?|planners?|executors?|execution|activations?|manifests?|preflights?|prepar(?:ed|ation)?|readiness|ready|requests?|status))?|"
+    r"runtime_window_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)|executors?))?|"
+    r"runtime_window_executor_closure(?:_(?:artifacts?|reports?|requests?|summar(?:y|ies)))?|"
+    r"approved_runtime_manifests?|"
+    r"(?:player_)?notice_action|player_notice|notice_dry_run|discord_notice|"
+    r"beta_notice(?:_(?:prep|send|sent|attestation|confirmed))?|"
+    r"(?:discord_)?beta_bridge(?:_(?:bot_?)?notice|_config|_events?|_plans?|_reports?|_status)?|"
+    r"discord_beta_bot_notice|discord_bot_notice|bot_notice|"
+    r"multi_surface_beta_packs?|"
+    r"(?:active_?)?passive_monitors?(?:_(?:session|status|summary|snapshot|tick|ticks))?|"
+    r"active_monitors?(?:_(?:session|status|summary|snapshot|tick|ticks))?|"
+    r"install(?:ed)?_runtime(?:_(?:checks?|ok|ready|reports?|status))?|"
+    r"runtime_install(?:ed)?(?:_(?:checks?|ok|ready|reports?|status))?|"
+    r"broadcasts?(?:_(?:checks?|ok|reports?|sent|status|notices?))?|"
+    r"rcon(?:_(?:checks?|commands?|counts?|player_?counts?|ok|ready|reachable|reports?|service|status))?|"
+    r"(?:installed_sdk_)?package_shape|sdk_package_shape|package_shape_evidence|"
+    r"install(?:ed)?_sdk(?:_package_shape|_evidence|_layout|_package)?|"
+    r"(?:install|installed|package)_(?:sdk_)?(?:package|shape|check|evidence|layout|success|succeeded|install|installed)(?:_(?:checks?|ok|ready|reports?|status|success|succeeded))?|"
+    r"find_package(?:_(?:obelisk|sdk|components?|success|succeeded|found|ready|reports?|status))?|"
+    r"cmake_(?:package|config|components?)(?:_(?:check|found|ready|reports?|status|success|succeeded))?|"
+    r"component_sdk(?:_(?:check|found|ready|reports?|status|success|succeeded))?|"
+    r"(?:abi|sdk)_consumer_guardrails?|"
+    r"(?:post_init|after_init|outside_init)_call_process_event(?:_(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"call_process_event_(?:post_init|after_init|outside_init)(?:_(?:guardrails?|tests?|skipped|rejected|passed|status|reports?))?|"
+    r"package_(?:exact|non_?exact)|"
+    r"install_evidence|"
+    r"(?:mission_)?copied_bool(?:_policy_slices?)?|"
+    r"(?:internal_)?fixture_boundar(?:y|ies)|"
+    r"report_only|readiness_only|"
+    r"command_chat_response_route_planning|route_planning(?:_readiness|_report)?|"
+    r"planning_route(?:_readiness|_report)?|"
+    r"transfer_(?:script_?struct|baccept)_readiness|"
+    r"dino_scalar_readiness|scalar_only_readiness|"
+    r"buff_status_readiness|"
+    r"tribe_scalar_boundary_readiness|scalar_boundary_readiness|"
+    r"source_bindings?|source_manifest|source_snapshot|snapshot_root|fixture_path|"
+    r"ufunction_snapshot|ufunction_chain_snapshot|redacted_ufunction_signatures|"
+    r"ufunction_snapshot_manifest|redacted_ufunction_signatures|"
+    r"offline_core|sdk_buffs|candidate_only|"
+    r"(?:route_gate_)?post_evidence_p0_lock_simulation|"
+    r"route_(?:simulation|lock_simulation|check_readiness|readiness)|"
+    r"post_evidence_identity_lock|identity_lock|"
+    r"compare_reflection_snapshots|scoped_non_complete"
+    r")",
+    re.IGNORECASE,
+)
 MANIFEST_BACKED_BLOCKED_HEADER_SURFACE_IDS = {
     "obelisk.gameplay_tick_callbacks.v1",
     "obelisk.inventory_items_mutation.v1",
@@ -1075,6 +4230,10 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
+    r"\b(?:(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|"
+    r"release[- ]?grade|production|stable)\s*(?:/|,|\band\b|\bor\b)?\s*){1,6}"
+    r"(?:sdk|api|support)(?:\s+claim)?\s+"
+    r"\b(?:pass(?:es|ed)?|green|satisf(?:y|ies|ied)|unlocks?)\b",
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
     r"(?:is|are|remains?|stays?)\s+"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|production|ready|released|"
@@ -1094,6 +4253,22 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bsupport[_ -]?tier\b.{0,40}\brelease[- ]supported(?:\s+seed)?\b.{0,80}"
     r"\b(?:installed\s+sdk|public\s+sdk|release\s+package|installed\s+package|"
     r"public\s+package|sdk|package\s+shape|foundation\s+package)\b",
+    r"\b(?:public\s+headers?|installed\s+headers?|obelisk\s*api(?:\.h|\s+h)?|"
+    r"cmake\s+package|cmake\s+config|"
+    r"obelisk\s*config(?:\.cmake|\s+cmake)?|obelisk\s*targets(?:\.cmake|\s+cmake)?|"
+    r"installed\s+sdk\s+consumer\s+tests?|sdk\s+consumer\s+tests?)\b.{0,80}"
+    r"\b(?:proves?|validates?|unlocks?|satisf(?:y|ies)|enables?|counts?)\b.{0,80}"
+    r"\b(?:runtime\s+readiness|public\s+sdk|public\s+abi|support\s+tier|"
+    r"v1(?:\.0)?\s+(?:completion|support)|complete\s+(?:sdk|api)|"
+    r"stable\s+(?:sdk|api|support)|production[- ]?ready\s+(?:sdk|api|support))\b",
+    r"\b(?:runtime\s+readiness|public\s+sdk|public\s+abi|support\s+tier|"
+    r"v1(?:\.0)?\s+(?:completion|support)|complete\s+(?:sdk|api)|"
+    r"stable\s+(?:sdk|api|support)|production[- ]?ready\s+(?:sdk|api|support))\b.{0,80}"
+    r"\b(?:proves?|validates?|unlocks?|satisf(?:y|ies)|enables?|counts?)\b.{0,80}"
+    r"\b(?:public\s+headers?|installed\s+headers?|obelisk\s*api(?:\.h|\s+h)?|"
+    r"cmake\s+package|cmake\s+config|"
+    r"obelisk\s*config(?:\.cmake|\s+cmake)?|obelisk\s*targets(?:\.cmake|\s+cmake)?|"
+    r"installed\s+sdk\s+consumer\s+tests?|sdk\s+consumer\s+tests?)\b",
     r"\bv1(?:\.0)?\s+(?:sdk|api|support)\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",
@@ -1179,6 +4354,21 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:proves?|validates?|unlocks?|satisf(?:y|ies)|enables?)\b.{0,60}"
     r"\b(?:v1(?:\.0)?\s+stable|complete\s+(?:sdk|api)|full\s+(?:sdk|api)|"
     r"production[- ]?ready\s+(?:sdk|api|support)|production\s+(?:sdk|api|support))\b",
+    r"\b(?:package[- ]?shape|installed[- ]?(?:headers?|sdk[- ]?headers?))\b.{0,80}"
+    r"\b(?:is|are|declares?|proves?|validates?|unlocks?|satisf(?:y|ies)|enables?)\b.{0,80}"
+    r"\b(?:v1(?:\.0)?\s+support|support[- ]?tier|release[- ]?supported|sdk\s+support|"
+    r"complete\s+(?:sdk|api)|stable\s+(?:sdk|api|support)|public\s+(?:sdk|api|support)|"
+    r"production[- ]?ready\s+(?:sdk|api|support))\b",
+    r"\b(?:route[- ]?check|route[- ]?gate|command[- ]?permission[- ]?route(?:[- ]?(?:check|gate))?)\b.{0,80}"
+    r"\b(?:accept(?:ed|ance)|pass(?:es|ed)?|green|satisf(?:y|ies|ied)|unlocks?|"
+    r"validates?|enables?)\b.{0,80}"
+    r"\b(?:complete\s+(?:sdk|api)|full\s+(?:sdk|api)|production[- ]?ready\s+(?:sdk|api|support)|"
+    r"stable\s+(?:sdk|api|support)|public\s+sdk|public\s+route|route\s+readiness|"
+    r"sdk\s+completion|v1\s+completion|support|status)\b",
+    r"\b(?:scoped[- ]?non[- ]?complete(?:[- ]?outcomes?)?|"
+    r"scoped[- ]?(?:v1[- ]?)?release[- ]?statements?|release[- ]?statement[- ]?bookkeeping)\b.{0,80}"
+    r"\b(?:accept(?:ed|ance)|complete(?:d)?|ready|green|pass(?:es|ed)?|"
+    r"satisf(?:y|ies|ied)|unlocks?|counts?|counted|progress)\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"
@@ -1252,7 +4442,8 @@ PROMOTED_RELEASE_STATEMENT_REVIEWED_EVIDENCE_DETAIL_RE = re.compile(
 )
 PROMOTED_RELEASE_STATEMENT_NON_EVIDENCE_DETAIL_RE = re.compile(
     r"\b(?:candidate(?:[-_ ]?only)?|consume[-_ ]?only|core[-_ ]?first|"
-    r"evidence[-_ ]?only|foundation|package[-_ ]?shape|placeholder|"
+    r"copied[-_ ]?logs?[-_ ]?only|"
+    r"evidence[-_ ]?only|foundation|package[-_ ]?shape|package[-_ ]?(?:exact|non[-_ ]?exact)|placeholder|"
     r"planning(?:[-_ ]?only)?|plugin[-_ ]?hub|pluginhub|readiness[-_ ]?only|"
     r"release[-_ ]?supported(?:[-_ ]?seeds?)?|support[-_ ]?tiers?|tbd|todo)\b",
     re.IGNORECASE,
@@ -1538,7 +4729,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release-statement",
         type=Path,
-        help="Reviewed v1 SDK release statement that names excluded/post-v1 blockers.",
+        help=(
+            "Reviewed v1 SDK release statement that names excluded/post-v1 blockers. "
+            "Overrides docs/SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md when that "
+            "durable scoped statement exists."
+        ),
     )
     parser.add_argument(
         "--public-header",
@@ -1618,6 +4813,197 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_release_statement_for_args(args: argparse.Namespace) -> tuple[Path | None, dict[str, Any]]:
+    if args.release_statement is not None:
+        return args.release_statement, {
+            "release_statement_source": "explicit",
+            "default_scoped_release_statement": str(DEFAULT_SCOPED_RELEASE_STATEMENT),
+            "default_scoped_release_statement_exists": DEFAULT_SCOPED_RELEASE_STATEMENT.exists(),
+            "default_scoped_release_statement_used": False,
+            "release_statement_auto_discovery": (
+                "not needed because explicit --release-statement was supplied"
+            ),
+        }
+    if DEFAULT_SCOPED_RELEASE_STATEMENT.exists():
+        return DEFAULT_SCOPED_RELEASE_STATEMENT, {
+            "release_statement_source": "default_scoped_release_statement",
+            "default_scoped_release_statement": str(DEFAULT_SCOPED_RELEASE_STATEMENT),
+            "default_scoped_release_statement_exists": True,
+            "default_scoped_release_statement_used": True,
+            "release_statement_auto_discovery": (
+                "enabled for fail-closed scoped bookkeeping; pass --release-statement "
+                "to override the durable default"
+            ),
+        }
+    auto_discovery = (
+        "default scoped release statement missing; pass --release-statement explicitly"
+    )
+    return None, {
+        "release_statement_source": None,
+        "default_scoped_release_statement": str(DEFAULT_SCOPED_RELEASE_STATEMENT),
+        "default_scoped_release_statement_exists": DEFAULT_SCOPED_RELEASE_STATEMENT.exists(),
+        "default_scoped_release_statement_used": False,
+        "release_statement_auto_discovery": auto_discovery,
+    }
+
+
+def _helper_subprocess_file_fingerprints(argv: list[str]) -> list[dict[str, Any]]:
+    fingerprints: list[dict[str, Any]] = []
+    try:
+        python_executable = Path(sys.executable).resolve()
+    except OSError:
+        python_executable = None
+    for index, raw_arg in enumerate(argv):
+        if not raw_arg or (os.sep not in raw_arg and not Path(raw_arg).is_absolute()):
+            continue
+        raw_path = Path(raw_arg)
+        try:
+            path = raw_path.resolve()
+        except OSError:
+            path = raw_path
+        if python_executable is not None and path == python_executable:
+            continue
+        if not path.is_file():
+            fingerprints.append(
+                {
+                    "index": index,
+                    "path": str(path),
+                    "exists": False,
+                }
+            )
+            continue
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            fingerprints.append(
+                {
+                    "index": index,
+                    "path": str(path),
+                    "exists": True,
+                    "read_error": type(exc).__name__,
+                }
+            )
+            continue
+        fingerprints.append(
+            {
+                "index": index,
+                "path": str(path),
+                "exists": True,
+                "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
+    return fingerprints
+
+
+def _helper_subprocess_cache_key(argv: list[str]) -> str:
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key.startswith("OBELISK_") and key != SUBPROCESS_CACHE_DIR_TEST_ENV
+    }
+    payload = {
+        "schema": "obelisk.public-sdk-v1-completion-helper-subprocess-cache-key.v1",
+        "argv": argv,
+        "cwd": str(REPO_ROOT),
+        "env": env,
+        "files": _helper_subprocess_file_fingerprints(argv),
+        "python": sys.version,
+    }
+    data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def helper_subprocess_timeout_seconds() -> float:
+    raw = os.environ.get(HELPER_SUBPROCESS_TIMEOUT_ENV)
+    if raw is None:
+        return HELPER_SUBPROCESS_TIMEOUT_SECONDS
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return HELPER_SUBPROCESS_TIMEOUT_SECONDS
+    if parsed <= 0:
+        return HELPER_SUBPROCESS_TIMEOUT_SECONDS
+    return parsed
+
+
+def timed_out_helper_result(
+    argv: list[str],
+    exc: subprocess.TimeoutExpired,
+) -> subprocess.CompletedProcess[str]:
+    stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+    stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+    timeout = exc.timeout if exc.timeout is not None else helper_subprocess_timeout_seconds()
+    message = f"helper subprocess timed out after {timeout:.3g}s: {' '.join(argv)}"
+    return subprocess.CompletedProcess(
+        argv,
+        124,
+        stdout,
+        f"{stderr}\n{message}\n" if stderr else f"{message}\n",
+    )
+
+
+def run_helper_subprocess(argv: list[str]) -> subprocess.CompletedProcess[str]:
+    cache_dir = os.environ.get(SUBPROCESS_CACHE_DIR_TEST_ENV)
+    timeout = helper_subprocess_timeout_seconds()
+    if not cache_dir:
+        try:
+            return subprocess.run(
+                argv,
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return timed_out_helper_result(argv, exc)
+
+    cache_path = Path(cache_dir) / f"{_helper_subprocess_cache_key(argv)}.json"
+    try:
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        cached = None
+    if isinstance(cached, dict) and cached.get("schema") == "obelisk.public-sdk-v1-completion-helper-subprocess-cache.v1":
+        return subprocess.CompletedProcess(
+            argv,
+            int(cached.get("returncode", 1)),
+            str(cached.get("stdout", "")),
+            str(cached.get("stderr", "")),
+        )
+
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        result = timed_out_helper_result(argv, exc)
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp")
+        tmp_path.write_text(
+            json.dumps(
+                {
+                    "schema": "obelisk.public-sdk-v1-completion-helper-subprocess-cache.v1",
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, cache_path)
+    except OSError:
+        pass
+    return result
+
+
 def run_command_permission_route_gate(
     path: Path,
     public_sdk_surfaces_path: Path,
@@ -1639,7 +5025,7 @@ def run_command_permission_route_gate(
             },
             ["command_permission_route_gate_override_not_allowed"],
         )
-    result = subprocess.run(
+    result = run_helper_subprocess(
         [
             sys.executable,
             str(path),
@@ -1648,11 +5034,7 @@ def run_command_permission_route_gate(
             "--public-header",
             str(public_header_path),
             "--json",
-        ],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
+        ]
     )
     try:
         payload = json.loads(result.stdout)
@@ -1678,6 +5060,9 @@ def run_command_permission_route_gate(
         )
     public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
     completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
+    post_evidence_p0_lock_simulation_alias_violations = (
+        route_gate_post_evidence_p0_lock_simulation_alias_violations(payload)
+    )
     if payload.get("schema") != "obelisk.command-permission-route-gate-check.v1":
         blockers.append("command_permission_route_gate_schema_mismatch")
     if result.returncode != 0 or payload.get("valid") is not True:
@@ -1700,11 +5085,53 @@ def run_command_permission_route_gate(
     critical_path_phase = payload.get("critical_path_phase") if isinstance(payload.get("critical_path_phase"), dict) else {}
     route_lock = payload.get("route_lock") if isinstance(payload.get("route_lock"), dict) else {}
     current_blocker = critical_path_phase.get("current_blocker")
+    current_route_blocker = payload.get("current_route_blocker")
+    if not isinstance(current_route_blocker, str) or not current_route_blocker:
+        current_route_blocker = current_blocker
+    raw_remaining_route_blockers = payload.get("remaining_route_blockers")
+    remaining_route_blockers = (
+        [
+            blocker
+            for blocker in raw_remaining_route_blockers
+            if isinstance(blocker, str) and blocker
+        ]
+        if isinstance(raw_remaining_route_blockers, list)
+        else []
+    )
+    if isinstance(current_route_blocker, str) and current_route_blocker:
+        remaining_route_blockers = list(
+            dict.fromkeys([current_route_blocker, *remaining_route_blockers])
+        )
     source_checker_primary_blocker = critical_path_phase.get("source_checker_primary_blocker")
     source_checker_next_blocker = critical_path_phase.get("source_checker_next_blocker")
     source_checker_status = critical_path_phase.get("source_checker_status")
     source_checker_ready = critical_path_phase.get("source_checker_ready")
     source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
+    source_ready_aliases = {
+        key: critical_path_phase.get(key)
+        for key in (
+            "ready",
+            "source_ready",
+            "sources_ready",
+            "source_readiness_ready",
+            "status_report_ready",
+            "runtime_evidence_status_ready",
+            "sdk_status_report_ready",
+        )
+        if key in critical_path_phase
+    }
+    source_status_aliases = {
+        key: critical_path_phase.get(key)
+        for key in (
+            "source_status",
+            "source_state",
+            "source_readiness_status",
+            "status_report_status",
+            "status_report_state",
+            "runtime_evidence_status",
+        )
+        if key in critical_path_phase
+    }
     route_blockers = payload.get("blockers", [])
     route_checks = payload.get("checks")
     approved_runtime_evidence_forwarded = False
@@ -1716,6 +5143,9 @@ def run_command_permission_route_gate(
             if isinstance(argv, list) and "--approved-runtime-evidence" in argv:
                 approved_runtime_evidence_forwarded = True
                 break
+    accepted_runtime_evidence_contract = (
+        accepted_approved_runtime_principal_lifecycle_bundle_aliases(payload)
+    )
     expected_lock_by_blocker = {
         "lifecycle_anchor_first_evidence_provenance_unbound": [
             "bound_lifecycle_anchor_and_principal_policy_sources",
@@ -1726,10 +5156,16 @@ def run_command_permission_route_gate(
             "reviewed_identity_public_contract",
         ],
     }
-    if approved_runtime_evidence_forwarded:
+    if accepted_runtime_evidence_contract:
         expected_lock_by_blocker["identity_public_contract_gate_missing"] = [
             "reviewed_identity_public_contract",
         ]
+        if current_blocker != "identity_public_contract_gate_missing":
+            blockers.append("command_permission_route_gate_accepted_runtime_evidence_blocker_unexpected")
+        if current_route_blocker != "identity_public_contract_gate_missing":
+            blockers.append("command_permission_route_gate_accepted_runtime_evidence_route_alias_unexpected")
+    elif approved_runtime_evidence_forwarded:
+        blockers.append("command_permission_route_gate_accepted_runtime_evidence_contract_missing")
     expected_route_lock = expected_lock_by_blocker.get(current_blocker)
     if current_blocker not in expected_lock_by_blocker:
         blockers.append("command_permission_route_gate_default_blocker_mismatch")
@@ -1741,6 +5177,10 @@ def run_command_permission_route_gate(
         blockers.append("command_permission_route_gate_source_status_unexpected")
     if source_checker_ready is not False:
         blockers.append("command_permission_route_gate_source_ready_overclaim")
+    if any(is_positive_completion_claim_value(value) for value in source_ready_aliases.values()):
+        blockers.append("command_permission_route_gate_source_ready_overclaim")
+    if any(is_positive_completion_claim_value(value) for value in source_status_aliases.values()):
+        blockers.append("command_permission_route_gate_source_status_unexpected")
     if source_checker_internal_planning is not False:
         blockers.append("command_permission_route_gate_source_internal_planning_overclaim")
     if route_blockers:
@@ -1751,6 +5191,10 @@ def run_command_permission_route_gate(
         blockers.append("command_permission_route_gate_default_lock_blocked_until_unexpected")
     if public_or_runtime_claims:
         blockers.append("command_permission_route_gate_public_or_runtime_claims")
+    if post_evidence_p0_lock_simulation_alias_violations:
+        blockers.append(
+            "command_permission_route_gate_post_evidence_p0_lock_simulation_completion_accounting_alias_not_false"
+        )
     if completion_claims_without_blocker:
         blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
     return (
@@ -1770,16 +5214,25 @@ def run_command_permission_route_gate(
             "counts_toward_runtime": payload.get("counts_toward_runtime"),
             "counts_toward_v1_completion": payload.get("counts_toward_v1_completion"),
             "public_or_runtime_accounting_allowed": payload.get("public_or_runtime_accounting_allowed"),
+            "current_route_blocker": current_route_blocker,
+            "remaining_route_blockers": remaining_route_blockers,
             "current_blocker": current_blocker,
             "source_checker_primary_blocker": source_checker_primary_blocker,
             "source_checker_next_blocker": source_checker_next_blocker,
             "source_checker_status": source_checker_status,
             "source_checker_ready": source_checker_ready,
+            "source_ready_aliases": source_ready_aliases,
+            "source_status_aliases": source_status_aliases,
             "source_checker_accepted_for_internal_planning": source_checker_internal_planning,
             "route_lock_blocked_until": route_lock.get("blocked_until"),
             "route_lock_locked": route_lock.get("locked"),
+            "approved_runtime_evidence_forwarded": approved_runtime_evidence_forwarded,
+            "accepted_runtime_evidence_contract": accepted_runtime_evidence_contract,
             "public_or_runtime_claims": public_or_runtime_claims,
             "completion_claims_without_blocker": completion_claims_without_blocker,
+            "post_evidence_p0_lock_simulation_alias_violations": (
+                post_evidence_p0_lock_simulation_alias_violations
+            ),
             "blockers": route_blockers,
             "completion_gate_accepted": not blockers,
             "completion_gate_blockers": blockers[:],
@@ -1806,19 +5259,34 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
             return True
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return value != 0
+        if isinstance(value, list):
+            return any(is_positive_claim_value(item) for item in value)
+        if isinstance(value, dict):
+            return any(is_positive_claim_value(item) for item in value.values())
         if isinstance(value, str):
             return normalized_key(value) in {
+                "accepted",
                 "allowed",
                 "available",
+                "complete",
+                "completed",
                 "enabled",
+                "green",
                 "live",
                 "operational",
+                "passed",
                 "promoted",
                 "public",
+                "published",
                 "ready",
+                "satisfied",
+                "satisfies",
+                "stable",
                 "supported",
                 "true",
                 "unlocked",
+                "validated",
+                "verified",
                 "yes",
             }
         return False
@@ -1853,11 +5321,21 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
 
     def contains_forbidden_claim_source(item: Any) -> bool:
         if isinstance(item, str):
-            return COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE.search(normalized_source(item)) is not None
+            normalized = normalized_source(item)
+            return (
+                COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_VALUE_RE.search(normalized)
+                is not None
+                or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(normalized)
+                is not None
+            )
         if isinstance(item, list):
             return any(contains_forbidden_claim_source(child) for child in item)
         if isinstance(item, dict):
-            return any(contains_forbidden_claim_source(child) for child in item.values())
+            return (
+                has_source_overclaim_marker(item)
+                or has_post_runtime_p0_chain_shortcut_marker(item)
+                or any(contains_forbidden_claim_source(child) for child in item.values())
+            )
         return False
 
     def text_claim_path_is_negative_context(path: str) -> bool:
@@ -1869,7 +5347,19 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
 
     def text_claim_path_is_command_metadata(path: str) -> bool:
         return any(
-            normalized_key(part.split("[", 1)[0]) in {"argv"}
+            normalized_key(part.split("[", 1)[0])
+            in {
+                "argv",
+                "artifact_schema",
+                "expected_schema",
+                "input_schema",
+                "report_schema",
+                "schema",
+                "schema_id",
+                "schema_ids",
+                "schemas",
+                "source_schema",
+            }
             for part in path.split(".")
             if part
         )
@@ -1892,6 +5382,8 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
                 item_path = f"{path}.{key}" if path else str(key)
                 key_name = normalized_key(key)
                 if claim_key_matches_path(key_name, item_path) and is_positive_claim_value(item):
+                    claims.append(item_path)
+                if notice_or_bundle_status_alias_claim(key_name, item, item_path):
                     claims.append(item_path)
                 if (
                     key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_SOURCE_KEYS
@@ -1985,7 +5477,13 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
 
     def claim_search_text(value: object) -> str:
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
-        return re.sub(r"[_-]+", " ", separated.casefold())
+        protected = re.sub(
+            r"\b(obelisk[_ -]*(?:api|config|targets))\.(h|cmake)\b",
+            r"\1 \2",
+            separated,
+            flags=re.IGNORECASE,
+        )
+        return re.sub(r"[_-]+", " ", protected.casefold())
 
     def is_split_claim_descriptor(value: Any) -> bool:
         if isinstance(value, dict):
@@ -2019,6 +5517,19 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 normalized_claim_text(path)
             )
             is not None
+        )
+
+    def path_marks_non_counting_completion_context(path: str) -> bool:
+        return any(
+            (
+                NON_COUNTING_COMPLETION_CONTEXT_RE.search(part) is not None
+                or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(part) is not None
+            )
+            and not re.fullmatch(
+                r"(?:active_)?side_lane(?:_(?:report|review|section|summary))?",
+                part,
+            )
+            for part in normalized_claim_path_parts(path)
         )
 
     def is_positive_standalone_status_claim(
@@ -2055,13 +5566,46 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             return False
         return is_positive_completion_claim_value(value) and path_has_completion_status_context(path)
 
+    def positive_completion_claim_leaf_paths(value: Any, path: str) -> list[str]:
+        if isinstance(value, dict):
+            paths: list[str] = []
+            for key, item in value.items():
+                item_path = f"{path}.{key}" if path else str(key)
+                paths.extend(positive_completion_claim_leaf_paths(item, item_path))
+            return paths
+        if isinstance(value, list):
+            paths = []
+            for index, item in enumerate(value):
+                paths.extend(positive_completion_claim_leaf_paths(item, f"{path}[{index}]"))
+            return paths
+        return [path] if is_positive_completion_claim_value(value) else []
+
     def path_is_non_claim_container(path: str) -> bool:
         return any(part in {"non_claim", "non_claims"} for part in normalized_claim_path_parts(path))
 
     def path_is_negative_claim_container(path: str) -> bool:
         return any(
-            part in {"not_sufficient", "not_sufficient_for"}
+            part in {
+                "not_sufficient",
+                "not_sufficient_for",
+                "required_before_unlocking",
+            }
             for part in normalized_claim_path_parts(path)
+        )
+
+    def path_is_machine_count_map(path: str) -> bool:
+        tail = normalized_claim_path_tail(path)
+        return (
+            tail in {
+                "diagnostic_candidate_target_counts",
+                "rejected_drift_target_counts",
+                "target_counts",
+                "targets_counts",
+            }
+            or tail.endswith("_target_counts")
+            or tail.endswith("_targets_counts")
+            or tail.endswith("_counts_by_target")
+            or tail.endswith("_counts_by_lifecycle_target")
         )
 
     def text_claim_path_is_machine_metadata(path: str) -> bool:
@@ -2072,19 +5616,31 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 part
                 in {
                     "argv",
+                    "artifact_schema",
+                    "allowed_remaining_blocker",
+                    "allowed_remaining_blockers",
+                    "blocker",
+                    "blockers",
                     "checker",
                     "command",
                     "commands",
                     "cwd",
                     "digest",
+                    "expected_schema",
                     "hash",
+                    "input_schema",
                     "output_name",
                     "path",
                     "paths",
                     "producer",
+                    "report_schema",
                     "script",
                     "schema",
+                    "schema_id",
+                    "schema_ids",
+                    "schemas",
                     "sha256",
+                    "source_schema",
                 }
                 for part in path_parts
             )
@@ -2127,6 +5683,7 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 claims.extend(split_completion_claim_paths(value, path))
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
+                key_is_machine_count_entry = path_is_machine_count_map(path)
                 if (
                     (
                         normalized_completion_claim_key(key) in forbidden_keys
@@ -2140,24 +5697,61 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                         )
                     )
                     and is_positive_completion_claim_value(item)
+                    and not key_is_machine_count_entry
                     and not current_blocked_context
                 ):
-                    claims.append(item_path)
+                    claims.extend(positive_completion_claim_leaf_paths(item, item_path))
                 if (
                     is_positive_standalone_status_claim(
                         normalized_completion_claim_key(key),
                         item,
                         item_path,
                     )
+                    and not key_is_machine_count_entry
                     and not current_blocked_context
                 ):
-                    claims.append(item_path)
+                    if isinstance(item, (dict, list)):
+                        claims.extend(positive_completion_claim_leaf_paths(item, item_path))
+                    else:
+                        claims.append(item_path)
                 if (
                     is_positive_completion_progress_claim(
                         normalized_completion_claim_key(key),
                         item,
                         item_path,
                     )
+                    and not key_is_machine_count_entry
+                    and not current_blocked_context
+                ):
+                    claims.append(item_path)
+                if (
+                    notice_or_bundle_status_alias_claim(
+                        normalized_completion_claim_key(key),
+                        item,
+                        item_path,
+                    )
+                    and not key_is_machine_count_entry
+                    and not current_blocked_context
+                ):
+                    claims.append(item_path)
+                if (
+                    path_marks_non_counting_completion_context(item_path)
+                    and non_counting_completion_readiness_alias_key(
+                        normalized_completion_claim_key(key)
+                    )
+                    and normalized_completion_claim_key(key) != "accepted_for_contract_review"
+                    and is_non_counting_context_positive_status_value(item)
+                    and not key_is_machine_count_entry
+                    and not current_blocked_context
+                ):
+                    claims.append(item_path)
+                if (
+                    path_marks_non_counting_completion_context(item_path)
+                    and non_counting_completion_progress_alias_key(
+                        normalized_completion_claim_key(key)
+                    )
+                    and is_positive_completion_claim_value(item)
+                    and not key_is_machine_count_entry
                     and not current_blocked_context
                 ):
                     claims.append(item_path)
@@ -2202,6 +5796,74 @@ def normalized_claim_path_tail(path: str) -> str:
     return parts[-1] if parts else ""
 
 
+def is_notice_or_bundle_positive_status_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, list):
+        return any(is_notice_or_bundle_positive_status_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(
+            is_notice_or_bundle_positive_status_value(item)
+            for item in value.values()
+        )
+    if isinstance(value, str):
+        return normalized_completion_claim_key(value) in NOTICE_OR_BUNDLE_POSITIVE_STATUS_VALUES
+    return False
+
+
+def is_non_counting_context_positive_status_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, list):
+        return any(is_non_counting_context_positive_status_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(
+            is_non_counting_context_positive_status_value(item)
+            for item in value.values()
+        )
+    if isinstance(value, str):
+        return normalized_completion_claim_key(value) in NON_COUNTING_COMPLETION_POSITIVE_STATUS_VALUES
+    return False
+
+
+def non_counting_completion_readiness_alias_key(key_name: str) -> bool:
+    if key_name in NON_COUNTING_COMPLETION_READINESS_ALIAS_EXEMPT_KEYS:
+        return False
+    return key_name in NON_COUNTING_COMPLETION_READINESS_ALIAS_KEYS or any(
+        key_name.endswith(suffix) for suffix in NON_COUNTING_COMPLETION_READINESS_ALIAS_SUFFIXES
+    )
+
+
+def non_counting_completion_progress_alias_key(key_name: str) -> bool:
+    return key_name in SIDE_LANE_COMPLETION_ACCOUNTING_ZERO_ALIAS_KEYS or any(
+        key_name.endswith(suffix) for suffix in NON_COUNTING_COMPLETION_PROGRESS_ALIAS_SUFFIXES
+    )
+
+
+def notice_or_bundle_status_alias_claim(key_name: str, value: Any, path: str) -> bool:
+    path_parts = normalized_claim_path_parts(path)
+    if key_name in NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS:
+        return is_notice_or_bundle_positive_status_value(value)
+    if any(suffix in NOTICE_OR_BUNDLE_NON_PROGRESS_FALSE_ALIAS_KEYS for suffix in normalized_claim_path_suffixes(path)):
+        return is_notice_or_bundle_positive_status_value(value)
+    combined_status_key_match = any(
+        key_name.endswith(f"_{status_key}")
+        and any(container in key_name for container in NOTICE_OR_BUNDLE_STATUS_CONTAINER_KEYS)
+        for status_key in NOTICE_OR_BUNDLE_STATUS_KEYS
+    )
+    if key_name not in NOTICE_OR_BUNDLE_STATUS_KEYS and not combined_status_key_match:
+        return False
+    if not combined_status_key_match and not any(
+        part in NOTICE_OR_BUNDLE_STATUS_CONTAINER_KEYS for part in path_parts
+    ):
+        return False
+    return is_notice_or_bundle_positive_status_value(value)
+
+
 def normalized_claim_path_suffixes(path: str) -> list[str]:
     parts = normalized_claim_path_parts(path)
     return ["_".join(parts[index:]) for index in range(len(parts))]
@@ -2214,6 +5876,8 @@ def is_positive_completion_claim_value(value: Any) -> bool:
         return value != 0
     if isinstance(value, list):
         return any(is_positive_completion_claim_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(is_positive_completion_claim_value(item) for item in value.values())
     if isinstance(value, str):
         stripped = value.strip()
         number_match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)%?", stripped)
@@ -2226,11 +5890,17 @@ def is_positive_completion_claim_value(value: Any) -> bool:
         if ratio_match:
             return float(ratio_match.group(1)) != 0
         return normalized_completion_claim_key(value) in {
+            "accepted",
             "allowed",
+            "approved",
             "available",
+            "complete",
+            "completed",
             "enabled",
+            "green",
             "live",
             "operational",
+            "passed",
             "promoted",
             "public",
             "published",
@@ -2239,23 +5909,182 @@ def is_positive_completion_claim_value(value: Any) -> bool:
             "counts",
             "satisfied",
             "satisfies",
+            "stable",
+            "success",
+            "succeeded",
             "supported",
             "true",
+            "unblocked",
             "unlocked",
             "yes",
         }
     return False
 
 
+def is_explicit_zero_accounting_alias_value(value: Any) -> bool:
+    if value is False:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value == 0
+    if isinstance(value, str):
+        stripped = value.strip()
+        number_match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)%?", stripped)
+        if number_match:
+            return float(number_match.group(1)) == 0
+        ratio_match = re.fullmatch(
+            r"([+-]?\d+(?:\.\d+)?)\s*/\s*([+-]?\d+(?:\.\d+)?)",
+            stripped,
+        )
+        if ratio_match:
+            return float(ratio_match.group(1)) == 0
+    return False
+
+
+def has_source_overclaim_marker(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_name = normalized_completion_claim_key(key)
+            if key_name in SOURCE_OVERCLAIM_MARKER_KEYS:
+                return True
+            if has_source_overclaim_marker(item):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(has_source_overclaim_marker(item) for item in value)
+    return False
+
+
+def has_post_runtime_p0_chain_shortcut_marker(value: Any) -> bool:
+    if isinstance(value, str):
+        return (
+            POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(
+                normalized_completion_claim_key(value)
+            )
+            is not None
+        )
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_name = normalized_completion_claim_key(key)
+            if (
+                key_name in SOURCE_OVERCLAIM_MARKER_KEYS
+                or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(key_name)
+                is not None
+                or has_post_runtime_p0_chain_shortcut_marker(item)
+            ):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(has_post_runtime_p0_chain_shortcut_marker(item) for item in value)
+    return False
+
+
+def side_lane_completion_accounting_alias_violations(payload: dict[str, Any]) -> list[str]:
+    violations: list[str] = []
+
+    def path_marks_non_counting_context(path: str) -> bool:
+        return any(
+            NON_COUNTING_COMPLETION_CONTEXT_RE.search(part) is not None
+            or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(part) is not None
+            for part in normalized_claim_path_parts(path)
+        )
+
+    def value_marks_non_counting_context(value: Any) -> bool:
+        if isinstance(value, str):
+            return (
+                NON_COUNTING_COMPLETION_CONTEXT_RE.search(
+                    normalized_completion_claim_key(value)
+                )
+                is not None
+                or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(
+                    normalized_completion_claim_key(value)
+                )
+                is not None
+            )
+        if isinstance(value, list):
+            return any(value_marks_non_counting_context(item) for item in value)
+        if isinstance(value, dict):
+            if has_source_overclaim_marker(value):
+                return True
+            return any(
+                POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(
+                    normalized_completion_claim_key(key)
+                )
+                is not None
+                or value_marks_non_counting_context(item)
+                for key, item in value.items()
+                if normalized_completion_claim_key(key)
+                in {
+                    "artifact_scope",
+                    "classification",
+                    "evidence_kind",
+                    "path_type",
+                    "readiness_scope",
+                    "ready_scope",
+                    "schema",
+                    "source_kind",
+                    "status",
+                    "target_set",
+                    "type",
+                }
+                or normalized_completion_claim_key(key) in SOURCE_OVERCLAIM_MARKER_KEYS
+            )
+        return False
+
+    def visit(value: Any, path: str, in_non_counting_context: bool) -> None:
+        current_context = in_non_counting_context or path_marks_non_counting_context(path)
+        if isinstance(value, dict):
+            current_context = current_context or value_marks_non_counting_context(value)
+            for key, item in value.items():
+                item_path = f"{path}.{key}" if path else str(key)
+                key_name = normalized_completion_claim_key(key)
+                if notice_or_bundle_status_alias_claim(key_name, item, item_path):
+                    violations.append(item_path)
+                if (
+                    key_name in SIDE_LANE_COMPLETION_ACCOUNTING_FALSE_ALIAS_KEYS
+                    and is_positive_completion_claim_value(item)
+                ):
+                    violations.append(item_path)
+                if (
+                    key_name in SIDE_LANE_COMPLETION_ACCOUNTING_ZERO_ALIAS_KEYS
+                    and not is_explicit_zero_accounting_alias_value(item)
+                ):
+                    violations.append(item_path)
+                if (
+                    current_context
+                    and non_counting_completion_readiness_alias_key(key_name)
+                    and is_non_counting_context_positive_status_value(item)
+                ):
+                    violations.append(item_path)
+                if (
+                    current_context
+                    and non_counting_completion_progress_alias_key(key_name)
+                    and is_positive_completion_claim_value(item)
+                ):
+                    violations.append(item_path)
+                visit(item, item_path, current_context)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]", current_context)
+
+    visit(payload, "", False)
+    return sorted(set(violations))
+
+
+def route_gate_post_evidence_p0_lock_simulation_alias_violations(
+    payload: dict[str, Any],
+) -> list[str]:
+    simulation = payload.get("post_evidence_p0_lock_simulation")
+    if not isinstance(simulation, dict):
+        return []
+    return [
+        f"post_evidence_p0_lock_simulation.{path}"
+        for path in side_lane_completion_accounting_alias_violations(simulation)
+    ]
+
+
 def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
-    result = subprocess.run(
-        [sys.executable, str(path), "--json"],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_helper_subprocess([sys.executable, str(path), "--json"])
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -2281,6 +6110,7 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
 
     public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
     completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
+    completion_accounting_alias_violations = side_lane_completion_accounting_alias_violations(payload)
     if result.returncode != 0 or payload.get("ready") is not True:
         blockers.append("inventory_copied_signals_stability_invalid")
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
@@ -2293,6 +6123,8 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
         blockers.append("inventory_copied_signals_stability_blockers_not_empty")
     if public_or_runtime_claims:
         blockers.append("inventory_copied_signals_public_or_runtime_claims")
+    if completion_accounting_alias_violations:
+        blockers.append("inventory_copied_signals_completion_accounting_alias_not_false")
     if completion_claims_without_blocker:
         blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
@@ -2307,8 +6139,13 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
             "resource_kind_contract": summary.get("resource_kind_contract"),
             "public_sdk_ready": summary.get("public_sdk_ready"),
             "v1_completion_ready": summary.get("v1_completion_ready"),
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress": 0,
+            "stable_claim_allowed": False,
             "public_or_runtime_claims": public_or_runtime_claims,
             "completion_claims_without_blocker": completion_claims_without_blocker,
+            "completion_accounting_alias_violations": completion_accounting_alias_violations,
             "blockers": report_blockers,
             "stderr": result.stderr.strip(),
             "non_claim": "copied-signal stability guard; not Inventory SDK, Items SDK, or v1 completion evidence",
@@ -2332,18 +6169,26 @@ def object_identity_resource_handle_public_or_runtime_claims(payload: dict[str, 
         if isinstance(value, str):
             return normalized_key(value) in {
                 "allowed",
-                "available",
-                "enabled",
-                "live",
+            "available",
+            "complete",
+            "completed",
+            "enabled",
+            "live",
                 "operational",
-                "promoted",
-                "public",
-                "ready",
-                "supported",
-                "true",
-                "unlocked",
-                "yes",
-            }
+            "promoted",
+            "public",
+            "published",
+            "ready",
+            "satisfied",
+            "satisfies",
+            "stable",
+            "supported",
+            "true",
+            "unlocked",
+            "validated",
+            "verified",
+            "yes",
+        }
         return False
 
     forbidden_keys = {normalized_key(key) for key in OBJECT_IDENTITY_RESOURCE_HANDLE_FORBIDDEN_READY_KEYS}
@@ -2371,7 +6216,7 @@ def run_object_identity_resource_handle_readiness(
 ) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
     decisions_path = contract_decisions_dir / OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME
-    result = subprocess.run(
+    result = run_helper_subprocess(
         [
             sys.executable,
             str(path),
@@ -2382,11 +6227,7 @@ def run_object_identity_resource_handle_readiness(
             "--public-header",
             str(public_header_path),
             "--json",
-        ],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
+        ]
     )
     try:
         payload = json.loads(result.stdout)
@@ -2424,6 +6265,13 @@ def run_object_identity_resource_handle_readiness(
     for key in OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS:
         if payload.get(key) is not False:
             blockers.append(f"object_identity_resource_handle_{key}_not_false")
+    if payload.get("strict_next_blocker") != OBJECT_IDENTITY_RESOURCE_HANDLE_STRICT_NEXT_BLOCKER:
+        blockers.append("object_identity_resource_handle_strict_next_blocker_missing")
+    if (
+        payload.get("offline_serial_post_callback_artifacts")
+        != OBJECT_IDENTITY_RESOURCE_HANDLE_OFFLINE_ARTIFACT_POLICY
+    ):
+        blockers.append("object_identity_resource_handle_offline_artifact_policy_not_candidate_only")
     readiness_blockers = payload.get("blockers", [])
     if readiness_blockers:
         blockers.append("object_identity_resource_handle_readiness_blockers_not_empty")
@@ -2446,6 +6294,29 @@ def run_object_identity_resource_handle_readiness(
             "runtime_ready": payload.get("runtime_ready"),
             "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
             "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+            "serialPolicyReady": payload.get("serialPolicyReady"),
+            "resourceLookupReady": payload.get("resourceLookupReady"),
+            "postCallbackHandleReady": payload.get("postCallbackHandleReady"),
+            "objectIdentityReady": payload.get("objectIdentityReady"),
+            "runtimeSampleReady": payload.get("runtimeSampleReady"),
+            "strict_next_blocker": payload.get("strict_next_blocker"),
+            "offline_serial_post_callback_artifacts": payload.get("offline_serial_post_callback_artifacts"),
+            "offline_artifacts_unlock_public_lookup_identity_runtime_sdk": payload.get(
+                "offline_artifacts_unlock_public_lookup_identity_runtime_sdk"
+            ),
+            "next_evidence_contract": {
+                "status": "planning-only-not-approval",
+                "required_future_evidence": [
+                    "runtime object negative samples",
+                    "runtime serial reuse/wraparound semantics",
+                ],
+                "offline_artifacts_policy": OBJECT_IDENTITY_RESOURCE_HANDLE_OFFLINE_ARTIFACT_POLICY,
+                "non_claim": (
+                    "Next evidence fields document the future ResourceHandle blocker only; "
+                    "they do not approve lookup, mutation, cross-event identity, persistent "
+                    "object identity, post-callback validity, runtime work, or public SDK readiness."
+                ),
+            },
             "public_or_runtime_claims": public_or_runtime_claims,
             "completion_claims_without_blocker": completion_claims_without_blocker,
             "blockers": readiness_blockers,
@@ -2459,6 +6330,90 @@ def run_object_identity_resource_handle_readiness(
     )
 
 
+def mission_transfer_dino_tribe_leaf_outcome_accounting(payload: dict[str, Any]) -> dict[str, Any]:
+    candidate_accounting = payload.get("candidate_only_accounting")
+    candidate_accounting = candidate_accounting if isinstance(candidate_accounting, dict) else {}
+    leaf_gaps = candidate_accounting.get("leaf_family_gaps")
+    leaf_gaps = leaf_gaps if isinstance(leaf_gaps, dict) else {}
+    leaf_statuses = payload.get("leaf_statuses")
+    leaf_statuses = leaf_statuses if isinstance(leaf_statuses, dict) else {}
+    missing_leaf_families = payload.get("missing_leaf_families")
+    missing_leaf_families = (
+        [leaf for leaf in missing_leaf_families if isinstance(leaf, str)]
+        if isinstance(missing_leaf_families, list)
+        else []
+    )
+
+    leaves: list[dict[str, Any]] = []
+    for leaf_id in MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES_ORDER:
+        gap = leaf_gaps.get(leaf_id)
+        gap = gap if isinstance(gap, dict) else {}
+        status = leaf_statuses.get(leaf_id)
+        if not isinstance(status, str):
+            status = gap.get("status") if isinstance(gap.get("status"), str) else None
+        accounted_by = gap.get("accounted_by") if isinstance(gap.get("accounted_by"), str) else None
+        manifest_outcome = status if status in {"excluded", "post-v1"} else None
+        release_statement_excluded = gap.get("release_statement_excluded") is True
+        explicit_non_promoted_outcome = (
+            manifest_outcome is not None
+            or accounted_by in {
+                "manifest_leaf_exclusion",
+                "manifest_leaf_exclusion_pending_acceptance",
+                "release_statement_leaf_exclusion",
+                "release_statement_leaf_exclusion_pending_acceptance",
+            }
+        )
+        leaves.append(
+            {
+                "leaf": leaf_id,
+                "status": status,
+                "manifest_outcome": manifest_outcome,
+                "v1_accounted": gap.get("v1_accounted") is True,
+                "accounted_by": accounted_by,
+                "release_statement_excluded": release_statement_excluded,
+                "release_statement_promoted": gap.get("release_statement_promoted") is True,
+                "explicit_non_promoted_outcome": explicit_non_promoted_outcome,
+                "scoped_non_complete_bookkeeping_only": explicit_non_promoted_outcome,
+                "allowed_v1_outcome": (
+                    gap.get("allowed_v1_outcome")
+                    if isinstance(gap.get("allowed_v1_outcome"), str)
+                    else None
+                ),
+                "missing_public_gates": as_string_list(gap.get("missing_public_gates")),
+                "counts_toward_complete_sdk_claim": False,
+                "counts_toward_p0_dependency_chain_claim": False,
+                "counts_toward_public_sdk": False,
+                "counts_toward_runtime": False,
+                "progress_contribution": 0,
+                "fail_closed_requirement": (
+                    "release statement must record the umbrella and every leaf as excluded/post-v1"
+                    if leaf_id in missing_leaf_families
+                    else "non-counting scoped outcome only; promotion remains separately blocked"
+                ),
+            }
+        )
+
+    return {
+        "schema": "obelisk.mission-transfer-dino-tribe-v1-leaf-outcomes.v1",
+        "surface": "obelisk.mission_transfer_dino_tribe.v1",
+        "accounting_route": payload.get("accounting_route"),
+        "v1_accounted": payload.get("v1_accounted") is True,
+        "all_leaf_outcomes_explicit": not missing_leaf_families,
+        "missing_or_unresolved_leaf_outcomes": missing_leaf_families,
+        "leaves": leaves,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "non_claim": (
+            "Leaf outcomes are scoped non-complete accounting only; they do not add "
+            "Mission, Transfer, Dino, Tribe, or Buff SDK coverage."
+        ),
+    }
+
+
 def run_mission_transfer_dino_tribe_outcome_accounting(
     path: Path,
     manifest_path: Path,
@@ -2468,13 +6423,7 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
     argv = [sys.executable, str(path), "--manifest", str(manifest_path), "--json"]
     if release_statement_path is not None:
         argv.extend(["--release-statement", str(release_statement_path)])
-    result = subprocess.run(
-        argv,
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_helper_subprocess(argv)
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -2501,25 +6450,80 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
     accounting_route = payload.get("accounting_route")
     public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
     completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
-    if payload.get("schema") != "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1":
-        blockers.append("mission_transfer_dino_tribe_outcome_accounting_schema_mismatch")
-    if result.returncode != 0 or payload.get("ready") is not True:
-        blockers.append("mission_transfer_dino_tribe_outcome_accounting_invalid")
-    if payload.get("surface") != "obelisk.mission_transfer_dino_tribe.v1":
-        blockers.append("mission_transfer_dino_tribe_outcome_accounting_surface_mismatch")
-    if set(payload.get("required_leaves", [])) != MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES:
-        blockers.append("mission_transfer_dino_tribe_required_leaves_mismatch")
-    if set(payload.get("observed_leaves", [])) != MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES:
-        blockers.append("mission_transfer_dino_tribe_observed_leaves_mismatch")
-    report_blockers = payload.get("blockers", [])
-    if report_blockers:
-        blockers.append("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty")
+    completion_accounting_alias_violations = side_lane_completion_accounting_alias_violations(payload)
+    leaf_outcome_accounting = mission_transfer_dino_tribe_leaf_outcome_accounting(payload)
     allowed_per_leaf_promoted_claims = {"promotion_ready", "public_sdk_ready", "runtime_ready"}
     unexpected_public_or_runtime_claims = [
         claim
         for claim in public_or_runtime_claims
         if accounting_route != "per_leaf_promoted" or claim not in allowed_per_leaf_promoted_claims
     ]
+    required_leaves_match = (
+        set(payload.get("required_leaves", [])) == MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES
+    )
+    observed_leaves_match = (
+        set(payload.get("observed_leaves", [])) == MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES
+    )
+    report_blockers = payload.get("blockers", [])
+    non_counting_route = accounting_route in {
+        "candidate_only",
+        "manifest_umbrella_excluded",
+        "release_statement_umbrella_excluded",
+    }
+    if accounting_route == "release_statement_umbrella_excluded":
+        allowed_leaf_exclusion_prefix = "release_statement.leaf_exclusions."
+        completion_claims_without_blocker = [
+            path
+            for path in completion_claims_without_blocker
+            if not path.startswith(allowed_leaf_exclusion_prefix)
+        ]
+        completion_accounting_alias_violations = [
+            path
+            for path in completion_accounting_alias_violations
+            if not path.startswith(allowed_leaf_exclusion_prefix)
+        ]
+    non_counting_public_runtime_flags_false = all(
+        payload.get(key) is False
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready")
+    )
+    release_statement_report = (
+        payload.get("release_statement") if isinstance(payload.get("release_statement"), dict) else {}
+    )
+    strict_release_statement_accounting_blocker = (
+        release_statement_report.get("umbrella_excluded") is True
+        and "release_statement_leaf_exclusions_missing" in report_blockers
+    )
+    suppress_helper_blocked_status = (
+        non_counting_route
+        and required_leaves_match
+        and observed_leaves_match
+        and non_counting_public_runtime_flags_false
+        and not unexpected_public_or_runtime_claims
+        and not strict_release_statement_accounting_blocker
+    )
+    normalized_ready = payload.get("ready")
+    if (
+        accounting_route == "candidate_only"
+        and suppress_helper_blocked_status
+        and not completion_accounting_alias_violations
+        and not completion_claims_without_blocker
+    ):
+        normalized_ready = True
+
+    if payload.get("schema") != "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1":
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_schema_mismatch")
+    if (
+        result.returncode != 0 or payload.get("ready") is not True
+    ) and not suppress_helper_blocked_status:
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_invalid")
+    if payload.get("surface") != "obelisk.mission_transfer_dino_tribe.v1":
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_surface_mismatch")
+    if not required_leaves_match:
+        blockers.append("mission_transfer_dino_tribe_required_leaves_mismatch")
+    if not observed_leaves_match:
+        blockers.append("mission_transfer_dino_tribe_observed_leaves_mismatch")
+    if report_blockers and not suppress_helper_blocked_status:
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty")
     if accounting_route == "candidate_only":
         if payload.get("candidate_only") is not True or payload.get("v1_accounted") is not False:
             blockers.append("mission_transfer_dino_tribe_candidate_only_accounting_mismatch")
@@ -2534,6 +6538,16 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
         )
         if payload.get("v1_accounted") is not True or missing_leaf_exclusions:
             blockers.append("mission_transfer_dino_tribe_release_statement_leaf_exclusions_incomplete")
+    elif accounting_route == "manifest_umbrella_excluded":
+        leaf_statuses = payload.get("leaf_statuses")
+        leaf_statuses = leaf_statuses if isinstance(leaf_statuses, dict) else {}
+        missing_leaf_exclusions = sorted(
+            leaf_id
+            for leaf_id in MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES
+            if leaf_statuses.get(leaf_id) != "excluded"
+        )
+        if payload.get("v1_accounted") is not True or missing_leaf_exclusions:
+            blockers.append("mission_transfer_dino_tribe_manifest_leaf_exclusions_incomplete")
     elif accounting_route == "per_leaf_promoted":
         if not (
             payload.get("promotion_ready") is True
@@ -2550,6 +6564,8 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
                 blockers.append(f"mission_transfer_dino_tribe_{key}_not_false")
     if unexpected_public_or_runtime_claims:
         blockers.append("mission_transfer_dino_tribe_public_or_runtime_claims")
+    if completion_accounting_alias_violations:
+        blockers.append("mission_transfer_dino_tribe_completion_accounting_alias_not_false")
     if completion_claims_without_blocker:
         blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
@@ -2557,22 +6573,38 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
         {
             "path": str(path),
             "exit_code": result.returncode,
+            "source_ready": payload.get("ready"),
             "schema": payload.get("schema"),
             "surface": payload.get("surface"),
-            "ready": payload.get("ready"),
+            "ready": normalized_ready,
             "accounting_route": accounting_route,
             "candidate_only": payload.get("candidate_only"),
             "v1_accounted": payload.get("v1_accounted"),
             "promotion_ready": payload.get("promotion_ready"),
             "public_sdk_ready": payload.get("public_sdk_ready"),
             "runtime_ready": payload.get("runtime_ready"),
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "progress": 0,
+            "stable_claim_allowed": False,
             "public_or_runtime_claims": public_or_runtime_claims,
             "completion_claims_without_blocker": completion_claims_without_blocker,
+            "completion_accounting_alias_violations": completion_accounting_alias_violations,
             "required_leaves": payload.get("required_leaves"),
             "observed_leaves": payload.get("observed_leaves"),
             "missing_leaf_families": payload.get("missing_leaf_families"),
+            "leaf_outcome_accounting": leaf_outcome_accounting,
             "release_statement": payload.get("release_statement"),
             "blockers": report_blockers,
+            "source_blockers": report_blockers,
+            "helper_blocked_status_normalized": (
+                suppress_helper_blocked_status
+                and (
+                    result.returncode != 0
+                    or payload.get("ready") is not True
+                    or bool(report_blockers)
+                )
+            ),
             "stderr": result.stderr.strip(),
             "non_claim": (
                 "Mission/Transfer/Dino/Tribe/Buff accounting guard; not public SDK, "
@@ -2585,13 +6617,7 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
 
 def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
-    result = subprocess.run(
-        [sys.executable, str(path), "--json"],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_helper_subprocess([sys.executable, str(path), "--json"])
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -2671,13 +6697,7 @@ def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str
 
 def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
-    result = subprocess.run(
-        [sys.executable, str(path), "--json"],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_helper_subprocess([sys.executable, str(path), "--json"])
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -2718,6 +6738,17 @@ def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any
     readiness_flags = payload.get("readiness_flags") if isinstance(payload.get("readiness_flags"), dict) else {}
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
         if readiness_flags.get(key) is not False:
+            blockers.append(f"structure_build_policy_readiness_flags_{key}_not_false")
+    for key in (
+        "build_policy_ready",
+        "structure_build_policy_ready",
+        "route_ready",
+        "blocker_resolved",
+        "side_lane_promoted",
+    ):
+        if key in payload and payload.get(key) is not False:
+            blockers.append(f"structure_build_policy_{key}_not_false")
+        if key in readiness_flags and readiness_flags.get(key) is not False:
             blockers.append(f"structure_build_policy_readiness_flags_{key}_not_false")
     if public_or_runtime_claims:
         blockers.append("structure_build_policy_public_or_runtime_claims")
@@ -2925,6 +6956,7 @@ def blocked_contract_public_header_symbol_drift(
     decisions_dir: Path,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     public_symbols, blockers = load_public_header_symbols(public_header_path)
+    public_symbols -= native_prototype_header_symbols(public_header_path)
     drift: dict[str, dict[str, Any]] = {}
     for decision_path in contract_decision_paths(decisions_dir):
         payload, load_blockers = load_manifest(decision_path)
@@ -2983,6 +7015,7 @@ def manifest_public_header_symbol_drift(
     decision_backed_surface_ids: set[str],
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     public_symbols, blockers = load_public_header_symbols(public_header_path)
+    public_symbols -= native_prototype_header_symbols(public_header_path)
     drift: dict[str, dict[str, Any]] = {}
     if blockers:
         return drift, blockers
@@ -3045,39 +7078,44 @@ def release_statement_all_surface_records(text: str | None) -> list[dict[str, An
     if text is None:
         return []
     pattern = re.compile(
-        rf"^\s*(?P<surface>obelisk\.[A-Za-z0-9_.-]+\.v1)\s*"
+        rf"(?<![A-Za-z0-9_.-])(?P<surface>obelisk\.[A-Za-z0-9_.-]+\.v1)\s*"
         rf"(?P<delimiter>{RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE}|{RELEASE_STATEMENT_ALTERNATE_ROW_DELIMITER_RE})\s*"
         rf"(?P<status>promoted|excluded|post-v1)"
-        rf"(?:\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)|\s*)$",
+        rf"(?![A-Za-z0-9_-])",
         re.IGNORECASE,
     )
     records: list[dict[str, Any]] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
-        match = pattern.fullmatch(line)
-        if not match:
-            continue
-        status = match.group("status").lower()
-        surface_id = match.group("surface")
-        has_reviewed_details = bool((match.group("details") or "").strip())
-        canonical_reviewed_record = bool(
-            re.fullmatch(
-                RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
-                match.group("delimiter"),
+        for match in pattern.finditer(line):
+            status = match.group("status").lower()
+            surface_id = match.group("surface")
+            detail_match = re.match(
+                rf"\s+{RELEASE_STATEMENT_DETAIL_SEPARATOR_RE}\s*(?P<details>.+)",
+                line[match.end() :],
             )
-        ) and (
-            surface_id == surface_id.casefold()
-            and match.group("status") == status
-            and (status != "promoted" or has_reviewed_details)
-        )
-        records.append(
-            {
-                "surface": surface_id,
-                "outcome": status,
-                "line": line.strip(),
-                "line_number": str(line_number),
-                "canonical_reviewed_record": canonical_reviewed_record,
-            }
-        )
+            has_reviewed_details = bool(
+                detail_match is not None
+                and (detail_match.group("details") or "").strip()
+            )
+            canonical_reviewed_record = bool(
+                re.fullmatch(
+                    RELEASE_STATEMENT_CANONICAL_ROW_DELIMITER_RE,
+                    match.group("delimiter"),
+                )
+            ) and (
+                surface_id == surface_id.casefold()
+                and match.group("status") == status
+                and (status != "promoted" or has_reviewed_details)
+            )
+            records.append(
+                {
+                    "surface": surface_id,
+                    "outcome": status,
+                    "line": line.strip(),
+                    "line_number": str(line_number),
+                    "canonical_reviewed_record": canonical_reviewed_record,
+                }
+            )
     return records
 
 
@@ -3164,6 +7202,48 @@ def required_release_statement_outcomes(surface: dict[str, Any]) -> set[str]:
         return outcomes
     status = surface.get("status")
     return {status} if status in {"excluded", "post-v1"} else set()
+
+
+def scoped_release_statement_required_outcome_records(
+    completion_blockers: list[str],
+    surfaces_by_id: dict[str, dict[str, Any]],
+    post_v1_or_excluded: set[str],
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for surface_id in completion_blockers:
+        if surface_id in seen:
+            continue
+        seen.add(surface_id)
+        surface = surfaces_by_id.get(surface_id)
+        if not surface:
+            continue
+        if surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN:
+            continue
+        if surface_id in CANONICAL_EXPERIMENTAL_SURFACE_IDS:
+            continue
+        status = surface.get("status")
+        allowed_outcomes = required_release_statement_outcomes(surface)
+        if status in {"excluded", "post-v1"}:
+            if surface_id not in post_v1_or_excluded:
+                continue
+            outcome = status
+        elif status == "planning" and allowed_outcomes & {"excluded", "post-v1"}:
+            outcome = "excluded" if "excluded" in allowed_outcomes else "post-v1"
+        else:
+            continue
+        records.append(
+            {
+                "surface": surface_id,
+                "outcome": outcome,
+                "required_release_statement_outcomes": sorted(allowed_outcomes),
+                "blocker": "release_statement_missing_non_promoted_blocker_outcomes",
+                "scoped_non_complete_bookkeeping_only": True,
+                "counts_toward_complete_sdk_claim": False,
+                "claim_progress_contribution": 0,
+            }
+        )
+    return records
 
 
 def text_has_affirmative_release_claim(text: str) -> bool:
@@ -3422,11 +7502,21 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
         return False
     surface_id = surface.get("id")
     status = surface.get("status")
-    if not isinstance(surface_id, str) or status not in {"excluded", "post-v1"}:
+    if not isinstance(surface_id, str):
         return False
     allowed_outcomes = required_release_statement_outcomes(surface)
     recorded_outcome = release_statement_recorded_outcome(text, surface_id)
-    if recorded_outcome != status:
+    if status in {"excluded", "post-v1"}:
+        effective_outcome = status
+    elif (
+        status == "planning"
+        and recorded_outcome in {"excluded", "post-v1"}
+        and recorded_outcome in allowed_outcomes
+    ):
+        effective_outcome = recorded_outcome
+    else:
+        return False
+    if recorded_outcome != effective_outcome:
         return False
     if recorded_outcome not in allowed_outcomes:
         return False
@@ -3442,6 +7532,18 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
         return False
     required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
     if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
+        leaf_units = surface.get("leaf_decision_units")
+        if not isinstance(leaf_units, list):
+            return False
+        leaf_statuses = {
+            leaf.get("id"): leaf.get("status")
+            for leaf in leaf_units
+            if isinstance(leaf, dict) and isinstance(leaf.get("id"), str)
+        }
+        if set(leaf_statuses) != MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES:
+            return False
+        if any(leaf_status not in {status, effective_outcome} for leaf_status in leaf_statuses.values()):
+            return False
         leaf_terms = {
             "mission": ("mission excluded", "mission post-v1", "mission post v1"),
             "transfer": ("transfer excluded", "transfer post-v1", "transfer post v1"),
@@ -3514,6 +7616,8 @@ def evidence_path_has_non_promotional_marker(raw_path: str) -> bool:
         for part in relative.with_suffix("").parts
     ]
     for part in normalized_parts:
+        if POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(part):
+            return True
         collapsed_part = part.replace("_", "")
         for marker in STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS:
             normalized_marker = normalized_marker_text(marker)
@@ -3549,6 +7653,9 @@ def evidence_has_non_promotional_schema_marker(
             text = json.dumps(value, sort_keys=True)
         except TypeError:
             text = str(value)
+        normalized_text = normalized_completion_claim_key(text)
+        if POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(normalized_text):
+            return True
         if (
             normalized_key in STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS
             and STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS.search(text)
@@ -3579,7 +7686,13 @@ def evidence_has_forbidden_ready_scope(value: Any) -> bool:
             if (
                 isinstance(item, str)
                 and normalized_scope_text(key) in PROMOTION_EVIDENCE_SCOPE_KEYS
-                and normalized_scope_text(item) in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES
+                and (
+                    normalized_scope_text(item) in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES
+                    or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(
+                        normalized_scope_text(item)
+                    )
+                    is not None
+                )
             ):
                 return True
             if evidence_has_forbidden_ready_scope(item):
@@ -3590,23 +7703,491 @@ def evidence_has_forbidden_ready_scope(value: Any) -> bool:
     return False
 
 
+def evidence_has_non_promotional_artifact_reference(
+    value: Any,
+    *,
+    parent_key: str | None = None,
+    in_artifact_reference: bool = False,
+) -> bool:
+    def normalized_marker_text(item: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(item))
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+    normalized_key = normalized_marker_text(parent_key) if parent_key is not None else ""
+    key_is_structured_promotion_reference = (
+        normalized_key in STRUCTURED_PROMOTION_EVIDENCE_REFERENCE_KEYS
+        or normalized_key in PROMOTION_CERTIFICATE_HASH_BINDING_REFERENCE_KEYS
+    )
+    key_is_artifact_reference = (
+        not key_is_structured_promotion_reference
+        and (
+            normalized_key in NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEYS
+            or normalized_key.endswith(NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEY_SUFFIXES)
+        )
+    )
+    if (
+        normalized_key
+        and not key_is_structured_promotion_reference
+        and NON_PROMOTIONAL_ARTIFACT_REFERENCE_KEY_MARKERS.search(normalized_key)
+    ):
+        return True
+    if (
+        normalized_key
+        and not key_is_structured_promotion_reference
+        and POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(normalized_key)
+    ):
+        return True
+    current_reference = in_artifact_reference or key_is_artifact_reference
+
+    if isinstance(value, dict):
+        if report_is_limited_to_non_promotional_readiness(value):
+            return True
+        for key, item in value.items():
+            next_key = key if isinstance(key, str) else None
+            if evidence_has_non_promotional_artifact_reference(
+                item,
+                parent_key=next_key,
+                in_artifact_reference=current_reference,
+            ):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(
+            evidence_has_non_promotional_artifact_reference(
+                item,
+                parent_key=parent_key,
+                in_artifact_reference=current_reference,
+            )
+            for item in value
+        )
+    if isinstance(value, str) and current_reference:
+        normalized_value = normalized_marker_text(value)
+        return (
+            NON_PROMOTIONAL_ARTIFACT_REFERENCE_VALUE_MARKERS.search(normalized_value)
+            is not None
+            or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(normalized_value)
+            is not None
+        )
+    return False
+
+
+def evidence_has_unscoped_public_contract_review_status_reference(
+    value: Any,
+    *,
+    surface_id: str,
+    parent_key: str | None = None,
+) -> bool:
+    def normalized_marker_text(item: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(item))
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+    normalized_key = normalized_marker_text(parent_key) if parent_key is not None else ""
+    if (
+        normalized_key in PUBLIC_CONTRACT_REVIEW_STATUS_REFERENCE_KEYS
+        and surface_id not in PUBLIC_CONTRACT_REVIEW_STATUS_REFERENCE_ALLOWED_SURFACE_IDS
+    ):
+        return True
+    if isinstance(value, dict):
+        for key, item in value.items():
+            next_key = key if isinstance(key, str) else None
+            if evidence_has_unscoped_public_contract_review_status_reference(
+                item,
+                surface_id=surface_id,
+                parent_key=next_key,
+            ):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(
+            evidence_has_unscoped_public_contract_review_status_reference(
+                item,
+                surface_id=surface_id,
+                parent_key=parent_key,
+            )
+            for item in value
+        )
+    return False
+
+
 def report_is_limited_to_non_promotional_readiness(report: Any) -> bool:
     if not isinstance(report, dict):
         return False
-    if report.get("planning_only") is True:
+    if has_source_overclaim_marker(report):
         return True
-    if report.get("accepted_for_planning") is True:
+    if any(
+        report.get(key) is True
+        for key in (
+            "planning_only",
+            "accepted_for_planning",
+            "accepted_for_internal_planning",
+            "accepted_for_offline_planning",
+            "accepted_for_contract_review",
+            "accepted_for_public_contract_review",
+            "contract_review_artifact_ready",
+            "contract_review_ready",
+            "public_contract_allowed",
+            "public_contract_artifact_ready",
+            "public_contract_ready",
+            "public_contract_review_ready",
+            "reviewed_public_contract",
+            "reviewed_public_contract_ready",
+            "accepted_for_runtime_evidence_preconditions",
+            "accepted_runtime_evidence_precondition",
+            "accepted_runtime_evidence_preconditions",
+            "accepted_artifact_class",
+            "accepted_artifact_class_report",
+            "accepted_artifact_class_ready",
+            "activation_preconditions",
+            "activation_preconditions_met",
+            "offline_pre_activation_consistency",
+            "pre_activation_consistency",
+            "accepted_runtime_evidence",
+            "approved_runtime_evidence_accepted",
+            "bundle_accepted",
+            "evidence_bundle_accepted",
+            "runtime_evidence_preconditions_accepted",
+            "beta_notice",
+            "beta_notice_send",
+            "beta_notice_sent",
+            "beta_notice_sent_attestation",
+            "bot_notice",
+            "bot_notice_sent",
+            "confirmed_beta_notice_sent",
+            "confirmed_send",
+            "confirmed_notice_report",
+            "confirmed_notice_sent",
+            "discord_beta_bridge",
+            "discord_beta_bridge_bot_notice",
+            "discord_beta_bridge_config",
+            "discord_beta_bridge_event",
+            "discord_beta_bot_notice",
+            "discord_bot_notice",
+            "discord_sent",
+            "notice_report",
+            "notice_action",
+            "notice_action_accepted",
+            "notice_action_sent",
+            "notice_dry_run",
+            "notice_dry_run_accepted",
+            "notice_dry_run_sent",
+            "notice_sent",
+            "player_notice",
+            "player_notice_action",
+            "player_notice_action_accepted",
+            "player_notice_action_required",
+            "player_notice_action_sent",
+            "player_notice_dry_run_accepted",
+            "player_notice_dry_run_sent",
+            "player_notice_sent",
+            "candidate_only",
+            "pre_abi",
+            "abi_consumer_guardrail",
+            "abi_consumer_guardrails",
+            "call_process_event_post_init",
+            "post_init_call_process_event",
+            "sdk_consumer_guardrail",
+            "sdk_consumer_guardrails",
+            "copied_log_only",
+            "copied_log_only_artifact",
+            "copied_log_only_report",
+            "copied_bool_fixture_boundary",
+            "fixture_boundary",
+            "fixture_boundary_only",
+            "internal_fixture_boundary",
+            "internal_fixture_boundary_only",
+            "internal_only",
+            "mission_copied_bool",
+            "mission_copied_bool_fixture_boundary",
+            "readiness_only",
+            "report_only",
+            "ready_log_evidence_split",
+            "ready_log_evidence_split_ready",
+            "lifecycle_event_split",
+            "lifecycle_event_split_ready",
+            "player_principal_lifecycle_event_split_summary",
+            "player_principal_lifecycle_event_split_ready",
+            "post_runtime_contract_gap",
+            "post_runtime_contract_gap_diagnostic",
+            "post_runtime_contract_gap_ready",
+            "route_sample",
+            "route_sample_ready",
+            "route_samples",
+            "route_samples_ready",
+            "closure_report",
+            "evidence_closure",
+            "evidence_closure_report",
+            "scoped_non_complete",
+            "scoped_non_complete_only",
+            "transfer_scriptstruct_readiness",
+            "transfer_scriptstruct_ready",
+            "transfer_script_struct_readiness",
+            "transfer_script_struct_ready",
+            "transfer_baccept_readiness",
+            "transfer_baccept_ready",
+            "dino_scalar_readiness",
+            "dino_scalar_ready",
+            "scalar_only_ready",
+            "precall_scalar_ready",
+            "buff_status_readiness",
+            "buff_status_ready",
+            "buff_status_candidate_ready",
+            "tribe_scalar_boundary_readiness",
+            "tribe_scalar_boundary_ready",
+            "scalar_boundary_readiness",
+            "scalar_boundary_ready",
+            "post_evidence_p0_lock_simulation",
+            "post_evidence_identity_lock",
+            "identity_lock",
+            "identity_lock_ready",
+            "route_simulation",
+            "route_lock_simulation",
+            "request_check",
+            "request_check_ready",
+            "request_pack_ready",
+            "package_check",
+            "package_install",
+            "package_install_succeeded",
+            "install_package",
+            "install_package_succeeded",
+            "find_package",
+            "find_package_succeeded",
+            "cmake_package_check",
+            "component_sdk_check",
+            "runtime_window_plan",
+            "runtime_window_plan_ready",
+            "runtime_window_planner",
+            "runtime_window_closure",
+            "runtime_window_closure_ready",
+            "runtime_window_executor",
+            "runtime_window_executor_closure",
+            "runtime_window_execution",
+            "route_ready",
+            "route_gate_post_evidence_p0_lock_simulation",
+            "simulation_only",
+            "binding_required",
+            "binding_required_report",
+            "binding_required_ready",
+        )
+    ):
         return True
-    if report.get("candidate_only") is True:
-        return True
-    if report.get("pre_abi") is True:
+    if has_post_runtime_p0_chain_shortcut_marker(
+        {
+            key: value
+            for key, value in report.items()
+            if normalized_completion_claim_key(key)
+            in {
+                "artifact_scope",
+                "classification",
+                "evidence_kind",
+                "path_type",
+                "readiness_scope",
+                "ready_scope",
+                "schema",
+                "source_kind",
+                "source_schema",
+                "source_scope",
+                "source_value",
+                "status",
+                "target_set",
+                "type",
+            }
+            or normalized_completion_claim_key(key) in SOURCE_OVERCLAIM_MARKER_KEYS
+        }
+    ):
         return True
     ready_scope = report.get("ready_scope")
-    return isinstance(ready_scope, str) and ready_scope in {
-        RUNTIME_EVIDENCE_READY_SCOPE,
-        PUBLIC_CONTRACT_REVIEW_READY_SCOPE,
-        BUNDLE_BUILDER_INPUTS_READY_SCOPE,
-    }
+    if not isinstance(ready_scope, str):
+        return False
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", ready_scope)
+    normalized_scope = re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+    return (
+        normalized_scope in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES
+        or POST_RUNTIME_P0_CHAIN_SHORTCUT_MARKER_RE.search(normalized_scope) is not None
+    )
+
+
+def evidence_has_explicit_no_approved_claim(value: Any) -> bool:
+    def normalized_marker_text(item: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(item))
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+    def claim_value_is_none(item: Any) -> bool:
+        if item is False or item is None:
+            return True
+        if isinstance(item, (int, float)) and not isinstance(item, bool):
+            return item == 0
+        if isinstance(item, str):
+            return normalized_marker_text(item) in APPROVED_EVIDENCE_CLAIM_NONE_VALUES
+        return False
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_name = normalized_marker_text(key)
+            if key_name in APPROVED_EVIDENCE_CLAIM_KEYS and claim_value_is_none(item):
+                return True
+            if evidence_has_explicit_no_approved_claim(item):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(evidence_has_explicit_no_approved_claim(item) for item in value)
+    return False
+
+
+def normalized_runtime_evidence_marker_text(value: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def runtime_evidence_positive_marker_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if value is False or value is None:
+        return False
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value > 0
+    if isinstance(value, str):
+        normalized = normalized_runtime_evidence_marker_text(value)
+        return normalized not in {"", "0", "false", "none", "not_applicable", "absent"}
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return True
+
+
+def approved_runtime_accepted_lifecycle_count(payload: dict[str, Any]) -> int | None:
+    for key in APPROVED_RUNTIME_ACCEPTED_COUNT_KEYS:
+        value = payload.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    for key in APPROVED_RUNTIME_ACCEPTED_LIST_KEYS:
+        value = payload.get(key)
+        if isinstance(value, list):
+            return len(value)
+    return None
+
+
+def approved_runtime_diagnostic_material_present(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_name = normalized_runtime_evidence_marker_text(key)
+            if (
+                "diagnostic" in key_name
+                or "observer_event_triage" in key_name
+                or "fname_mismatch" in key_name
+                or "f_name_mismatch" in key_name
+                or NON_PUBLIC_CHECKJOIN_REJECTED_OFFLINE_ACCEPTANCE_RE.search(key_name)
+                is not None
+            ) and runtime_evidence_positive_marker_value(item):
+                return True
+            if approved_runtime_diagnostic_material_present(item):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(approved_runtime_diagnostic_material_present(item) for item in value)
+    if isinstance(value, str):
+        return APPROVED_RUNTIME_DIAGNOSTIC_MISMATCH_TEXT_RE.search(value) is not None
+    return False
+
+
+def non_public_checkjoin_session_start_rejected_acceptance_present(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if (
+                NON_PUBLIC_CHECKJOIN_REJECTED_OFFLINE_ACCEPTANCE_RE.search(
+                    normalized_runtime_evidence_marker_text(key)
+                )
+                is not None
+                or non_public_checkjoin_session_start_rejected_acceptance_present(item)
+            ):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(
+            non_public_checkjoin_session_start_rejected_acceptance_present(item)
+            for item in value
+        )
+    if isinstance(value, str):
+        return (
+            NON_PUBLIC_CHECKJOIN_REJECTED_OFFLINE_ACCEPTANCE_RE.search(
+                normalized_runtime_evidence_marker_text(value)
+            )
+            is not None
+        )
+    return False
+
+
+def approved_runtime_evidence_non_approved_artifact_reasons(
+    payload: dict[str, Any],
+    reason_prefix: str,
+) -> list[str]:
+    reasons: list[str] = []
+    required_event_count = len(
+        getattr(
+            approved_runtime_principal_lifecycle_evidence,
+            "REQUIRED_OBSERVED_EVENT_CASES",
+            (),
+        )
+    )
+
+    def add(reason: str) -> None:
+        formatted = f"{reason_prefix}:{reason}"
+        if formatted not in reasons:
+            reasons.append(formatted)
+
+    def add_shortcut_marker_reasons(marker_text: str, *, positive: bool = True) -> None:
+        if not positive:
+            return
+        for marker, reason in POST_RUNTIME_P0_CHAIN_RUNTIME_FORBIDDEN_MARKERS:
+            if marker in marker_text:
+                add(reason)
+
+    def visit(value: Any, depth: int = 0) -> None:
+        if isinstance(value, dict):
+            if non_public_checkjoin_session_start_rejected_acceptance_present(value):
+                add(
+                    "checkjoininprogress_session_start_rejected_offline_acceptance_not_approved_runtime_evidence"
+                )
+            if has_source_overclaim_marker(value):
+                add("source_overclaim_zero_not_approved_runtime_evidence")
+            accepted_count = approved_runtime_accepted_lifecycle_count(value)
+            if accepted_count is not None and required_event_count and accepted_count != required_event_count:
+                add("partial_lifecycle_events_not_approved_runtime_evidence")
+            if approved_runtime_diagnostic_material_present(value) and accepted_count is not None:
+                if accepted_count == 0 or (required_event_count and accepted_count != required_event_count):
+                    add("diagnostic_only_mismatch_summary_not_approved_runtime_evidence")
+            for key, item in value.items():
+                key_name = normalized_runtime_evidence_marker_text(key)
+                for marker, reason in APPROVED_RUNTIME_EVIDENCE_FORBIDDEN_MARKERS:
+                    if marker in key_name and runtime_evidence_positive_marker_value(item):
+                        add(reason)
+                add_shortcut_marker_reasons(
+                    key_name,
+                    positive=(
+                        runtime_evidence_positive_marker_value(item)
+                        or key_name in SOURCE_OVERCLAIM_MARKER_KEYS
+                    ),
+                )
+                if (
+                    any(marker in key_name for marker in APPROVED_RUNTIME_PARTIAL_LIFECYCLE_MARKERS)
+                    and runtime_evidence_positive_marker_value(item)
+                ):
+                    add("partial_lifecycle_events_not_approved_runtime_evidence")
+                if (
+                    depth == 0
+                    and key_name in APPROVED_RUNTIME_EVIDENCE_CLASSIFICATION_KEYS
+                    and isinstance(item, str)
+                ):
+                    item_marker = normalized_runtime_evidence_marker_text(item)
+                    for marker, reason in APPROVED_RUNTIME_EVIDENCE_FORBIDDEN_MARKERS:
+                        if marker in item_marker:
+                            add(reason)
+                    add_shortcut_marker_reasons(item_marker)
+                visit(item, depth + 1)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item, depth)
+
+    visit(payload)
+    return reasons
 
 
 def structured_readiness_report_claim_blockers(report: dict[str, Any], reason_prefix: str) -> list[str]:
@@ -3640,11 +8221,14 @@ def strict_promotion_evidence_value_valid(
             return False
         relative_text = relative.as_posix()
         if evidence_key in {"sdk_consumer_tests", "installed_sdk_consumer_tests"}:
+            if (
+                relative_text == "tests/sdk_installed_consumer"
+                or relative_text.startswith("tests/sdk_installed_consumer/")
+            ):
+                return False
             if not (
                 relative_text == "tests/sdk_consumer"
                 or relative_text.startswith("tests/sdk_consumer/")
-                or relative_text == "tests/sdk_installed_consumer"
-                or relative_text.startswith("tests/sdk_installed_consumer/")
             ):
                 return False
         if evidence_key == "abi_tests":
@@ -3697,6 +8281,19 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         return False
     if evidence_has_non_promotional_schema_marker(evidence):
         return False
+    if evidence_has_non_promotional_artifact_reference(evidence):
+        return False
+    if evidence_has_unscoped_public_contract_review_status_reference(
+        evidence,
+        surface_id=surface_id,
+    ):
+        return False
+    if evidence_has_explicit_no_approved_claim(evidence):
+        return False
+    if evidence_is_generated_promotion_certificate_or_builder_report(evidence):
+        return False
+    if report_is_limited_to_non_promotional_readiness(evidence):
+        return False
     if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
         leaf_units = surface.get("leaf_decision_units")
         if not isinstance(leaf_units, list) or not leaf_units:
@@ -3717,6 +8314,17 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
             if evidence_has_forbidden_ready_scope(leaf_evidence):
                 return False
             if evidence_has_non_promotional_schema_marker(leaf_evidence):
+                return False
+            if evidence_has_non_promotional_artifact_reference(leaf_evidence):
+                return False
+            if evidence_has_unscoped_public_contract_review_status_reference(
+                leaf_evidence,
+                surface_id=surface_id,
+            ):
+                return False
+            if evidence_has_explicit_no_approved_claim(leaf_evidence):
+                return False
+            if evidence_is_generated_promotion_certificate_or_builder_report(leaf_evidence):
                 return False
             if report_is_limited_to_non_promotional_readiness(leaf_evidence):
                 return False
@@ -3792,7 +8400,6 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     machine_keys = (
         "abi_tests",
         "sdk_consumer_tests",
-        "installed_sdk_consumer_tests",
         "tests",
         "install_gate",
     )
@@ -4506,6 +9113,18 @@ def player_identity_structured_promotion_evidence_missing(
     missing.extend(runtime_manifest_errors)
     replayed_runtime_report: dict[str, Any] | None = None
     if runtime_manifest is not None:
+        missing.extend(
+            structured_readiness_report_claim_blockers(
+                runtime_manifest,
+                "approved_runtime_evidence_manifest",
+            )
+        )
+        missing.extend(
+            approved_runtime_evidence_non_approved_artifact_reasons(
+                runtime_manifest,
+                "approved_runtime_evidence_manifest",
+            )
+        )
         validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(
             runtime_manifest,
             check_mode="consume",
@@ -4521,31 +9140,44 @@ def player_identity_structured_promotion_evidence_missing(
     runtime_report, runtime_error = load_repo_relative_json_evidence(evidence.get("approved_runtime_evidence_report"))
     if runtime_error is not None:
         missing.append(f"approved_runtime_evidence_report:{runtime_error}")
-    elif not (
-        runtime_report.get("schema")
-        == "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
-        and runtime_report.get("ready_scope") == RUNTIME_EVIDENCE_READY_SCOPE
-        and runtime_report.get("approved_runtime_evidence_present") is True
-        and runtime_report.get("runtime_evidence_ready") is True
-        and runtime_report.get("promotion_ready") is False
-        and runtime_report.get("public_sdk_ready") is False
-        and runtime_report.get("runtime_ready") is False
-        and runtime_report.get("next_blocker") == "identity_public_contract_gate_missing"
-    ):
-        missing.append("approved_runtime_evidence_report:fields_invalid")
-    elif replayed_runtime_report is not None:
-        for key in (
-            "schema",
-            "ready_scope",
-            "approved_runtime_evidence_present",
-            "runtime_evidence_ready",
-            "promotion_ready",
-            "public_sdk_ready",
-            "runtime_ready",
-            "next_blocker",
+    else:
+        missing.extend(
+            structured_readiness_report_claim_blockers(
+                runtime_report,
+                "approved_runtime_evidence_report",
+            )
+        )
+        missing.extend(
+            approved_runtime_evidence_non_approved_artifact_reasons(
+                runtime_report,
+                "approved_runtime_evidence_report",
+            )
+        )
+        if not (
+            runtime_report.get("schema")
+            == "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+            and runtime_report.get("ready_scope") == RUNTIME_EVIDENCE_READY_SCOPE
+            and runtime_report.get("approved_runtime_evidence_present") is True
+            and runtime_report.get("runtime_evidence_ready") is True
+            and runtime_report.get("promotion_ready") is False
+            and runtime_report.get("public_sdk_ready") is False
+            and runtime_report.get("runtime_ready") is False
+            and runtime_report.get("next_blocker") == "identity_public_contract_gate_missing"
         ):
-            if runtime_report.get(key) != replayed_runtime_report.get(key):
-                missing.append(f"approved_runtime_evidence_report:replay_mismatch:{key}")
+            missing.append("approved_runtime_evidence_report:fields_invalid")
+        elif replayed_runtime_report is not None:
+            for key in (
+                "schema",
+                "ready_scope",
+                "approved_runtime_evidence_present",
+                "runtime_evidence_ready",
+                "promotion_ready",
+                "public_sdk_ready",
+                "runtime_ready",
+                "next_blocker",
+            ):
+                if runtime_report.get(key) != replayed_runtime_report.get(key):
+                    missing.append(f"approved_runtime_evidence_report:replay_mismatch:{key}")
 
     contract_report, contract_error = load_repo_relative_json_evidence(evidence.get("public_contract_readiness_report"))
     if contract_error is not None:
@@ -4553,6 +9185,18 @@ def player_identity_structured_promotion_evidence_missing(
     else:
         approved_runtime = contract_report.get("approved_runtime_evidence")
         approved_runtime = approved_runtime if isinstance(approved_runtime, dict) else {}
+        missing.extend(
+            structured_readiness_report_claim_blockers(
+                approved_runtime,
+                "public_contract_readiness_report:approved_runtime_evidence",
+            )
+        )
+        missing.extend(
+            approved_runtime_evidence_non_approved_artifact_reasons(
+                approved_runtime,
+                "public_contract_readiness_report:approved_runtime_evidence",
+            )
+        )
         remaining_blockers = set(contract_report.get("remaining_blockers", []))
         private_candidate_contract = contract_report.get("private_candidate_contract")
         private_candidate_contract = private_candidate_contract if isinstance(private_candidate_contract, dict) else {}
@@ -4623,12 +9267,23 @@ def load_hash_bound_json_artifact_binding(
 ) -> tuple[dict[str, Any] | None, list[str]]:
     if not isinstance(binding, dict):
         return None, [f"{reason_prefix}:missing"]
+    if any(key in binding for key in PROMOTION_CERTIFICATE_BINDING_INLINE_SHAPE_KEYS):
+        return None, [f"{reason_prefix}:inline_certificate_binding_not_allowed"]
+    if set(binding) != {"path", "sha256"}:
+        return None, [f"{reason_prefix}:binding_keys_mismatch"]
     raw_path = binding.get("path")
     if not isinstance(raw_path, str) or not raw_path.strip():
         return None, [f"{reason_prefix}:path_missing"]
+    raw_binding_path = Path(raw_path)
+    if raw_binding_path.is_absolute():
+        return None, [f"{reason_prefix}:path_must_be_canonical_repo_relative"]
+    if ".." in raw_binding_path.parts:
+        return None, [f"{reason_prefix}:path_must_not_traverse"]
     relative = repo_relative_evidence_path(raw_path)
     if relative is None:
         return None, [f"{reason_prefix}:path_not_repo_relative"]
+    if raw_path != relative.as_posix():
+        return None, [f"{reason_prefix}:path_must_be_canonical_repo_relative"]
     path = REPO_ROOT / relative
     if not path.is_file():
         return None, [f"{reason_prefix}:path_not_file"]
@@ -4653,14 +9308,78 @@ def load_hash_bound_json_artifact_binding(
     return payload, []
 
 
-def surface_record_sha256_for_certificate(surface: dict[str, Any]) -> str:
+def hash_bound_artifact_bindings_match(left: Any, right: Any) -> bool:
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    if set(left) != {"path", "sha256"} or set(right) != {"path", "sha256"}:
+        return False
+    return (
+        left.get("path") == right.get("path")
+        and isinstance(left.get("sha256"), str)
+        and isinstance(right.get("sha256"), str)
+        and left["sha256"].lower() == right["sha256"].lower()
+    )
+
+
+def active_promoted_surface_certificate_binding(
+    manifest_path: Path,
+    surface_id: str,
+    certificate_key: str,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, [f"{certificate_key}:manifest_unreadable"]
+    if not isinstance(manifest, dict):
+        return None, [f"{certificate_key}:manifest_not_object"]
+    surfaces = manifest.get("surfaces")
+    if not isinstance(surfaces, list):
+        return None, [f"{certificate_key}:manifest_surfaces_missing"]
+    surface = next(
+        (
+            item
+            for item in surfaces
+            if isinstance(item, dict) and item.get("id") == surface_id
+        ),
+        None,
+    )
+    if not isinstance(surface, dict) or surface.get("status") != "promoted":
+        return None, [f"{certificate_key}:current_surface_record_missing_or_unpromoted"]
+    evidence = surface.get("evidence")
+    binding = evidence.get(certificate_key) if isinstance(evidence, dict) else None
+    if not isinstance(binding, dict):
+        return None, [f"{certificate_key}:current_hash_bound_certificate_missing"]
+    if set(binding) != {"path", "sha256"}:
+        return None, [f"{certificate_key}:current_hash_bound_certificate_binding_keys_mismatch"]
+    return binding, []
+
+
+SURFACE_PROMOTION_CERTIFICATE_EVIDENCE_KEYS = {
+    "obelisk.player_identity.v1": "player_identity_promotion_certificate",
+    "obelisk.permissions_admin.v1": "permissions_admin_promotion_certificate",
+    "obelisk.command_chat_response_path.v1": "command_response_promotion_certificate",
+    "obelisk.commands_replies.v1": "commands_replies_promotion_certificate",
+}
+
+
+def promotion_certificate_evidence_key_for_surface(surface_id: str) -> str:
+    return SURFACE_PROMOTION_CERTIFICATE_EVIDENCE_KEYS.get(
+        surface_id,
+        "player_identity_promotion_certificate",
+    )
+
+
+def surface_record_sha256_for_certificate(
+    surface: dict[str, Any],
+    certificate_key: str = "player_identity_promotion_certificate",
+) -> str:
     sanitized = dict(surface)
     evidence = sanitized.get("evidence")
     if isinstance(evidence, dict):
         sanitized["evidence"] = {
             key: value
             for key, value in evidence.items()
-            if key != "player_identity_promotion_certificate"
+            if key != certificate_key
         }
     data = json.dumps(sanitized, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     return hashlib.sha256(data).hexdigest()
@@ -4670,7 +9389,11 @@ def active_player_identity_surface_record_sha256(manifest_path: Path) -> str | N
     return active_promoted_surface_record_sha256(manifest_path, "obelisk.player_identity.v1")
 
 
-def active_promoted_surface_record_sha256(manifest_path: Path, surface_id: str) -> str | None:
+def active_promoted_surface_record_sha256(
+    manifest_path: Path,
+    surface_id: str,
+    certificate_key: str | None = None,
+) -> str | None:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -4684,7 +9407,10 @@ def active_promoted_surface_record_sha256(manifest_path: Path, surface_id: str) 
             and surface.get("id") == surface_id
             and surface.get("status") == "promoted"
         ):
-            return surface_record_sha256_for_certificate(surface)
+            return surface_record_sha256_for_certificate(
+                surface,
+                certificate_key or promotion_certificate_evidence_key_for_surface(surface_id),
+            )
     return None
 
 
@@ -4713,6 +9439,21 @@ def player_identity_promotion_certificate_missing(
     ):
         missing.append("player_identity_promotion_certificate:fields_invalid")
 
+    if (
+        certificate.get("required_reviewed_artifact_hash")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH
+    ):
+        missing.append("player_identity_promotion_certificate:required_reviewed_artifact_hash_invalid")
+    if (
+        certificate.get("reviewed_artifact_hash_policy")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH_POLICY
+    ):
+        missing.append("player_identity_promotion_certificate:reviewed_artifact_hash_policy_invalid")
+    if certificate.get("missing_mismatched_or_stale_certificate_counts") is not False:
+        missing.append(
+            "player_identity_promotion_certificate:missing_mismatched_or_stale_certificate_counts_not_false"
+        )
+
     identity_evidence = certificate.get("evidence")
     if not isinstance(identity_evidence, dict):
         missing.append("player_identity_promotion_certificate:evidence_missing")
@@ -4735,6 +9476,72 @@ def player_identity_promotion_certificate_missing(
         for reason in dependency_missing:
             missing.append(f"player_identity_{reason}")
     return missing
+
+
+def evidence_is_generated_promotion_certificate_or_builder_report(
+    evidence: dict[str, Any],
+) -> bool:
+    schema = evidence.get("schema")
+    if schema in {
+        PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+        PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_SCHEMA,
+        COMMAND_RESPONSE_PROMOTION_CERTIFICATE_SCHEMA,
+        COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA,
+        *PROMOTION_CERTIFICATE_BUILD_REPORT_SCHEMAS,
+    }:
+        return True
+    if isinstance(schema, str):
+        normalized_schema = schema.lower().replace("-", "_")
+        if (
+            "promotion_certificate" in normalized_schema
+            or "promotion_cert" in normalized_schema
+            or "generated_cert" in normalized_schema
+            or "generated_certificate" in normalized_schema
+        ):
+            return True
+    if (
+        evidence.get("promotion_status") == "promoted"
+        and isinstance(evidence.get("v1_dependency_chain"), list)
+        and isinstance(evidence.get("v1_dependency_chain_position"), int)
+        and isinstance(evidence.get("required_by_surface"), str)
+        and isinstance(evidence.get("required_by_v1_dependency_chain_position"), int)
+    ):
+        return True
+    if (
+        evidence.get("identity_surface_certificate_binding_valid") is True
+        and "player_identity_promotion_certificate" in evidence
+        and any(
+            key in evidence
+            for key in (
+                "sdk_progress",
+                "counts_toward_v1_completion",
+                "output_certificate",
+            )
+        )
+    ):
+        return True
+    if (
+        any(evidence.get(key) is True for key in PROMOTION_CERTIFICATE_BINDING_VALID_KEYS)
+        and any(key in evidence for key in SURFACE_PROMOTION_CERTIFICATE_EVIDENCE_KEYS.values())
+        and any(key in evidence for key in PROMOTION_CERTIFICATE_REPORT_CONTAINER_KEYS)
+    ):
+        return True
+    if any(key in evidence for key in PROMOTION_CERTIFICATE_REPORT_CONTAINER_KEYS):
+        artifact_schema = evidence.get("certificate_artifact_schema")
+        if artifact_schema in {
+            PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA,
+            PERMISSIONS_ADMIN_PROMOTION_CERTIFICATE_SCHEMA,
+            COMMAND_RESPONSE_PROMOTION_CERTIFICATE_SCHEMA,
+            COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA,
+        }:
+            return True
+        if (
+            evidence.get("certificate_written") is True
+            and isinstance(evidence.get("certificate_binding"), dict)
+            and isinstance(evidence.get("certificate_sha256"), str)
+        ):
+            return True
+    return False
 
 
 def promoted_dependency_certificate_missing(
@@ -4777,7 +9584,26 @@ def promoted_dependency_certificate_missing(
         missing.append(f"{certificate_key}:evidence_missing")
         return missing
 
-    active_surface_hash = active_promoted_surface_record_sha256(manifest_path, surface_id)
+    if (
+        certificate.get("required_reviewed_artifact_hash")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH
+    ):
+        missing.append(f"{certificate_key}:required_reviewed_artifact_hash_invalid")
+    if (
+        certificate.get("reviewed_artifact_hash_policy")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH_POLICY
+    ):
+        missing.append(f"{certificate_key}:reviewed_artifact_hash_policy_invalid")
+    if certificate.get("missing_mismatched_or_stale_certificate_counts") is not False:
+        missing.append(
+            f"{certificate_key}:missing_mismatched_or_stale_certificate_counts_not_false"
+        )
+
+    active_surface_hash = active_promoted_surface_record_sha256(
+        manifest_path,
+        surface_id,
+        certificate_key,
+    )
     if active_surface_hash is None:
         missing.append(f"{certificate_key}:surface_record_missing_or_unpromoted")
     else:
@@ -4836,6 +9662,114 @@ def command_response_promotion_certificate_missing(
         manifest_path=manifest_path,
         public_header_path=public_header_path,
     )
+
+
+def commands_replies_promotion_certificate_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
+    del public_header_path
+    certificate_key = "commands_replies_promotion_certificate"
+    surface_id = "obelisk.commands_replies.v1"
+    missing: list[str] = []
+    certificate, certificate_errors = load_hash_bound_json_artifact_binding(
+        evidence.get(certificate_key),
+        certificate_key,
+    )
+    if certificate_errors:
+        return certificate_errors
+
+    assert certificate is not None
+    if not (
+        certificate.get("schema") == COMMANDS_REPLIES_PROMOTION_CERTIFICATE_SCHEMA
+        and certificate.get("surface_id") == surface_id
+        and certificate.get("promotion_status") == "promoted"
+        and certificate.get("v1_dependency_chain") == list(CANONICAL_V1_DEPENDENCY_SEQUENCE)
+        and certificate.get("v1_dependency_chain_position") == 4
+    ):
+        missing.append(f"{certificate_key}:fields_invalid")
+    if (
+        certificate.get("certificate_status") == "built"
+        or certificate.get("planning_only") is True
+        or certificate.get("non_authorizing") is True
+        or str(certificate.get("promotion_status", "")).startswith("blocked_")
+    ):
+        missing.append(f"{certificate_key}:non_authorizing_or_blocked_certificate")
+    if (
+        certificate.get("required_by_surface") not in (None, "")
+        or certificate.get("required_by_v1_dependency_chain_position") not in (None, 0)
+    ):
+        missing.append(f"{certificate_key}:terminal_scope_invalid")
+
+    if (
+        certificate.get("required_reviewed_artifact_hash")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH
+    ):
+        missing.append(f"{certificate_key}:required_reviewed_artifact_hash_invalid")
+    if (
+        certificate.get("reviewed_artifact_hash_policy")
+        != REQUIRED_PROMOTION_CERTIFICATE_REVIEWED_ARTIFACT_HASH_POLICY
+    ):
+        missing.append(f"{certificate_key}:reviewed_artifact_hash_policy_invalid")
+    if certificate.get("missing_mismatched_or_stale_certificate_counts") is not False:
+        missing.append(f"{certificate_key}:missing_mismatched_or_stale_certificate_counts_not_false")
+
+    certificate_evidence = certificate.get("evidence")
+    if not isinstance(certificate_evidence, dict):
+        missing.append(f"{certificate_key}:evidence_missing")
+        return missing
+
+    active_surface_hash = active_promoted_surface_record_sha256(
+        manifest_path,
+        surface_id,
+        certificate_key,
+    )
+    if active_surface_hash is None:
+        missing.append(f"{certificate_key}:surface_record_missing_or_unpromoted")
+    else:
+        for evidence_hash_key in ("reviewed_surface_record_sha256", "reviewed_artifact_hash"):
+            observed = certificate_evidence.get(evidence_hash_key)
+            if not isinstance(observed, str) or observed.lower() != active_surface_hash:
+                missing.append(f"{certificate_key}:{evidence_hash_key}_mismatch")
+
+    current_command_response_binding, current_command_response_errors = (
+        active_promoted_surface_certificate_binding(
+            manifest_path,
+            "obelisk.command_chat_response_path.v1",
+            "command_response_promotion_certificate",
+        )
+    )
+    if current_command_response_errors:
+        missing.extend(
+            f"{certificate_key}:current_{reason}"
+            for reason in current_command_response_errors
+        )
+    else:
+        input_bindings = certificate.get("input_bindings")
+        declared_command_response_binding = (
+            input_bindings.get("command_response_promotion_certificate")
+            if isinstance(input_bindings, dict)
+            else None
+        )
+        if declared_command_response_binding is None:
+            declared_command_response_binding = certificate_evidence.get(
+                "command_response_promotion_certificate"
+            )
+        if not hash_bound_artifact_bindings_match(
+            declared_command_response_binding,
+            current_command_response_binding,
+        ):
+            missing.append(
+                f"{certificate_key}:current_command_response_promotion_certificate_binding_missing_or_mismatch"
+            )
+        else:
+            for reason in command_response_promotion_certificate_missing(
+                {"command_response_promotion_certificate": current_command_response_binding},
+                manifest_path,
+            ):
+                missing.append(f"{certificate_key}:current_{reason}")
+    return missing
 
 
 def permissions_admin_structured_promotion_evidence_missing(
@@ -5021,6 +9955,12 @@ def commands_replies_structured_promotion_evidence_missing(
         for reason in legacy_dependency_missing:
             missing.append(f"command_response_{reason}")
         dependency_missing = [*dependency_missing, *legacy_dependency_missing]
+    terminal_certificate_missing = commands_replies_promotion_certificate_missing(
+        evidence,
+        manifest_path,
+        public_header_path,
+    )
+    missing.extend(terminal_certificate_missing)
 
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -5085,6 +10025,8 @@ def surface_missing_structured_promotion_evidence(
     evidence = surface.get("evidence")
     if not isinstance(evidence, dict):
         return ["evidence:missing"]
+    if evidence_is_generated_promotion_certificate_or_builder_report(evidence):
+        return ["generated_promotion_certificate_or_builder_report_not_attached"]
     if surface_id == "obelisk.player_identity.v1":
         return player_identity_structured_promotion_evidence_missing(evidence, manifest_path, public_header_path)
     if surface_id == "obelisk.permissions_admin.v1":
@@ -5226,6 +10168,80 @@ def blocker_outcome_next_action(
     return "choose a reviewed v1 outcome: promote with evidence or explicitly exclude/post-v1 where the contract allows it"
 
 
+def approved_runtime_principal_lifecycle_report_contract_satisfied(
+    container: dict[str, Any],
+) -> bool:
+    report_schema = getattr(
+        approved_runtime_principal_lifecycle_evidence,
+        "REPORT_SCHEMA",
+        "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+    )
+    input_schema = getattr(
+        approved_runtime_principal_lifecycle_evidence,
+        "SCHEMA",
+        "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    )
+    if (
+        container.get("schema") != report_schema
+        or container.get("input_schema") != input_schema
+        or container.get("ready_scope") != RUNTIME_EVIDENCE_READY_SCOPE
+        or container.get("approved_runtime_evidence_present") is not True
+        or container.get("runtime_evidence_ready") is not True
+        or container.get("next_blocker") != IDENTITY_PUBLIC_CONTRACT_GATE_MISSING_BLOCKER
+    ):
+        return False
+    for key in (
+        "promotion_ready",
+        "public_header_allowed",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "v1_completion_ready",
+        "runtime_ready",
+        "stable_claim_allowed",
+        "complete_sdk_allowed",
+        "complete_sdk_ready",
+    ):
+        if container.get(key) is not False:
+            return False
+    return not approved_runtime_evidence_non_approved_artifact_reasons(
+        container,
+        "approved_runtime_evidence",
+    )
+
+
+def accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+    command_permission_route_gate: dict[str, Any],
+) -> bool:
+    containers = [
+        command_permission_route_gate,
+        command_permission_route_gate.get("approved_in_game_evidence"),
+        command_permission_route_gate.get("approved_runtime_evidence"),
+        command_permission_route_gate.get(APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE),
+    ]
+    runtime_required_blockers = command_permission_route_gate.get("runtime_required_blockers")
+    if isinstance(runtime_required_blockers, dict):
+        containers.append(runtime_required_blockers.get("approved_runtime_evidence"))
+    critical_path_phase = command_permission_route_gate.get("critical_path_phase")
+    if isinstance(critical_path_phase, dict):
+        containers.append(
+            critical_path_phase.get("source_checker_approved_runtime_evidence_manifest")
+        )
+
+    for container in containers:
+        if not isinstance(container, dict):
+            continue
+        if non_public_checkjoin_session_start_rejected_acceptance_present(container):
+            continue
+        if approved_runtime_evidence_non_approved_artifact_reasons(
+            container,
+            "approved_runtime_evidence",
+        ):
+            continue
+        if approved_runtime_principal_lifecycle_report_contract_satisfied(container):
+            return True
+    return False
+
+
 def command_permission_route_gate_current_blocker(
     command_permission_route_gate: dict[str, Any] | None,
 ) -> str | None:
@@ -5242,7 +10258,968 @@ def command_permission_route_gate_current_blocker(
         nested_current_blocker = critical_path_phase.get("current_blocker")
         if isinstance(nested_current_blocker, str) and nested_current_blocker:
             return nested_current_blocker
+    if accepted_approved_runtime_principal_lifecycle_bundle_aliases(
+        command_permission_route_gate
+    ):
+        return IDENTITY_PUBLIC_CONTRACT_GATE_MISSING_BLOCKER
     return None
+
+
+def command_permission_route_gate_remaining_route_blockers(
+    command_permission_route_gate: dict[str, Any] | None,
+) -> list[str]:
+    if not isinstance(command_permission_route_gate, dict):
+        return []
+    current_route_blocker = command_permission_route_gate_current_blocker(
+        command_permission_route_gate
+    )
+    remaining_route_blockers = command_permission_route_gate.get("remaining_route_blockers")
+    normalized = (
+        [
+            blocker
+            for blocker in remaining_route_blockers
+            if isinstance(blocker, str) and blocker
+        ]
+        if isinstance(remaining_route_blockers, list)
+        else []
+    )
+    if current_route_blocker is not None:
+        return list(dict.fromkeys([current_route_blocker, *normalized]))
+    return normalized
+
+
+def normalized_completion_summary(
+    *,
+    status: str,
+    ready: bool,
+    blockers: list[str],
+    current_route_blocker: str | None,
+    remaining_route_blockers: list[str],
+    stable_claim_allowed: bool,
+    manifest_stable_claim_allowed: bool,
+    complete_sdk_blocker_claim_accounting: dict[str, Any],
+    p0_dependency_chain_claim_accounting: dict[str, Any],
+) -> dict[str, Any]:
+    def accounting_int(value: Any) -> int:
+        return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+    p0_promoted_count = accounting_int(
+        p0_dependency_chain_claim_accounting.get("promoted_for_claim_count")
+    )
+    p0_total = accounting_int(p0_dependency_chain_claim_accounting.get("total"))
+    p0_remaining_count = accounting_int(
+        p0_dependency_chain_claim_accounting.get("remaining_for_claim_count")
+    )
+    normalized_remaining_route_blockers = [
+        blocker
+        for blocker in remaining_route_blockers
+        if isinstance(blocker, str) and blocker
+    ]
+    normalized_current_route_blocker = (
+        current_route_blocker
+        if isinstance(current_route_blocker, str) and current_route_blocker
+        else None
+    )
+    route_gate_blocked = (
+        normalized_current_route_blocker is not None
+        or bool(normalized_remaining_route_blockers)
+    )
+    p0_ready = (
+        p0_total > 0
+        and p0_promoted_count == p0_total
+        and p0_remaining_count == 0
+        and not route_gate_blocked
+    )
+    return {
+        "schema": "obelisk.public-sdk-v1-completion-summary.v1",
+        "status": status,
+        "ready": ready,
+        "blockers": list(blockers),
+        "current_route_blocker": normalized_current_route_blocker,
+        "remaining_route_blockers": normalized_remaining_route_blockers,
+        "route_gate_blocked": route_gate_blocked,
+        "stable_claim_allowed": stable_claim_allowed,
+        "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
+        "sdk_completion": {
+            "status": status,
+            "ready": ready,
+            "claim_ready": stable_claim_allowed,
+            "claim_allowed": stable_claim_allowed,
+            "total": accounting_int(complete_sdk_blocker_claim_accounting.get("total")),
+            "promoted_for_claim_count": accounting_int(
+                complete_sdk_blocker_claim_accounting.get("promoted_for_claim_count")
+            ),
+            "remaining_for_claim_count": accounting_int(
+                complete_sdk_blocker_claim_accounting.get("remaining_for_claim_count")
+            ),
+            "progress_ratio": complete_sdk_blocker_claim_accounting.get(
+                "promoted_for_claim_ratio",
+                "0/0",
+            ),
+            "promoted_for_claim_surfaces": as_string_list(
+                complete_sdk_blocker_claim_accounting.get(
+                    "promoted_for_claim_surfaces",
+                    [],
+                )
+            ),
+            "remaining_for_claim_surfaces": as_string_list(
+                complete_sdk_blocker_claim_accounting.get(
+                    "remaining_for_claim_surfaces",
+                    [],
+                )
+            ),
+        },
+        "p0_completion": {
+            "status": "ready" if p0_ready else "blocked",
+            "ready": p0_ready,
+            "total": p0_total,
+            "promoted_for_claim_count": p0_promoted_count,
+            "remaining_for_claim_count": p0_remaining_count,
+            "progress_ratio": p0_dependency_chain_claim_accounting.get(
+                "promoted_for_claim_ratio",
+                "0/0",
+            ),
+            "promoted_for_claim_surfaces": as_string_list(
+                p0_dependency_chain_claim_accounting.get(
+                    "promoted_for_claim_surfaces",
+                    [],
+                )
+            ),
+            "remaining_for_claim_surfaces": as_string_list(
+                p0_dependency_chain_claim_accounting.get(
+                    "remaining_for_claim_surfaces",
+                    [],
+                )
+            ),
+            "current_route_blocker": normalized_current_route_blocker,
+            "remaining_route_blockers": normalized_remaining_route_blockers,
+            "route_gate_blocked": route_gate_blocked,
+            "route_gate_current_blockers": as_string_list(
+                p0_dependency_chain_claim_accounting.get(
+                    "route_gate_current_blockers",
+                    [],
+                )
+            ),
+        },
+        "non_claim": (
+            "Normalized progress summary only; it does not authorize stable, complete, "
+            "full, production, runtime, Plugin Hub, or support-tier SDK wording."
+        ),
+    }
+
+
+def non_authorizing_action_path_accounting_fields() -> dict[str, bool | int]:
+    fields: dict[str, bool | int] = {
+        key: False for key in ACTIONABLE_PATH_NON_AUTHORIZING_FALSE_KEYS
+    }
+    fields.update({key: 0 for key in ACTIONABLE_PATH_ZERO_KEYS})
+    return fields
+
+
+def fastest_next_sdk_unblock(
+    *,
+    current_route_blocker: str | None,
+    remaining_route_blockers: list[str],
+    p0_dependency_chain_claim_accounting: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_route_blockers = [
+        blocker
+        for blocker in remaining_route_blockers
+        if isinstance(blocker, str) and blocker
+    ]
+    if isinstance(current_route_blocker, str) and current_route_blocker:
+        normalized_route_blockers = list(
+            dict.fromkeys([current_route_blocker, *normalized_route_blockers])
+        )
+
+    remaining_p0 = as_string_list(
+        p0_dependency_chain_claim_accounting.get("remaining_for_claim_surfaces", [])
+    )
+    current_p0_surface = remaining_p0[0] if remaining_p0 else None
+    current_blocker = normalized_route_blockers[0] if normalized_route_blockers else None
+    actionable_paths: dict[str, Any] = {}
+
+    if current_blocker == "approved_runtime_evidence_missing":
+        unblock_kind = "approved_copied_runtime_principal_lifecycle_evidence"
+        required_artifacts = [
+            APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE,
+            "copied_Obelisk.log_with_PlayerPrincipalLifecycleObserver_event_triplet",
+        ]
+        required_actions = ["player_notice_action"]
+        required_event_roles = list(REQUIRED_PRINCIPAL_LIFECYCLE_EVENT_ROLES)
+        required_closure_artifacts = [
+            "window-manifest.env",
+            "preflight-post.json",
+            "approved-bundle/approved-runtime-principal-lifecycle-evidence.json",
+        ]
+        actionable_paths = {
+            "historical_theisland_candidate_missing_sidecars": {
+                "path_type": "candidate_closure_request_helper",
+                "authorization": "non-authorizing",
+                "non_authorizing": True,
+                **non_authorizing_action_path_accounting_fields(),
+                "authorizes_runtime_work": False,
+                "authorizes_server_operations": False,
+                "authorizes_workspace_writes": False,
+                "reads_live_logs": False,
+                "counts_toward_complete_sdk_claim_now": False,
+                "counts_toward_p0_dependency_chain_claim_now": False,
+                "complete_sdk_claim_progress_contribution": 0,
+                "p0_dependency_chain_claim_progress_contribution": 0,
+                "target": {"instance": "arkserver2", "map": "TheIsland"},
+                "helper_path": (
+                    "scripts/prepare_player_principal_lifecycle_evidence_closure_request.py"
+                ),
+                "command_template": [
+                    "python3",
+                    "scripts/prepare_player_principal_lifecycle_evidence_closure_request.py",
+                    "--evidence-dir",
+                    "<copied-historical-TheIsland-evidence-dir>",
+                    "--instance",
+                    "arkserver2",
+                    "--map",
+                    "TheIsland",
+                    "--the-island-off",
+                    "--two-server-cap-preserved",
+                    "--format",
+                    "json",
+                ],
+                "paths": [
+                    "scripts/prepare_player_principal_lifecycle_evidence_closure_request.py",
+                    "<copied-historical-TheIsland-evidence-dir>/window-manifest.env",
+                    "<copied-historical-TheIsland-evidence-dir>/preflight-post.json",
+                    (
+                        "<copied-historical-TheIsland-evidence-dir>/approved-bundle/"
+                        "approved-runtime-principal-lifecycle-evidence.json"
+                    ),
+                ],
+                "requirements": [
+                    "use copied/offline candidate artifacts only; do not read live logs",
+                    (
+                        "close the historical TheIsland candidate's missing sidecars with "
+                        "fresh current-turn operator approval before any file write"
+                    ),
+                    (
+                        "the helper report is a closure request only and does not create "
+                        "sidecars or approved evidence"
+                    ),
+                    "preserve TheIsland-off and two-server-cap constraints when supplied",
+                    (
+                        "required event roles remain session_start, session_start_rejected, "
+                        "and session_end"
+                    ),
+                ],
+                "required_closure_artifacts": required_closure_artifacts,
+                "required_event_roles": required_event_roles,
+                "evidence_status": "non_evidence_until_approved_bundle_acceptance",
+                "path_status": "historical_theisland_sidecar_closure",
+                "missing_artifact_key": "historical_theisland_candidate_missing_sidecars",
+            },
+            "active_genesis2_passive_missing_roles": {
+                "path_type": "passive_observation_missing_role_triplet",
+                "source_scope": "historical_documented_passive_context",
+                "freshness": "not_current_runtime_evidence",
+                "current_live_capture": False,
+                "current_posture_input": False,
+                "active_path_label_is_historical_compatibility_alias": True,
+                "path_label_note": (
+                    "The active_genesis2 path id is retained for compatibility with "
+                    "older reports; current one-server posture must not treat it as "
+                    "an active live capture or current role source."
+                ),
+                "authorization": "non-authorizing",
+                "non_authorizing": True,
+                **non_authorizing_action_path_accounting_fields(),
+                "authorizes_runtime_work": False,
+                "authorizes_server_operations": False,
+                "authorizes_workspace_writes": False,
+                "reads_live_logs": False,
+                "counts_toward_complete_sdk_claim_now": False,
+                "counts_toward_p0_dependency_chain_claim_now": False,
+                "complete_sdk_claim_progress_contribution": 0,
+                "p0_dependency_chain_claim_progress_contribution": 0,
+                "target": {"instance": "arkserver3", "map": "Genesis2"},
+                "paths": [
+                    "current-docs passive Genesis2 observation scope",
+                    "missing_role_triplet:session_end",
+                ],
+                "requirements": [
+                    (
+                        "treat the Genesis2 passive observation as historical "
+                        "diagnostic context until a checked current copied/runtime "
+                        "log artifact explicitly supplies fresh roles"
+                    ),
+                    (
+                        "a complete role triplet still remains diagnostic until copied, "
+                        "reviewed approved runtime evidence is produced"
+                    ),
+                    (
+                        "passive snapshots, latest summaries, and activity triage do not "
+                        "satisfy approved runtime principal lifecycle evidence"
+                    ),
+                    (
+                        "required event roles remain session_start, session_start_rejected, "
+                        "and session_end"
+                    ),
+                ],
+                "required_event_roles": required_event_roles,
+                "missing_event_roles": ["session_end"],
+                "evidence_status": "diagnostic_passive_non_evidence",
+                "path_status": "active_genesis2_missing_session_end",
+                "required_next_role": "session_end",
+                "missing_requirement_key": "active_genesis2_passive_missing_roles",
+            },
+            "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle": {
+                "path_type": "passive_observation_complete_role_triplet_non_evidence",
+                "source_scope": "historical_documented_passive_context",
+                "freshness": "not_current_runtime_evidence",
+                "current_live_capture": False,
+                "current_posture_input": False,
+                "approved_offline_bundle_candidate": False,
+                "authorization": "non-authorizing",
+                "non_authorizing": True,
+                **non_authorizing_action_path_accounting_fields(),
+                "authorizes_runtime_work": False,
+                "authorizes_server_work": False,
+                "authorizes_workspace_work": False,
+                "authorizes_server_operations": False,
+                "authorizes_workspace_writes": False,
+                "reads_live_logs": False,
+                "counts_as_approved_runtime_evidence": False,
+                "passive_snapshot_evidence_allowed": False,
+                "counts_toward_complete_sdk_claim_now": False,
+                "counts_toward_p0_dependency_chain_claim_now": False,
+                "claim_progress_contribution": 0,
+                "complete_sdk_claim_progress_contribution": 0,
+                "p0_dependency_chain_claim_progress_contribution": 0,
+                "target": {"instance": "arkserver", "map": "Ragnarok"},
+                "paths": [
+                    "historical/current-docs passive Ragnarok observation scope",
+                    "passive_role_triplet:session_start",
+                    "passive_role_triplet:session_start_rejected",
+                    "passive_role_triplet:session_end",
+                    "approved_bundle_missing",
+                ],
+                "requirements": [
+                    (
+                        "treat the documented complete passive Ragnarok triplet as "
+                        "historical diagnostic/non-evidence context only, not as a "
+                        "fresh live capture"
+                    ),
+                    (
+                        "do not read live logs or perform server/runtime work from this "
+                        "actionable path"
+                    ),
+                    (
+                        "produce a copied, reviewed approved runtime principal lifecycle "
+                        "evidence bundle before it can unblock the route gate"
+                    ),
+                    (
+                        "passive snapshots, latest summaries, and activity triage do not "
+                        "satisfy approved runtime principal lifecycle evidence"
+                    ),
+                    (
+                        "required event roles remain session_start, session_start_rejected, "
+                        "and session_end"
+                    ),
+                ],
+                "required_event_roles": required_event_roles,
+                "present_event_roles": required_event_roles,
+                "missing_event_roles": [],
+                "evidence_status": "diagnostic_passive_non_evidence",
+                "path_status": "active_ragnarok_complete_passive_triplet_needs_approved_bundle",
+                "required_next_artifact": APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE,
+                "approved_bundle_required": True,
+                "missing_requirement_key": (
+                    "active_ragnarok_passive_complete_triplet_non_evidence_needs_bundle"
+                ),
+            },
+            "player_notice_action": {
+                "path_type": "player_notice_action",
+                "authorization": "non-authorizing",
+                "non_authorizing": True,
+                **non_authorizing_action_path_accounting_fields(),
+                "player_notice_action_required": True,
+                "notice_action_authorized": False,
+                "player_notice_action_authorized": False,
+                "authorizes_discord": False,
+                "discord_authorized": False,
+                "authorizes_runtime_work": False,
+                "authorizes_server_work": False,
+                "authorizes_workspace_work": False,
+                "authorizes_server_operations": False,
+                "authorizes_workspace_writes": False,
+                "reads_live_logs": False,
+                "notice_sent": False,
+                "player_notice_sent": False,
+                "notice_dry_run_sent": False,
+                "notice_dry_run_accepted": False,
+                "notice_bundle_accepted": False,
+                "counts_as_approved_runtime_evidence": False,
+                "counts_toward_complete_sdk_claim_now": False,
+                "counts_toward_p0_dependency_chain_claim_now": False,
+                "complete_sdk_claim_progress_contribution": 0,
+                "p0_dependency_chain_claim_progress_contribution": 0,
+                "paths": [
+                    "player_notice_action",
+                    "standing-authorized or current-turn approved player notice path required before activation",
+                ],
+                "requirements": [
+                    (
+                        "player-backed evidence windows require a standing-authorized "
+                        "or current-turn approved player_notice_action before activation"
+                    ),
+                    (
+                        "this status report does not authorize Discord, beta tester "
+                        "notices, runtime work, server operations, live-log reads, or "
+                        "workspace writes"
+                    ),
+                    (
+                        "notice sent, notice dry-run accepted, and bundle accepted "
+                        "statuses do not satisfy approved runtime evidence or count "
+                        "toward SDK/P0 progress"
+                    ),
+                ],
+                "required_event_roles": required_event_roles,
+                "evidence_status": "player_notice_action_required_non_evidence",
+                "path_status": "player_notice_action_required",
+                "missing_requirement_key": "player_notice_action",
+            },
+            "multi_surface_beta_capture_candidate_queue": {
+                "path_type": "multi_surface_beta_capture_plan_queue",
+                "authorization": "non-authorizing",
+                "non_authorizing": True,
+                **non_authorizing_action_path_accounting_fields(),
+                "visible_as_next_action": True,
+                "candidate_presence_visible": True,
+                "approved_runtime_evidence_missing_cleared": False,
+                "approved_runtime_evidence_missing_resolved": False,
+                "clears_approved_runtime_evidence_missing": False,
+                "resolves_approved_runtime_evidence_missing": False,
+                "plugin_hub_ready": False,
+                "plugin_hub_readiness_claim_allowed": False,
+                "plugin_hub_readiness_ready": False,
+                "public_sdk_readiness_ready": False,
+                "runtime_readiness_ready": False,
+                "sdk_accounting_counts_as_completed_surface": False,
+                "p0_accounting_counts_as_promoted_surface": False,
+                "candidate_presence_counts_toward_sdk": False,
+                "candidate_presence_counts_toward_p0_dependency_chain": False,
+                "safe_candidate_surfaces": list(MULTI_SURFACE_BETA_CAPTURE_TARGETS),
+                "recognized_candidate_queue_artifact_schemas": list(
+                    MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_SCHEMAS
+                ),
+                "recognized_candidate_queue_artifact_names": list(
+                    MULTI_SURFACE_BETA_CAPTURE_CANDIDATE_QUEUE_ARTIFACT_NAMES
+                ),
+                "required_event_roles": required_event_roles,
+                "candidate_queue_artifact_family_status": (
+                    "visible_non_counting_candidate_queue_material"
+                ),
+                "candidate_queue_artifact_family_counts_as_approved_runtime_evidence": False,
+                "candidate_queue_artifact_family_counts_toward_sdk": False,
+                "candidate_queue_artifact_family_counts_toward_p0_dependency_chain": False,
+                "prior_blocker": APPROVED_RUNTIME_EVIDENCE_MISSING_BLOCKER,
+                "required_first_artifact": APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE,
+                "queue_status": "candidate_plan_visible_non_counting",
+                "evidence_status": "multi_surface_beta_capture_plan_queue_non_evidence",
+                "path_status": (
+                    "queue_safe_beta_candidate_surfaces_after_player_principal_"
+                    "evidence_blocker"
+                ),
+                "requirements": [
+                    (
+                        "keep the approved player-principal runtime evidence blocker "
+                        "first before any downstream promotion checker can count surfaces"
+                    ),
+                    (
+                        "beta sessions may collect safe candidate observations across "
+                        "player-principal, admin, command, dino, tribe, buff, "
+                        "inventory, transfer, and mission surfaces"
+                    ),
+                    (
+                        "candidate presence, plans, beta notices, passive logs, and "
+                        "multi-surface queues are visible planning inputs only"
+                    ),
+                    (
+                        "generated pack manifests, checker-command matrices, "
+                        "non-claim manifests, operator runbooks, and manifest/readme "
+                        "files remain candidate queue material only"
+                    ),
+                    (
+                        "this queue does not clear approved_runtime_evidence_missing, "
+                        "runtime readiness, public SDK readiness, Plugin Hub readiness, "
+                        "or SDK/P0 progress"
+                    ),
+                ],
+                "missing_requirement_key": (
+                    "multi_surface_beta_capture_candidate_queue_non_counting"
+                ),
+            },
+        }
+        next_route_blocker_after_acceptance = "identity_public_contract_gate_missing"
+        active_runtime_window_requires_current_turn_scope = False
+        active_runtime_window_requires_standing_or_current_scope = True
+        recommended_next_action = (
+            "produce approved copied runtime principal lifecycle evidence for "
+            "obelisk.player_identity.v1 before reviewing public identity, permissions/admin, "
+            "command response, or commands/replies ABI"
+        )
+    elif current_blocker == "identity_public_contract_gate_missing":
+        unblock_kind = "reviewed_identity_public_contract"
+        required_artifacts = ["reviewed_player_identity_public_contract_decision"]
+        required_actions = []
+        required_event_roles = []
+        next_route_blocker_after_acceptance = None
+        active_runtime_window_requires_current_turn_scope = False
+        active_runtime_window_requires_standing_or_current_scope = False
+        recommended_next_action = (
+            "review the player identity public contract before permissions/admin, "
+            "command response, or commands/replies ABI"
+        )
+    elif current_p0_surface:
+        unblock_kind = "p0_dependency_chain_promotion"
+        required_artifacts = ["promoted_surface_evidence_and_matching_sdk_consumer_tests"]
+        required_actions = []
+        required_event_roles = []
+        next_route_blocker_after_acceptance = None
+        active_runtime_window_requires_current_turn_scope = False
+        active_runtime_window_requires_standing_or_current_scope = False
+        recommended_next_action = (
+            f"promote {current_p0_surface} with reviewed evidence before later P0 surfaces"
+        )
+    else:
+        unblock_kind = "remaining_complete_sdk_demand_family_promotion"
+        required_artifacts = ["promoted_surface_evidence_or_reviewed_v1_outcome"]
+        required_actions = []
+        required_event_roles = []
+        next_route_blocker_after_acceptance = None
+        active_runtime_window_requires_current_turn_scope = False
+        active_runtime_window_requires_standing_or_current_scope = False
+        recommended_next_action = (
+            "resolve remaining complete-SDK demand family blockers with promoted evidence "
+            "or reviewed scoped outcomes"
+        )
+
+    return {
+        "schema": "obelisk.public-sdk-v1-fastest-next-unblock.v1",
+        "surface": current_p0_surface,
+        "current_route_blocker": current_blocker,
+        "remaining_route_blockers": normalized_route_blockers,
+        "unblock_kind": unblock_kind,
+        "required_artifacts": required_artifacts,
+        "required_actions": required_actions,
+        "required_event_roles": required_event_roles,
+        "next_route_blocker_after_acceptance": next_route_blocker_after_acceptance,
+        "active_runtime_window_requires_current_turn_scope": (
+            active_runtime_window_requires_current_turn_scope
+        ),
+        "active_runtime_window_requires_standing_or_current_scope": (
+            active_runtime_window_requires_standing_or_current_scope
+        ),
+        "standing_launch_authority_recorded": STANDING_LAUNCH_AUTHORITY_RECORDED,
+        "standing_launch_authority_source": STANDING_LAUNCH_AUTHORITY_SOURCE,
+        "standing_launch_authority_satisfies_runtime_window_scope": (
+            active_runtime_window_requires_standing_or_current_scope
+            and STANDING_LAUNCH_AUTHORITY_RECORDED
+        ),
+        "current_turn_scope_requirement": STANDING_OR_CURRENT_SCOPE_REQUIREMENT,
+        "runtime_window_scope_requirement": STANDING_OR_CURRENT_SCOPE_REQUIREMENT,
+        "runtime_window_can_be_prepared_under_standing_authority": (
+            active_runtime_window_requires_standing_or_current_scope
+            and STANDING_LAUNCH_AUTHORITY_RECORDED
+        ),
+        "runtime_window_preparation_counts_as_approved_runtime_evidence": False,
+        "runtime_window_preparation_counts_as_runtime_evidence": False,
+        "runtime_window_preparation_counts_toward_sdk": False,
+        "runtime_window_preparation_counts_toward_p0_dependency_chain": False,
+        "runtime_window_preparation_counts_toward_complete_sdk_claim": False,
+        "standing_launch_authority_counts_as_approved_runtime_evidence": False,
+        "standing_launch_authority_counts_as_runtime_evidence": False,
+        "standing_launch_authority_counts_toward_sdk": False,
+        "standing_launch_authority_counts_toward_p0_dependency_chain": False,
+        "standing_launch_authority_counts_toward_complete_sdk_claim": False,
+        **non_authorizing_action_path_accounting_fields(),
+        "counts_toward_complete_sdk_claim_now": False,
+        "counts_toward_p0_dependency_chain_claim_now": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "prioritization_only": True,
+        "player_notice_action_required": "player_notice_action" in required_actions,
+        "notice_action_authorized": False,
+        "player_notice_action_authorized": False,
+        "authorizes_discord": False,
+        "discord_authorized": False,
+        "notice_sent": False,
+        "player_notice_sent": False,
+        "notice_dry_run_sent": False,
+        "notice_dry_run_accepted": False,
+        "notice_bundle_accepted": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "stable_claim_allowed": False,
+        "actionable_paths": actionable_paths,
+        "recommended_next_action": recommended_next_action,
+        "non_claim": (
+            "Prioritization only; this object does not approve runtime work, public ABI, "
+            "public SDK readiness, or complete/full/production/stable SDK wording."
+        ),
+    }
+
+
+def approved_in_game_evidence_completion_status(
+    *,
+    current_route_blocker: str | None,
+    fastest_next_unblock: dict[str, Any],
+) -> dict[str, Any]:
+    action_paths = fastest_next_unblock.get("actionable_paths")
+    if not isinstance(action_paths, dict):
+        action_paths = {}
+    required_roles = list(REQUIRED_PRINCIPAL_LIFECYCLE_EVENT_ROLES)
+    required_role_set = set(required_roles)
+    diagnostic_complete_triplet_path_ids: list[str] = []
+    missing_role_path_ids: list[str] = []
+    path_summaries: dict[str, dict[str, Any]] = {}
+
+    for path_id, payload in action_paths.items():
+        if not isinstance(path_id, str) or not isinstance(payload, dict):
+            continue
+        present_roles = as_string_list(payload.get("present_event_roles"))
+        missing_roles = as_string_list(payload.get("missing_event_roles"))
+        complete_triplet = required_role_set.issubset(set(present_roles)) and not missing_roles
+        evidence_status = payload.get("evidence_status")
+        if complete_triplet and evidence_status == "diagnostic_passive_non_evidence":
+            diagnostic_complete_triplet_path_ids.append(path_id)
+        if missing_roles:
+            missing_role_path_ids.append(path_id)
+        path_summaries[path_id] = {
+            "target": payload.get("target"),
+            "path_status": payload.get("path_status"),
+            "path_type": payload.get("path_type"),
+            "source_scope": payload.get("source_scope"),
+            "freshness": payload.get("freshness"),
+            "current_live_capture": bool(payload.get("current_live_capture")),
+            "current_posture_input": bool(payload.get("current_posture_input")),
+            "approved_offline_bundle_candidate": bool(
+                payload.get("approved_offline_bundle_candidate")
+            ),
+            "evidence_status": evidence_status,
+            "authorization": "non-authorizing",
+            "candidate_presence_visible": bool(payload.get("candidate_presence_visible")),
+            "candidate_queue_artifact_family_status": payload.get(
+                "candidate_queue_artifact_family_status"
+            ),
+            "recognized_candidate_queue_artifact_schemas": as_string_list(
+                payload.get("recognized_candidate_queue_artifact_schemas")
+            ),
+            "recognized_candidate_queue_artifact_names": as_string_list(
+                payload.get("recognized_candidate_queue_artifact_names")
+            ),
+            "present_event_roles": present_roles,
+            "missing_event_roles": missing_roles,
+            "complete_required_role_triplet": complete_triplet,
+            "approved_runtime_evidence": False,
+            "approved_runtime_evidence_accepted": False,
+            "evidence_bundle_accepted": False,
+            "counts_as_approved_runtime_evidence": False,
+            "candidate_queue_artifact_family_counts_as_approved_runtime_evidence": False,
+            "counts_toward_complete_sdk_claim_now": False,
+            "counts_toward_p0_dependency_chain_claim_now": False,
+            "candidate_queue_artifact_family_counts_toward_sdk": False,
+            "candidate_queue_artifact_family_counts_toward_p0_dependency_chain": False,
+            "live_ops_authorized": False,
+            "server_operations_authorized": False,
+            "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "read_live_logs": False,
+            "required_next_artifact": payload.get("required_next_artifact"),
+        }
+
+    next_required_artifact = None
+    for artifact in as_string_list(fastest_next_unblock.get("required_artifacts")):
+        if artifact == APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE:
+            next_required_artifact = artifact
+            break
+    if next_required_artifact is None:
+        source_next_required_artifact = fastest_next_unblock.get("next_required_artifact")
+        if isinstance(source_next_required_artifact, str) and source_next_required_artifact:
+            next_required_artifact = source_next_required_artifact
+    if (
+        next_required_artifact is None
+        and current_route_blocker == "approved_runtime_evidence_missing"
+    ):
+        next_required_artifact = APPROVED_RUNTIME_PRINCIPAL_LIFECYCLE_BUNDLE
+    return {
+        "schema": "obelisk.public-sdk-v1-approved-in-game-evidence-status.v1",
+        "completion_gate_status_only": True,
+        "current_route_blocker": current_route_blocker,
+        "approved_in_game_evidence_ready": False,
+        "approved_runtime_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
+        "approved_runtime_evidence_accepted": False,
+        "runtime_evidence_present": False,
+        "runtime_evidence_ready": False,
+        "evidence_bundle_accepted": False,
+        "complete_lifecycle_event_triplet_approved": False,
+        "complete_lifecycle_event_triplet_observed_diagnostic_only": bool(
+            diagnostic_complete_triplet_path_ids
+        ),
+        "diagnostic_complete_triplet_path_ids": diagnostic_complete_triplet_path_ids,
+        "missing_role_path_ids": missing_role_path_ids,
+        "required_event_roles": required_roles,
+        "next_required_artifact": next_required_artifact,
+        "missing_required_artifact": (
+            next_required_artifact
+            if current_route_blocker == "approved_runtime_evidence_missing"
+            else None
+        ),
+        "current_turn_scope_required": bool(
+            fastest_next_unblock.get("active_runtime_window_requires_current_turn_scope")
+        ),
+        "active_runtime_window_requires_standing_or_current_scope": bool(
+            fastest_next_unblock.get("active_runtime_window_requires_standing_or_current_scope")
+        ),
+        "standing_launch_authority_recorded": bool(
+            fastest_next_unblock.get("standing_launch_authority_recorded")
+        ),
+        "standing_launch_authority_source": fastest_next_unblock.get(
+            "standing_launch_authority_source"
+        ),
+        "standing_launch_authority_satisfies_runtime_window_scope": bool(
+            fastest_next_unblock.get("standing_launch_authority_satisfies_runtime_window_scope")
+        ),
+        "runtime_window_scope_requirement": fastest_next_unblock.get(
+            "runtime_window_scope_requirement"
+        ),
+        "runtime_window_can_be_prepared_under_standing_authority": bool(
+            fastest_next_unblock.get("runtime_window_can_be_prepared_under_standing_authority")
+        ),
+        "runtime_window_preparation_counts_as_approved_runtime_evidence": False,
+        "runtime_window_preparation_counts_as_runtime_evidence": False,
+        "runtime_window_preparation_counts_toward_sdk": False,
+        "runtime_window_preparation_counts_toward_p0_dependency_chain": False,
+        "runtime_window_preparation_counts_toward_complete_sdk_claim": False,
+        "standing_launch_authority_counts_as_approved_runtime_evidence": False,
+        "standing_launch_authority_counts_as_runtime_evidence": False,
+        "standing_launch_authority_counts_toward_sdk": False,
+        "standing_launch_authority_counts_toward_p0_dependency_chain": False,
+        "standing_launch_authority_counts_toward_complete_sdk_claim": False,
+        "player_notice_action_required": bool(
+            fastest_next_unblock.get("player_notice_action_required")
+        ),
+        "live_ops_authorized": False,
+        "server_operations_authorized": False,
+        "workspace_writes_authorized": False,
+        "runtime_capture_authorized": False,
+        "discord_authorized": False,
+        "reads_live_logs": False,
+        "read_live_logs": False,
+        "counts_toward_complete_sdk_claim_now": False,
+        "counts_toward_p0_dependency_chain_claim_now": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "path_summaries": path_summaries,
+        "path_summary_count": len(path_summaries),
+        "blocker_reason": (
+            "approved_runtime_principal_lifecycle_evidence_bundle_missing_or_unaccepted"
+            if current_route_blocker == "approved_runtime_evidence_missing"
+            else "not_current_runtime_evidence_blocker"
+        ),
+        "non_claim": (
+            "Completion-gate status only: approved in-game evidence stays false unless "
+            "an approved copied runtime principal lifecycle evidence bundle is accepted; "
+            "passive triplets, player notices, public reachability, and closure requests "
+            "do not count toward SDK or P0 progress."
+        ),
+    }
+
+
+def progress_normalization_trace(
+    *,
+    status: str,
+    ready: bool,
+    current_route_blocker: str | None,
+    remaining_route_blockers: list[str],
+    approved_in_game_evidence: dict[str, Any],
+    complete_sdk_blocker_claim_accounting: dict[str, Any],
+    p0_dependency_chain_claim_accounting: dict[str, Any],
+    stable_claim_allowed: bool,
+) -> dict[str, Any]:
+    next_required_artifact = approved_in_game_evidence.get("next_required_artifact")
+    missing_required_artifact = approved_in_game_evidence.get("missing_required_artifact")
+    complete_sdk_progress_ratio = complete_sdk_blocker_claim_accounting.get(
+        "promoted_for_claim_ratio"
+    )
+    p0_chain_progress_ratio = p0_dependency_chain_claim_accounting.get(
+        "promoted_for_claim_ratio"
+    )
+    normalization_reasons = list(dict.fromkeys(
+        [
+            reason
+            for reason in [
+                current_route_blocker,
+                (
+                    f"missing_required_artifact:{missing_required_artifact}"
+                    if missing_required_artifact
+                    else None
+                ),
+                (
+                    "complete_sdk_blockers_remaining_for_claim"
+                    if complete_sdk_blocker_claim_accounting.get("remaining_for_claim_count")
+                    else None
+                ),
+                (
+                    "p0_dependency_chain_remaining_for_claim"
+                    if p0_dependency_chain_claim_accounting.get("remaining_for_claim_count")
+                    else None
+                ),
+            ]
+            if isinstance(reason, str) and reason
+        ]
+    ))
+
+    return {
+        "schema": "obelisk.public-sdk-v1-progress-normalization-trace.v1",
+        "status_report_only": True,
+        "status": status,
+        "ready": ready,
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": remaining_route_blockers,
+        "route_gate_blocked": bool(current_route_blocker or remaining_route_blockers),
+        "next_required_artifact": next_required_artifact,
+        "missing_required_artifact": missing_required_artifact,
+        "approved_runtime_evidence_ready": bool(
+            approved_in_game_evidence.get("approved_runtime_evidence_ready")
+        ),
+        "approved_in_game_evidence_ready": bool(
+            approved_in_game_evidence.get("approved_in_game_evidence_ready")
+        ),
+        "evidence_bundle_accepted": bool(
+            approved_in_game_evidence.get("evidence_bundle_accepted")
+        ),
+        "complete_sdk_progress_ratio": complete_sdk_progress_ratio,
+        "p0_chain_progress_ratio": p0_chain_progress_ratio,
+        "complete_sdk_promoted_for_claim_count": (
+            complete_sdk_blocker_claim_accounting.get("promoted_for_claim_count")
+        ),
+        "complete_sdk_remaining_for_claim_count": (
+            complete_sdk_blocker_claim_accounting.get("remaining_for_claim_count")
+        ),
+        "p0_dependency_chain_promoted_for_claim_count": (
+            p0_dependency_chain_claim_accounting.get("promoted_for_claim_count")
+        ),
+        "p0_dependency_chain_remaining_for_claim_count": (
+            p0_dependency_chain_claim_accounting.get("remaining_for_claim_count")
+        ),
+        "runtime_ready": False,
+        "public_sdk_ready": stable_claim_allowed,
+        "stable_claim_allowed": stable_claim_allowed,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "normalization_reasons": normalization_reasons,
+        "non_claim": (
+            "Diagnostic trace only: it explains why claim progress remains normalized; "
+            "it does not approve runtime evidence, public SDK readiness, or stable SDK claims."
+        ),
+    }
+
+
+def stable_sdk_remaining_blockers_report(
+    *,
+    status: str,
+    ready: bool,
+    current_route_blocker: str | None,
+    remaining_route_blockers: list[str],
+    complete_sdk_blocker_claim_accounting: dict[str, Any],
+    p0_dependency_chain_claim_accounting: dict[str, Any],
+    fastest_next_unblock: dict[str, Any],
+    approved_in_game_evidence: dict[str, Any],
+    stable_claim_allowed: bool,
+) -> dict[str, Any]:
+    sdk_remaining_surfaces = as_string_list(
+        complete_sdk_blocker_claim_accounting.get("remaining_for_claim_surfaces", [])
+    )
+    p0_remaining_surfaces = as_string_list(
+        p0_dependency_chain_claim_accounting.get("remaining_for_claim_surfaces", [])
+    )
+    normalized_route_blockers = [
+        blocker
+        for blocker in remaining_route_blockers
+        if isinstance(blocker, str) and blocker
+    ]
+    if isinstance(current_route_blocker, str) and current_route_blocker:
+        normalized_route_blockers = list(
+            dict.fromkeys([current_route_blocker, *normalized_route_blockers])
+        )
+    next_required_artifact = approved_in_game_evidence.get("next_required_artifact")
+    if not isinstance(next_required_artifact, str) or not next_required_artifact:
+        next_required_artifact = fastest_next_unblock.get("next_required_artifact")
+    missing_required_artifact = approved_in_game_evidence.get("missing_required_artifact")
+
+    return {
+        "schema": "obelisk.public-sdk-v1-stable-sdk-remaining-blockers.v1",
+        "status_report_only": True,
+        "status": status,
+        "ready": ready,
+        "complete_sdk_ready": ready,
+        "stable_claim_allowed": stable_claim_allowed,
+        "stable_sdk_ready": stable_claim_allowed,
+        "public_sdk_ready": stable_claim_allowed,
+        "runtime_ready": False,
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": normalized_route_blockers,
+        "route_gate_blocked": bool(normalized_route_blockers),
+        "next_required_artifact": next_required_artifact,
+        "missing_required_artifact": missing_required_artifact,
+        "after_runtime_evidence": fastest_next_unblock.get("next_route_blocker_after_acceptance"),
+        "complete_sdk_progress_ratio": complete_sdk_blocker_claim_accounting.get(
+            "promoted_for_claim_ratio"
+        ),
+        "complete_sdk_promoted_for_claim_count": complete_sdk_blocker_claim_accounting.get(
+            "promoted_for_claim_count"
+        ),
+        "complete_sdk_remaining_for_claim_count": complete_sdk_blocker_claim_accounting.get(
+            "remaining_for_claim_count"
+        ),
+        "complete_sdk_total": complete_sdk_blocker_claim_accounting.get("total"),
+        "remaining_sdk_blocker_surfaces": sdk_remaining_surfaces,
+        "remaining_sdk_blocker_surface_count": len(sdk_remaining_surfaces),
+        "p0_dependency_chain": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+        "p0_dependency_chain_progress_ratio": p0_dependency_chain_claim_accounting.get(
+            "promoted_for_claim_ratio"
+        ),
+        "p0_dependency_chain_promoted_for_claim_count": (
+            p0_dependency_chain_claim_accounting.get("promoted_for_claim_count")
+        ),
+        "p0_dependency_chain_remaining_for_claim_count": (
+            p0_dependency_chain_claim_accounting.get("remaining_for_claim_count")
+        ),
+        "p0_dependency_chain_total": p0_dependency_chain_claim_accounting.get("total"),
+        "remaining_p0_dependency_chain_surfaces": p0_remaining_surfaces,
+        "remaining_p0_dependency_chain_surface_count": len(p0_remaining_surfaces),
+        "current_p0_surface": p0_remaining_surfaces[0] if p0_remaining_surfaces else None,
+        "package_shape_counts_toward_complete_sdk_claim": False,
+        "scoped_non_complete_release_statement_counts_toward_complete_sdk_claim": False,
+        "monitor_context_counts_toward_complete_sdk_claim": False,
+        "passive_status_counts_toward_complete_sdk_claim": False,
+        "beta_notice_counts_toward_complete_sdk_claim": False,
+        "copied_log_only_counts_toward_complete_sdk_claim": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "non_claim": (
+            "Stable SDK remaining-blocker report only: package-shape installs, scoped "
+            "non-complete release statements, monitor/passive status context, beta notices, "
+            "and copied-log-only artifacts do not satisfy runtime evidence, SDK/P0 progress, "
+            "runtime readiness, public SDK readiness, release readiness, or stable SDK wording."
+        ),
+    }
 
 
 def completion_blocker_outcome_rows(
@@ -5265,6 +11242,30 @@ def completion_blocker_outcome_rows(
         status = status if isinstance(status, str) else "invalid"
         manifest_outcome = status if status in {"promoted", "post-v1", "excluded"} else None
         release_statement_outcome = release_statement_recorded_outcome(release_statement_text, surface_id)
+        evidence = surface.get("evidence") if surface else None
+        evidence_is_dict = isinstance(evidence, dict)
+        promotion_evidence_forbidden_ready_scope = (
+            evidence_is_dict and evidence_has_forbidden_ready_scope(evidence)
+        )
+        promotion_evidence_non_promotional_schema_marker = (
+            evidence_is_dict and evidence_has_non_promotional_schema_marker(evidence)
+        )
+        promotion_evidence_non_promotional_artifact_reference = (
+            evidence_is_dict and evidence_has_non_promotional_artifact_reference(evidence)
+        )
+        promotion_evidence_public_contract_review_status_reference = (
+            evidence_is_dict
+            and evidence_has_unscoped_public_contract_review_status_reference(
+                evidence,
+                surface_id=surface_id,
+            )
+        )
+        promotion_evidence_explicit_no_approved_claim = (
+            evidence_is_dict and evidence_has_explicit_no_approved_claim(evidence)
+        )
+        promotion_evidence_limited_to_non_promotional_readiness = (
+            evidence_is_dict and report_is_limited_to_non_promotional_readiness(evidence)
+        )
         promotion_evidence_satisfied = bool(surface) and status == "promoted" and surface_has_promotion_evidence(surface)
         missing_required_terms = surface_missing_required_promotion_evidence(surface)
         missing_structured_evidence = surface_missing_structured_promotion_evidence(
@@ -5272,6 +11273,7 @@ def completion_blocker_outcome_rows(
             manifest_path,
             public_header_path,
         )
+        required_outcomes = sorted(required_release_statement_outcomes(surface)) if surface else []
         release_statement_contract_satisfied = False
         release_statement_outcome_matches_manifest = release_statement_outcome == manifest_outcome
         if status == "promoted":
@@ -5283,14 +11285,19 @@ def completion_blocker_outcome_rows(
                 )
             )
         elif status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
-            allowed_outcomes = required_release_statement_outcomes(surface)
             release_statement_contract_satisfied = (
                 release_statement_text is not None
                 and release_statement_outcome_matches_manifest
-                and release_statement_outcome in allowed_outcomes
+                and release_statement_outcome in required_outcomes
                 and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
             )
-        required_outcomes = sorted(required_release_statement_outcomes(surface)) if surface else []
+        elif status == "planning" and release_statement_outcome in required_outcomes:
+            release_statement_outcome_matches_manifest = True
+            release_statement_contract_satisfied = (
+                release_statement_text is not None
+                and release_statement_outcome in {"post-v1", "excluded"}
+                and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
+            )
         is_p0_dependency_chain = surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
         scoped_non_complete_outcome_only = (
             is_p0_dependency_chain
@@ -5323,6 +11330,20 @@ def completion_blocker_outcome_rows(
         non_counting_reasons: list[str] = []
         if not promotion_evidence_satisfied:
             non_counting_reasons.append("promotion_evidence_missing")
+        if promotion_evidence_forbidden_ready_scope:
+            non_counting_reasons.append("non_promotional_ready_scope")
+        if promotion_evidence_non_promotional_schema_marker:
+            non_counting_reasons.append("non_promotional_schema_marker")
+        if promotion_evidence_non_promotional_artifact_reference:
+            non_counting_reasons.append("non_promotional_artifact_reference")
+        if promotion_evidence_public_contract_review_status_reference:
+            non_counting_reasons.append(
+                "public_contract_review_status_artifact_without_identity_gate"
+            )
+        if promotion_evidence_explicit_no_approved_claim:
+            non_counting_reasons.append("approved_evidence_claim_none")
+        if promotion_evidence_limited_to_non_promotional_readiness:
+            non_counting_reasons.append("non_promotional_readiness_only")
         if missing_required_terms:
             non_counting_reasons.append("required_promotion_evidence_terms_missing")
         if missing_structured_evidence:
@@ -5333,6 +11354,12 @@ def completion_blocker_outcome_rows(
             if scoped_non_complete_outcome_only:
                 non_counting_reasons.append("p0_scoped_non_complete_outcome")
             elif manifest_outcome in {"post-v1", "excluded"}:
+                non_counting_reasons.append("scoped_non_complete_outcome")
+            elif (
+                status == "planning"
+                and release_statement_contract_satisfied
+                and release_statement_outcome in {"post-v1", "excluded"}
+            ):
                 non_counting_reasons.append("scoped_non_complete_outcome")
             else:
                 non_counting_reasons.append("manifest_promoted_outcome_missing")
@@ -5354,7 +11381,13 @@ def completion_blocker_outcome_rows(
             and not counts_toward_complete_sdk_claim
         )
         release_statement_scoped_non_complete_bookkeeping = (
-            manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
+            (
+                manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
+                or (
+                    status == "planning"
+                    and release_statement_outcome in {"post-v1", "excluded"}
+                )
+            )
             and release_statement_contract_satisfied
             and not counts_toward_complete_sdk_claim
         )
@@ -5373,6 +11406,22 @@ def completion_blocker_outcome_rows(
                 "release_statement_contract_satisfied": release_statement_contract_satisfied,
                 "required_release_statement_outcomes": required_outcomes,
                 "promotion_evidence_satisfied": promotion_evidence_satisfied,
+                "promotion_evidence_forbidden_ready_scope": promotion_evidence_forbidden_ready_scope,
+                "promotion_evidence_non_promotional_schema_marker": (
+                    promotion_evidence_non_promotional_schema_marker
+                ),
+                "promotion_evidence_non_promotional_artifact_reference": (
+                    promotion_evidence_non_promotional_artifact_reference
+                ),
+                "promotion_evidence_public_contract_review_status_reference": (
+                    promotion_evidence_public_contract_review_status_reference
+                ),
+                "promotion_evidence_explicit_no_approved_claim": (
+                    promotion_evidence_explicit_no_approved_claim
+                ),
+                "promotion_evidence_limited_to_non_promotional_readiness": (
+                    promotion_evidence_limited_to_non_promotional_readiness
+                ),
                 "required_promotion_evidence_terms_satisfied": not missing_required_terms,
                 "missing_required_promotion_evidence_terms": missing_required_terms,
                 "structured_promotion_evidence_satisfied": not missing_structured_evidence,
@@ -5387,6 +11436,8 @@ def completion_blocker_outcome_rows(
                     release_statement_scoped_non_complete_bookkeeping
                 ),
                 "route_gate_non_counting_blocker": route_gate_non_counting_blocker,
+                "scoped_release_statement_counts_toward_complete_sdk_claim": False,
+                "scoped_release_statement_claim_progress_contribution": 0,
                 "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,
                 "unresolved_for_complete_sdk_claim": not counts_toward_complete_sdk_claim,
                 "next_action": blocker_outcome_next_action(
@@ -5554,6 +11605,7 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         "release_statement_scoped_non_complete_bookkeeping_count": len(
             release_statement_scoped_non_complete_bookkeeping
         ),
+        "release_statement_scoped_non_complete_claim_progress_contribution": 0,
         "p0_release_statement_scoped_non_complete_outcome_count": (
             len(p0_release_statement_scoped_non_complete_outcomes)
         ),
@@ -5591,6 +11643,8 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         "release_statement_scoped_non_complete_bookkeeping": (
             release_statement_scoped_non_complete_bookkeeping
         ),
+        "release_statement_scoped_non_complete_counts_toward_complete_sdk_claim": False,
+        "release_statement_scoped_non_complete_claim_progress_contribution": 0,
         "p0_release_statement_scoped_non_complete_outcomes": (
             p0_release_statement_scoped_non_complete_outcomes
         ),
@@ -5619,7 +11673,7 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         "route_gate_current_blockers": route_gate_current_blockers,
         "p0_scoped_non_complete_note": (
             "P0 dependency-chain excluded/post-v1 outcomes are scoped non-complete "
-            "bookkeeping only; they remain unresolved for complete/full/production SDK claims."
+            "bookkeeping only; they do not satisfy complete/full/production SDK claims."
         ),
         "dependency_chain_remaining": dependency_chain_remaining,
         "dependency_chain_remaining_count": len(dependency_chain_remaining),
@@ -5918,8 +11972,8 @@ def categorized_v1_report_sections(
             ),
             "non_claim": (
                 "These are SDK/runtime promotion blockers and header-drift guardrails; they "
-                "must be resolved by promotion evidence or reviewed non-promoted outcomes "
-                "before stable SDK wording is possible."
+                "do not allow stable SDK wording before promotion evidence or reviewed "
+                "non-promoted outcomes."
             ),
         },
         "next_v1_work": {
@@ -6437,10 +12491,11 @@ def build_report(
     )
     completion_blockers_with_release_statement_post_v1_or_excluded_outcome = sorted(
         surface_id
-        for surface_id in completion_blockers_with_post_v1_or_excluded_outcome
+        for surface_id in unique_completion_blockers
         if release_statement_text is not None
-        and surface_id in post_v1_or_excluded
         and not release_statement_duplicate_or_mixed_records(release_statement_text, surface_id)
+        and release_statement_recorded_outcome(release_statement_text, surface_id)
+        in {"post-v1", "excluded"}
         and release_statement_satisfies_exclusion_contract(
             release_statement_text,
             surfaces_by_id.get(surface_id, {}),
@@ -6473,11 +12528,15 @@ def build_report(
     release_statement_surface_records_all = release_statement_all_surface_records(
         release_statement_text
     )
+    required_scoped_release_statement_outcome_records = (
+        scoped_release_statement_required_outcome_records(
+            completion_blockers_for_accounting,
+            surfaces_by_id,
+            post_v1_or_excluded,
+        )
+    )
     scoped_release_statement_allowed_surface_records = [
-        row["surface"]
-        for row in blocker_outcome_rows
-        if row.get("is_p0_dependency_chain") is not True
-        and row.get("manifest_outcome") in {"post-v1", "excluded"}
+        record["surface"] for record in required_scoped_release_statement_outcome_records
     ]
     scoped_release_statement_allowed_surface_record_set = set(
         scoped_release_statement_allowed_surface_records
@@ -6493,6 +12552,16 @@ def build_report(
     ]
     release_statement_scoped_non_complete_bookkeeping = blocker_outcome_summary[
         "release_statement_scoped_non_complete_bookkeeping"
+    ]
+    scoped_release_statement_satisfied_outcome_surfaces = [
+        surface_id
+        for surface_id in scoped_release_statement_allowed_surface_records
+        if surface_id in set(release_statement_scoped_non_complete_bookkeeping)
+    ]
+    scoped_release_statement_missing_required_outcome_surfaces = [
+        surface_id
+        for surface_id in scoped_release_statement_allowed_surface_records
+        if surface_id not in set(release_statement_scoped_non_complete_bookkeeping)
     ]
     route_gate_non_counting_blockers = blocker_outcome_summary[
         "route_gate_non_counting_blockers"
@@ -6541,8 +12610,9 @@ def build_report(
         "remaining_for_claim_surfaces": completion_blockers_remaining_for_claim,
         "stable_claim_allowed": stable_claim_allowed,
         "non_claim": (
-            "Only rows with counts_toward_complete_sdk_claim=true count here; "
-            "manifest or release-statement post-v1/excluded bookkeeping never increments this total."
+            "Rows do not count here unless promoted-for-claim evidence is present; "
+            "accepted runtime evidence, manifest post-v1/excluded outcomes, and "
+            "release-statement bookkeeping never increment this total."
         ),
     }
     p0_dependency_chain_claim_accounting = {
@@ -6558,9 +12628,35 @@ def build_report(
         "stable_claim_allowed": stable_claim_allowed,
         "non_claim": (
             "P0 dependency-chain rows must be promoted with evidence and pass the route gate; "
-            "excluded/post-v1 outcomes are scoped non-complete bookkeeping only."
+            "accepted runtime evidence only advances the route blocker to identity public "
+            "contract review, and excluded/post-v1 outcomes are scoped non-complete "
+            "bookkeeping only."
         ),
     }
+    current_route_blocker = command_permission_route_gate_current_blocker(
+        command_permission_route_gate
+    )
+    remaining_route_blockers = command_permission_route_gate_remaining_route_blockers(
+        command_permission_route_gate
+    )
+    complete_sdk_claim_progress_ratio = complete_sdk_blocker_claim_accounting[
+        "promoted_for_claim_ratio"
+    ]
+    p0_dependency_chain_claim_progress_ratio = p0_dependency_chain_claim_accounting[
+        "promoted_for_claim_ratio"
+    ]
+    status = "ready" if ready else "blocked"
+    summary = normalized_completion_summary(
+        status=status,
+        ready=ready,
+        blockers=blockers,
+        current_route_blocker=current_route_blocker,
+        remaining_route_blockers=remaining_route_blockers,
+        stable_claim_allowed=stable_claim_allowed,
+        manifest_stable_claim_allowed=manifest_stable_claim_allowed,
+        complete_sdk_blocker_claim_accounting=complete_sdk_blocker_claim_accounting,
+        p0_dependency_chain_claim_accounting=p0_dependency_chain_claim_accounting,
+    )
     report_sections = categorized_v1_report_sections(
         manifest=manifest,
         blockers=blockers,
@@ -6591,16 +12687,97 @@ def build_report(
         stable_claim_allowed=stable_claim_allowed,
         manifest_stable_claim_allowed=manifest_stable_claim_allowed,
     )
+    fastest_next_unblock = fastest_next_sdk_unblock(
+        current_route_blocker=current_route_blocker,
+        remaining_route_blockers=remaining_route_blockers,
+        p0_dependency_chain_claim_accounting=p0_dependency_chain_claim_accounting,
+    )
+    approved_in_game_evidence = approved_in_game_evidence_completion_status(
+        current_route_blocker=current_route_blocker,
+        fastest_next_unblock=fastest_next_unblock,
+    )
+    progress_trace = progress_normalization_trace(
+        status=status,
+        ready=ready,
+        current_route_blocker=current_route_blocker,
+        remaining_route_blockers=remaining_route_blockers,
+        approved_in_game_evidence=approved_in_game_evidence,
+        complete_sdk_blocker_claim_accounting=complete_sdk_blocker_claim_accounting,
+        p0_dependency_chain_claim_accounting=p0_dependency_chain_claim_accounting,
+        stable_claim_allowed=stable_claim_allowed,
+    )
+    stable_sdk_remaining_blockers = stable_sdk_remaining_blockers_report(
+        status=status,
+        ready=ready,
+        current_route_blocker=current_route_blocker,
+        remaining_route_blockers=remaining_route_blockers,
+        complete_sdk_blocker_claim_accounting=complete_sdk_blocker_claim_accounting,
+        p0_dependency_chain_claim_accounting=p0_dependency_chain_claim_accounting,
+        fastest_next_unblock=fastest_next_unblock,
+        approved_in_game_evidence=approved_in_game_evidence,
+        stable_claim_allowed=stable_claim_allowed,
+    )
 
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
-        "status": "ready" if ready else "blocked",
+        "status": status,
         "ready": ready,
+        "summary": summary,
+        "progress_normalization_trace": progress_trace,
+        "stable_sdk_remaining_blockers": stable_sdk_remaining_blockers,
+        "fastest_next_sdk_unblock": fastest_next_unblock,
+        "approved_in_game_evidence_ready": approved_in_game_evidence[
+            "approved_in_game_evidence_ready"
+        ],
+        "approved_runtime_evidence_ready": approved_in_game_evidence[
+            "approved_runtime_evidence_ready"
+        ],
+        "next_required_artifact": approved_in_game_evidence["next_required_artifact"],
+        "missing_required_artifact": approved_in_game_evidence[
+            "missing_required_artifact"
+        ],
+        "approved_in_game_evidence": approved_in_game_evidence,
         "manifest": str(manifest_path),
         "release_statement": str(release_statement_path) if release_statement_path else None,
         "public_header": str(public_header_path),
         "contract_decisions_dir": str(contract_decisions_dir),
         "command_permission_route_gate": command_permission_route_gate,
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": remaining_route_blockers,
+        "route_gate_blocked": summary["route_gate_blocked"],
+        "promotion_ready": stable_claim_allowed,
+        "public_sdk_ready": stable_claim_allowed,
+        "public_abi_ready": stable_claim_allowed,
+        "runtime_ready": False,
+        "complete_sdk_ready": ready,
+        "v1_completion_ready": ready,
+        "complete_sdk_blockers_promoted_for_claim_count": (
+            complete_sdk_blocker_claim_accounting["promoted_for_claim_count"]
+        ),
+        "complete_sdk_blockers_remaining_for_claim_count": (
+            complete_sdk_blocker_claim_accounting["remaining_for_claim_count"]
+        ),
+        "complete_sdk_blockers_promoted_for_claim_ratio": complete_sdk_claim_progress_ratio,
+        "complete_sdk_claim_progress_ratio": complete_sdk_claim_progress_ratio,
+        "complete_sdk_progress_ratio": complete_sdk_claim_progress_ratio,
+        "p0_chain_promoted_count": p0_dependency_chain_claim_accounting[
+            "promoted_for_claim_count"
+        ],
+        "p0_chain_progress_ratio": p0_dependency_chain_claim_progress_ratio,
+        "p0_chain_promoted_ratio": p0_dependency_chain_claim_progress_ratio,
+        "p0_dependency_chain_promoted_for_claim_count": (
+            p0_dependency_chain_claim_accounting["promoted_for_claim_count"]
+        ),
+        "p0_dependency_chain_remaining_for_claim_count": (
+            p0_dependency_chain_claim_accounting["remaining_for_claim_count"]
+        ),
+        "p0_dependency_chain_promoted_for_claim_ratio": (
+            p0_dependency_chain_claim_progress_ratio
+        ),
+        "p0_dependency_chain_claim_progress_ratio": (
+            p0_dependency_chain_claim_progress_ratio
+        ),
+        "p0_dependency_chain_progress_ratio": p0_dependency_chain_claim_progress_ratio,
         "inventory_copied_signals_stability": inventory_copied_signals_stability,
         "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
         "mission_transfer_dino_tribe_outcome_accounting": mission_transfer_dino_tribe_outcome_accounting,
@@ -6693,6 +12870,29 @@ def build_report(
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
         "release_statement_forbidden_broad_claims": release_statement_forbidden_claims,
         "release_statement_surface_records": release_statement_surface_records_all,
+        "scoped_release_statement_required_outcome_records": (
+            required_scoped_release_statement_outcome_records
+        ),
+        "scoped_release_statement_required_outcome_surfaces": (
+            scoped_release_statement_allowed_surface_records
+        ),
+        "scoped_release_statement_required_outcome_count": len(
+            scoped_release_statement_allowed_surface_records
+        ),
+        "scoped_release_statement_satisfied_outcome_surfaces": (
+            scoped_release_statement_satisfied_outcome_surfaces
+        ),
+        "scoped_release_statement_satisfied_outcome_count": len(
+            scoped_release_statement_satisfied_outcome_surfaces
+        ),
+        "scoped_release_statement_missing_required_outcome_surfaces": (
+            scoped_release_statement_missing_required_outcome_surfaces
+        ),
+        "scoped_release_statement_missing_required_outcome_count": len(
+            scoped_release_statement_missing_required_outcome_surfaces
+        ),
+        "scoped_release_statement_counts_toward_complete_sdk_claim": False,
+        "scoped_release_statement_claim_progress_contribution": 0,
         "scoped_release_statement_allowed_surface_records": (
             scoped_release_statement_allowed_surface_records
         ),
@@ -6716,14 +12916,26 @@ def build_report(
             "complete_sdk_blockers_promoted_for_claim": completion_blockers_counting_toward_claim,
             "complete_sdk_blockers_remaining_for_claim": completion_blockers_remaining_for_claim,
             "complete_sdk_blocker_claim_accounting": complete_sdk_blocker_claim_accounting,
+            "complete_sdk_blockers_promoted_for_claim_ratio": complete_sdk_claim_progress_ratio,
+            "complete_sdk_claim_progress_ratio": complete_sdk_claim_progress_ratio,
+            "complete_sdk_progress_ratio": complete_sdk_claim_progress_ratio,
             "p0_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
             "p0_chain_promoted_count": len(p0_chain_counting_toward_claim),
+            "p0_chain_progress_ratio": p0_dependency_chain_claim_progress_ratio,
+            "p0_chain_promoted_ratio": p0_dependency_chain_claim_progress_ratio,
             "p0_dependency_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
             "p0_dependency_chain_promoted_for_claim_count": len(p0_chain_counting_toward_claim),
             "p0_dependency_chain_remaining_for_claim_count": len(p0_chain_remaining_for_claim),
             "p0_dependency_chain_promoted_for_claim": p0_chain_counting_toward_claim,
             "p0_dependency_chain_remaining_for_claim": p0_chain_remaining_for_claim,
             "p0_dependency_chain_claim_accounting": p0_dependency_chain_claim_accounting,
+            "p0_dependency_chain_promoted_for_claim_ratio": (
+                p0_dependency_chain_claim_progress_ratio
+            ),
+            "p0_dependency_chain_claim_progress_ratio": (
+                p0_dependency_chain_claim_progress_ratio
+            ),
+            "p0_dependency_chain_progress_ratio": p0_dependency_chain_claim_progress_ratio,
             "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
             "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
             "p0_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
@@ -6745,6 +12957,26 @@ def build_report(
             "release_statement_scoped_non_complete_bookkeeping_blocker_count": len(
                 release_statement_scoped_non_complete_bookkeeping
             ),
+            "scoped_release_statement_required_outcome_surfaces": (
+                scoped_release_statement_allowed_surface_records
+            ),
+            "scoped_release_statement_required_outcome_count": len(
+                scoped_release_statement_allowed_surface_records
+            ),
+            "scoped_release_statement_satisfied_outcome_surfaces": (
+                scoped_release_statement_satisfied_outcome_surfaces
+            ),
+            "scoped_release_statement_satisfied_outcome_count": len(
+                scoped_release_statement_satisfied_outcome_surfaces
+            ),
+            "scoped_release_statement_missing_required_outcome_surfaces": (
+                scoped_release_statement_missing_required_outcome_surfaces
+            ),
+            "scoped_release_statement_missing_required_outcome_count": len(
+                scoped_release_statement_missing_required_outcome_surfaces
+            ),
+            "scoped_release_statement_counts_toward_complete_sdk_claim": False,
+            "scoped_release_statement_claim_progress_contribution": 0,
             "p0_release_statement_scoped_non_complete_outcomes": blocker_outcome_summary[
                 "p0_release_statement_scoped_non_complete_outcomes"
             ],
@@ -6808,6 +13040,8 @@ def build_report(
                 "P0 excluded/post-v1 outcomes are scoped release-statement accounting only and do not "
                 "increase p0_chain_promoted_count or complete_sdk_claim_progress_percent."
             ),
+            "progress_normalization_trace": progress_trace,
+            "stable_sdk_remaining_blockers": stable_sdk_remaining_blockers,
             "complete_sdk_claim_progress_percent": (
                 int((len(completion_blockers_counting_toward_claim) / completion_blocker_total) * 100)
                 if completion_blocker_total
@@ -6886,7 +13120,39 @@ def add_scoped_release_statement_result(
     scoped_ready = not blocking_report_blockers
     report["scoped_release_statement"] = {
         "ready": scoped_ready,
+        "stable_claim_allowed": False,
+        "stable_sdk_claim_allowed": False,
         "stable_v1_sdk_claim_allowed": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "complete_sdk_claim_allowed": False,
+        "complete_sdk_ready": False,
+        "v1_completion_ready": False,
+        "current_route_blocker": report.get("current_route_blocker"),
+        "remaining_route_blockers": report.get("remaining_route_blockers", []),
+        "next_required_artifact": report.get("next_required_artifact"),
+        "missing_required_artifact": report.get("missing_required_artifact"),
+        "approved_runtime_evidence": False,
+        "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
+        "approved_runtime_evidence_accepted": False,
+        "approved_runtime_principal_lifecycle_evidence_bundle_accepted": False,
+        "evidence_bundle_accepted": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "counts_toward_v1_completion": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "p0_dependency_chain_progress_contribution": 0,
+        "v1_completion_contribution": 0,
+        "scoped_non_complete_bookkeeping_only": True,
+        "release_statement": report.get("release_statement"),
+        "release_statement_source": report.get("release_statement_source"),
+        "default_scoped_release_statement_used": report.get(
+            "default_scoped_release_statement_used",
+            False,
+        ),
         "blocking_report_blockers": sorted(set(blocking_report_blockers)),
         "allowed_remaining_blockers": sorted(
             set(report.get("blockers", [])) & SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS
@@ -6895,11 +13161,39 @@ def add_scoped_release_statement_result(
             "scoped_release_statement_allowed_surface_records",
             [],
         ),
+        "required_outcome_records": report.get(
+            "scoped_release_statement_required_outcome_records",
+            [],
+        ),
+        "required_outcome_surfaces": report.get(
+            "scoped_release_statement_required_outcome_surfaces",
+            [],
+        ),
+        "required_outcome_count": report.get(
+            "scoped_release_statement_required_outcome_count",
+            0,
+        ),
+        "satisfied_outcome_surfaces": report.get(
+            "scoped_release_statement_satisfied_outcome_surfaces",
+            [],
+        ),
+        "satisfied_outcome_count": report.get(
+            "scoped_release_statement_satisfied_outcome_count",
+            0,
+        ),
+        "missing_required_outcome_surfaces": report.get(
+            "scoped_release_statement_missing_required_outcome_surfaces",
+            [],
+        ),
+        "missing_required_outcome_count": report.get(
+            "scoped_release_statement_missing_required_outcome_count",
+            0,
+        ),
         "unexpected_surface_records": unexpected_records or [],
         "extra_records_explicitly_allowed": allow_extra_records,
         "non_claim": (
             "A scoped release statement records reviewed exclusions/post-v1 outcomes only; "
-            "it does not authorize v1.0 stable, complete SDK, full SDK, or production SDK wording."
+            "it does not authorize v1.0 stable, stable SDK, complete SDK, full SDK, or production SDK wording."
         ),
     }
     return report
@@ -6912,6 +13206,33 @@ def format_human_list(items: Any, *, limit: int = 12) -> str:
     if len(items) > limit:
         rendered.append(f"... {len(items) - limit} more")
     return ", ".join(rendered)
+
+
+def release_statement_missing_outcomes_guidance(report: dict[str, Any]) -> list[str]:
+    guidance = [
+        "The release statement is missing required outcome records for non-promoted blockers.",
+        f"Surfaces: {format_human_list(report.get('release_statement_missing_blocker_outcomes'))}.",
+    ]
+    if report.get("release_statement") is None:
+        default_statement = report.get("default_scoped_release_statement")
+        if report.get("default_scoped_release_statement_exists") is True and default_statement:
+            guidance.append(
+                f"Default scoped statement exists at {default_statement}, but this report did not "
+                "load it."
+            )
+            guidance.append(
+                "Action: rerun the default checker or pass --release-statement with that file "
+                "for fail-closed full-gate accounting."
+            )
+        else:
+            guidance.append(
+                "Action: pass --release-statement with a reviewed v1 SDK compatibility statement."
+            )
+        return guidance
+    guidance.append(
+        "Action: add one exact record per surface: '<surface-id>: excluded - ...' or '<surface-id>: post-v1 - ...'."
+    )
+    return guidance
 
 
 def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
@@ -7036,11 +13357,9 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "The manifest is trying to allow a v1 completion claim without a reviewed release statement.",
             "Action: pass --release-statement with the reviewed v1 SDK compatibility statement.",
         ],
-        "release_statement_missing_non_promoted_blocker_outcomes": [
-            "The release statement is missing required outcome records for non-promoted blockers.",
-            f"Surfaces: {format_human_list(report.get('release_statement_missing_blocker_outcomes'))}.",
-            "Action: add one exact record per surface: '<surface-id>: excluded - ...' or '<surface-id>: post-v1 - ...'.",
-        ],
+        "release_statement_missing_non_promoted_blocker_outcomes": (
+            release_statement_missing_outcomes_guidance(report)
+        ),
         "release_statement_missing_exclusion_contract": [
             "The release statement outcome text does not satisfy the surface exclusion contract.",
             f"Surfaces: {format_human_list(report.get('release_statement_missing_exclusion_contracts'))}.",
@@ -7099,6 +13418,10 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "Inventory copied-signal stability attempted to mark v1 completion readiness.",
             "Action: copied inventory signals cannot count toward complete/full/production SDK progress.",
         ],
+        "inventory_copied_signals_completion_accounting_alias_not_false": [
+            "Inventory copied-signal stability attempted to expose positive complete-SDK accounting aliases.",
+            "Action: keep counts_toward_complete_sdk_claim=false, counts_toward_p0_dependency_chain_claim=false, progress=0, and stable_claim_allowed=false for copied-signal stability reports.",
+        ],
         "object_identity_resource_handle_readiness_output_invalid": [
             "The ResourceHandle/object-identity public-contract readiness checker did not emit valid JSON.",
             "Action: fix scripts/check_object_identity_resource_handle_public_contract_readiness.py before relying on ResourceHandle/object-identity accounting.",
@@ -7118,6 +13441,14 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "object_identity_resource_handle_readiness_blockers_not_empty": [
             "The ResourceHandle/object-identity readiness checker reported blockers.",
             "Action: resolve the dedicated checker blockers before any SDK completion claim.",
+        ],
+        "object_identity_resource_handle_strict_next_blocker_missing": [
+            "The ResourceHandle/object-identity readiness checker did not preserve the precise next-evidence contract.",
+            "Action: keep the next blocker scoped to runtime object negative samples plus serial reuse/wraparound semantics under a future approved live-ops brief.",
+        ],
+        "object_identity_resource_handle_offline_artifact_policy_not_candidate_only": [
+            "The ResourceHandle/object-identity readiness checker stopped treating offline serial/post-callback artifacts as candidate-only.",
+            "Action: offline artifacts may plan the blocker but must not approve lookup, mutation, persistent identity, post-callback validity, runtime readiness, or public SDK readiness.",
         ],
         "object_identity_resource_handle_public_or_runtime_claims": [
             "The ResourceHandle/object-identity readiness checker reported a public, runtime, or promotion claim.",
@@ -7227,6 +13558,10 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "Structure build-policy readiness_flags attempted to mark public SDK readiness.",
             "Action: nested readiness flags must remain false in offline intake accounting.",
         ],
+        "mission_transfer_dino_tribe_completion_accounting_alias_not_false": [
+            "Mission/Transfer/Dino/Tribe/Buff outcome accounting attempted to expose positive complete-SDK accounting aliases.",
+            "Action: keep counts_toward_complete_sdk_claim=false, counts_toward_p0_dependency_chain_claim=false, progress=0, and stable_claim_allowed=false for candidate and umbrella accounting reports.",
+        ],
         "schema_mismatch": [
             "The manifest schema is not obelisk.public-sdk-surfaces.v1.",
         ],
@@ -7298,6 +13633,13 @@ def print_human_report(report: dict[str, Any]) -> None:
             f"{outcome_summary.get('release_statement_outcome_missing_count', 0)} need release-statement outcomes; "
             f"{outcome_summary.get('dependency_chain_remaining_count', 0)} dependency-chain blockers remain."
         )
+    complete_sdk_progress = report.get("complete_sdk_progress_ratio")
+    p0_dependency_chain_progress = report.get("p0_dependency_chain_claim_progress_ratio")
+    if isinstance(complete_sdk_progress, str) and isinstance(p0_dependency_chain_progress, str):
+        print(
+            "Complete SDK progress: "
+            f"{complete_sdk_progress}; P0 dependency-chain progress: {p0_dependency_chain_progress}."
+        )
     route_gate = report.get("command_permission_route_gate")
     if isinstance(route_gate, dict):
         current_blocker = route_gate.get("current_blocker")
@@ -7312,6 +13654,44 @@ def print_human_report(report: dict[str, Any]) -> None:
                     "Request-pack and preflight readiness are non-counting preparation; "
                     "they do not satisfy approved runtime principal lifecycle evidence."
                 )
+    approved_in_game = report.get("approved_in_game_evidence")
+    if isinstance(approved_in_game, dict):
+        print(
+            "Approved in-game evidence: "
+            f"ready={str(bool(approved_in_game.get('approved_in_game_evidence_ready'))).lower()}; "
+            f"approved_runtime_evidence={str(bool(approved_in_game.get('approved_runtime_evidence'))).lower()}; "
+            f"diagnostic_complete_triplet={str(bool(approved_in_game.get('complete_lifecycle_event_triplet_observed_diagnostic_only'))).lower()}; "
+            f"next_required_artifact={approved_in_game.get('next_required_artifact')}."
+        )
+        diagnostic_paths = as_string_list(approved_in_game.get("diagnostic_complete_triplet_path_ids"))
+        missing_role_paths = as_string_list(approved_in_game.get("missing_role_path_ids"))
+        if diagnostic_paths:
+            print(
+                "Diagnostic complete-triplet paths are non-evidence: "
+                f"{format_human_list(diagnostic_paths)}."
+            )
+        if missing_role_paths:
+            print(
+                "Player-backed paths still missing lifecycle roles: "
+                f"{format_human_list(missing_role_paths)}."
+            )
+    fastest_unblock = report.get("fastest_next_sdk_unblock")
+    if isinstance(fastest_unblock, dict):
+        actionable_paths = fastest_unblock.get("actionable_paths")
+        if isinstance(actionable_paths, dict) and actionable_paths:
+            path_labels = []
+            for path_id, path_payload in actionable_paths.items():
+                authorization = "non-authorizing"
+                if isinstance(path_payload, dict) and isinstance(
+                    path_payload.get("authorization"),
+                    str,
+                ):
+                    authorization = path_payload["authorization"]
+                path_labels.append(f"{path_id} ({authorization})")
+            print(
+                "Fastest next SDK unblock paths: "
+                f"{format_human_list(path_labels)}."
+            )
     print("Blockers:")
     for blocker in report["blockers"]:
         print(f"- {blocker}")
@@ -7337,9 +13717,10 @@ def print_scoped_release_statement_report(report: dict[str, Any]) -> None:
 
 def main() -> int:
     args = parse_args()
+    release_statement_path, release_statement_resolution = resolve_release_statement_for_args(args)
     report = build_report(
         args.manifest,
-        args.release_statement,
+        release_statement_path,
         args.public_header,
         args.contract_decisions_dir,
         args.command_permission_route_gate,
@@ -7349,6 +13730,7 @@ def main() -> int:
         args.structure_census_readiness,
         args.structure_build_policy_offline_intake,
     )
+    report.update(release_statement_resolution)
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(
             report,

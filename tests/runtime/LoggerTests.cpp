@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <stdexcept>
 #include <string>
 
@@ -51,6 +52,19 @@ namespace
         Require(!Obelisk::Logger::IsInitialized(), "logger stayed initialized after failed init");
     }
 
+    std::string ReadTextFile(const fs::path& path)
+    {
+        std::ifstream file(path);
+        return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    }
+
+    void RequireUtcFileLogPrefix(const fs::path& path)
+    {
+        const std::string contents = ReadTextFile(path);
+        const std::regex utcPrefix(R"(\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\] \[info\] logger test message)");
+        Require(std::regex_search(contents, utcPrefix), "file log did not use approved UTC timestamp prefix");
+    }
+
     void TestExplicitLogDirCreatesInstanceLogs()
     {
         ResetEnv();
@@ -63,10 +77,14 @@ namespace
         OBELISK_INFO("logger test message");
         Obelisk::Logger::Shutdown();
 
-        Require(fs::is_regular_file(root / "logs" / "arkserver" / "Obelisk.log"),
+        const fs::path sharedLog = root / "logs" / "arkserver" / "Obelisk.log";
+        const fs::path mapLog = root / "logs" / "arkserver" / "Obelisk-unknown.log";
+        Require(fs::is_regular_file(sharedLog),
                 "shared instance log was not created");
-        Require(fs::is_regular_file(root / "logs" / "arkserver" / "Obelisk-unknown.log"),
+        Require(fs::is_regular_file(mapLog),
                 "map-specific instance log was not created");
+        RequireUtcFileLogPrefix(sharedLog);
+        RequireUtcFileLogPrefix(mapLog);
         fs::remove_all(root);
     }
 

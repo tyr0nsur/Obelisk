@@ -48,6 +48,8 @@ namespace Obelisk::Core
         size_t UnregisterCallbacksForOwner(void* owner);
 #ifdef OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+        void FailNextDeferredDestroyFailureRecordForTesting();
+        void FailNextFailedOwnerDestroyRetrySetupForTesting();
 #endif
 
         size_t Dispatch(const ChatMessageView& message);
@@ -64,6 +66,7 @@ namespace Obelisk::Core
 
         struct PendingDestroy
         {
+            void* Owner = nullptr;
             ChatMessageSubscription Subscription;
             uint64_t CleanupBatchId = 0;
         };
@@ -79,23 +82,38 @@ namespace Obelisk::Core
         {
             void* Owner = nullptr;
             ChatMessageSubscription Subscription;
+            std::exception_ptr UnreportedFailure;
         };
 
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId, uint64_t generation) const;
         bool QueueOrDestroyRemovedSubscriptions(
+            void* owner,
             std::vector<ChatMessageSubscription>& removed,
             std::unique_lock<std::mutex>& lock,
             uint64_t cleanupBatchId = 0);
         bool IsDispatchCleanupComplete() const;
-        std::vector<ChatMessageSubscription> TakeFailedOwnerDestroySubscriptions(void* owner);
+        std::vector<ChatMessageSubscription> TakeFailedOwnerDestroySubscriptions(
+            void* owner,
+            std::exception_ptr& firstFailure);
         void RetainFailedOwnerDestroySubscriptions(
             void* owner,
-            const std::vector<ChatMessageSubscription>& subscriptions);
+            const std::vector<ChatMessageSubscription>& subscriptions,
+            std::exception_ptr unreportedFailure = nullptr);
+        void RetainFailedOwnerDestroySubscriptionNoThrow(
+            void* owner,
+            const ChatMessageSubscription& subscription,
+            std::exception_ptr unreportedFailure = nullptr);
         std::vector<ChatMessageSubscription> TakeDeferredDestroyFailures(
             uint64_t cleanupBatchId,
             std::exception_ptr& firstFailure);
+        void ReserveDeferredDestroyFailureSlots(size_t count);
+        void ReleaseDeferredDestroyFailureSlots(size_t count);
+        void RecordDeferredDestroyFailure(
+            uint64_t cleanupBatchId,
+            const ChatMessageSubscription& subscription,
+            std::exception_ptr failure);
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -107,8 +125,17 @@ namespace Obelisk::Core
         std::atomic<size_t> m_SubscriptionCount{0};
         std::vector<PendingDestroy> m_PendingDestroy;
         std::vector<DeferredDestroyFailure> m_DeferredDestroyFailures;
+        bool m_HasFallbackDeferredDestroyFailure = false;
+        DeferredDestroyFailure m_FallbackDeferredDestroyFailure;
         std::vector<FailedOwnerDestroy> m_FailedOwnerDestroy;
+        bool m_HasFallbackFailedOwnerDestroy = false;
+        FailedOwnerDestroy m_FallbackFailedOwnerDestroy;
         size_t m_PendingDestroyInProgress = 0;
+        size_t m_ReservedDeferredDestroyFailureSlots = 0;
         uint64_t m_NextCleanupBatchId = 1;
+#ifdef OBELISK_CHAT_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+        bool m_FailNextDeferredDestroyFailureRecordForTesting = false;
+        bool m_FailNextFailedOwnerDestroyRetrySetupForTesting = false;
+#endif
     };
 }

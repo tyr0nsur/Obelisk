@@ -574,7 +574,7 @@ namespace
                 "short-api-before-gameplay-policy-unregister",
                 static_cast<uint32_t>(offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken)),
                 0,
-                1,
+                0,
                 0,
                 0,
                 0,
@@ -585,7 +585,7 @@ namespace
                 "short-api-before-resource-descriptor",
                 static_cast<uint32_t>(offsetof(ObeliskApi, DescribeResourceKind)),
                 0,
-                1,
+                0,
                 1,
                 0,
                 0,
@@ -596,7 +596,7 @@ namespace
                 "short-api-before-gameplay-descriptor",
                 static_cast<uint32_t>(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind)),
                 0,
-                1,
+                0,
                 1,
                 2,
                 0,
@@ -607,7 +607,7 @@ namespace
                 "short-api-before-chat-unregister",
                 static_cast<uint32_t>(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken)),
                 0,
-                1,
+                0,
                 1,
                 2,
                 11,
@@ -618,7 +618,7 @@ namespace
                 "short-api-before-timer-unregister",
                 static_cast<uint32_t>(offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken))),
                 0,
-                1,
+                0,
                 1,
                 2,
                 11,
@@ -629,7 +629,7 @@ namespace
                 "missing-gameplay-policy-capability",
                 sizeof(ObeliskApi),
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS,
-                1,
+                0,
                 0,
                 2,
                 11,
@@ -640,7 +640,7 @@ namespace
                 "missing-resource-descriptor-capability",
                 sizeof(ObeliskApi),
                 OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS,
-                1,
+                0,
                 1,
                 0,
                 11,
@@ -651,7 +651,7 @@ namespace
                 "missing-gameplay-descriptor-capability",
                 sizeof(ObeliskApi),
                 OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS,
-                1,
+                0,
                 1,
                 2,
                 0,
@@ -662,7 +662,7 @@ namespace
                 "missing-chat-capability",
                 sizeof(ObeliskApi),
                 OBELISK_API_CAPABILITY_CHAT_EVENTS,
-                1,
+                0,
                 1,
                 2,
                 11,
@@ -673,7 +673,7 @@ namespace
                 "missing-timer-capability",
                 sizeof(ObeliskApi),
                 OBELISK_API_CAPABILITY_TIMERS,
-                1,
+                0,
                 1,
                 2,
                 11,
@@ -1303,6 +1303,34 @@ namespace
             Require(g_TimerUnregisterCount == 0, "timer example failed init unregistered failed timer handle");
         }
     }
+
+    void RunCAbiConsumerFailureGuardrails(InitFn init,
+                                          ShutdownFn shutdown,
+                                          ObeliskPluginInitContext context,
+                                          BoolProbeFn copiedApiRetained)
+    {
+        Require(shutdown != nullptr, "C ABI consumer guardrails require plugin shutdown cleanup");
+        Require(copiedApiRetained != nullptr, "C ABI consumer must expose copied API state probe");
+
+        ObeliskApi api{};
+        PopulateApi(api);
+        ObeliskPluginInitContext badContext = context;
+        badContext.instance_id = "wrong-instance";
+
+        ResetFixtureObservations();
+        Require(!init(&api, &badContext), "C ABI consumer accepted invalid context after API copy");
+        Require(!copiedApiRetained(), "C ABI consumer retained copied API after invalid context");
+        Require(g_RegisterCount == 0, "C ABI invalid context registered ProcessEvent callback");
+        Require(g_GameplayPolicyRegisterCount == 0, "C ABI invalid context registered gameplay callback");
+        Require(g_ChatMessageRegisterCount == 0, "C ABI invalid context registered chat callback");
+        Require(g_TimerRegisterCount == 0, "C ABI invalid context registered timer");
+        shutdown();
+        Require(!copiedApiRetained(), "C ABI shutdown retained copied API after invalid context");
+        Require(g_UnregisterCount == 0, "C ABI invalid context unregistered ProcessEvent callback");
+        Require(g_GameplayPolicyUnregisterCount == 0, "C ABI invalid context unregistered gameplay callback");
+        Require(g_ChatMessageUnregisterCount == 0, "C ABI invalid context unregistered chat callback");
+        Require(g_TimerUnregisterCount == 0, "C ABI invalid context unregistered timer");
+    }
 }
 
 int main(int argc, char** argv)
@@ -1328,6 +1356,8 @@ int main(int argc, char** argv)
             ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ScheduledCallbackSeen");
         BoolProbeFn descriptorCatalogValidated =
             ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_DescriptorCatalogValidated");
+        BoolProbeFn copiedApiRetained =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_CopiedApiRetained");
         const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
         const bool expectsTimer = timerSeen != nullptr;
         const bool lifecycleOnlyPlugin = std::strcmp(argv[2], "obelisk_sdk_minimal_plugin") == 0;
@@ -1358,6 +1388,8 @@ int main(int argc, char** argv)
             RunDescriptorCatalogGuardrails(init, shutdown, context);
         if (std::strcmp(argv[2], "install_layout_descriptor_timer_consumer") == 0)
             RunDescriptorTimerGuardrails(init, shutdown, context);
+        if (std::strcmp(argv[2], "install_layout_c_abi_consumer") == 0)
+            RunCAbiConsumerFailureGuardrails(init, shutdown, context, copiedApiRetained);
         if (std::strcmp(argv[2], "obelisk_sdk_timer_plugin") == 0)
             RunTimerOnlyGuardrails(init, shutdown, context);
 
@@ -1465,7 +1497,7 @@ int main(int argc, char** argv)
         }
         if (shutdown)
         {
-            Require(g_RegisterCount == 1, "expected one owner-token callback registration");
+            Require(g_RegisterCount == 0, "install layout consumer unexpectedly registered raw ProcessEvent callback");
             if (expectsGameplayPolicy)
                 Require(g_GameplayPolicyRegisterCount == 1, "expected one gameplay policy callback registration");
             else
@@ -1491,7 +1523,7 @@ int main(int argc, char** argv)
             }
             api = {};
             shutdown();
-            Require(g_UnregisterCount == 1, "expected one owner-token callback unregister");
+            Require(g_UnregisterCount == 0, "install layout consumer unexpectedly unregistered raw ProcessEvent callback");
             if (expectsGameplayPolicy)
                 Require(g_GameplayPolicyUnregisterCount == 1, "expected one gameplay policy callback unregister");
             else
@@ -1514,7 +1546,7 @@ int main(int argc, char** argv)
                 Require(g_TimerUserData == nullptr, "timer user data was not cleared");
             }
             shutdown();
-            Require(g_UnregisterCount == 1, "second shutdown repeated owner-token callback unregister");
+            Require(g_UnregisterCount == 0, "install layout consumer second shutdown unregistered raw ProcessEvent callback");
             if (expectsGameplayPolicy)
                 Require(g_GameplayPolicyUnregisterCount == 1,
                         "second shutdown repeated gameplay policy callback unregister");

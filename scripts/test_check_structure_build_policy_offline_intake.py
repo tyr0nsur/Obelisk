@@ -375,6 +375,39 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertEqual(payload["non_claim_matrix"]["runtime_hooks"], "not_claimed")
         self.assertEqual(payload["blockers"], [])
 
+    def test_allows_legacy_aggregate_candidate_target_set_without_counting_it_for_build_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            self.add_snapshot_details(root, readiness_payload)
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            manifest_payload["surfaces"][0]["readiness_checker_candidate"] = {
+                "status": "candidate-only",
+                "scope": "offline structure aggregate/census policy audit only",
+                "target_set": "structure-aggregate-census-planning",
+                "artifact_schema": "obelisk.structure-aggregate-census-policy-slice.v1",
+                "copied_scalar_only": True,
+                "public_sdk_ready": False,
+                "promotion_ready": False,
+                "runtime_ready": False,
+                "must_remain_consume_only": True,
+                "must_block_promote_mode": True,
+            }
+            manifest = root / "public_sdk_surfaces.json"
+            manifest.write_text(json.dumps(manifest_payload, sort_keys=True), encoding="utf-8")
+
+            result = self.run_checker("--manifest", str(manifest), "--json")
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["blockers"], [])
+
     def test_manifest_wide_public_sdk_text_and_unrelated_promotions_do_not_block_structure_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -689,6 +722,98 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertIn("v1_completion", surfaces)
         self.assertIn("support_tier", surfaces)
         self.assertIn("umbrella_leaf_promotion", surfaces)
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
+    def test_runtime_sample_route_and_sdk_progress_aliases_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            readiness_payload["approvedRuntimeSamplesReady"] = True
+            readiness_payload["routeAccepted"] = True
+            readiness_payload["sdkProgressReady"] = True
+            readiness_payload["completeSdkReadiness"] = True
+            readiness_payload["publicLookupProgress"] = True
+            readiness_payload["mutationReadiness"] = True
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            candidate = manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]
+            candidate["notes"] = [
+                "route acceptance is ready",
+                "approved runtime samples make SDK progress accepted",
+                "SDK progress is accepted",
+                "public lookup is ready",
+                "mutation readiness accepted",
+                "complete SDK readiness is accepted",
+            ]
+            manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        true_paths = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_readiness_true"}
+        for key in (
+            "approvedRuntimeSamplesReady",
+            "routeAccepted",
+            "sdkProgressReady",
+            "completeSdkReadiness",
+            "publicLookupProgress",
+            "mutationReadiness",
+        ):
+            self.assertTrue(any(path.endswith(f".{key}") for path in true_paths), key)
+        string_surfaces = {item["surface"] for item in payload["blockers"] if item["reason"] == "forbidden_string_claim"}
+        self.assertIn("route_acceptance", string_surfaces)
+        self.assertIn("runtime_samples", string_surfaces)
+        self.assertIn("sdk_progress", string_surfaces)
+        self.assertIn("public_lookup", string_surfaces)
+        self.assertIn("mutation", string_surfaces)
+        self.assertIn("v1_completion", string_surfaces)
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
+    def test_side_lane_source_artifact_substitutions_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            readiness_payload["source_overclaim_total_flag_count"] = 0
+            readiness_payload["principal_start_end_runtime_evidence"] = {
+                "ready_scope": "principal_start_end_runtime_evidence_only",
+                "principal_start_end_runtime_evidence_ready": False,
+                "resolved_inputs": ["runtime_lifecycle_start_end_evidence"],
+            }
+            readiness_payload["passive_snapshot"] = {
+                "status": "passive_snapshot_non_evidence",
+                "passive_snapshot_evidence_allowed": False,
+            }
+            readiness_payload["target_set_alias"] = "structure-build-policy-runtime-ready"
+            readiness_payload["multi_surface_beta_capture_pack_ready"] = True
+            readiness_payload["current_route_blocker"] = "identity_public_contract_gate_missing"
+            readiness_payload["remaining_route_blockers"] = []
+            readiness_payload["required_first_artifact"] = "structure_build_policy_beta_pack"
+
+            manifest, _ = self.write_case(root, readiness_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        reasons = {item["reason"] for item in payload["blockers"]}
+        self.assertIn("source_overclaim_zero_not_allowed", reasons)
+        self.assertIn("copied_start_end_player_evidence_not_allowed", reasons)
+        self.assertIn("passive_snapshot_source_not_allowed", reasons)
+        self.assertIn("non_current_target_alias", reasons)
+        self.assertIn("beta_capture_source_alias_not_allowed", reasons)
+        self.assertIn("approved_runtime_evidence_missing_not_preserved", reasons)
+        self.assertIn("required_runtime_evidence_artifact_mismatch", reasons)
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])

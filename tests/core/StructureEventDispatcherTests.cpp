@@ -393,6 +393,180 @@ namespace
                 "self-unregister destroy structure callback remained registered");
     }
 
+    struct SelfUnregisterFailingDestroyState
+    {
+        Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
+        uint64_t RegistrationId = 0;
+        int Calls = 0;
+        int DestroyCalls = 0;
+        bool FailNextDestroy = true;
+    };
+
+    void SelfUnregisterFailingDestroyCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<SelfUnregisterFailingDestroyState*>(userData);
+        ++state->Calls;
+        Require(state->Dispatcher != nullptr, "self-unregister failing destroy callback had no dispatcher");
+        Require(state->Dispatcher->Unregister(state->RegistrationId),
+                "self-unregister failing destroy callback could not unregister itself");
+    }
+
+    void FailsOnceSelfUnregisterDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<SelfUnregisterFailingDestroyState*>(userData);
+        ++state->DestroyCalls;
+        if (state->FailNextDestroy)
+        {
+            state->FailNextDestroy = false;
+            throw std::runtime_error("expected self-unregister structure destroy failure");
+        }
+    }
+
+    void TestSelfUnregisterDestroyFailureIsRetainedForOwnerCleanup()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterFailingDestroyState state{&dispatcher, 0, 0, 0, true};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        state.RegistrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterFailingDestroyCallback, &state, FailsOnceSelfUnregisterDestroyUserData});
+        Require(state.RegistrationId != 0, "self-unregister failing destroy registration failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "self-unregister failing destroy callback did not dispatch");
+        Require(state.Calls == 1, "self-unregister failing destroy callback ran wrong count");
+        Require(state.DestroyCalls == 1, "self-unregister failing destroy did not run once");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "self-unregister failing destroy callback stayed dispatchable after failure");
+
+        bool retryThrew = false;
+        size_t retryRemoved = 0;
+        try
+        {
+            retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            retryThrew = true;
+        }
+
+        Require(retryThrew,
+                "owner cleanup hid unreported self-unregister structure destroy failure");
+        Require(retryRemoved == 0,
+                "throwing owner cleanup reported a completed self-unregister structure cleanup");
+        Require(state.DestroyCalls == 2,
+                "owner cleanup did not retry self-unregister structure destroy failure");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed self-unregister structure destroy retry was not idempotent");
+    }
+
+    struct WaitingOwnerCleanupSelfUnregisterState
+    {
+        Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
+        uint64_t RegistrationId = 0;
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool Unregistered = false;
+        bool ReleaseCallback = false;
+        int Calls = 0;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 1;
+    };
+
+    void WaitingOwnerCleanupSelfUnregisterCallback(const Obelisk::Core::StructureEventView&, void* userData)
+    {
+        auto* state = static_cast<WaitingOwnerCleanupSelfUnregisterState*>(userData);
+        Require(state->Dispatcher != nullptr, "waiting owner cleanup structure callback had no dispatcher");
+        ++state->Calls;
+        Require(state->Dispatcher->Unregister(state->RegistrationId),
+                "waiting owner cleanup structure callback could not unregister itself");
+        {
+            std::unique_lock<std::mutex> lock(state->Mutex);
+            state->Unregistered = true;
+            state->Cv.notify_all();
+            state->Cv.wait(lock, [state]() { return state->ReleaseCallback; });
+        }
+    }
+
+    void FailsOnceWaitingOwnerCleanupDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<WaitingOwnerCleanupSelfUnregisterState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected waiting owner cleanup structure destroy failure");
+        }
+    }
+
+    void TestWaitingOwnerCleanupObservesSelfUnregisterDeferredDestroyFailure()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        WaitingOwnerCleanupSelfUnregisterState state{&dispatcher};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        state.RegistrationId = dispatcher.Register(
+            &owner,
+            {WaitingOwnerCleanupSelfUnregisterCallback,
+             &state,
+             FailsOnceWaitingOwnerCleanupDestroyUserData});
+        Require(state.RegistrationId != 0,
+                "waiting owner cleanup structure self-unregister registration failed");
+
+        std::thread dispatchThread([&]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "waiting owner cleanup structure callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock,
+                                      std::chrono::seconds(2),
+                                      [&state]() { return state.Unregistered; }),
+                    "waiting owner cleanup structure callback did not unregister");
+        }
+        Require(dispatcher.SubscriptionCount() == 0,
+                "waiting owner cleanup structure callback remained dispatchable");
+
+        std::atomic<bool> cleanupThrew{false};
+        std::atomic<bool> cleanupFinished{false};
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "waiting owner cleanup structure completed before deferred destroy ran");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "waiting owner cleanup structure hid self-unregister deferred DestroyUserData failure");
+        Require(state.DestroyCalls == 2,
+                "waiting owner cleanup structure did not retry deferred DestroyUserData before reporting failure");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed waiting owner cleanup structure retry was not idempotent");
+    }
+
     struct ReentrantUnregisterOtherState
     {
         Obelisk::Core::StructureEventDispatcher* Dispatcher = nullptr;
@@ -835,6 +1009,78 @@ namespace
                 "completed deferred destroy retry was not idempotent");
     }
 
+    void TestDeferredDestroyFailureRecordStorageFailureIsRetainedForOwnerRetry()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        RetryingDeferredDestroyState state;
+        std::atomic<bool> cleanupThrewRuntimeError{false};
+        std::atomic<bool> cleanupThrewUnexpected{false};
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeScalars();
+
+        Require(dispatcher.Register(&owner, {BlockingRetryDestroyCallback, &state, FailsThenCountsDestroy}) != 0,
+                "deferred failure-record fallback registration failed");
+
+        std::thread dispatchThread([&dispatcher, &scalars]() {
+            Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                    "deferred failure-record fallback dispatch did not run");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "deferred failure-record fallback callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                dispatcher.FailNextDeferredDestroyFailureRecordForTesting();
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrewRuntimeError.store(true, std::memory_order_release);
+            }
+            catch (...)
+            {
+                cleanupThrewUnexpected.store(true, std::memory_order_release);
+            }
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred failure-record fallback cleanup did not remove dispatchable callback");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrewRuntimeError.load(std::memory_order_acquire),
+                "deferred failure-record storage failure hid original DestroyUserData failure");
+        Require(!cleanupThrewUnexpected.load(std::memory_order_acquire),
+                "deferred failure-record storage fallback propagated the wrong exception type");
+        Require(state.DestroyCalls == 1,
+                "deferred failure-record fallback first cleanup did not destroy once");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "deferred failure-record fallback did not retain failed subscription for retry");
+        Require(state.DestroyCalls == 2,
+                "deferred failure-record fallback retry did not rerun DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed deferred failure-record fallback cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred failure-record fallback left callbacks dispatchable");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -937,6 +1183,59 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left structure callbacks dispatchable");
     }
 
+    void TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "retry setup failure structure registration failed");
+
+        bool firstCleanupThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            firstCleanupThrew = true;
+        }
+
+        Require(firstCleanupThrew,
+                "retry setup failure fixture did not create a retained structure DestroyUserData failure");
+        Require(state.FailingCalls == 1,
+                "retry setup failure fixture did not attempt first structure DestroyUserData cleanup");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "retry setup failure fixture left structure callback dispatchable after first cleanup");
+
+        dispatcher.FailNextFailedOwnerDestroyRetrySetupForTesting();
+        bool setupFailureThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::bad_alloc&)
+        {
+            setupFailureThrew = true;
+        }
+
+        Require(setupFailureThrew,
+                "structure owner cleanup retry setup failure did not propagate to PluginManager");
+        Require(state.FailingCalls == 1,
+                "structure owner cleanup retry setup failure reran DestroyUserData before setup completed");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "structure owner cleanup retry setup failure did not retain pending DestroyUserData for retry");
+        Require(state.FailingCalls == 2,
+                "structure owner cleanup retry setup failure did not retry retained DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "structure owner cleanup retry setup failure retry was not idempotent after success");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "structure owner cleanup retry setup failure left callback dispatchable");
+    }
+
     void TestExceptionsDoNotStopDispatch()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -963,15 +1262,19 @@ int main()
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
     TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
+    TestSelfUnregisterDestroyFailureIsRetainedForOwnerCleanup();
+    TestWaitingOwnerCleanupObservesSelfUnregisterDeferredDestroyFailure();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestDeferredOwnerCleanupRetainsEveryFailedDestroy();
+    TestDeferredDestroyFailureRecordStorageFailureIsRetainedForOwnerRetry();
     TestOwnerCleanup();
     TestOwnerCleanupPropagatesDestroyUserDataFailure();
     TestOwnerCleanupRetriesFailedDestroyUserData();
+    TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData();
     TestExceptionsDoNotStopDispatch();
 
     std::cout << "StructureEventDispatcherTests passed\n";

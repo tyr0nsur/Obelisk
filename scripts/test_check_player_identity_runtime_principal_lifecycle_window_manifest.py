@@ -38,12 +38,23 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
     REQUEST_ROLLBACK_DELTA,
+    STANDING_LAUNCH_AUTHORITY_APPROVAL_TEXT,
     WINDOW_MARKERS,
+    current_turn_approval_scope,
+    deployment_intent,
+    direct_join_plan,
     env_lines,
+    exact_target_scope,
     markdown_request,
-    operator_live_ops_brief,
     operator_approval_receipt_payload,
+    operator_live_ops_brief,
+    passive_wait_boundary,
+    player_notice_action,
+    player_presence_safety,
+    planned_obelisk_build_identity,
     post_window_replay_contract,
+    rollback_plan,
+    runtime_triplet_contract,
 )
 if _OLD_TEST_WORKSPACE_ROOT is None:
     os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
@@ -65,10 +76,10 @@ ARK_SHA = EXPECTED_BINARY_SHA256
 
 
 def future_window_fields() -> dict[str, str]:
-    start = (datetime.now(timezone.utc) + timedelta(minutes=5)).replace(microsecond=0)
+    start = (datetime.now(timezone.utc) + timedelta(minutes=8)).replace(microsecond=0)
     capture_start = start + timedelta(minutes=1)
-    capture_end = start + timedelta(minutes=8)
-    rollback_end = start + timedelta(minutes=10)
+    capture_end = start + timedelta(minutes=14)
+    rollback_end = start + timedelta(minutes=15)
     run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
     payload = {
         "run_id": run_id,
@@ -103,9 +114,9 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "target": "arkserver2/TheIsland",
         "approval": "current-turn operator-approved runtime window, not standing approval",
         "approved_window_start_utc": "2026-06-01T12:00:00Z",
-        "approved_window_end_utc": "2026-06-01T12:10:00Z",
+        "approved_window_end_utc": "2026-06-01T12:15:00Z",
         "actual_capture_start_utc": "2026-06-01T12:01:00Z",
-        "actual_capture_end_utc": "2026-06-01T12:09:00Z",
+        "actual_capture_end_utc": "2026-06-01T12:14:00Z",
         "copied_log_path": f"live-validation-logs/{RUN_ID}/Obelisk.log",
         "copied_log_sha256": GOOD_SHA,
         "request_pack_path": "window-request.json",
@@ -122,8 +133,8 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "post_posture": "stable",
         "pre_check": "passed",
         "post_check": "passed",
-        "rollback_start_utc": "2026-06-01T12:09:00Z",
-        "rollback_end_utc": "2026-06-01T12:10:00Z",
+        "rollback_start_utc": "2026-06-01T12:14:00Z",
+        "rollback_end_utc": "2026-06-01T12:15:00Z",
         "rollback_completed": "true",
         "rollback_delta": "removed_observer_env_and_markers_preserved_disable_plugins",
         "observer_env_survived": "false",
@@ -156,6 +167,7 @@ def manifest_lines(**overrides: str | None) -> list[str]:
 
 def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     target = fields.get("target", "arkserver2/TheIsland").split("/", 1)
+    target_payload = {"instance": target[0], "map": target[1]}
     copied_log_path = Path(fields["copied_log_path"])
     if not copied_log_path.is_absolute():
         copied_log_path = base / copied_log_path
@@ -170,9 +182,12 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     payload = {
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
         "status": "candidate_only_request_pack",
-        "approval_required": "current-turn operator-approved runtime window, not standing approval",
+        "approval_required": fields.get(
+            "approval",
+            "current-turn operator-approved runtime window, not standing approval",
+        ),
         "prepared_at_utc": prepared_at_utc,
-        "target": {"instance": target[0], "map": target[1]},
+        "target": target_payload,
         "run_id": fields["run_id"],
         "ark_binary_sha256": ARK_SHA,
         "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
@@ -183,6 +198,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         },
         "restart_expectation": "restart",
         "final_posture": "stable",
+        "diagnostic_candidates_enabled": False,
         "authorization_flags": dict(AUTHORIZATION_FLAGS),
         "user_policy": fields.get("user_policy", "no_regular_users"),
         "notice_path": "not_applicable",
@@ -190,14 +206,15 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         "copied_log_path": str(copied_log_path),
         "window_manifest_path": str(window_manifest_path),
         "observer_env_file": "observer-window.env",
+        "runtime_triplet_contract": runtime_triplet_contract(),
         "marker_set": WINDOW_MARKERS,
         "forbidden_markers": FORBIDDEN_MARKERS,
-        "rollback": {
-            "owner": "operator",
-            "delta": REQUEST_ROLLBACK_DELTA,
-        },
+        "rollback": rollback_plan(target_payload, "operator"),
         "non_claims": NON_CLAIMS,
     }
+    payload["exact_target_scope"] = exact_target_scope(payload)
+    payload["passive_wait_boundary"] = passive_wait_boundary(payload)
+    payload["direct_join_plan"] = direct_join_plan(payload)
     args = type(
         "Args",
         (),
@@ -205,10 +222,20 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
             "instance": target[0],
             "map_name": target[1],
             "binary_sha256": ARK_SHA,
+            "obelisk_commit": payload["obelisk_commit"],
+            "obelisk_build_artifact": None,
+            "obelisk_build_artifact_sha256": None,
+            "obelisk_build_artifact_label": None,
         },
     )()
-    payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env_lines(args))
+    env = env_lines(args)
+    payload["planned_obelisk_build_identity"] = planned_obelisk_build_identity(args)
+    payload["player_notice_action"] = player_notice_action(payload)
+    payload["player_presence_safety"] = player_presence_safety(payload)
     payload["post_window_replay_contract"] = post_window_replay_contract(payload)
+    payload["current_turn_approval_scope"] = current_turn_approval_scope(payload, env)
+    payload["deployment_intent"] = deployment_intent(payload)
+    payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env)
     return payload
 
 
@@ -237,7 +264,13 @@ def preflight_payload(
         "observer_env_counts_as_approved_runtime_evidence": False,
         "operator_request_counts_as_approved_runtime_evidence": False,
         "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "copied_log_presence_counts_as_approved_runtime_evidence": False,
         "bundle_output_counts_as_approved_runtime_evidence": False,
+        "dry_run_success_counts_as_approved_runtime_evidence": False,
+        "historical_target_names_authorize_runtime": False,
+        "marker_env_readiness_counts_as_approved_runtime_evidence": False,
+        "player_notice_counts_as_approved_runtime_evidence": False,
+        "public_reachability_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -271,6 +304,7 @@ def preflight_payload(
             "sha256": "1" * 64,
         },
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
+        "diagnostic_candidates_enabled": False,
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": False,
@@ -372,7 +406,7 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
             request_md_path=operator_request_path,
             env_path=observer_env_path,
             operator_approved=True,
-            operator_reference="test-current-turn-approval",
+            operator_reference="operator",
             approved_at_utc=fields.get(
                 "approval_recorded_at_utc",
                 datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -539,6 +573,48 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["route_ready"])
         self.assertFalse(report["sdk_accounting_counts_as_completed_surface"])
         self.assertFalse(report["p0_accounting_counts_as_promoted_surface"])
+        self.assertEqual(report["remaining_blockers"], [])
+        self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
+        self.assertEqual(report["next_required_artifact"], "approved_runtime_principal_lifecycle_evidence_bundle")
+        self.assertEqual(report["missing_required_artifact"], "approved_runtime_principal_lifecycle_evidence_bundle")
+        self.assertEqual(report["required_artifact_status"], "missing_or_not_accepted")
+        self.assertEqual(
+            report["next_step"],
+            "build_and_check_approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        next_step = report["machine_next_step"]
+        self.assertEqual(
+            next_step["schema"],
+            "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-next-step.v1",
+        )
+        self.assertEqual(
+            next_step["step"],
+            "build_and_check_approved_runtime_principal_lifecycle_evidence_bundle",
+        )
+        self.assertFalse(next_step["authorized_by_this_report"])
+        self.assertFalse(next_step["server_operations_authorized"])
+        self.assertFalse(next_step["runtime_work_authorized"])
+        self.assertFalse(next_step["runtime_capture_authorized"])
+        self.assertFalse(next_step["approved_runtime_evidence"])
+        self.assertFalse(next_step["approved_runtime_evidence_ready"])
+
+    def test_accepts_standing_launch_authority_window_manifest_without_promoting_identity(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(approval=STANDING_LAUNCH_AUTHORITY_APPROVAL_TEXT)
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["operational_window_manifest_ready"])
+        self.assertEqual(report["approval"], STANDING_LAUNCH_AUTHORITY_APPROVAL_TEXT)
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
 
     def test_post_window_replay_rejects_future_operational_window(self) -> None:
         result = self.run_checker_in_approved_workspace(
@@ -594,6 +670,513 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("request_pack_path_not_beside_window_manifest", report["blockers"])
         self.assertEqual(report["remaining_blockers"], ["window_manifest_not_accepted"])
         self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
+        self.assertEqual(report["next_required_artifact"], "accepted_player_principal_lifecycle_window_manifest")
+        self.assertEqual(report["next_step"], "fix_window_manifest_blockers")
+        self.assertFalse(report["machine_next_step"]["server_operations_authorized"])
+
+    def test_rejects_notice_prep_json_copied_into_preflight_sidecar(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields["preflight_pre_path"])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = {
+                "schema": "obelisk.player-principal-lifecycle-beta-notice-prep.v1",
+                "ready": True,
+                "mode": "dry_run",
+                "counts_as_approved_runtime_evidence": False,
+                "approved_runtime_evidence_ready": False,
+                "non_authorization": "notice preparation only",
+            }
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "preflight_pre_path_notice_prep_sidecar_not_approved_runtime_evidence",
+            report["blockers"],
+        )
+        self.assertFalse(report["ready"])
+
+    def test_rejects_public_reachability_json_copied_into_preflight_sidecar(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields["preflight_pre_path"])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = {
+                "schema": "obelisk.player-principal-public-reachability-check.v1",
+                "ready": True,
+                "public_reachability_ready": True,
+                "public_reachability_counts_as_approved_runtime_evidence": True,
+            }
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "preflight_pre_path_public_reachability_sidecar_not_approved_runtime_evidence",
+            report["blockers"],
+        )
+        self.assertFalse(report["ready"])
+
+    def test_rejects_active_or_passive_summary_json_copied_into_preflight_sidecar(self) -> None:
+        cases = (
+            (
+                "passive_activity_triage",
+                {
+                    "schema": "obelisk.player-principal-passive-activity-triage.v1",
+                    "classification": "passive_activity_triage_non_evidence",
+                    "active_targets": ["arkserver:Ragnarok:27015"],
+                    "candidate_targets_with_complete_observer_event_triplet_candidate": [
+                        "arkserver:Ragnarok:27015"
+                    ],
+                    "approved_runtime_evidence": True,
+                    "ready": True,
+                },
+                "preflight_pre_path_passive_activity_triage_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "sdk_status_report",
+                {
+                    "schema": "obelisk.sdk-status-report.v1",
+                    "status_report_only": True,
+                    "active_player_principal_paths": {
+                        "ragnarok": {
+                            "path_status": "active_ragnarok_complete_passive_triplet_needs_approved_bundle"
+                        }
+                    },
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                },
+                "preflight_pre_path_sdk_status_report_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "passive_monitor_only_summary",
+                {
+                    "schema": "obelisk.player-principal-passive-monitor-only-summary.v1",
+                    "ready": True,
+                    "next_action": "run_runtime_window",
+                    "approved_runtime_evidence_present": False,
+                },
+                "preflight_pre_path_passive_monitor_only_sidecar_not_approved_runtime_evidence",
+            ),
+        )
+        for name, payload, expected_blocker in cases:
+            with self.subTest(name=name):
+                def mutate(root: Path, fields: dict[str, str]) -> None:
+                    preflight_path = Path(fields["preflight_pre_path"])
+                    if not preflight_path.is_absolute():
+                        preflight_path = root / preflight_path
+                    preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+                    fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+                result = self.run_checker_in_approved_workspace(
+                    manifest_lines(),
+                    check=False,
+                    sidecar_mutator=mutate,
+                )
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_blocker, report["blockers"])
+                self.assertFalse(report["ready"])
+
+    def test_rejects_notice_action_or_status_report_json_copied_into_preflight_sidecar(self) -> None:
+        cases = (
+            (
+                "player_notice_action",
+                {
+                    "schema": "obelisk.player-principal-lifecycle-player-notice-action.v1",
+                    "required": True,
+                    "notice_path": "discord-beta-testers",
+                    "counts_as_approved_runtime_evidence": False,
+                },
+                "preflight_pre_path_player_notice_action_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "discord_active_notice_state",
+                {
+                    "schema": "obelisk.discord-beta-bridge-active-notice.v1",
+                    "status": "active",
+                    "discord_sent": True,
+                    "counts_as_approved_runtime_evidence": False,
+                },
+                "preflight_pre_path_discord_bridge_state_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "window_request_check",
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request-check.v1",
+                    "ready": True,
+                    "request_pack_ready": True,
+                    "approved_runtime_evidence_ready": False,
+                },
+                "preflight_pre_path_window_request_check_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "approved_runtime_manifest",
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                },
+                "preflight_pre_path_approved_runtime_manifest_sidecar_not_checked_bundle_output",
+            ),
+            (
+                "public_sdk_completion_check",
+                {
+                    "schema": "obelisk.public-sdk-v1-completion-check.v1",
+                    "status": "blocked",
+                    "ready": False,
+                    "approved_in_game_evidence_ready": False,
+                    "sdk_completion": {"progress_ratio": "0/12"},
+                },
+                "preflight_pre_path_public_sdk_completion_check_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "public_sdk_completion_summary",
+                {
+                    "schema": "obelisk.public-sdk-v1-completion-summary.v1",
+                    "status": "blocked",
+                    "ready": False,
+                    "sdk_completion": {"status": "blocked", "progress_ratio": "0/12"},
+                },
+                "preflight_pre_path_public_sdk_completion_summary_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "approved_in_game_evidence_status",
+                {
+                    "schema": "obelisk.approved-in-game-evidence-status.v1",
+                    "approved_runtime_evidence_ready": False,
+                    "sdk": {"promoted": 0, "total": 12},
+                },
+                "preflight_pre_path_approved_in_game_evidence_status_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "runtime_evidence_status",
+                {
+                    "schema": "obelisk.player-principal-lifecycle-runtime-evidence-status.v1",
+                    "ready": False,
+                    "status": "blocked",
+                    "machine_next_actions_schema": (
+                        "obelisk.player-principal-lifecycle-runtime-evidence-status-machine-next-actions.v1"
+                    ),
+                    "machine_next_actions": [{"action": "run_bundle_checker"}],
+                },
+                "preflight_pre_path_runtime_evidence_status_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "next_action_plan",
+                {
+                    "schema": "obelisk.player-principal-lifecycle-next-action-plan.v1",
+                    "status": "next_actions_planned",
+                    "next_action_sequence": [{"id": "run_window"}],
+                },
+                "preflight_pre_path_next_action_plan_sidecar_not_approved_runtime_evidence",
+            ),
+            (
+                "runtime_window_execution",
+                {
+                    "schema": "obelisk.player-principal-lifecycle-runtime-window-execution.v1",
+                    "next_action_sequence": [{"id": "copy_log"}],
+                    "runtime_capture_authorized": False,
+                },
+                "preflight_pre_path_runtime_window_execution_sidecar_not_approved_runtime_evidence",
+            ),
+        )
+        for name, payload, expected_blocker in cases:
+            with self.subTest(name=name):
+                def mutate(root: Path, fields: dict[str, str]) -> None:
+                    preflight_path = Path(fields["preflight_pre_path"])
+                    if not preflight_path.is_absolute():
+                        preflight_path = root / preflight_path
+                    preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+                    fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+                result = self.run_checker_in_approved_workspace(
+                    manifest_lines(),
+                    check=False,
+                    sidecar_mutator=mutate,
+                )
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_blocker, report["blockers"])
+                self.assertFalse(report["ready"])
+
+    def test_rejects_multi_surface_beta_capture_json_copied_into_preflight_sidecar(self) -> None:
+        cases = (
+            (
+                "pack_manifest",
+                {
+                    "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                    "status": "candidate_capture_pack",
+                    "non_claim_flags": {
+                        "authorizes_marker_or_env_changes": True,
+                        "counts_as_runtime_evidence": True,
+                        "clears_approved_runtime_evidence_missing": True,
+                    },
+                },
+                "preflight_pre_path_multi_surface_beta_capture_pack_sidecar_not_approved_runtime_evidence",
+                {
+                    "preflight_pre_path_authorizes_marker_or_env_changes_not_false",
+                    "preflight_pre_path_counts_as_runtime_evidence_not_false",
+                    "preflight_pre_path_clears_approved_runtime_evidence_missing_not_false",
+                },
+            ),
+            (
+                "capture_plan",
+                {
+                    "schema": "obelisk.multi-surface-beta-capture-plan.v1",
+                    "status": "candidate_capture_plan",
+                    "capture_surfaces": [{"id": "player_principal_lifecycle"}],
+                },
+                "preflight_pre_path_multi_surface_beta_capture_plan_sidecar_not_approved_runtime_evidence",
+                set(),
+            ),
+            (
+                "checker_matrix",
+                {
+                    "schema": "obelisk.multi-surface-beta-capture-checker-matrix.v1",
+                    "status": "candidate_only",
+                    "surfaces": [{"id": "player_principal_lifecycle"}],
+                },
+                "preflight_pre_path_multi_surface_beta_capture_checker_matrix_sidecar_not_approved_runtime_evidence",
+                set(),
+            ),
+            (
+                "non_claim_manifest",
+                {
+                    "schema": "obelisk.multi-surface-beta-capture-non-claim-manifest.v1",
+                    "status": "non_authorizing_candidate_pack",
+                    "surface_non_claims": [{"id": "player_principal_lifecycle"}],
+                },
+                "preflight_pre_path_multi_surface_beta_capture_non_claim_manifest_sidecar_not_approved_runtime_evidence",
+                set(),
+            ),
+        )
+        for name, payload, expected_blocker, extra_blockers in cases:
+            with self.subTest(name=name):
+                def mutate(root: Path, fields: dict[str, str], payload: dict = payload) -> None:
+                    preflight_path = Path(fields["preflight_pre_path"])
+                    if not preflight_path.is_absolute():
+                        preflight_path = root / preflight_path
+                    preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+                    fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+                result = self.run_checker_in_approved_workspace(
+                    manifest_lines(),
+                    check=False,
+                    sidecar_mutator=mutate,
+                )
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_blocker, report["blockers"])
+                for blocker in extra_blockers:
+                    self.assertIn(blocker, report["blockers"])
+                self.assertFalse(report["ready"])
+                self.assertFalse(report["runtime_ready"])
+                self.assertFalse(report["approved_runtime_evidence_ready"])
+
+    def test_rejects_multi_surface_beta_capture_pack_copied_into_request_pack_sidecar(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = {
+                "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                "status": "candidate_capture_pack",
+                "run_id": "multi-surface-beta-capture-20260601T120000Z-arkserver2-TheIsland",
+                "non_claim_flags": {
+                    "authorizes_marker_or_env_changes": True,
+                    "authorizes_server_restart": True,
+                    "counts_as_approved_runtime_evidence": True,
+                },
+                "artifacts": [],
+            }
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "request_pack_multi_surface_beta_capture_pack_sidecar_not_approved_runtime_evidence",
+            report["blockers"],
+        )
+        self.assertIn("request_pack_authorizes_marker_or_env_changes_not_false", report["blockers"])
+        self.assertIn("request_pack_authorizes_server_restart_not_false", report["blockers"])
+        self.assertIn("request_pack_counts_as_approved_runtime_evidence_not_false", report["blockers"])
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["machine_next_step"]["marker_env_changes_authorized"])
+
+    def test_post_window_replay_rejects_multi_surface_beta_capture_artifacts_beside_manifest(self) -> None:
+        artifacts = {
+            "manifest.json": {"schema": "obelisk.multi-surface-beta-capture-pack.v1"},
+            "multi-surface-capture-plan.json": {"schema": "obelisk.multi-surface-beta-capture-plan.v1"},
+            "checker-command-matrix.json": {
+                "schema": "obelisk.multi-surface-beta-capture-checker-matrix.v1"
+            },
+            "non-claim-manifest.json": {
+                "schema": "obelisk.multi-surface-beta-capture-non-claim-manifest.v1"
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name, payload in artifacts.items():
+                (root / name).write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            blockers: list[dict[str, object]] = []
+            CHECKER.validate_unexpected_post_window_json_sidecars(
+                root,
+                blockers,
+                post_window_replay=True,
+            )
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn(
+            "unexpected_json_sidecar_multi_surface_beta_capture_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "unexpected_json_sidecar_multi_surface_beta_capture_schema_not_approved_runtime_evidence",
+            reasons,
+        )
+        for reason in (
+            "unexpected_json_sidecar_multi_surface_beta_capture_pack_sidecar_not_approved_runtime_evidence",
+            "unexpected_json_sidecar_multi_surface_beta_capture_plan_sidecar_not_approved_runtime_evidence",
+            "unexpected_json_sidecar_multi_surface_beta_capture_checker_matrix_sidecar_not_approved_runtime_evidence",
+            "unexpected_json_sidecar_multi_surface_beta_capture_non_claim_manifest_sidecar_not_approved_runtime_evidence",
+        ):
+            self.assertIn(reason, reasons)
+
+    def test_rejects_multi_surface_beta_capture_pack_manifest_as_window_manifest_input(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.multi-surface-beta-capture-pack.v1",
+                        "status": "candidate_capture_pack",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(manifest), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("expected key=value", result.stderr)
+
+    def test_rejects_stale_request_pack_schema_missing_current_notice_and_passive_fields(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload.pop("player_notice_action")
+            payload.pop("passive_wait_boundary")
+            payload.pop("current_turn_approval_scope")
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_current_schema_key_missing", report["blockers"])
+        missing = {
+            detail.get("key_path")
+            for detail in report["blocker_details"]
+            if detail["reason"] == "request_pack_current_schema_key_missing"
+        }
+        self.assertEqual(
+            {"player_notice_action", "passive_wait_boundary", "current_turn_approval_scope"},
+            missing,
+        )
+        self.assertFalse(report["ready"])
+
+    def test_rejects_receipt_bound_request_missing_player_presence_safety(self) -> None:
+        def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
+            receipt = Path(fields["operator_approval_receipt_path"])
+            if not receipt.is_absolute():
+                receipt = exact_dir / receipt
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["bound_request_pack"].pop("player_presence_safety")
+            receipt.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate_receipt,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["operator_approval_receipt"]["verified"])
+        self.assertIn("operator_approval_receipt_player_presence_safety_mismatch", report["blockers"])
+        self.assertIn("operator_approval_receipt_bound_request_player_presence_safety_missing", report["blockers"])
+
+    def test_rejects_request_pack_public_reachability_as_runtime_evidence_alias(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["public_reachability"] = {
+                "counts_as_approved_runtime_evidence": True,
+                "ready": True,
+            }
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_unexpected_key", report["blockers"])
+        self.assertIn(
+            "request_pack_counts_as_approved_runtime_evidence_not_false",
+            report["blockers"],
+        )
+        self.assertFalse(report["ready"])
 
     def test_rejects_receipt_approved_before_request_prepared(self) -> None:
         def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
@@ -697,7 +1280,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
                         request_md_path=operator_request,
                         env_path=observer_env,
                         operator_approved=True,
-                        operator_reference="test-current-turn-approval",
+                        operator_reference="operator",
                         approved_at_utc=(window_start - timedelta(minutes=11)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     ),
                     sort_keys=True,
@@ -740,6 +1323,27 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_approval_receipt_approved_by_role_invalid", report["blockers"])
         self.assertIn("operator_approval_receipt_approval_source_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_operator_approval_receipt_incomplete_role(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approved_by_role"] = "test-current-turn-approval"
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_approval_receipt_approved_by_role_unapproved", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_operator_approval_receipt_bound_request_pack_drift(self) -> None:
@@ -1048,6 +1652,10 @@ class WindowManifestCheckerTests(unittest.TestCase):
         forbidden_flags = (
             "runtime_work_authorized",
             "server_operations_authorized",
+            "live_log_reads_authorized",
+            "reads_live_logs",
+            "live_ops_authorized",
+            "runtime_capture_authorized",
             "runtime_ready",
             "public_sdk_ready",
             "public_abi_ready",
@@ -1122,6 +1730,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
             payload["nested_flags"] = {
                 "runtimeWorkAuthorized": True,
                 "server-operations-authorized": "yes",
+                "liveLogReadsAuthorized": "yes",
+                "readsLiveLogs": "true",
                 "public sdk ready": "ready",
                 "approved runtime evidence present": "present",
                 "approvedRuntimeEvidenceReady": "accepted",
@@ -1155,6 +1765,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
         reasons = [item["reason"] for item in blockers]
         self.assertIn("preflight_pre_path_runtime_work_authorized_not_false", reasons)
         self.assertIn("preflight_pre_path_server_operations_authorized_not_false", reasons)
+        self.assertIn("preflight_pre_path_live_log_reads_authorized_not_false", reasons)
+        self.assertIn("preflight_pre_path_reads_live_logs_not_false", reasons)
         self.assertIn("preflight_pre_path_public_sdk_ready_not_false", reasons)
         self.assertIn("preflight_pre_path_approved_runtime_evidence_present_not_false", reasons)
         self.assertIn("preflight_pre_path_approved_runtime_evidence_ready_not_false", reasons)
@@ -1165,6 +1777,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
         }
         self.assertIn("nested_flags.runtimeWorkAuthorized", key_paths)
         self.assertIn("nested_flags.server-operations-authorized", key_paths)
+        self.assertIn("nested_flags.liveLogReadsAuthorized", key_paths)
+        self.assertIn("nested_flags.readsLiveLogs", key_paths)
         self.assertIn("nested_flags.public sdk ready", key_paths)
         self.assertIn("nested_flags.approved runtime evidence present", key_paths)
         self.assertIn("nested_flags.approvedRuntimeEvidenceReady", key_paths)
@@ -1915,6 +2529,15 @@ class WindowManifestCheckerTests(unittest.TestCase):
             blockers: list[dict[str, object]] = []
             receipt_resolved = receipt_path.resolve()
 
+            for flag in (
+                "current_turn_scope_authorized",
+                "discord_send_authorized",
+                "marker_env_changes_authorized",
+                "runtime_capture_authorized",
+                "runtime_window_authorized",
+            ):
+                self.assertIn(flag, CHECKER.EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS)
+
             def guarded_is_file(path: Path) -> bool:
                 if path == receipt_resolved:
                     return True
@@ -2354,6 +2977,59 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("operator_request_markdown_mismatch", details[0]["request_check_blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_request_pack_runtime_triplet_contract_without_exact_copied_bool_shape(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["runtime_triplet_contract"]["session_start_rejected"]["required_copied_bool_values"] = [
+                "0",
+                "0",
+            ]
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_runtime_triplet_contract_mismatch", report["blockers"])
+        self.assertIn(
+            "request_pack_runtime_triplet_contract_session_start_copied_bool_values_mismatch",
+            report["blockers"],
+        )
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+
+    def test_rejects_request_pack_player_presence_safety_overclaim(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["player_presence_safety"]["player_check_or_broadcast_authorized_by_request_pack"] = True
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "request_pack_player_presence_safety_player_check_or_broadcast_authorized_by_request_pack_mismatch",
+            report["blockers"],
+        )
+        self.assertFalse(report["ready"])
+
     def test_rejects_request_pack_post_window_replay_contract_sidecar_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
             request_pack = Path(fields["request_pack_path"])
@@ -2613,6 +3289,37 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("preflight_pre_path_json_invalid", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_preflight_sidecar_positive_status_shortcuts(self) -> None:
+        cases = (
+            ("approved", True, "preflight_pre_path_approved_not_false"),
+            ("accepted", "yes", "preflight_pre_path_accepted_not_false"),
+            ("complete", 1, "preflight_pre_path_complete_not_false"),
+            ("current_turn_authorized", True, "preflight_pre_path_current_turn_authorized_not_false"),
+            ("ready", {"value": "true"}, "preflight_pre_path_ready_not_false"),
+        )
+        for key, value, reason in cases:
+            with self.subTest(key=key):
+                def mutate(root: Path, fields: dict[str, str]) -> None:
+                    preflight_path = Path(fields["preflight_pre_path"])
+                    if not preflight_path.is_absolute():
+                        preflight_path = root / preflight_path
+                    payload = json.loads(preflight_path.read_text(encoding="utf-8"))
+                    payload["sidecar_shortcut"] = {key: value}
+                    preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+                    fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+                result = self.run_checker_in_approved_workspace(
+                    manifest_lines(),
+                    check=False,
+                    sidecar_mutator=mutate,
+                )
+                report = json.loads(result.stdout)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(reason, report["blockers"])
+            self.assertFalse(report["ready"])
+            self.assertFalse(report["approved_runtime_evidence_ready"])
+
     def test_rejects_preflight_sidecar_anchor_drift_even_with_matching_sha(self) -> None:
         workspace = SAFE_OFFLINE_WORKSPACE
         cases = (
@@ -2725,6 +3432,18 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("beta_user_policy_requires_notice_sent", report["blockers"])
+
+    def test_beta_user_policy_requires_bound_real_notice_contract(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(user_policy="operator_approved_beta_users", notice_sent="true"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_player_notice_action_notice_path_mismatch", report["blockers"])
+        self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertFalse(report["ready"])
 
     def test_rejects_unknown_user_policy(self) -> None:
         result = self.run_checker(manifest_lines(user_policy="unknown"), check=False)

@@ -1,11 +1,13 @@
 #include "Logger.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/pattern_formatter.h>
 #include <spdlog/spdlog.h>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -60,6 +62,50 @@ namespace Obelisk
             }
         }
 
+        void CreateDirectoriesNoSymlinkEscapes(const std::filesystem::path& path, const char* label)
+        {
+            ValidateNoPathAliasComponents(path, label);
+
+            std::filesystem::path current;
+            for (const auto& component : path)
+            {
+                if (component == path.root_name())
+                {
+                    current = component;
+                    continue;
+                }
+                if (component == path.root_directory())
+                {
+                    current = current.empty() ? component : current / component;
+                    continue;
+                }
+
+                current = current.empty() ? component : current / component;
+                std::error_code statusEc;
+                std::filesystem::file_status status = std::filesystem::symlink_status(current, statusEc);
+
+                if (status.type() == std::filesystem::file_type::not_found)
+                {
+                    std::error_code createEc;
+                    if (!std::filesystem::create_directory(current, createEc) && createEc)
+                        throw std::runtime_error(std::string("failed to create ") + label + ": " + createEc.message());
+
+                    status = std::filesystem::symlink_status(current, statusEc);
+                    if (statusEc)
+                        throw std::runtime_error(std::string(label) + " status failed after creation: " + statusEc.message());
+                }
+                else if (statusEc)
+                {
+                    throw std::runtime_error(std::string(label) + " path component is not accessible: " + statusEc.message());
+                }
+
+                if (std::filesystem::is_symlink(status))
+                    throw std::runtime_error(std::string(label) + " path component must not be a symlink");
+                if (!std::filesystem::is_directory(status))
+                    throw std::runtime_error(std::string(label) + " path component must be a directory");
+            }
+        }
+
         void ValidateOrCreateLogDirectory(const std::filesystem::path& path, const char* label)
         {
             if (path.empty())
@@ -67,28 +113,9 @@ namespace Obelisk
             if (!path.is_absolute())
                 throw std::runtime_error(std::string(label) + " must be absolute");
 
-            ValidateExistingPathComponentsNoSymlinks(path, label);
+            CreateDirectoriesNoSymlinkEscapes(path, label);
 
             std::error_code ec;
-            const std::filesystem::file_status symlinkStatus = std::filesystem::symlink_status(path, ec);
-            if (symlinkStatus.type() == std::filesystem::file_type::not_found)
-            {
-                std::filesystem::create_directories(path, ec);
-                if (ec)
-                    throw std::runtime_error(std::string("failed to create ") + label + ": " + ec.message());
-            }
-            else
-            {
-                if (ec)
-                    throw std::runtime_error(std::string(label) + " is not accessible: " + ec.message());
-                if (std::filesystem::is_symlink(symlinkStatus))
-                    throw std::runtime_error(std::string(label) + " must not be a symlink");
-                if (!std::filesystem::is_directory(symlinkStatus))
-                    throw std::runtime_error(std::string(label) + " must be a directory");
-            }
-
-            ValidateExistingPathComponentsNoSymlinks(path, label);
-
             const std::filesystem::file_status finalStatus = std::filesystem::symlink_status(path, ec);
             if (ec)
                 throw std::runtime_error(std::string(label) + " status failed: " + ec.message());
@@ -159,19 +186,20 @@ namespace Obelisk
             return sanitized.empty() ? "unknown" : sanitized;
         }
 
-        std::string SanitizeIdentifier(const char* value)
+        std::string GetSafeInstanceIdentifier(const char* value)
         {
             if (!value || value[0] == '\0')
                 return "";
 
-            std::string sanitized;
+            std::string identifier(value);
             for (const unsigned char ch : std::string(value))
             {
                 if (std::isalnum(ch) || ch == '_' || ch == '-')
-                    sanitized.push_back(static_cast<char>(ch));
+                    continue;
+                throw std::runtime_error("OBELISK_INSTANCE_ID must contain only letters, digits, '_' or '-' before deriving log directory");
             }
 
-            return sanitized;
+            return identifier;
         }
 
         std::string GetInstanceLogName()
@@ -180,9 +208,9 @@ namespace Obelisk
             return "Obelisk-" + mapName + ".log";
         }
 
-        std::filesystem::path GetInstanceLogDir(const std::filesystem::path& baseLogDir)
+        std::filesystem::path GetInstanceLogDir(const std::filesystem::path& baseLogDir,
+                                                const std::string& instanceId)
         {
-            const std::string instanceId = SanitizeIdentifier(std::getenv("OBELISK_INSTANCE_ID"));
             if (instanceId.empty())
                 return baseLogDir;
 
@@ -200,13 +228,16 @@ namespace Obelisk
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_pattern("%^[%T] [Obelisk] %v%$");
 
+        const std::string instanceId = GetSafeInstanceIdentifier(std::getenv("OBELISK_INSTANCE_ID"));
         std::filesystem::path logDir = GetLogDir();
-        std::filesystem::path instanceLogDir = GetInstanceLogDir(logDir);
+        std::filesystem::path instanceLogDir = GetInstanceLogDir(logDir, instanceId);
         auto shared_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((instanceLogDir / "Obelisk.log").string(), true);
-        shared_file_sink->set_pattern("[%T] [%l] %v");
+        shared_file_sink->set_formatter(std::make_unique<spdlog::pattern_formatter>(
+            "[%Y-%m-%dT%H:%M:%SZ] [%l] %v", spdlog::pattern_time_type::utc));
 
         auto instance_file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>((instanceLogDir / GetInstanceLogName()).string(), true);
-        instance_file_sink->set_pattern("[%T] [%l] %v");
+        instance_file_sink->set_formatter(std::make_unique<spdlog::pattern_formatter>(
+            "[%Y-%m-%dT%H:%M:%SZ] [%l] %v", spdlog::pattern_time_type::utc));
 
         std::vector<spdlog::sink_ptr> sinks { console_sink, shared_file_sink, instance_file_sink };
 

@@ -246,12 +246,20 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                     "target_sets": [
                         "structure-observer-intake",
                         "minimal-second-source-intake",
-                        "item-return-only-policy-slice",
+                    ],
+                    "second_source_reports": [
+                        "docs/research/2026-05-29-structure-observer-intake-refresh.md",
+                        "docs/research/2026-05-29-minimal-second-source-readiness.md",
+                        "docs/research/2026-05-30-item-return-only-policy-slice.md",
                     ],
                     "target_set_evidence": [
                         {
-                            "target_set": "item-return-only-policy-slice",
-                            "scope": "second-source accepted copied ReturnValue-only item backing",
+                            "target_set": "structure-observer-intake",
+                            "scope": "fresh copied-redacted GameplayPolicyEvent structure backing",
+                        },
+                        {
+                            "target_set": "minimal-second-source-intake",
+                            "scope": "layout-only compact inventory/structure backing",
                         }
                     ],
                     "inventory_sdk": "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
@@ -505,6 +513,36 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertIn("safety_summary_unexpected_field", reasons)
         self.assertIn("copied_return_bool_entry_unexpected_field", reasons)
         self.assertIn("excluded_field_entry_unexpected_field", reasons)
+
+    def test_policy_rejects_positive_claim_text_inside_allowed_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["non_claims"].append(
+                "does not promote public SDK callbacks; public SDK ready for item return callbacks"
+            )
+            payload["descriptor_preflight"]["explicitly_not_assigned"].append(
+                "ResourceHandle ready for item identity"
+            )
+            payload["descriptor_preflight"]["descriptors"][0][
+                "descriptor"
+            ] = "package shape ready for public callbacks"
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("forbidden_positive_policy_claim_value", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in report["blockers"]
+            if blocker["reason"] == "forbidden_positive_policy_claim_value"
+        }
+        self.assertIn("$.non_claims[3]", paths)
+        self.assertIn("$.descriptor_preflight.explicitly_not_assigned[5]", paths)
+        self.assertIn("$.descriptor_preflight.descriptors[0].descriptor", paths)
 
     def test_descriptor_reconciliation_requires_unassigned_preflight(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -24,6 +24,7 @@ from check_player_identity_runtime_principal_lifecycle_approved_evidence import 
 
 
 REPORT_SCHEMA = "obelisk.player-principal-lifecycle-planning-blocker-smoke.v1"
+ROUTE_AUDIT_SCHEMA = "obelisk.player-principal-lifecycle-offline-route-audit.v1"
 EXPECTED_BLOCKER = "approved_runtime_evidence_missing"
 DEFAULT_ROOT = Path("docs/research/player-identity-planning-sources")
 REPORT_NAME = "player-identity-planning-source-manifests-report.json"
@@ -40,11 +41,86 @@ NO_RUNTIME_NON_CLAIM = "no runtime or server operation was performed"
 NO_PUBLIC_SDK_NON_CLAIM = "no public SDK, public ABI, release, or v1 completion readiness is claimed"
 APPROVED_MANIFEST_CHECKER = "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 APPROVED_MANIFEST_BUILDER = "scripts/build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
+PLAYER_PRESENCE_SAFETY_SCHEMA = "obelisk.player-principal-lifecycle-player-presence-safety.v1"
+PLAYER_PRESENCE_SAFETY_NON_AUTHORIZATION = (
+    "player-presence safety checklist only; request pack acceptance does not authorize player "
+    "queries, RCON/admin-console broadcasts, server operations, marker/env changes, restart, "
+    "runtime capture, approved runtime evidence, public readiness, or SDK completion"
+)
+PLAYER_PRESENCE_SAFETY_KEYS = (
+    "schema",
+    "target",
+    "restart_expectation",
+    "connected_player_check_required_before_restart",
+    "rcon_broadcast_required_if_players_connected",
+    "restart_must_be_cancelled_or_rescheduled_if_players_remain_connected",
+    "passive_wait_preferred_after_activation",
+    "linuxgsm_monitor_forbidden",
+    "player_check_or_broadcast_authorized_by_request_pack",
+    "non_authorization",
+)
+
+
+def route_audit_summary() -> dict[str, Any]:
+    return {
+        "schema": ROUTE_AUDIT_SCHEMA,
+        "status": "route_blocked_approved_runtime_evidence_missing",
+        "current_blocker": EXPECTED_BLOCKER,
+        "waiting_for_exact_check_join_in_progress_1_0_is_fastest_valid_route": True,
+        "recommended_next_action": (
+            "under a separately approved player-backed runtime window, obtain exact "
+            "CheckJoinInProgress(1,0) session_start_rejected between accepted "
+            "HandleNewPlayer(1,1) session_start and matched OnLogout session_end"
+        ),
+        "primary_missing_runtime_shape": {
+            "role": "session_start_rejected",
+            "target": "ShooterGameMode.CheckJoinInProgress",
+            "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+            "copied_bool_values": ["1", "0"],
+            "principal_action": "none",
+            "apply_status": "session_start_rejected_noop",
+            "correlation_status": "not_applicable",
+        },
+        "extra_diagnostic_shape_logging_should_be_primary_next_action": False,
+        "different_map_or_tester_flow_should_be_primary_next_action": False,
+        "offline_layout_or_static_discovery_should_be_primary_next_action": False,
+        "offline_planning_change_needed_for_evidence": False,
+        "copied_observation_rejection_is_not_evidence": True,
+        "passive_or_diagnostic_material_counts_as_evidence": False,
+        "approved_runtime_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_evidence": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "stable_claim_allowed": False,
+        "non_authorization": "planning smoke only; this route audit does not authorize runtime work",
+    }
 POSITIVE_CLAIM_ALIAS_RE = (
+    "approvedruntimeevidence",
+    "approved_runtime_evidence",
     "approvedruntimeevidencepresent",
     "approved_runtime_evidence_present",
     "approvedruntimeevidenceready",
     "approved_runtime_evidence_ready",
+    "authorizesruntimework",
+    "authorizes_runtime_work",
+    "authorizesserveroperations",
+    "authorizes_server_operations",
+    "authorizesworkspacewrites",
+    "authorizes_workspace_writes",
+    "currentturnauthorization",
+    "current_turn_authorization",
+    "currentturnauthorized",
+    "current_turn_authorized",
+    "liveopsauthorized",
+    "live_ops_authorized",
+    "runtimecaptureauthorized",
+    "runtime_capture_authorized",
+    "workspacewritesauthorized",
+    "workspace_writes_authorized",
+    "readslivelogs",
+    "reads_live_logs",
     "publicsdkready",
     "public_sdk",
     "publicabiready",
@@ -69,6 +145,22 @@ POSITIVE_CLAIM_ALIAS_RE = (
     "stable_claim",
     "stablesdk",
     "stable_sdk",
+    "passivesnapshotsasevidence",
+    "passive_snapshots_as_evidence",
+    "passivesnapshotscountasevidence",
+    "passive_snapshots_count_as_evidence",
+    "passivesnapshotevidenceallowed",
+    "passive_snapshot_evidence_allowed",
+    "candidatesidecarscountasapprovedruntimeevidence",
+    "candidate_sidecars_count_as_approved_runtime_evidence",
+    "passivecompletetripletscountasapprovedruntimeevidence",
+    "passive_complete_triplets_count_as_approved_runtime_evidence",
+    "requestpackpreflightwindowmanifestcountasapprovedruntimeevidence",
+    "request_pack_preflight_window_manifest_count_as_approved_runtime_evidence",
+    "statusreportpathsauthorizecurrentturn",
+    "status_report_paths_authorize_current_turn",
+    "statusreportpathscountasapprovedruntimeevidence",
+    "status_report_paths_count_as_approved_runtime_evidence",
     "productionready",
     "production_ready",
     "releaseready",
@@ -77,12 +169,29 @@ POSITIVE_CLAIM_ALIAS_RE = (
     "runtime_v1",
     "countstowardpublicsdk",
     "counts_toward_public_sdk",
+    "countstowardsdk",
+    "counts_toward_sdk",
     "countstowardruntime",
     "counts_toward_runtime",
+    "countstowardv1",
+    "counts_toward_v1",
     "countstowardv1completion",
     "counts_toward_v1_completion",
+    "countstowardcompletesdkclaimnow",
+    "counts_toward_complete_sdk_claim_now",
+    "countstowardp0dependencychainclaimnow",
+    "counts_toward_p0_dependency_chain_claim_now",
+    "requestpackready",
+    "request_pack_ready",
+    "preflightready",
+    "preflight_ready",
+    "windowmanifestready",
+    "window_manifest_ready",
+    "statusreportready",
+    "status_report_ready",
 )
 POSITIVE_CLAIM_TEXT_RE = (
+    "approved runtime evidence",
     "approved runtime evidence present",
     "approved runtime evidence ready",
     "runtime evidence ready",
@@ -99,6 +208,53 @@ POSITIVE_CLAIM_TEXT_RE = (
     "stable sdk",
     "production ready",
     "release ready",
+    "counts toward sdk",
+    "counts toward v1",
+    "live ops authorized",
+    "runtime capture authorized",
+    "reads live logs",
+    "passive snapshots as evidence",
+)
+FALSE_CLAIM_KEYS = (
+    "runtime_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "public_header_allowed",
+    "promotion_ready",
+    "v1_completion_ready",
+    "stable_claim_allowed",
+    "runtime_work_authorized",
+    "server_operations_authorized",
+    "live_ops_authorized",
+    "runtime_capture_authorized",
+    "workspace_writes_authorized",
+    "reads_live_logs",
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+    "runtime_evidence_present",
+    "runtime_evidence_ready",
+    "counts_as_approved_runtime_evidence",
+    "counts_as_runtime_evidence",
+    "counts_as_sdk_evidence",
+    "passive_snapshots_as_evidence",
+    "passive_snapshots_count_as_evidence",
+    "passive_snapshot_evidence_allowed",
+    "candidate_sidecars_count_as_approved_runtime_evidence",
+    "passive_complete_triplets_count_as_approved_runtime_evidence",
+    "request_pack_preflight_window_manifest_count_as_approved_runtime_evidence",
+    "status_report_paths_authorize_current_turn",
+    "status_report_paths_count_as_approved_runtime_evidence",
+    "request_pack_ready",
+    "preflight_ready",
+    "window_manifest_ready",
+    "status_report_ready",
+    "counts_toward_sdk",
+    "counts_toward_public_sdk",
+    "counts_toward_v1",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim_now",
+    "counts_toward_p0_dependency_chain_claim_now",
 )
 NEGATIVE_CONTEXT_KEYS = frozenset(
     (
@@ -135,7 +291,26 @@ def required_runtime_event_cases() -> list[dict[str, Any]]:
     }
     for case in REQUIRED_OBSERVED_EVENT_CASES:
         role = str(case["role"])
-        cases.append({"case": labels[role], **case})
+        rendered = {"case": labels[role], **case}
+        if role == "session_start_rejected":
+            rendered["accepted_alternatives"] = [
+                {
+                    "target": "ShooterGameMode.CheckJoinInProgress",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["1", "0"],
+                },
+            ]
+            rendered["superseded_non_evidence_alternatives"] = [
+                {
+                    "target": "ShooterGameMode.HandleNewPlayer",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": values,
+                    "status": "superseded_non_evidence",
+                    "reason": "historical HandleNewPlayer rejected-start tuple is ambiguous and no longer satisfies approved runtime evidence",
+                }
+                for values in (["0", "1"], ["1", "0"], ["0", "0"])
+            ]
+        cases.append(rendered)
     return cases
 
 
@@ -203,17 +378,7 @@ def bool_false(payload: dict[str, Any], key: str, blockers: list[dict[str, Any]]
 
 
 def validate_no_readiness_overclaim(payload: dict[str, Any], blockers: list[dict[str, Any]], label: str) -> None:
-    for key in (
-        "runtime_ready",
-        "public_sdk_ready",
-        "public_abi_ready",
-        "public_header_allowed",
-        "promotion_ready",
-        "v1_completion_ready",
-        "stable_claim_allowed",
-        "runtime_work_authorized",
-        "server_operations_authorized",
-    ):
+    for key in FALSE_CLAIM_KEYS:
         if key in payload:
             bool_false(payload, key, blockers, label)
 
@@ -222,21 +387,35 @@ def normalized_claim_key(value: str) -> str:
     return "".join(ch.lower() if ch.isalnum() else "_" for ch in value).strip("_")
 
 
+def compact_claim_key(value: str) -> str:
+    return "".join(ch.lower() for ch in value if ch.isalnum())
+
+
+def has_positive_claim_alias(value: str) -> bool:
+    normalized = normalized_claim_key(value)
+    compact = compact_claim_key(value)
+    return any(alias in normalized or compact_claim_key(alias) in compact for alias in POSITIVE_CLAIM_ALIAS_RE)
+
+
 def normalized_claim_text(value: str) -> str:
     return " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in value).split())
 
 
 def is_negative_context(path: tuple[str, ...]) -> bool:
-    return any(normalized_claim_key(part) in NEGATIVE_CONTEXT_KEYS for part in path)
+    for part in path:
+        normalized = normalized_claim_key(part)
+        tokens = set(normalized.split("_"))
+        if normalized in NEGATIVE_CONTEXT_KEYS or tokens & NEGATIVE_CONTEXT_KEYS:
+            return True
+    return False
 
 
 def validate_no_nested_positive_claims(value: Any, blockers: list[dict[str, Any]], label: str, path: tuple[str, ...] = ()) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
             key_text = str(key)
-            normalized = normalized_claim_key(key_text)
             child_path = (*path, key_text)
-            if any(alias in normalized for alias in POSITIVE_CLAIM_ALIAS_RE) and not is_negative_context(child_path):
+            if has_positive_claim_alias(key_text) and not is_negative_context(child_path):
                 if child not in (False, None, [], {}, "false", "False", "not_ready", "blocked", "no", "none"):
                     add(
                         blockers,
@@ -404,13 +583,17 @@ def validate_build_report(report: dict[str, Any], blockers: list[dict[str, Any]]
 
 def build_report(root: Path, manifests: dict[str, LoadedManifest | None], blockers: list[dict[str, Any]]) -> dict[str, Any]:
     planning_ready = not blockers
+    route_audit = route_audit_summary()
     return {
         "schema": REPORT_SCHEMA,
         "ready": planning_ready,
         "planning_sources_ready": planning_ready,
         "offline_only": True,
         "runtime_evidence_ready": False,
+        "runtime_evidence_present": False,
+        "approved_runtime_evidence": False,
         "approved_runtime_evidence_present": False,
+        "approved_runtime_evidence_ready": False,
         "runtime_ready": False,
         "public_sdk_ready": False,
         "public_abi_ready": False,
@@ -420,8 +603,31 @@ def build_report(root: Path, manifests: dict[str, LoadedManifest | None], blocke
         "stable_claim_allowed": False,
         "runtime_work_authorized": False,
         "server_operations_authorized": False,
+        "live_ops_authorized": False,
+        "runtime_capture_authorized": False,
+        "workspace_writes_authorized": False,
+        "reads_live_logs": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_as_sdk_evidence": False,
+        "passive_snapshots_as_evidence": False,
+        "passive_snapshots_count_as_evidence": False,
+        "passive_snapshot_evidence_allowed": False,
+        "candidate_sidecars_count_as_approved_runtime_evidence": False,
+        "passive_complete_triplets_count_as_approved_runtime_evidence": False,
+        "request_pack_preflight_window_manifest_count_as_approved_runtime_evidence": False,
+        "request_pack_ready": False,
+        "preflight_ready": False,
+        "window_manifest_ready": False,
+        "status_report_ready": False,
+        "status_report_paths_authorize_current_turn": False,
+        "status_report_paths_count_as_approved_runtime_evidence": False,
+        "counts_toward_sdk": False,
+        "counts_toward_v1": False,
+        "counts_toward_v1_completion": False,
         "remaining_blockers": [EXPECTED_BLOCKER],
         "next_blocker": EXPECTED_BLOCKER,
+        "route_audit": route_audit,
         "root": str(root),
         "manifests": {
             key: (
@@ -447,6 +653,29 @@ def build_report(root: Path, manifests: dict[str, LoadedManifest | None], blocke
             "required_checker": APPROVED_MANIFEST_CHECKER,
             "required_window_replay": "--post-window-replay",
             "source_summary_module": "player_principal_lifecycle",
+            "required_request_sections": [
+                "current_turn_approval_scope",
+                "passive_wait_boundary",
+                "player_notice_action",
+                "player_presence_safety",
+                "post_window_replay_contract",
+            ],
+            "player_presence_safety_contract": {
+                "schema": PLAYER_PRESENCE_SAFETY_SCHEMA,
+                "required": True,
+                "source": "window-request.json.player_presence_safety",
+                "required_keys": list(PLAYER_PRESENCE_SAFETY_KEYS),
+                "restart_expectation_restart_requires": {
+                    "connected_player_check_required_before_restart": True,
+                    "rcon_broadcast_required_if_players_connected": True,
+                    "restart_must_be_cancelled_or_rescheduled_if_players_remain_connected": True,
+                },
+                "passive_wait_preferred_after_activation": True,
+                "linuxgsm_monitor_forbidden": True,
+                "player_check_or_broadcast_authorized_by_request_pack": False,
+                "non_authorization": PLAYER_PRESENCE_SAFETY_NON_AUTHORIZATION,
+            },
+            "route_audit": route_audit,
             "non_authorization": "planning smoke only; this contract does not authorize runtime work",
         },
         "blockers": [blocker["reason"] for blocker in blockers],

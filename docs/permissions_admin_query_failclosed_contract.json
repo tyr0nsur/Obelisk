@@ -23,9 +23,13 @@
       "operator-config",
       "runtime-local"
     ],
+    "command_text_authority_allowed": false,
     "cross_process_authority_allowed": false,
     "operator_config_allow_capable": false,
+    "operator_config_authority_creates_permission_allowed": false,
     "plugin_supplied_authority_allowed": false,
+    "plugin_supplied_authority_creates_identity_allowed": false,
+    "plugin_supplied_authority_creates_permission_allowed": false,
     "recognized_authority_kinds": [
       "operator-config",
       "runtime-local"
@@ -67,12 +71,26 @@
   },
   "dependency_context": {
     "command_response_dependency_promoted": false,
+    "identity_alias_or_stale_source_unlock_allowed": false,
+    "identity_decision_record_alone_unlock_allowed": false,
+    "missing_mismatched_or_stale_identity_certificate_counts": false,
     "permissions_admin_public_abi_promoted": false,
     "public_identity_promoted": false,
     "public_identity_required_before_promotion": true,
+    "required_identity_promotion_certificate_chain_position": 1,
+    "required_identity_promotion_certificate_hash_policy": "evidence.reviewed_artifact_hash must equal evidence.reviewed_surface_record_sha256",
+    "required_identity_promotion_certificate_required_by_chain_position": 2,
+    "required_identity_promotion_certificate_required_by_surface": "obelisk.permissions_admin.v1",
+    "required_identity_promotion_certificate_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+    "required_identity_promotion_certificate_schema": "obelisk.player-identity-promotion-certificate.v1",
+    "required_identity_promotion_certificate_surface": "obelisk.player_identity.v1",
+    "required_identity_public_contract_decision_record_id": "reviewed_identity_public_contract_decision_record",
+    "required_identity_public_contract_decision_record_schema": "obelisk.player-identity-public-contract-decision-record.v1",
+    "required_identity_public_contract_review_status": "reviewed",
     "required_lifecycle_anchor_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
     "required_principal_invalidation_schema": "obelisk.players-identity-principal-invalidation-policy.v1",
     "required_runtime_evidence_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    "runtime_evidence_alone_unlock_allowed": false,
     "upstream_surface": "obelisk.player_identity.v1",
     "upstream_surface_status": "planning_only"
   },
@@ -86,6 +104,12 @@
     {
       "allow_allowed": false,
       "case": "scope_mismatch",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "stale_principal_scope_flags",
       "consumer_result": "deny",
       "fail_closed": true
     },
@@ -139,6 +163,12 @@
     },
     {
       "allow_allowed": false,
+      "case": "plugin_supplied_authority_claim",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
       "case": "missing_action",
       "consumer_result": "deny",
       "fail_closed": true
@@ -175,6 +205,12 @@
     },
     {
       "allow_allowed": false,
+      "case": "principal_handle_only",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
       "case": "missing_principal_generation",
       "consumer_result": "deny",
       "fail_closed": true
@@ -182,6 +218,12 @@
     {
       "allow_allowed": false,
       "case": "missing_principal_scope_flags",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "missing_server_process_epoch",
       "consumer_result": "deny",
       "fail_closed": true
     },
@@ -200,6 +242,12 @@
     {
       "allow_allowed": false,
       "case": "plugin_supplied_principal_tuple",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "plugin_supplied_principal_provenance",
       "consumer_result": "deny",
       "fail_closed": true
     },
@@ -236,6 +284,12 @@
     {
       "allow_allowed": false,
       "case": "unloading_plugin_owner_token",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "owner_token_identity_or_permission_claim",
       "consumer_result": "deny",
       "fail_closed": true
     },
@@ -344,6 +398,14 @@
       {
         "allow_allowed": false,
         "bit_index": 2,
+        "case": "stale_principal_scope_flags",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "stale_principal_scope_flags"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 3,
         "case": "process_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -351,7 +413,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 3,
+        "bit_index": 4,
         "case": "missing_principal",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -359,7 +421,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 4,
+        "bit_index": 5,
         "case": "missing_runtime_principal_identity",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -367,7 +429,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 5,
+        "bit_index": 6,
         "case": "command_text_principal_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -375,7 +437,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 6,
+        "bit_index": 7,
         "case": "command_text_permission_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -383,7 +445,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 7,
+        "bit_index": 8,
         "case": "operator_config_principal_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -391,7 +453,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 8,
+        "bit_index": 9,
         "case": "operator_config_permission_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -399,7 +461,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 9,
+        "bit_index": 10,
         "case": "operator_config_allow_capability_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -407,7 +469,15 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 10,
+        "bit_index": 11,
+        "case": "plugin_supplied_authority_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "plugin_supplied_authority_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 12,
         "case": "missing_action",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -415,7 +485,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 11,
+        "bit_index": 13,
         "case": "malformed_action_size",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -423,7 +493,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 12,
+        "bit_index": 14,
         "case": "action_size_exceeds_max",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -431,7 +501,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 13,
+        "bit_index": 15,
         "case": "malformed_resource_scope_size",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -439,7 +509,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 14,
+        "bit_index": 16,
         "case": "resource_scope_size_exceeds_max",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -447,7 +517,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 15,
+        "bit_index": 17,
         "case": "missing_principal_handle",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -455,7 +525,15 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 16,
+        "bit_index": 18,
+        "case": "principal_handle_only",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "principal_handle_only"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 19,
         "case": "missing_principal_generation",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -463,7 +541,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 17,
+        "bit_index": 20,
         "case": "missing_principal_scope_flags",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -471,7 +549,15 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 18,
+        "bit_index": 21,
+        "case": "missing_server_process_epoch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_server_process_epoch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 22,
         "case": "missing_principal_provenance",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -479,7 +565,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 19,
+        "bit_index": 23,
         "case": "principal_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -487,7 +573,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 20,
+        "bit_index": 24,
         "case": "plugin_supplied_principal_tuple",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -495,7 +581,15 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 21,
+        "bit_index": 25,
+        "case": "plugin_supplied_principal_provenance",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "plugin_supplied_principal_provenance"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 26,
         "case": "server_process_epoch_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -503,7 +597,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 22,
+        "bit_index": 27,
         "case": "unsupported_principal_scope_flags",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -511,7 +605,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 23,
+        "bit_index": 28,
         "case": "missing_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -519,7 +613,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 24,
+        "bit_index": 29,
         "case": "zero_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -527,7 +621,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 25,
+        "bit_index": 30,
         "case": "unknown_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -535,7 +629,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 26,
+        "bit_index": 31,
         "case": "unloading_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -543,7 +637,15 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 27,
+        "bit_index": 32,
+        "case": "owner_token_identity_or_permission_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "owner_token_identity_or_permission_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 33,
         "case": "missing_capability",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -551,7 +653,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 28,
+        "bit_index": 34,
         "case": "rate_limit_exceeded",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -559,7 +661,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 29,
+        "bit_index": 35,
         "case": "unknown_authority",
         "consumer_result": "unknown",
         "fail_closed": true,
@@ -567,7 +669,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 30,
+        "bit_index": 36,
         "case": "missing_authority_kind",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -575,7 +677,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 31,
+        "bit_index": 37,
         "case": "missing_policy_source",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -583,7 +685,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 32,
+        "bit_index": 38,
         "case": "missing_policy_source_generation",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -591,7 +693,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 33,
+        "bit_index": 39,
         "case": "policy_source_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -599,7 +701,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 34,
+        "bit_index": 40,
         "case": "missing_policy_epoch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -607,7 +709,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 35,
+        "bit_index": 41,
         "case": "missing_authority_generation",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -615,7 +717,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 36,
+        "bit_index": 42,
         "case": "authority_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -623,7 +725,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 37,
+        "bit_index": 43,
         "case": "plugin_supplied_provenance",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -631,7 +733,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 38,
+        "bit_index": 44,
         "case": "command_text_policy_provenance_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -639,7 +741,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 39,
+        "bit_index": 45,
         "case": "operator_config_policy_provenance_claim",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -674,14 +776,25 @@
     "candidate-only pre-ABI permissions/admin query contract",
     "command text and operator config cannot establish principal identity or permission claims before runtime principal observation",
     "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
-    "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate"
+    "generated, scaffold, placeholder, template, stale, or hash-unbound upstream certificates cannot satisfy the upstream identity dependency",
+    "nested readiness, progress, unlock, route, public, runtime, stable, Plugin Hub, publication, or SDK/P0 accounting aliases remain non-counting until the full hash-bound dependency chain is accepted",
+    "only a reviewed, hash-bound, current player-identity promotion certificate can satisfy the upstream identity dependency; identity aliases, stale decision records, route reports, and runtime evidence substitutes remain non-counting",
+    "plugin-supplied provenance, plugin-supplied authority, and invalid owner tokens cannot establish identity or permission authority",
+    "principal_handle alone never authorizes; generation, scope flags, server process epoch, and runtime-owned provenance are required before allow",
+    "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate",
+    "RCON, ListPlayers, Kick, ServerListPlayers, ServerKickPlayer, admin snapshots, static thunk, route candidate, source-ready, status, and command aliases are admin orientation or operational metadata only and cannot unlock readiness or progress",
+    "runtime-window artifacts, beta/Discord notices, no-users status, package installs, side-lanes, passive evidence, unblocked/allowed aliases, and generic identity-present aliases cannot unlock readiness",
+    "v1 remains false for this candidate-only pre-ABI planning artifact"
   ],
   "owner_token_policy": {
+    "invalid_owner_token_cannot_create_identity_or_permission": true,
     "live_owner_required_before_policy_evaluation": true,
     "missing_owner_token_result": "deny",
     "nonzero_owner_token_required_before_policy_evaluation": true,
     "owner_cleanup_invalidates_candidate_cache": true,
     "owner_cleanup_invalidates_query_budget": true,
+    "owner_token_does_not_establish_principal_identity": true,
+    "owner_token_does_not_grant_permission": true,
     "owner_token_source": "runtime_assigned_plugin_owner_token",
     "owner_token_validation_before_candidate_cache_read": true,
     "owner_token_validation_before_rate_budget": true,
@@ -698,6 +811,7 @@
     "authority_generation_required_before_allow": true,
     "authority_kind_required_before_allow": true,
     "command_text_policy_provenance_claim_allowed": false,
+    "complete_policy_provenance_required_before_allow": true,
     "missing_authority_generation_result": "deny",
     "missing_authority_kind_result": "deny",
     "missing_policy_epoch_result": "deny",
@@ -706,11 +820,13 @@
     "operator_config_allow_provenance_allowed": false,
     "operator_config_policy_provenance_claim_allowed": false,
     "plugin_supplied_policy_provenance_allowed": false,
+    "plugin_supplied_policy_provenance_creates_authority_allowed": false,
     "plugin_supplied_policy_provenance_result": "deny",
     "policy_epoch_required_before_allow": true,
     "policy_provenance_source": "runtime_owned_policy_evaluator",
     "policy_source_generation_mismatch_result": "deny",
     "policy_source_generation_required_before_allow": true,
+    "policy_source_id_generation_authority_kind_generation_epoch_required_before_allow": true,
     "policy_source_id_required_before_allow": true,
     "public_abi_field_allowed": false,
     "runtime_ready": false,
@@ -720,21 +836,28 @@
   "principal_provenance_policy": {
     "command_supplied_principal_tuple_allowed": false,
     "missing_principal_provenance_result": "deny",
+    "missing_server_process_epoch_result": "deny",
     "operator_config_supplied_principal_tuple_allowed": false,
+    "plugin_supplied_principal_provenance_allowed": false,
+    "plugin_supplied_principal_provenance_result": "deny",
     "plugin_supplied_principal_tuple_allowed": false,
     "plugin_supplied_principal_tuple_result": "deny",
     "principal_generation_mismatch_result": "deny",
     "principal_generation_provenance_required_before_allow": true,
+    "principal_handle_generation_scope_epoch_required_before_allow": true,
+    "principal_handle_only_result": "deny",
     "principal_scope_provenance_required_before_allow": true,
     "principal_tuple_provenance_required_before_allow": true,
     "principal_tuple_source": "runtime_owned_player_identity_observation",
     "process_mismatch_result": "deny",
     "public_abi_field_allowed": false,
+    "runtime_owned_principal_provenance_required_before_allow": true,
     "runtime_ready": false,
     "scope_mismatch_result": "deny",
     "server_process_epoch_mismatch_result": "deny",
     "server_process_epoch_required_before_allow": true,
     "stale_principal_result": "deny",
+    "stale_principal_scope_flags_result": "deny",
     "unsupported_principal_scope_flags_result": "deny"
   },
   "principal_runtime_identity_policy": {
@@ -743,6 +866,9 @@
     "config_enables_surface_only": true,
     "operator_config_permission_claim_allowed": false,
     "operator_config_principal_claim_allowed": false,
+    "principal_handle_alone_authorizes": false,
+    "principal_handle_only_creates_identity_allowed": false,
+    "principal_handle_only_creates_permission_allowed": false,
     "runtime_observation_establishes_identity": true,
     "runtime_principal_required_for_permission_authority": true
   },
@@ -791,6 +917,13 @@
         "name": "principal_scope_flags",
         "source": "obelisk_owned_copy",
         "type": "uint64_flags"
+      },
+      {
+        "consumer_visible": true,
+        "copied": true,
+        "name": "server_process_epoch",
+        "source": "obelisk_owned_copy",
+        "type": "uint64"
       },
       {
         "consumer_visible": true,
@@ -852,5 +985,6 @@
     "player_identity_required_before_permission_query": true,
     "query_result_contains_command_or_reply_handle": false,
     "query_result_provenance_required_before_command_response": true
-  }
+  },
+  "v1": false
 }

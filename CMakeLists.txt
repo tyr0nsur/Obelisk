@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 
 set(OBELISK_DEVELOPMENT_LINE "0.1.0-dev")
 set(OBELISK_RELEASE_CHANNEL "dev")
@@ -50,6 +51,59 @@ target_include_directories(obelisk_sdk INTERFACE
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+function(obelisk_assert_sdk_interface_only target_name)
+    if(NOT TARGET ${target_name})
+        message(FATAL_ERROR "Missing SDK target: ${target_name}")
+    endif()
+
+    get_target_property(sdk_target_type ${target_name} TYPE)
+    if(NOT sdk_target_type STREQUAL "INTERFACE_LIBRARY")
+        message(FATAL_ERROR "${target_name} must stay an interface-only SDK target, got: ${sdk_target_type}")
+    endif()
+
+    foreach(forbidden_property IN ITEMS
+        IMPORTED_IMPLIB
+        IMPORTED_IMPLIB_DEBUG
+        IMPORTED_IMPLIB_MINSIZEREL
+        IMPORTED_IMPLIB_RELEASE
+        IMPORTED_IMPLIB_RELWITHDEBINFO
+        IMPORTED_LINK_DEPENDENT_LIBRARIES
+        IMPORTED_LINK_DEPENDENT_LIBRARIES_DEBUG
+        IMPORTED_LINK_DEPENDENT_LIBRARIES_MINSIZEREL
+        IMPORTED_LINK_DEPENDENT_LIBRARIES_RELEASE
+        IMPORTED_LINK_DEPENDENT_LIBRARIES_RELWITHDEBINFO
+        IMPORTED_LOCATION
+        IMPORTED_LOCATION_DEBUG
+        IMPORTED_LOCATION_MINSIZEREL
+        IMPORTED_LOCATION_RELEASE
+        IMPORTED_LOCATION_RELWITHDEBINFO
+        IMPORTED_OBJECTS
+        IMPORTED_OBJECTS_DEBUG
+        IMPORTED_OBJECTS_MINSIZEREL
+        IMPORTED_OBJECTS_RELEASE
+        IMPORTED_OBJECTS_RELWITHDEBINFO
+        IMPORTED_SONAME
+        IMPORTED_SONAME_DEBUG
+        IMPORTED_SONAME_MINSIZEREL
+        IMPORTED_SONAME_RELEASE
+        IMPORTED_SONAME_RELWITHDEBINFO
+        INTERFACE_COMPILE_DEFINITIONS
+        INTERFACE_COMPILE_OPTIONS
+        INTERFACE_LINK_LIBRARIES
+        INTERFACE_LINK_OPTIONS
+        INTERFACE_SOURCES
+        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+    )
+        get_target_property(forbidden_value ${target_name} ${forbidden_property})
+        if(forbidden_value AND NOT forbidden_value STREQUAL "forbidden_value-NOTFOUND")
+            message(FATAL_ERROR
+                "${target_name} must not expose ${forbidden_property}: ${forbidden_value}")
+        endif()
+    endforeach()
+endfunction()
+
+obelisk_assert_sdk_interface_only(obelisk_sdk)
+
 # Dependencies
 include(FetchContent)
 
@@ -82,7 +136,11 @@ add_library(obelisk SHARED
     loader/Bootstrap.cpp
     runtime/Logger.cpp
     runtime/RuntimeMarkers.cpp
+    runtime/BinaryIdentity.cpp
     ue/Memory.cpp
+    ue/SafeMemoryRead.cpp
+    ue/NativeChatText.cpp
+    ue/ObjectClassValidation.cpp
     ue/BuffReflection.cpp
     ue/ChatReflection.cpp
     ue/DinoReflection.cpp
@@ -93,18 +151,27 @@ add_library(obelisk SHARED
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
+    hooks/StartupNativeHook.cpp
+    hooks/NativeChatHook.cpp
     hooks/ProcessEventCallGuard.cpp
     hooks/ProcessEventDispatch.cpp
+    hooks/ProcessEventBuffReflection.cpp
     hooks/ProcessEventChatReflection.cpp
+    hooks/ProcessEventDinoReflection.cpp
     hooks/ProcessEventInventoryReflection.cpp
     hooks/ProcessEventItemReflection.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleApplicator.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleCorrelation.cpp
     hooks/ProcessEventPlayerPrincipalLifecycleObserver.cpp
     hooks/ProcessEventStructureReflection.cpp
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
+    core/CommandDispatcher.cpp
+    core/PlayerLifecycleDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
     core/ItemReturnEventDispatcher.cpp
     core/PlayerPrincipalEventDispatcher.cpp
+    core/PlayerPrincipalRegistry.cpp
     core/StructureAggregateCensus.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
@@ -115,7 +182,7 @@ add_library(obelisk SHARED
 
 # Includes and linking
 target_include_directories(obelisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(obelisk PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs)
+target_link_libraries(obelisk PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog subhook dl pthread stdc++fs OpenSSL::Crypto)
 
 # Ensure visibility is hidden by default, and we only export what we want
 # (Good practice for LD_PRELOAD plugins)
@@ -125,6 +192,7 @@ set_target_properties(obelisk PROPERTIES BUILD_RPATH "\$ORIGIN")
 set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
+add_subdirectory(plugins/oPing)
 add_subdirectory(plugins/oProcessTimer)
 add_subdirectory(plugins/oDescriptorCatalog)
 if(OBELISK_BUILD_EXPERIMENTAL_PLUGINS)
@@ -240,14 +308,32 @@ add_executable(player_principal_event_dispatcher_tests
     runtime/Logger.cpp
 )
 target_include_directories(player_principal_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(player_principal_event_dispatcher_tests
+    PRIVATE OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS=1
+)
 target_link_libraries(player_principal_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME PlayerPrincipalEventDispatcherTests COMMAND player_principal_event_dispatcher_tests)
 
+add_executable(player_principal_registry_tests
+    tests/core/PlayerPrincipalRegistryTests.cpp
+    core/PlayerPrincipalRegistry.cpp
+)
+target_include_directories(player_principal_registry_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(player_principal_registry_tests
+    PRIVATE OBELISK_PLAYER_PRINCIPAL_REGISTRY_ENABLE_TEST_HOOKS=1
+)
+
+add_test(NAME PlayerPrincipalRegistryTests COMMAND player_principal_registry_tests)
+
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
+    tests/core/PingPluginIntegrationTests.cpp
     core/ChatEventDispatcher.cpp
+    core/CommandDispatcher.cpp
+    core/PlayerLifecycleDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
+    core/ItemReturnEventDispatcher.cpp
     core/PlayerPrincipalEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
@@ -259,9 +345,78 @@ add_executable(plugin_manager_tests
     tests/core/ProcessEventHookStub.cpp
 )
 target_include_directories(plugin_manager_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(plugin_manager_tests
+    PRIVATE OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS=1
+    OBELISK_PING_PLUGIN_PATH="$<TARGET_FILE:oPing>"
+)
+add_dependencies(plugin_manager_tests oPing)
 target_link_libraries(plugin_manager_tests PRIVATE obelisk_sdk fmt::fmt spdlog::spdlog dl stdc++fs)
 
 add_test(NAME PluginManagerTests COMMAND plugin_manager_tests)
+
+add_executable(command_dispatcher_tests
+    tests/core/CommandDispatcherTests.cpp
+    core/CommandDispatcher.cpp
+)
+target_include_directories(command_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(command_dispatcher_tests PRIVATE obelisk_sdk pthread)
+add_test(NAME CommandDispatcherTests COMMAND command_dispatcher_tests)
+
+add_executable(player_lifecycle_dispatcher_tests
+    tests/core/PlayerLifecycleDispatcherTests.cpp
+    core/PlayerLifecycleDispatcher.cpp
+)
+target_include_directories(player_lifecycle_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(player_lifecycle_dispatcher_tests PRIVATE obelisk_sdk pthread)
+add_test(NAME PlayerLifecycleDispatcherTests COMMAND player_lifecycle_dispatcher_tests)
+
+add_executable(startup_native_hook_tests
+    tests/core/StartupNativeHookTests.cpp
+    hooks/StartupNativeHook.cpp
+    ue/SafeMemoryRead.cpp
+)
+target_include_directories(startup_native_hook_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(startup_native_hook_tests PRIVATE pthread)
+add_test(NAME StartupNativeHookTests COMMAND startup_native_hook_tests)
+
+add_executable(safe_memory_read_tests tests/core/SafeMemoryReadTests.cpp ue/SafeMemoryRead.cpp)
+target_include_directories(safe_memory_read_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME SafeMemoryReadTests COMMAND safe_memory_read_tests)
+
+add_executable(object_class_validation_tests
+    tests/core/ObjectClassValidationTests.cpp
+    ue/ObjectClassValidation.cpp
+    ue/SafeMemoryRead.cpp
+)
+target_include_directories(object_class_validation_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME ObjectClassValidationTests COMMAND object_class_validation_tests)
+
+add_executable(native_chat_text_tests tests/core/NativeChatTextTests.cpp ue/NativeChatText.cpp ue/SafeMemoryRead.cpp)
+target_include_directories(native_chat_text_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME NativeChatTextTests COMMAND native_chat_text_tests)
+
+add_executable(native_player_lifecycle_frame_tests
+    tests/core/NativePlayerLifecycleFrameTests.cpp
+    hooks/NativeChatHook.cpp
+    hooks/StartupNativeHook.cpp
+    core/CommandDispatcher.cpp
+    core/PlayerLifecycleDispatcher.cpp
+    runtime/BinaryIdentity.cpp
+    runtime/Logger.cpp
+    ue/Memory.cpp
+    ue/SafeMemoryRead.cpp
+    ue/NativeChatText.cpp
+    ue/ObjectClassValidation.cpp
+)
+target_include_directories(native_player_lifecycle_frame_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(native_player_lifecycle_frame_tests PRIVATE
+    obelisk_sdk fmt::fmt spdlog::spdlog OpenSSL::Crypto dl pthread)
+add_test(NAME NativePlayerLifecycleFrameTests COMMAND native_player_lifecycle_frame_tests)
+
+add_executable(binary_identity_tests tests/core/BinaryIdentityTests.cpp runtime/BinaryIdentity.cpp)
+target_include_directories(binary_identity_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(binary_identity_tests PRIVATE OpenSSL::Crypto)
+add_test(NAME BinaryIdentityTests COMMAND binary_identity_tests)
 
 add_executable(timer_manager_tests
     tests/core/TimerManagerTests.cpp
@@ -360,6 +515,8 @@ add_test(NAME DinoReflectionTests COMMAND dino_reflection_tests)
 add_executable(process_event_dino_reflection_tests
     tests/core/ProcessEventDinoReflectionTests.cpp
     hooks/ProcessEventDinoReflection.cpp
+    ue/DinoReflection.cpp
+    ue/RuntimeReflection.cpp
 )
 target_include_directories(process_event_dino_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -441,6 +598,27 @@ add_executable(player_principal_lifecycle_reflection_tests
 target_include_directories(player_principal_lifecycle_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME PlayerPrincipalLifecycleReflectionTests COMMAND player_principal_lifecycle_reflection_tests)
+
+add_executable(player_principal_lifecycle_applicator_tests
+    tests/core/PlayerPrincipalLifecycleApplicatorTests.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleApplicator.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleCorrelation.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleObserver.cpp
+    core/PlayerPrincipalEventDispatcher.cpp
+    core/PlayerPrincipalRegistry.cpp
+    runtime/Logger.cpp
+    ue/PlayerPrincipalLifecycleReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(player_principal_lifecycle_applicator_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(player_principal_lifecycle_applicator_tests
+    PRIVATE
+        OBELISK_PLAYER_PRINCIPAL_REGISTRY_ENABLE_TEST_HOOKS=1
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_CORRELATION_ENABLE_TEST_HOOKS=1
+)
+target_link_libraries(player_principal_lifecycle_applicator_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME PlayerPrincipalLifecycleApplicatorTests COMMAND player_principal_lifecycle_applicator_tests)
 
 add_executable(process_event_player_principal_lifecycle_observer_tests
     tests/core/ProcessEventPlayerPrincipalLifecycleObserverTests.cpp
@@ -562,7 +740,8 @@ install(TARGETS obelisk_sdk
     COMPONENT SDK
 )
 
-install(FILES include/obelisk/ObeliskApi.h
+install(FILES include/obelisk/ObeliskApi.h include/obelisk/ObeliskCommandApi.h
+    include/obelisk/ObeliskPlayerLifecycleApi.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/obelisk
     COMPONENT SDK
 )
@@ -580,10 +759,127 @@ configure_package_config_file(
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Obelisk
 )
 
-write_basic_package_version_file(
+set(OBELISK_CONFIG_GUARDRAILS_CONTENT [=[
+if(NOT Obelisk_FIND_VERSION)
+    set(Obelisk_FOUND FALSE)
+    set(Obelisk_NOT_FOUND_MESSAGE
+        "Obelisk SDK package-shape requires an explicit non-EXACT version request with COMPONENTS SDK.")
+    return()
+endif()
+
+if(Obelisk_FIND_VERSION_EXACT)
+    set(Obelisk_FOUND FALSE)
+    set(Obelisk_NOT_FOUND_MESSAGE
+        "Obelisk SDK package-shape does not satisfy EXACT stable-version requests.")
+    return()
+endif()
+
+if(NOT Obelisk_FIND_COMPONENTS)
+    set(Obelisk_FOUND FALSE)
+    set(Obelisk_NOT_FOUND_MESSAGE
+        "Obelisk SDK package-shape requires find_package(... COMPONENTS SDK).")
+    return()
+endif()
+
+foreach(_obelisk_requested_component IN LISTS Obelisk_FIND_COMPONENTS)
+    if(NOT _obelisk_requested_component STREQUAL "SDK")
+        set(Obelisk_${_obelisk_requested_component}_FOUND FALSE)
+        set(Obelisk_FOUND FALSE)
+        set(Obelisk_NOT_FOUND_MESSAGE
+            "Unsupported Obelisk component '${_obelisk_requested_component}'; only SDK is installed.")
+        return()
+    endif()
+endforeach()
+unset(_obelisk_requested_component)
+
+set(Obelisk_SDK_BLOCKER_PROMOTION_COUNT 0)
+set(Obelisk_SDK_BLOCKER_PROMOTION_TOTAL 12)
+set(Obelisk_P0_DEPENDENCY_COUNT 0)
+set(Obelisk_P0_DEPENDENCY_TOTAL 4)
+set(Obelisk_ACTIVE_COMPLETION_BLOCKER "approved_runtime_evidence_missing")
+set(Obelisk_FIND_PACKAGE_SDK_PACKAGE_SHAPE_ONLY TRUE)
+set(Obelisk_EXACT_VERSION_REQUESTS_ALLOWED FALSE)
+set(Obelisk_FIND_PACKAGE_VERSION_IS_STABLE_SDK_CLAIM FALSE)
+set(Obelisk_FIND_PACKAGE_SDK_IS_PUBLIC_PACKAGE_READINESS FALSE)
+set(Obelisk_FIND_PACKAGE_SDK_IS_V1_COMPLETION_EVIDENCE FALSE)
+]=])
+set(OBELISK_CONFIG_REQUIRED_NON_CLAIM_MARKERS
+    [=[set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")]=]
+    [=[set(Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED FALSE)]=]
+    [=[set(Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED FALSE)]=]
+    [=[set(Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED FALSE)]=]
+    [=[set(Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED FALSE)]=]
+    [=[set(Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED FALSE)]=]
+    [=[set(Obelisk_V1_COMPLETION_CLAIM_ALLOWED FALSE)]=]
+    [=[set(Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED FALSE)]=]
+    [=[set(Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED FALSE)]=]
+    [=[set(Obelisk_SDK_BLOCKER_PROMOTION_COUNT 0)]=]
+    [=[set(Obelisk_SDK_BLOCKER_PROMOTION_TOTAL 12)]=]
+    [=[set(Obelisk_P0_DEPENDENCY_COUNT 0)]=]
+    [=[set(Obelisk_P0_DEPENDENCY_TOTAL 4)]=]
+    [=[set(Obelisk_ACTIVE_COMPLETION_BLOCKER "approved_runtime_evidence_missing")]=]
+    [=[set(Obelisk_FIND_PACKAGE_SDK_PACKAGE_SHAPE_ONLY TRUE)]=]
+    [=[set(Obelisk_EXACT_VERSION_REQUESTS_ALLOWED FALSE)]=]
+    [=[set(Obelisk_FIND_PACKAGE_VERSION_IS_STABLE_SDK_CLAIM FALSE)]=]
+    [=[set(Obelisk_FIND_PACKAGE_SDK_IS_PUBLIC_PACKAGE_READINESS FALSE)]=]
+    [=[set(Obelisk_FIND_PACKAGE_SDK_IS_V1_COMPLETION_EVIDENCE FALSE)]=]
+)
+set(OBELISK_CONFIG_TARGETS_INCLUDE_LINE [=[include("${CMAKE_CURRENT_LIST_DIR}/ObeliskTargets.cmake")]=])
+file(READ ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfig.cmake OBELISK_CONFIG_CONTENT)
+string(FIND
+    "${OBELISK_CONFIG_CONTENT}"
+    "${OBELISK_CONFIG_TARGETS_INCLUDE_LINE}"
+    OBELISK_CONFIG_TARGETS_INCLUDE_INDEX
+)
+if(OBELISK_CONFIG_TARGETS_INCLUDE_INDEX EQUAL -1)
+    message(FATAL_ERROR "ObeliskConfig.cmake target include marker was not found")
+endif()
+string(REPLACE
+    "${OBELISK_CONFIG_TARGETS_INCLUDE_LINE}"
+    "${OBELISK_CONFIG_GUARDRAILS_CONTENT}\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/ObeliskTargets.cmake\")"
+    OBELISK_CONFIG_CONTENT
+    "${OBELISK_CONFIG_CONTENT}"
+)
+foreach(obelisk_config_required_non_claim_marker IN LISTS OBELISK_CONFIG_REQUIRED_NON_CLAIM_MARKERS)
+    string(FIND
+        "${OBELISK_CONFIG_CONTENT}"
+        "${obelisk_config_required_non_claim_marker}"
+        OBELISK_CONFIG_REQUIRED_NON_CLAIM_MARKER_INDEX
+    )
+    if(OBELISK_CONFIG_REQUIRED_NON_CLAIM_MARKER_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Generated ObeliskConfig.cmake missed package-shape non-claim marker: "
+            "${obelisk_config_required_non_claim_marker}")
+    endif()
+endforeach()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfig.cmake "${OBELISK_CONFIG_CONTENT}")
+
+set(OBELISK_CONFIG_VERSION_CONTENT [=[
+set(PACKAGE_VERSION "@PROJECT_VERSION@")
+set(PACKAGE_VERSION_COMPATIBLE FALSE)
+set(PACKAGE_VERSION_EXACT FALSE)
+set(PACKAGE_VERSION_UNSUITABLE FALSE)
+
+if(NOT PACKAGE_FIND_VERSION)
+    set(PACKAGE_VERSION_UNSUITABLE TRUE)
+    return()
+endif()
+
+if(PACKAGE_FIND_VERSION_EXACT)
+    set(PACKAGE_VERSION_UNSUITABLE TRUE)
+    return()
+endif()
+
+if(PACKAGE_FIND_VERSION_MAJOR EQUAL @PROJECT_VERSION_MAJOR@ AND
+       PACKAGE_FIND_VERSION_MINOR EQUAL @PROJECT_VERSION_MINOR@ AND
+       NOT PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION)
+    set(PACKAGE_VERSION_COMPATIBLE TRUE)
+endif()
+]=])
+string(CONFIGURE "${OBELISK_CONFIG_VERSION_CONTENT}" OBELISK_CONFIG_VERSION_CONTENT @ONLY)
+file(WRITE
     ${CMAKE_CURRENT_BINARY_DIR}/ObeliskConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMinorVersion
+    "${OBELISK_CONFIG_VERSION_CONTENT}"
 )
 
 install(FILES

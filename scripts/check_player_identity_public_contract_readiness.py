@@ -19,7 +19,9 @@ import check_player_identity_runtime_principal_lifecycle_approved_evidence as ap
 import check_player_identity_identifier_redaction_evidence as identifier_redaction
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 import check_player_identity_public_abi_preflight_candidate as public_abi_preflight_candidate
+import check_player_identity_public_contract_decision_record as public_contract_decision_record
 import build_player_identity_planning_source_manifests as planning_source_manifests
+from native_prototype_guardrails import without_native_prototype_symbols
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -32,8 +34,148 @@ SURFACE = "obelisk.player_identity.v1"
 DEFAULT_PRIVATE_CANDIDATE_CONTRACT = Path("docs/research/2026-06-01-player-identity-private-candidate-contract.json")
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
+DEFAULT_IDENTIFIER_REDACTION_EVIDENCE = Path(
+    "docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json"
+)
+DEFAULT_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD = public_contract_decision_record.DEFAULT_RECORD
 REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
+PRINCIPAL_START_END_RUNTIME_EVIDENCE_SCHEMA = (
+    "obelisk.players-identity-runtime-principal-start-end-evidence-check.v1"
+)
+PRINCIPAL_START_END_RESOLVED_INPUT = "runtime.lifecycle_start_end_evidence"
+PRINCIPAL_START_END_READY_SCOPE = "principal_start_end_runtime_evidence_only"
+PRINCIPAL_START_END_NEXT_REVIEW_BLOCKER = "approved_runtime_evidence_missing"
+PRINCIPAL_START_END_MISSING_CHECK_JOIN_BLOCKER = (
+    "missing_exact_CheckJoinInProgress_1_0_session_start_rejected"
+)
+PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS = {
+    "runtime.lifecycle_rejected_start_evidence",
+    "approved_runtime_principal_lifecycle_evidence_bundle",
+}
+MULTI_SURFACE_BETA_CAPTURE_SCHEMAS = {
+    "obelisk.multi-surface-beta-capture-plan.v1",
+    "obelisk.multi-surface-beta-capture-pack.v1",
+    "obelisk.multi-surface-beta-capture-plan-queue.v1",
+}
+MULTI_SURFACE_BETA_CAPTURE_ARTIFACT_RE = re.compile(
+    r"(?:multi[._ -]?surface(?:[._ -]?(?:beta[._ -]?capture|candidate[._ -]?queue|"
+    r"capture[._ -]?(?:plan|pack|queue)|plan[._ -]?queue))?|"
+    r"beta[._ -]?capture(?:[._ -]?(?:plan|pack|queue|artifact|bundle|prep))?)",
+    re.IGNORECASE,
+)
+MULTI_SURFACE_BETA_CAPTURE_FALSE_OR_ZERO_KEYS = {
+    "approved_runtime_evidence_accepted",
+    "approved_runtime_evidence_binding",
+    "approved_runtime_evidence_binding_accepted",
+    "approved_runtime_evidence_binding_ready",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_missing_resolved",
+    "approved_runtime_evidence_ready",
+    "beta_capture_ready",
+    "candidate_capture_evidence_ready",
+    "candidate_capture_ready",
+    "capture_ready",
+    "clears_approved_runtime_evidence_missing",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress",
+    "complete_sdk_progress_contribution",
+    "complete_sdk_ready",
+    "counts_as_approved_runtime_evidence",
+    "counts_as_runtime_evidence",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_sdk",
+    "counts_toward_v1_completion",
+    "debug_capture_ready",
+    "dependency_chain_completion_ready",
+    "evidence_bundle_accepted",
+    "identity_public_contract_gate_missing_cleared",
+    "identity_public_contract_gate_missing_resolved",
+    "identity_public_contract_readiness",
+    "identity_public_contract_ready",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
+    "p0_dependency_chain_ready",
+    "p0_progress",
+    "p0_progress_ready",
+    "public_identity_contract_readiness",
+    "public_identity_contract_ready",
+    "public_sdk_ready",
+    "replaces_player_principal_evidence",
+    "multi_surface_beta_capture_pack_runtime_evidence_ready",
+    "multi_surface_beta_capture_plan_queue_runtime_evidence_ready",
+    "multi_surface_beta_capture_plan_runtime_evidence_ready",
+    "multi_surface_beta_capture_runtime_evidence_ready",
+    "runtime_readiness",
+    "runtime_ready",
+    "sdk_p0_progress",
+    "sdk_p0_progress_ready",
+    "sdk_progress",
+    "sdk_progress_contribution",
+    "sdk_ready",
+    "v1_completion",
+    "v1_completion_contribution",
+    "v1_completion_ready",
+}
+MULTI_SURFACE_BETA_CAPTURE_STATUS_KEYS = {
+    "beta_capture_pack_status",
+    "beta_capture_plan_status",
+    "beta_capture_prep_status",
+    "beta_capture_queue_status",
+    "candidate_beta_capture_pack_status",
+    "candidate_beta_capture_plan_status",
+    "candidate_surfaces_queue_status",
+    "candidate_surfaces_status",
+    "capture_pack_status",
+    "capture_plan_status",
+    "multi_surface_beta_capture_pack_status",
+    "multi_surface_beta_capture_plan_queue_queue_status",
+    "multi_surface_beta_capture_plan_queue_status",
+    "multi_surface_beta_capture_plan_status",
+    "multi_surface_beta_capture_queue_status",
+    "multi_surface_beta_capture_status",
+    "multi_surface_candidate_queue_queue_status",
+    "multi_surface_candidate_queue_status",
+}
+MULTI_SURFACE_BETA_CAPTURE_ALLOWED_STATUS_VALUES = {
+    "blocked",
+    "candidate_capture_pack",
+    "candidate_only",
+    "candidate_prep",
+    "candidate_preparation",
+    "dry_run_candidate_capture_pack",
+    "future_capture_plan_only",
+    "future_capture_target",
+    "future_capture_targets_only",
+    "missing",
+    "not_available",
+    "unavailable",
+    "unresolved",
+}
+ZERO_OR_FALSE_READINESS_KEYS = {
+    "claim_progress",
+    "claim_progress_contribution",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress",
+    "complete_sdk_progress_contribution",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
+    "p0_progress",
+    "p0_sdk_progress",
+    "progress",
+    "progress_contribution",
+    "progress_percent",
+    "progress_ratio",
+    "public_sdk_progress_contribution",
+    "runtime_progress_contribution",
+    "sdk_p0_progress",
+    "sdk_progress",
+    "sdk_progress_contribution",
+    "v1_completion_contribution",
+}
 REQUIRED_IDENTIFIER_REDACTION_INTAKE_ID = "identifier_redaction_evidence"
 REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT = "privacy.identifier_redaction"
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
@@ -59,7 +201,8 @@ REQUIRED_PLANNING_SOURCE_VERIFICATION_CHECKER = (
 )
 REQUIRED_PLANNING_SOURCE_VERIFICATION_NON_CLAIM = (
     "A valid source-bound planning manifest verification is contract-review provenance only; it does not "
-    "promote player identity, public SDK/header/runtime readiness, public ABI, runtime authorization, or v1 completion."
+    "promote public player identity, lookup, public SDK/runtime/API/ABI/header readiness, runtime authorization, "
+    "permissions/admin, command/chat surfaces, or v1 completion."
 )
 PLANNING_SOURCE_VERIFICATION_REPORT_NON_CLAIMS = [
     "source-bound planning manifest verification is provenance-only contract-review input",
@@ -82,8 +225,40 @@ REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_NON_CLAIM = (
     "not resolve lifecycle.owner_cleanup, add public header symbols, add capability bits, expose callbacks, "
     "promote player identity, or count toward v1 completion."
 )
+LIVE_AUTHORIZATION_FALSE_FLAGS = (
+    "live_ops_authorized",
+    "server_operations_authorized",
+    "workspace_writes_authorized",
+    "runtime_capture_authorized",
+    "reads_live_logs",
+)
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM = (
+    "A valid approved runtime evidence manifest can resolve only the runtime lifecycle evidence input "
+    "for public-contract review; it does not promote public player identity, lookup, public "
+    "SDK/runtime/API/ABI/header readiness, permissions/admin, command/chat surfaces, or v1 completion."
+)
+REQUIRED_APPROVED_RUNTIME_READY_SCOPE = "runtime_evidence_only"
+REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES = [
+    "observer_enable",
+    "session_start_anchor",
+    "session_start_rejected_anchor",
+    "session_end_anchor",
+]
+REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES = [
+    "malformed_or_unsupported_evidence",
+    "stale_after_logout",
+]
 DECISION_GATE_ID = "identity_public_contract_gate"
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
+NEXT_BLOCKER_AFTER_IDENTITY_CONTRACT_REVIEW = "public_header_gate_missing"
+REQUIRED_REVIEWED_IDENTITY_PUBLIC_CONTRACT_SOURCE_ARTIFACTS = {
+    label: {
+        "path": spec["path"],
+        "role": spec["role"],
+        "counting_scope": public_contract_decision_record.REVIEW_ROUTE,
+    }
+    for label, spec in public_contract_decision_record.EXPECTED_SOURCE_ARTIFACTS.items()
+}
 REQUIRED_DECISION_GATE_CURRENT_DECISION = (
     "no public header, no public capability bit, no plugin callback, no lookup, "
     "no downstream permission or command dependency may consume identity yet"
@@ -203,6 +378,7 @@ CONTRACT_REVIEW_INPUT_ONLY_TESTS = {
 REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY = {
     "runtime evidence can prove a candidate lifecycle route was observed; it does not define a stable C ABI",
     "runtime evidence can show login/logout ordering; it does not choose the copied opaque identifier form, generation rules, or scope flags",
+    "runtime evidence can show logout observations; it does not prove the private logout correlation contract required before public identity promotion",
     "runtime evidence can support internal lifecycle semantics; it does not prove owner-token registration, unregister, plugin unload cleanup, or in-flight callback drain",
     "runtime evidence does not provide ABI layout tests, SDK consumer tests, or append-only compatibility rules",
     "runtime evidence does not prove process-local scope, cross-instance isolation, or cluster identity semantics",
@@ -211,6 +387,7 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY = {
 REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
     "privacy and redaction decision resolved",
     "principal lifetime and invalidation decision resolved",
+    "private logout correlation contract resolved",
     "cross-instance/process-local scope decision resolved",
     "candidate POD payload and descriptor contract reviewed",
     "named capability and owner-token lifecycle policy reviewed",
@@ -220,19 +397,188 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
 REQUIRED_ALIAS_GUARDRAILS_FALSE = {
     "contractReviewed",
     "identityContractReady",
+    "identityPublicContractReady",
     "publicIdentityReady",
     "publicPrincipalReady",
     "principalHandleAbiReady",
+    "principalAbiReady",
+    "principalHandleReady",
     "identityHeaderAllowed",
     "identityHeaderReady",
+    "publicHeaderAllowed",
+    "publicHeaderReady",
+    "publicHeaderReadiness",
+    "publicContractAllowed",
+    "publicContractReady",
+    "publicContractReadiness",
+    "publicReadiness",
+    "publicApiAllowed",
+    "publicApiReady",
+    "publicApiReadiness",
+    "publicAbiAllowed",
+    "publicAbiReady",
+    "publicAbiReadiness",
+    "publicCallbackAbiReady",
+    "lookupReady",
+    "lookupAllowed",
+    "playerLookupReady",
+    "permissionsReady",
+    "permissionsAdminUnlocked",
+    "permissionsAdminReady",
+    "permissionsAdminPublicReady",
+    "commandsReady",
+    "commandResponseUnlocked",
+    "commandResponseReady",
+    "commandChatResponseReady",
+    "commandsRepliesUnlocked",
+    "commandsRepliesReady",
+    "chatRepliesReady",
+    "sendChatReady",
+    "publicSdkReady",
+    "publicSdkReadiness",
+    "sdkConsumerReady",
+    "sdkConsumerReadiness",
+    "packageShapeReady",
+    "installedSdkPackageShapeReady",
+    "supportPackageReady",
+    "supportTierReady",
+    "betaNoticeReady",
+    "betaCaptureReady",
+    "runtimeEvidenceStatusReportReady",
+    "statusReportReady",
+    "scopedReleaseRowReady",
+    "scopedReleaseStatementReady",
+    "stableSdkReady",
+    "stableClaimAllowed",
+    "stableReleaseContractClaimAllowed",
     "principalLookupReady",
+    "identityLookupReady",
+    "publicLookupReady",
+    "publicLookupAllowed",
+    "runtimeReady",
+    "runtimeReadiness",
+    "runtimeReadyAlias",
+    "runtimePrincipalReady",
+    "promotionReady",
+    "publicIdentityAllowed",
+    "playerIdentityReady",
+    "playerIdentityPromoted",
+    "playerPrincipalReady",
     "realIdentityReady",
     "redactionEvidencePromotesIdentity",
+    "v1Ready",
+    "v1CompletionReady",
+    "v1CompletionEvidence",
+    "v1CompletionClaim",
+    "publicSdkV1CompletionReady",
+    "publicSdkV1CompletionClaim",
+    "identityContractReviewed",
+    "identityPublicContractReviewed",
+    "acceptedForHeaderGateReview",
+    "acceptedForPublicHeaderGateReview",
+    "acceptedForPublicHeaderReview",
+    "acceptedForPublicApiReview",
+    "acceptedForPublicAbiReview",
+    "publicHeaderGateReady",
+    "publicHeaderGateUnlocked",
+    "publicApiGateReady",
+    "publicApiGateUnlocked",
+    "publicAbiGateReady",
+    "publicAbiGateUnlocked",
+    "resourceHandleReady",
+    "resourceHandleSupported",
+    "resourceHandleAllowed",
+    "completeSdkReady",
+    "completeSdkReadiness",
+    "completeSdkCountingAllowed",
+}
+OPTIONAL_ALIAS_GUARDRAILS_FALSE = {
+    "broadcastReady",
+    "broadcastReplyReady",
+    "p0Progress",
+    "p0ProgressReady",
+    "p0Ready",
+    "p0SdkProgress",
+    "p0SdkProgressReady",
+    "sdkP0Progress",
+    "sdkP0ProgressReady",
+    "sdkP0Ready",
+    "countsTowardP0",
+    "countsTowardP0DependencyChain",
+    "countsTowardP0DependencyChainClaim",
+    "rconReady",
+    "rconCommandReady",
+    "rconReplyReady",
+    "pluginHubReady",
+    "pluginHubPublicationReady",
+    "principalStartEndReady",
+    "principalStartEndRuntimeEvidenceReady",
+    "runtimeLifecycleStartEndEvidenceReady",
+    "startEndRuntimeEvidenceReady",
+}
+REQUIRED_ALIAS_GUARDRAILS_FALSE = REQUIRED_ALIAS_GUARDRAILS_FALSE | {
+    "mutationAllowed",
+    "mutationReady",
+    "mutationSupported",
+    "returnOverrideAllowed",
+    "returnOverrideReady",
 }
 REQUIRED_ALIAS_GUARDRAILS_NON_CLAIM = (
     "Alias guardrails are false-only until identity_public_contract_gate is reviewed."
 )
 FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS = (
+    "accepted_alias",
+    "accepted-alias",
+    "approved_manifest",
+    "approved-manifest",
+    "beta_notice",
+    "beta-notice",
+    "closure",
+    "closure_report",
+    "closure-report",
+    "complete_alias",
+    "complete-alias",
+    "completed_alias",
+    "completed-alias",
+    "diagnostic",
+    "executor",
+    "executor_report",
+    "executor-report",
+    "extended_monitor",
+    "extended-monitor",
+    "extended_passive_monitor",
+    "extended-passive-monitor",
+    "monitor_log",
+    "monitor-log",
+    "monitor_snapshot",
+    "monitor-snapshot",
+    "passive",
+    "passive_monitor",
+    "passive-monitor",
+    "beta_capture",
+    "beta-capture",
+    "beta_capture_pack",
+    "beta-capture-pack",
+    "beta_capture_plan",
+    "beta-capture-plan",
+    "beta_capture_queue",
+    "beta-capture-queue",
+    "multi_surface_beta_capture",
+    "multi-surface-beta-capture",
+    "multi_surface_beta_capture_pack",
+    "multi-surface-beta-capture-pack",
+    "multi_surface_beta_capture_plan",
+    "multi-surface-beta-capture-plan",
+    "multi_surface_beta_capture_plan_queue",
+    "multi-surface-beta-capture-plan-queue",
+    "multi_surface_candidate_queue",
+    "multi-surface-candidate-queue",
+    "post_reboot",
+    "post-reboot",
+    "post_reboot_passive_monitor",
+    "post-reboot-passive-monitor",
+    "ready_alias",
+    "ready-alias",
     "request_pack",
     "request-pack",
     "preflight",
@@ -242,17 +588,466 @@ FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS = (
     "operator-receipt",
     "operator_approval_receipt",
     "operator-approval-receipt",
+    "post_runtime_bridge",
+    "post-runtime-bridge",
+    "post_runtime_bridge_build_report",
+    "post-runtime-bridge-build-report",
+    "bridge_build_report",
+    "bridge-build-report",
+    "shutdown_worker",
+    "shutdown-worker",
+    "worker_shutdown",
+    "worker-shutdown",
+    "shutdown_report",
+    "shutdown-report",
     "sidecar",
+    "scoped_statement",
+    "scoped-statement",
+    "scoped_release_statement",
+    "scoped-release-statement",
+    "release_statement",
+    "release-statement",
+    "promotion_certificate",
+    "promotion-certificate",
+    "completion_certificate",
+    "completion-certificate",
     "observer_env",
     "observer-env",
     "live_ops",
     "live-ops",
+    "installed_runtime",
+    "installed-runtime",
+    "runtime_install",
+    "runtime-install",
+    "runtime_installed",
+    "runtime-installed",
+    "broadcast",
+    "broadcasts",
+    "broadcast-ok",
+    "broadcast_ok",
+    "rcon",
+    "rcon-ok",
+    "rcon_ok",
+    "principal_start_end_runtime_evidence",
+    "principal-start-end-runtime-evidence",
+    "runtime_lifecycle_start_end_evidence",
+    "runtime-lifecycle-start-end-evidence",
+    "runtime.lifecycle_start_end_evidence",
+    "lifecycle_start_end_evidence",
+    "lifecycle-start-end-evidence",
+    "start_end_runtime_evidence",
+    "start-end-runtime-evidence",
+    "start_end_only",
+    "start-end-only",
+    "start_only",
+    "start-only",
+    "end_only",
+    "end-only",
+    "partial",
+    "partial_runtime",
+    "partial-runtime",
+    "runtime_partial",
+    "runtime-partial",
+    "copied_runtime_partial",
+    "copied-runtime-partial",
+    "truncated",
+    "incomplete",
+    "simulation",
+    "simulated",
+    "synthetic",
+    "mock",
+    "fixture",
+    "next_action",
+    "next-action",
+    "next_actions",
+    "next-actions",
+    "next_action_plan",
+    "next-action-plan",
+    "action_plan",
+    "action-plan",
+    "runtime_evidence_shortcut",
+    "runtime-evidence-shortcut",
+    "evidence_shortcut",
+    "evidence-shortcut",
+    "status_artifact",
+    "status-artifact",
+    "status_report",
+    "status-report",
+    "route_status",
+    "route-status",
+    "runtime_status",
+    "runtime-status",
+    "readiness_status",
+    "readiness-status",
+    "p0_progress",
+    "p0-progress",
+    "p0_sdk_progress",
+    "p0-sdk-progress",
+    "sdk_p0_progress",
+    "sdk-p0-progress",
+    "phase0_progress",
+    "phase0-progress",
+    "public_header",
+    "public-header",
+    "public_header_gate",
+    "public-header-gate",
+    "public_header_gate_proposal",
+    "public-header-gate-proposal",
+    "public_header_proposal",
+    "public-header-proposal",
+    "header_gate_proposal",
+    "header-gate-proposal",
+    "header_proposal",
+    "header-proposal",
+    "confirmed_beta_notice",
+    "confirmed-beta-notice",
+    "copied_log_only",
+    "copied-log-only",
+    "cmake_package",
+    "cmake-package",
+    "find_package",
+    "find-package",
+    "source_overclaim",
+    "source-overclaim",
+    "source_overclaim_total_flag_count",
+    "source-overclaim-total-flag-count",
+    "source_overclaim_zero",
+    "source-overclaim-zero",
+    "package_shape",
+    "package-shape",
+    "installed_sdk",
+    "installed-sdk",
+    "plugin_hub",
+    "plugin-hub",
+    "support_tier",
+    "support-tier",
+    "release_support",
+    "release-support",
 )
+SOURCE_PROVENANCE_NON_PROMOTIONAL_ALIAS_PATTERNS = {
+    "approved_manifest_reference": re.compile(
+        r"\bapproved[-_ ]+manifest(?:[-_ ]+(?:reference|artifact|shortcut))?\b",
+        re.IGNORECASE,
+    ),
+    "beta_notice_material": re.compile(
+        r"\bbeta[-_ ]+notice(?:[-_ ]+(?:prep|draft|artifact|shortcut))?\b",
+        re.IGNORECASE,
+    ),
+    "confirmed_beta_notice_material": re.compile(
+        r"\bconfirmed[-_ ]+beta[-_ ]+notice(?:[-_ ]+(?:json|artifact|manifest|report|shortcut))?\b",
+        re.IGNORECASE,
+    ),
+    "closure_or_executor_report": re.compile(
+        r"\b(?:closure|executor)[-_ ]+(?:request|report|artifact|shortcut)\b",
+        re.IGNORECASE,
+    ),
+    "next_action_plan": re.compile(
+        r"\b(?:next[-_ ]+actions?|next[-_ ]+actions?[-_ ]+plan|action[-_ ]+plan|"
+        r"plan[-_ ][A-Za-z0-9_-]*next[-_ ]+actions?)"
+        r"(?:[-_ ]+(?:artifact|execution|manifest|report|shortcut))?\b",
+        re.IGNORECASE,
+    ),
+    "runtime_evidence_shortcut": re.compile(
+        r"\b(?:runtime[-_ ]+(?:lifecycle[-_ ]+)?evidence|approved[-_ ]+runtime[-_ ]+evidence|"
+        r"approved[-_ ]+runtime[-_ ]+bundle|runtime[-_ ]+observer[-_ ]+log)\b"
+        r"[^\.;]{0,80}\b(?:alias|shortcut|substitute|reference|status|notice|plan)\b|"
+        r"\b(?:alias|shortcut|substitute|reference|status|notice|plan)\b"
+        r"[^\.;]{0,80}\b(?:runtime[-_ ]+(?:lifecycle[-_ ]+)?evidence|"
+        r"approved[-_ ]+runtime[-_ ]+evidence|approved[-_ ]+runtime[-_ ]+bundle|"
+        r"runtime[-_ ]+observer[-_ ]+log)\b",
+        re.IGNORECASE,
+    ),
+    "principal_start_end_only_runtime_evidence": re.compile(
+        r"\b(?:(?:principal|player)[-_ ]+start[-_ ]+end(?:[-_ ]+(?:runtime[-_ ]+)?"
+        r"(?:evidence|artifact|report|manifest|bundle))?|"
+        r"(?:runtime[-_ ]+)?lifecycle[-_ ]+start[-_ ]+end(?:[-_ ]+"
+        r"(?:evidence|artifact|report|manifest|bundle))?|"
+        r"start[-_ ]+end(?:[-_ ]+(?:runtime[-_ ]+)?(?:evidence|artifact|report|manifest|bundle))?|"
+        r"(?:start|end)[-_ ]+only(?:[-_ ]+(?:runtime[-_ ]+)?(?:evidence|artifact|report|manifest|bundle))?)\b",
+        re.IGNORECASE,
+    ),
+    "status_artifact": re.compile(
+        r"\b(?:(?:route|runtime|evidence|identity|lifecycle|public|sdk)[-_ ]+status|"
+        r"status[-_ ]+(?:artifact|manifest|notice|report|shortcut|snapshot)|"
+        r"(?:route|runtime|evidence|identity|lifecycle|public|sdk)[-_ ]+status[-_ ]+"
+        r"(?:artifact|manifest|notice|report|shortcut|snapshot))\b",
+        re.IGNORECASE,
+    ),
+    "partial_copied_runtime_evidence": re.compile(
+        r"\b(?:copied[-_ ]+runtime(?:[-_ ]+evidence|[-_ ]+observer[-_ ]+log)?|"
+        r"runtime[-_ ]+(?:observer[-_ ]+log|lifecycle[-_ ]+evidence|evidence))\b"
+        r"[^\.;]{0,80}\b(?:partial|truncated|incomplete)\b|"
+        r"\b(?:partial|truncated|incomplete)\b[^\.;]{0,80}\b"
+        r"(?:copied[-_ ]+runtime|runtime[-_ ]+(?:observer[-_ ]+log|lifecycle[-_ ]+evidence|evidence))\b",
+        re.IGNORECASE,
+    ),
+    "passive_extended_monitor_material": re.compile(
+        r"\b(?:(?:extended[-_ ]+)?passive[-_ ]+monitor|extended[-_ ]+monitor|"
+        r"monitor[-_ ]+(?:snapshot|log))(?:[-_ ]+(?:snapshot|log|artifact|report))?\b",
+        re.IGNORECASE,
+    ),
+    "post_reboot_passive_monitor_context": re.compile(
+        r"\bpost[-_ ]+reboot(?:[-_ ]+(?:passive[-_ ]+monitor|monitor|context|snapshot|log|artifact|report))?\b|"
+        r"\b(?:passive[-_ ]+monitor|monitor[-_ ]+(?:context|snapshot|log))"
+        r"[-_ ]+post[-_ ]+reboot\b",
+        re.IGNORECASE,
+    ),
+    "multi_surface_beta_capture_material": MULTI_SURFACE_BETA_CAPTURE_ARTIFACT_RE,
+    "post_runtime_bridge_or_shutdown_worker_artifact": re.compile(
+        r"\b(?:post[-_ ]?runtime[-_ ]?bridge(?:[-_ ]?(?:build|builder|report|artifact|manifest))?|"
+        r"bridge[-_ ]?(?:build|builder)[-_ ]?report|shutdown[-_ ]?worker|"
+        r"worker[-_ ]?shutdown|shutdown[-_ ]?(?:report|artifact|manifest))\b",
+        re.IGNORECASE,
+    ),
+    "copied_log_only_artifact": re.compile(
+        r"\bcopied[-_ ]+log[-_ ]+only(?:[-_ ]+(?:artifact|evidence|manifest|report|shortcut))?\b|"
+        r"\bcopied[-_ ]+log\b[^\.;]{0,80}\b(?:only|shortcut|substitute)\b",
+        re.IGNORECASE,
+    ),
+    "package_shape_material": re.compile(
+        r"\b(?:cmake[-_ ]+package|cmake[-_ ]+config|find[-_ ]+package|"
+        r"obeliskconfig\.cmake|obelisktargets\.cmake|obelisk::obelisk_sdk|"
+        r"installed[-_ ]+sdk(?:[-_ ]+package[-_ ]+shape)?|package[-_ ]+shape)\b",
+        re.IGNORECASE,
+    ),
+    "support_or_publication_material": re.compile(
+        r"\b(?:support[-_ ]+tier|release[-_ ]+support|release[-_ ]+grade[-_ ]+support|"
+        r"plugin[-_ ]+hub|pluginhub)(?:[-_ ]+(?:package|support|publication|wording))?\b",
+        re.IGNORECASE,
+    ),
+    "runtime_live_status_material": re.compile(
+        r"\b(?:installed[-_ ]+runtime|runtime[-_ ]+install(?:ed)?|runtime[-_ ]+installed|"
+        r"broadcasts?(?:[-_ ]+(?:ok|sent|status|notice))?|"
+        r"rcon(?:[-_ ]+(?:ok|ready|reachable|command(?:s)?|service|status))?)\b",
+        re.IGNORECASE,
+    ),
+    "source_overclaim_zero_diagnostic": re.compile(
+        r"\b(?:side[-_ ]?lane[-_ ]?)?source[-_ ]?overclaim(?:ed|s)?"
+        r"(?:[-_ ]+(?:total[-_ ]+flag[-_ ]+count|component[-_ ]+count|summary|diagnostics?|zero))?\b|"
+        r"\bsource[-_ ]?overclaim[-_ ]?zero\b",
+        re.IGNORECASE,
+    ),
+    "planning_artifact": re.compile(r"\bplanning(?:[-_ ]+only)?\b", re.IGNORECASE),
+    "public_header_proposal_artifact": re.compile(
+        r"\b(?:public[-_ ]+header(?:[-_ ]+gate)?[-_ ]+proposal|"
+        r"header[-_ ]+gate[-_ ]+proposal|header[-_ ]+proposal)\b",
+        re.IGNORECASE,
+    ),
+    "public_api_readiness_alias": re.compile(
+        r"\bpublic[-_ ]+api[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "public_sdk_readiness_alias": re.compile(
+        r"\bpublic[-_ ]+sdk[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "public_abi_readiness_alias": re.compile(
+        r"\bpublic[-_ ]+abi[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "public_header_readiness_alias": re.compile(
+        r"\bpublic[-_ ]+header[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "runtime_readiness_alias": re.compile(
+        r"\bruntime[-_ ]+(?:allowed|available|complete|enabled|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "v1_completion_readiness_alias": re.compile(
+        r"\bv1[-_ ]+completion[-_ ]+(?:complete|ready|readiness|satisfied)\b",
+        re.IGNORECASE,
+    ),
+    "identity_lookup_readiness_alias": re.compile(
+        r"\b(?:identity|principal|player|public)[-_ ]+lookup[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "permissions_admin_unlock_alias": re.compile(
+        r"\b(?:permissions?[/_-]?admin|permissions?|admin)[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "command_response_unlock_alias": re.compile(
+        r"\b(?:command[/_-]?chat[-_ ]+response|commands?[/_-]?replies|"
+        r"command[-_ ]+response|chat[-_ ]+replies|send[-_ ]+chat|broadcasts?|"
+        r"rcon(?:[-_ ]+commands?)?)[-_ ]+"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|readiness|"
+        r"satisfied|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "runtime_authorization_alias": re.compile(
+        r"\b(?:runtime[-_ ]+(?:work|capture)|live[-_ ]+ops|server[-_ ]+ops|"
+        r"server[-_ ]+operations?|workspace[-_ ]+writes?)[-_ ]+"
+        r"(?:allowed|authorized|authorization|enabled|ready|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "counts_toward_alias": re.compile(
+        r"\bcounts?[-_ ]+toward[-_ ]+"
+        r"(?:public|runtime|sdk|v1|complete[-_ ]+sdk|public[-_ ]+(?:sdk|api|abi|header|runtime)|"
+        r"v1[-_ ]+completion)\b",
+        re.IGNORECASE,
+    ),
+    "production_sdk_readiness_alias": re.compile(
+        r"\b(?:production|stable|complete)[-_ ]+sdk[-_ ]+"
+        r"(?:allowed|available|claim|complete|enabled|promoted|ready|readiness|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
+    "generic_public_contract_shortcut_alias": re.compile(
+        r"\b(?:(?:identity|reviewed|public)?[-_ ]*(?:public[-_ ]+)?contract(?:[-_ ]+review)?|"
+        r"identity[-_ ]+public[-_ ]+contract|public[-_ ]+contract)[-_ ]+"
+        r"(?:ready|accepted|complete|completed)(?:[-_ ]+(?:alias|shortcut|artifact|manifest))?\b|"
+        r"\b(?:ready|accepted|complete|completed)[-_ ]+(?:alias|shortcut)[-_ ]+"
+        r"(?:identity[-_ ]+)?public[-_ ]+contract\b",
+        re.IGNORECASE,
+    ),
+    "sdk_p0_progress_alias": re.compile(
+        r"\b(?:sdk[/_-]*p0|p0[/_-]*(?:sdk)?|complete[-_ ]+sdk)[-_ ]*"
+        r"(?:progress|completion|complete|ready|readiness|satisfied)\b",
+        re.IGNORECASE,
+    ),
+}
 NON_PROMOTIONAL_EVIDENCE_DENIAL = (
-    "Request packs, preflight/window manifests, operator receipts, and live-ops sidecars are "
-    "planning or operational-preparation artifacts only; they do not resolve runtime lifecycle "
-    "evidence, public identity promotion, public ABI/SDK readiness, runtime readiness, or v1 completion."
+    "Post-reboot passive monitor context, passive or extended monitor snapshots/logs, confirmed beta "
+    "notice JSON, beta notices, multi-surface beta capture plan/pack/queue artifacts, "
+    "closure/executor reports, post-runtime bridge build reports, shutdown-worker artifacts, "
+    "approved-manifest references, next-action plans, route/status "
+    "artifacts, copied-log-only artifacts, installed runtime, broadcast, RCON, package-shape "
+    "artifacts, historical handoff text, request packs, preflight/window manifests, operator "
+    "receipts, and live-ops sidecars are planning or operational-preparation artifacts only; they do not "
+    "resolve runtime lifecycle evidence, public identity, lookup, public API/ABI/header/SDK "
+    "readiness, runtime readiness, permissions/admin, command/chat surfaces, or v1 completion."
 )
+REQUIRED_POST_EVIDENCE_NON_COUNTING_ARTIFACT_CLASSES = [
+    "post-reboot passive monitor context",
+    "passive or extended monitor snapshots/logs",
+    "confirmed beta notice JSON",
+    "beta notices",
+    "next-action/status reports",
+    "status JSON artifacts",
+    "copied-log-only artifacts",
+    "installed runtime, broadcast, or RCON status checks",
+    "package-shape artifacts",
+    "source-overclaim zero diagnostics",
+    "post-runtime bridge build reports or shutdown-worker artifacts",
+    "historical handoff text",
+    "request/preflight/window manifests",
+    "operator receipts or live-ops sidecars",
+    "diagnostic-only artifacts",
+    "scoped/non-complete release statements",
+    "promotion or completion certificates",
+    "simulation/mock/fixture artifacts",
+]
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_COUNTING_CANDIDATE_ALIAS_POLICY = {
+    "alias_classes": [
+        "copied-log candidate aliases",
+        "preflight aliases",
+        "review-status aliases",
+        "live-ops sidecar candidate aliases",
+        "beta or confirmed-beta notice candidate aliases",
+        "passive or post-reboot passive monitor candidate aliases",
+        "diagnostic-only candidate aliases",
+    ],
+    "can_count_candidate_aliases": False,
+    "can_count_preflight_aliases": False,
+    "can_count_review_aliases": False,
+    "can_unlock_identity_public_contract_gate_missing": False,
+    "can_unlock_public_identity_contract_readiness": False,
+    "can_replace_reviewed_identity_public_contract_decision_record": False,
+    "accepted_for_public_header_gate_review": False,
+    "p0_progress_contribution": 0,
+    "non_claim": (
+        "Candidate, preflight, review-status, copied-log, sidecar, beta, passive, and diagnostic "
+        "aliases remain non-counting after accepted runtime evidence; they cannot unlock "
+        "identity_public_contract_gate_missing, public identity contract readiness, public header "
+        "review, P0 progress, or replace the hash-current reviewed identity public contract "
+        "decision record."
+    ),
+}
+REQUIRED_PLAYER_IDENTITY_P0_DEPENDENCY_CHAIN = [
+    "player_identity",
+    "permissions_admin",
+    "command_chat_response_path",
+    "commands_replies",
+]
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_STEP_FALSE_FLAGS = [
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_readiness",
+    "runtime_readiness",
+    "stable_ready",
+    "stable_claim_allowed",
+    "stable_claim_ready",
+    "stable_sdk_ready",
+    "plugin_hub_ready",
+    "plugin_hub_publication_ready",
+    "publication_ready",
+    "publication_authorized",
+    "counts_toward_public_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "p0_progress_ready",
+    "sdk_p0_progress_ready",
+    "public_sdk_v1_completion_ready",
+    "complete_sdk_ready",
+    "permissions_admin_ready",
+    "permissions_admin_public_ready",
+    "permissions_admin_unlocked",
+    "command_response_ready",
+    "command_chat_response_ready",
+    "commands_replies_ready",
+    "v1_completion_evidence",
+]
+REQUIRED_APPROVED_RUNTIME_SOURCE_PROVENANCE_POLICY = {
+    "accepted_source_kind": "runtime-observer-log",
+    "resolved_source_path": "$.source_summary.evidence.sources[0].path",
+    "copied_log_path": "$.operational_window.copied_log.path",
+    "required_output_artifact_hash": "$.output_artifact_identity.artifact_sha256",
+    "forbidden_source_classes": [
+        "diagnostic-only sources",
+        "passive monitor or snapshot sources",
+        "post-reboot passive monitor context",
+        "confirmed beta notice JSON",
+        "next-action/status reports",
+        "status JSON artifacts",
+        "copied-log-only artifacts",
+        "installed runtime, broadcast, or RCON status checks",
+        "installed/package-shape artifacts",
+        "source-overclaim zero diagnostics",
+        "post-runtime bridge build reports or shutdown-worker artifacts",
+        "historical handoff text",
+        "request packs",
+        "preflight or window manifests",
+        "operator receipts",
+        "live-ops sidecars",
+        "scoped or non-complete release statements",
+        "promotion or completion certificates",
+        "simulation, mock, or fixture artifacts",
+    ],
+    "non_claim": (
+        "Only the approved runtime evidence manifest's copied runtime-observer log source can resolve "
+        "runtime.lifecycle_evidence for contract review; post-reboot passive monitor context, confirmed beta "
+        "notice JSON, next-action/status reports, status JSON artifacts, copied-log-only artifacts, "
+        "installed runtime, broadcast, RCON, installed/package-shape artifacts, source-overclaim zero diagnostics, "
+        "post-runtime bridge build reports, shutdown-worker artifacts, historical handoff text, diagnostic-only, passive, "
+        "request/preflight/window/receipt/sidecar/scoped-statement/certificate/simulation/mock/fixture "
+        "artifacts remain non-counting and cannot open the public identity contract gate."
+    ),
+}
 REQUIRED_NON_CLAIMS = {
     "This manifest does not add public header symbols.",
     "This manifest does not promote obelisk.player_identity.v1.",
@@ -319,7 +1114,7 @@ REQUIRED_TEST_COVERAGE_BY_ID = {
     "runtime.evidence_intake": {
         "approved runtime evidence is checked as an input to promotion",
         "approved runtime evidence alone leaves the public-header gate closed",
-        "approved runtime evidence cannot set promotion_ready, public_sdk_ready, runtime_ready, or public_header_allowed",
+        "approved runtime evidence cannot set promotion_ready, public_sdk_ready, runtime_ready, public_header_allowed, public_api_ready, public_abi_ready, lookup_ready, permissions_ready, commands_ready, or v1_completion_evidence",
         "offline fixtures and second-source layout evidence remain separate from runtime lifecycle acceptance",
     },
 }
@@ -340,6 +1135,518 @@ REQUIRED_BEFORE_PUBLIC_HEADER = {
     "abi.append_only_layout_tests",
     "separation.no_commands_permissions_persistence",
 }
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_BASE_DECISION_KEYS = [
+    "evidence.complete_non_protected_pack",
+    "evidence.accepted_session_start_anchor",
+    "evidence.accepted_session_end_anchor",
+    "evidence.second_source_anchor_layout",
+    "privacy.public_identifier_form",
+    "privacy.redacted_identifier_fields",
+    "privacy.logging_and_storage_policy",
+    "lifetime.principal_scope",
+    "lifetime.invalidation_events",
+    "lifetime.reconnect_duplicate_stale_policy",
+    "abi.payload_shape",
+    "abi.capability_bits",
+    "abi.owner_token_registration",
+    "abi.append_only_layout_tests",
+    "separation.no_commands_permissions_persistence",
+]
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS = [
+    "identity_public_contract.reviewed_copied_opaque_principal_pod_abi",
+    "identity_public_contract.reviewed_owner_token_lifecycle",
+    "identity_public_contract.reviewed_process_local_non_persistent_handles",
+    "identity_public_contract.reviewed_no_lookup_persistence_permissions_commands_mutation_return_override",
+]
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_DECISION_KEYS = (
+    REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_BASE_DECISION_KEYS
+    + REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS
+)
+POST_RUNTIME_APPROVED_BUNDLE_CONSUMED_DECISION_KEYS = [
+    "evidence.complete_non_protected_pack",
+    "evidence.accepted_session_start_anchor",
+    "evidence.accepted_session_end_anchor",
+]
+POST_RUNTIME_PUBLIC_IDENTITY_HEADER_DECISION_GAP_KEYS = [
+    key
+    for key in REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_BASE_DECISION_KEYS
+    if key not in POST_RUNTIME_APPROVED_BUNDLE_CONSUMED_DECISION_KEYS
+]
+POST_RUNTIME_DEFERRED_DOWNSTREAM_SURFACE_GAPS = sorted(
+    REQUIRED_CONTRACT_GATE_INPUTS["separation.downstream_surfaces"]["remaining_promotion_inputs"]
+)
+POST_RUNTIME_CONTRACT_GAP_DIAGNOSTIC_BLOCKED_SURFACES = [
+    "public_identity",
+    "player_lookup",
+    "public_api",
+    "public_abi",
+    "public_header",
+    "runtime_readiness",
+    "sdk_readiness",
+    "permissions_admin",
+    "command_chat_response",
+    "commands_replies",
+    "v1_completion",
+    "p0_progress",
+]
+POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS = [
+    "approved_runtime_principal_lifecycle_evidence_bundle",
+    "reviewed_identity_public_contract_decision_record",
+    "identifier_redaction_evidence",
+    "principal_invalidation_policy",
+    "public_abi_preflight_candidate",
+    "owner_token_sdk_consumer_contract",
+    "source_bound_planning_manifest_verification",
+    "player_identity_public_header_gate_proposal",
+]
+POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_FALSE_FLAGS = (
+    "accepted_for_public_header_gate_review",
+    "promotion_ready",
+    "public_contract_allowed",
+    "public_header_allowed",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "runtime_readiness",
+    "lookup_ready",
+    "permissions_ready",
+    "commands_ready",
+    "v1_completion_evidence",
+    "complete_sdk_ready",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "p0_progress_ready",
+    "sdk_p0_progress_ready",
+)
+POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_REQUIRED_ITEM_FIELDS = [
+    "id",
+    "status",
+    "checker",
+    "required_next_action",
+    "blocks_until",
+    "review_scope",
+    "counts_as_public_readiness",
+    "counts_toward_public_sdk",
+    "counts_toward_p0_dependency_chain_claim",
+    "p0_progress_contribution",
+    "accepted_for_public_header_gate_review",
+    "public_header_allowed",
+    "promotion_ready",
+    "non_claim",
+]
+REQUIRED_POST_RUNTIME_CONTRACT_GAP_DIAGNOSTIC_NON_CLAIM = (
+    "This post-runtime contract gap diagnostic is offline/fail-closed only: it identifies the "
+    "hash-current reviewed identity public contract decision record and remaining decision keys after "
+    "the approved runtime bundle is consumed, but it does not unlock public identity, lookup, public "
+    "API/ABI/header, callbacks, capability bits, runtime readiness, SDK readiness, permissions/admin, "
+    "command/chat surfaces, P0 progress, or v1 completion."
+)
+REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_NON_CLAIM = (
+    "This post-runtime identity contract checklist is routing-only: it keeps the next reviewed "
+    "identity contract and public header inputs explicit after runtime evidence, but it does not "
+    "unlock public identity, lookup, public API/ABI/header, callbacks, capability bits, runtime "
+    "readiness, SDK readiness, permissions/admin, command/chat surfaces, P0 progress, or v1 completion."
+)
+REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_NON_CLAIM = (
+    "Checklist items are action targets only; an accepted item never opens public identity, public "
+    "header/API/ABI/SDK/runtime readiness, P0 progress, or v1 completion from this route."
+)
+POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_POLICIES = [
+    {
+        "id": "approved_runtime_principal_lifecycle_evidence_bundle",
+        "checker": "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py",
+        "required_next_action": (
+            "Run the strict approved runtime principal lifecycle evidence checker on a copied "
+            "runtime-observer log bundle."
+        ),
+        "blocks_until": REQUIRED_RESOLVED_INPUT,
+        "review_scope": "runtime_evidence_contract_review_input",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "reviewed_identity_public_contract_decision_record",
+        "checker": "scripts/check_player_identity_public_contract_decision_record.py",
+        "required_next_action": (
+            "Run the decision-record checker on the bound contract-review record."
+        ),
+        "blocks_until": "identity_public_contract.reviewed_* contract-review decisions",
+        "review_scope": public_contract_decision_record.REVIEW_ROUTE,
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "identifier_redaction_evidence",
+        "checker": REQUIRED_IDENTIFIER_REDACTION_CHECKER,
+        "required_next_action": (
+            "Run the identifier-redaction evidence checker and keep sanitized identifiers "
+            "contract-review-only."
+        ),
+        "blocks_until": REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT,
+        "review_scope": "privacy_contract_review_input",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "principal_invalidation_policy",
+        "checker": REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER,
+        "required_next_action": (
+            "Run the principal-invalidation policy checker for candidate generation, scope, "
+            "reconnect, duplicate, stale, and logout-correlation policy review."
+        ),
+        "blocks_until": PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT,
+        "review_scope": "candidate_policy_review_input",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "public_abi_preflight_candidate",
+        "checker": REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER,
+        "required_next_action": (
+            "Run the public ABI preflight candidate checker for offline POD and owner-token review "
+            "evidence without adding header symbols or capability bits."
+        ),
+        "blocks_until": REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT,
+        "review_scope": "candidate_abi_preflight_review_input",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "owner_token_sdk_consumer_contract",
+        "checker": REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_CHECKER,
+        "required_next_action": (
+            "Run the owner-token SDK consumer contract checker for candidate cleanup and lifecycle "
+            "review evidence."
+        ),
+        "blocks_until": REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT,
+        "review_scope": "candidate_owner_token_lifecycle_review_input",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "source_bound_planning_manifest_verification",
+        "checker": REQUIRED_PLANNING_SOURCE_VERIFICATION_CHECKER,
+        "required_next_action": (
+            "Verify source-bound planning manifests are current; provenance remains non-counting."
+        ),
+        "blocks_until": REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT,
+        "review_scope": "source_bound_provenance_only",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+    {
+        "id": "player_identity_public_header_gate_proposal",
+        "checker": "scripts/check_player_identity_public_header_gate.py",
+        "required_next_action": (
+            "Prepare only a separate fail-closed public-header gate proposal after the reviewed "
+            "identity contract record is accepted."
+        ),
+        "blocks_until": NEXT_BLOCKER_AFTER_IDENTITY_CONTRACT_REVIEW,
+        "review_scope": "future_public_header_gate_review_candidate_only",
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+    },
+]
+REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY = {
+    "id": "post_runtime_identity_contract_checklist",
+    "status": "blocked/fail-closed-action-list",
+    "active_after_resolved_input": REQUIRED_RESOLVED_INPUT,
+    "current_blocker_after_resolved_input": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+    "required_item_ids": POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS,
+    "items": [
+        {
+            **item,
+            "non_claim": REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_NON_CLAIM,
+        }
+        for item in POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_POLICIES
+    ],
+    "must_remain_false": list(POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_FALSE_FLAGS),
+    "per_item_zero_progress_fields": [
+        "p0_progress_contribution",
+        "complete_sdk_claim_progress_contribution",
+    ],
+    "non_claim": REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_NON_CLAIM,
+}
+POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_POLICY_BY_ID = {
+    item["id"]: item for item in REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY["items"]
+}
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_AUDIT_INPUTS = {
+    "approved_runtime_evidence_intake",
+    "approved_runtime_evidence_not_sufficient",
+    "contract_gate_inputs",
+    "proposed_public_pod_abi_candidate",
+    "required_before_public_header",
+    "required_tests_before_public_header",
+}
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT = {
+    "id": "reviewed_identity_public_contract_decision_record",
+    "status": "missing",
+    "checker": "scripts/check_player_identity_public_contract_decision_record.py",
+    "accepted_artifact_class": "hash-current reviewed identity public contract decision record",
+    "accepted_review_route": "reviewed_identity_public_contract_review",
+    "must_resolve_decision_keys": REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS,
+    "must_remain_false": REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_STEP_FALSE_FLAGS,
+    "p0_dependency_chain": REQUIRED_PLAYER_IDENTITY_P0_DEPENDENCY_CHAIN,
+    "p0_progress_contribution": 0,
+    "non_counting_artifact_classes": REQUIRED_POST_EVIDENCE_NON_COUNTING_ARTIFACT_CLASSES,
+    "non_counting_candidate_alias_policy": (
+        REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_COUNTING_CANDIDATE_ALIAS_POLICY
+    ),
+    "source_artifact_hash_policy": public_contract_decision_record.SOURCE_ARTIFACT_HASH_POLICY,
+    "required_source_artifacts": REQUIRED_REVIEWED_IDENTITY_PUBLIC_CONTRACT_SOURCE_ARTIFACTS,
+}
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_OFFLINE_PREPARATION = {
+    "status": "preparable_offline_not_counting",
+    "active_after_resolved_input": REQUIRED_RESOLVED_INPUT,
+    "blocked_until_resolved_input": REQUIRED_RESOLVED_INPUT,
+    "current_blocker_before_resolved_input": "approved_runtime_evidence_missing",
+    "next_blocker_after_resolved_input": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+    "checkable_artifact": (
+        "docs/research/player-identity-planning-sources/"
+        "reviewed-identity-public-contract-decision-record.json"
+    ),
+    "checker": "scripts/check_player_identity_public_contract_decision_record.py",
+    "required_review_route": public_contract_decision_record.REVIEW_ROUTE,
+    "must_bind_to_approved_runtime_evidence": True,
+    "must_bind_current_source_artifacts": True,
+    "must_remain_contract_review_only": True,
+    "must_resolve_decision_keys": REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS,
+    "must_remain_false": REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_STEP_FALSE_FLAGS,
+    "does_not_unlock_identity_public_contract_gate": True,
+    "does_not_unlock_public_header_gate": True,
+    "public_header_allowed": False,
+    "public_abi_ready": False,
+    "public_api_ready": False,
+    "public_sdk_ready": False,
+    "runtime_ready": False,
+    "v1_completion_evidence": False,
+    "p0_progress_contribution": 0,
+    "non_claim": (
+        "This is offline preparation for the reviewed identity public contract record only; it remains "
+        "non-counting until approved runtime lifecycle evidence resolves runtime.lifecycle_evidence and "
+        "cannot unlock identity_public_contract_gate_missing, public header/API/ABI/SDK/runtime readiness, "
+        "P0 progress, or v1 completion."
+    ),
+}
+REQUIRED_PUBLIC_HEADER_GATE_NEXT_REQUIRED_ARTIFACT = {
+    "id": "player_identity_public_header_gate_proposal",
+    "status": "candidate_only",
+    "checker": "scripts/check_player_identity_public_header_gate.py",
+    "must_remain_non_claim": True,
+    "public_header_allowed": False,
+}
+REQUIRED_PUBLIC_HEADER_FAIL_CLOSED_PATH_FALSE_FLAGS = (
+    "accepted_decision_record_opens_public_header_gate",
+    "public_header_readiness_from_decision_record",
+    "public_header_gate_ready",
+    "public_header_gate_unlocked",
+    "promotion_ready",
+    "public_contract_allowed",
+    "public_header_allowed",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "runtime_readiness",
+    "lookup_ready",
+    "permissions_ready",
+    "commands_ready",
+    "v1_completion_evidence",
+    "complete_sdk_ready",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "p0_progress_ready",
+    "sdk_p0_progress_ready",
+)
+REQUIRED_PUBLIC_HEADER_FAIL_CLOSED_PATH_NON_CLAIM = (
+    "An accepted strict runtime bundle plus a bound reviewed identity public contract record only "
+    "makes the public header gate proposal the next auditable fail-closed artifact; it does not open "
+    "the public header/API/ABI, expose callbacks or capability bits, promote the SDK/runtime, unlock "
+    "lookup or downstream surfaces, or count toward SDK/P0/v1 completion."
+)
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM = (
+    "After approved runtime lifecycle evidence resolves runtime.lifecycle_evidence, the next blocker is "
+    "identity_public_contract_gate_missing; this remains an offline reviewed public identity contract gate "
+    "and cannot open public identity, lookup, public API/ABI/header, callbacks, capability bits, runtime "
+    "readiness, SDK readiness, stable readiness, Plugin Hub readiness, publication, permissions/admin, "
+    "command/chat surfaces, or v1 completion."
+)
+REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_FALSE_FLAGS = (
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_abi_ready",
+    "counts_toward_public_sdk",
+    "counts_toward_complete_sdk_claim",
+    "stable_ready",
+    "stable_claim_allowed",
+    "stable_claim_ready",
+    "stable_sdk_ready",
+    "plugin_hub_ready",
+    "plugin_hub_publication_ready",
+    "publication_ready",
+    "publication_authorized",
+    "public_sdk_v1_completion_ready",
+    "complete_sdk_ready",
+    "permissions_admin_ready",
+    "permissions_admin_public_ready",
+    "permissions_admin_unlocked",
+    "command_response_ready",
+    "command_chat_response_ready",
+    "commands_replies_ready",
+    "v1_completion_evidence",
+)
+POST_APPROVED_RUNTIME_EVIDENCE_FALSE_ONLY_ALIAS_FLAGS = (
+    "public_contract_allowed",
+    "public_readiness",
+    "runtime_readiness",
+    "public_api_ready",
+    "public_header_gate_ready",
+    "public_header_gate_unlocked",
+    "public_api_gate_ready",
+    "public_api_gate_unlocked",
+    "public_abi_gate_ready",
+    "public_abi_gate_unlocked",
+    "identity_public_contract_ready",
+    "identity_public_contract_gate_ready",
+    "identity_public_contract_gate_unlocked",
+    "public_identity_ready",
+    "public_principal_ready",
+    "lookup_ready",
+    "lookup_allowed",
+    "player_lookup_ready",
+    "principal_lookup_ready",
+    "public_lookup_ready",
+    "permissions_ready",
+    "permissions_admin_ready",
+    "permissions_admin_public_ready",
+    "permissions_admin_unlocked",
+    "commands_ready",
+    "command_response_ready",
+    "command_response_unlocked",
+    "commands_replies_ready",
+    "commands_replies_unlocked",
+    "chat_replies_ready",
+    "send_chat_ready",
+    "broadcast_ready",
+    "broadcast_reply_ready",
+    "rcon_ready",
+    "rcon_command_ready",
+    "rcon_reply_ready",
+    "stable_ready",
+    "stable_claim_allowed",
+    "stable_claim_ready",
+    "stable_sdk_ready",
+    "plugin_hub_ready",
+    "plugin_hub_publication_ready",
+    "publication_ready",
+    "publication_authorized",
+    "public_sdk_v1_completion_ready",
+    "public_sdk_v1_completion_claim",
+    "complete_sdk_ready",
+    "complete_sdk_counting_allowed",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "p0_progress_ready",
+    "sdk_p0_progress_ready",
+    "resource_handle_ready",
+    "resource_handle_supported",
+    "resource_handle_allowed",
+    "mutation_allowed",
+    "mutation_ready",
+    "return_override_allowed",
+    "return_override_ready",
+    "live_ops_authorized",
+    "server_operations_authorized",
+    "workspace_writes_authorized",
+    "runtime_capture_authorized",
+    "reads_live_logs",
+)
+IDENTITY_CONTRACT_DECISION_RECORD_SHORTCUT_FALSE_KEYS = tuple(
+    dict.fromkeys(
+        (
+            *REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_FALSE_FLAGS,
+            *POST_APPROVED_RUNTIME_EVIDENCE_FALSE_ONLY_ALIAS_FLAGS,
+            "accepted_for_header_gate_review",
+            "accepted_for_public_header_gate_review",
+            "accepted_for_public_header_review",
+            "accepted_for_public_api_review",
+            "accepted_for_public_abi_review",
+            "identity_contract_gate_complete",
+            "identity_contract_gate_open",
+            "identity_contract_gate_resolved",
+            "identity_contract_gate_cleared",
+            "identity_contract_gate_satisfied",
+            "identity_contract_gate_accepted",
+            "identity_public_contract_gate_complete",
+            "public_contract_gate_complete",
+            "public_header_gate_open",
+            "public_header_gate_resolved",
+            "public_header_gate_cleared",
+            "complete_sdk_claim_progress_contribution",
+            "p0_dependency_chain_claim_progress_contribution",
+            "p0_dependency_chain_progress_contribution",
+            "sdk_progress",
+            "sdk_progress_contribution",
+            "sdk_p0_progress",
+            "public_sdk_progress_contribution",
+            "runtime_progress_contribution",
+            "progress",
+            "progress_contribution",
+        )
+    )
+)
 REQUIRED_PUBLIC_IDENTIFIER_FORBIDDEN = {
     "SteamID",
     "EOS ID",
@@ -442,6 +1749,49 @@ REQUIRED_SEPARATION_FORBIDDEN = {
     "admin mutation",
     "storage/persistence",
     "operator ingress",
+}
+REQUIRED_PERMISSIONS_ADMIN_QUERY_ONLY_STATUS = "blocked/query-only-planning"
+REQUIRED_PERMISSIONS_ADMIN_QUERY_ONLY_POLICY = {
+    "permissions/admin remains query-only planning until obelisk.player_identity.v1 is promoted",
+    "the first permissions/admin public slice may only be fail-closed permission queries over copied principals",
+    "permission queries must include principal_generation and principal_scope_flags or be formally callback-local only",
+    "allow decisions require policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+}
+REQUIRED_PERMISSIONS_ADMIN_FORBIDDEN_UNTIL_PROMOTION = {
+    "permission groups",
+    "admin groups",
+    "grant/revoke API",
+    "admin actions",
+    "admin mutation",
+    "permission cache ABI",
+    "storage/persistence",
+    "operator ingress",
+    "command router",
+    "command/chat response path",
+    "replies/send-chat",
+    "moderation authority",
+    "ban/kick API",
+    "allow without provenance",
+    "public header permission symbols",
+}
+REQUIRED_PERMISSIONS_ADMIN_NON_COUNTING_ARTIFACTS = {
+    "diagnostic route/gap/readiness reports",
+    "passive chat parsing or plugin-local routing artifacts",
+    "scoped non-complete-SDK release statements or exclusions",
+    "candidate-only permissions/admin query fail-closed contracts",
+    "missing, mismatched, stale, or hash-unbound promotion certificates",
+}
+REQUIRED_PLAYER_IDENTITY_PROMOTION_CERTIFICATE_REQUIREMENTS = {
+    "schema": "obelisk.player-identity-promotion-certificate.v1",
+    "surface_id": "obelisk.player_identity.v1",
+    "promotion_status": "promoted",
+    "v1_dependency_chain_position": 1,
+    "required_by_surface": "obelisk.permissions_admin.v1",
+    "required_by_v1_dependency_chain_position": 2,
+    "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+    "reviewed_artifact_hash_policy": (
+        "must match the reviewed identity surface record hash carried by the certificate"
+    ),
 }
 REQUIRED_CANDIDATE_PAYLOAD_FIELDS = {
     "abi_version",
@@ -601,16 +1951,89 @@ FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
 PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
 READINESS_FALSE_KEYS = {
     "accepted_for_contract_review",
+    "blocker_resolved",
+    "contract_review_only",
     "contract_review_ready",
     "contract_reviewed",
+    "contract_record_contract_review_only",
     "identity_contract_ready",
+    "identity_contract_current",
+    "identity_contract_decision_record_contract_review_only",
+    "identity_contract_decision_record_current",
+    "identity_contract_decision_record_hash_current",
+    "identity_contract_decision_record_reviewed",
     "identity_contract_reviewed",
     "identity_header_allowed",
     "identity_header_ready",
+    "identity_lookup_allowed",
+    "identity_lookup_ready",
     "identity_public_contract_ready",
+    "identity_public_contract_current",
+    "identity_public_contract_hash_current",
+    "identity_public_contract_decision_record_contract_review_only",
+    "identity_public_contract_decision_record_current",
+    "identity_public_contract_decision_record_hash_current",
+    "identity_public_contract_decision_record_reviewed",
+    "identity_public_contract_record_contract_review_only",
+    "identity_public_contract_record_current",
+    "identity_public_contract_record_hash_current",
+    "identity_public_contract_record_reviewed",
+    "identity_public_contract_gate_ready",
+    "identity_public_contract_gate_reviewed",
+    "identity_public_contract_gate_unlocked",
+    "identity_public_contract_gate_open",
+    "identity_public_contract_gate_resolved",
+    "identity_public_contract_gate_cleared",
+    "identity_public_contract_gate_satisfied",
+    "identity_public_contract_gate_accepted",
+    "identity_public_contract_gate_missing_resolved",
+    "identity_public_contract_gate_missing_cleared",
     "identity_public_contract_reviewed",
+    "permissions_ready",
+    "permissions_admin_ready",
+    "permissions_admin_public_ready",
+    "permissions_admin_unlocked",
+    "lookup_ready",
+    "command_response_ready",
+    "command_chat_response_ready",
+    "command_response_unlocked",
+    "commands_ready",
+    "commands_replies_ready",
+    "commands_replies_unlocked",
+    "chat_replies_ready",
+    "send_chat_ready",
+    "derived_readiness",
+    "helper_derived_readiness",
+    "helper_derived_ready",
+    "helper_readiness",
+    "helper_ready",
+    "header_shape_valid",
+    "identity_contract_hash_current",
     "player_identity_promoted",
     "player_identity_ready",
+    "api_readiness",
+    "abi_layout_readiness",
+    "public_abi_readiness",
+    "public_api_allowed",
+    "public_api_readiness",
+    "public_api_ready",
+    "public_contract_ready",
+    "public_contract_readiness",
+    "public_header_readiness",
+    "public_surface_status",
+    "lookup_allowed",
+    "player_lookup_allowed",
+    "player_lookup_ready",
+    "principal_lookup_allowed",
+    "public_lookup_allowed",
+    "public_lookup_ready",
+    "public_readiness",
+    "public_sdk_readiness",
+    "production_sdk_claim",
+    "production_sdk_claim_allowed",
+    "production_sdk_ready",
+    "production_sdk_readiness",
+    "sdk_consumer_ready",
     "public_principal_ready",
     "player_principal_ready",
     "principal_abi_ready",
@@ -619,23 +2042,165 @@ READINESS_FALSE_KEYS = {
     "principal_lookup_ready",
     "promotion",
     "promotion_ready",
+    "runtime_readiness",
+    "runtime_work_allowed",
+    "runtime_work_authorization",
+    "runtime_work_authorized",
+    "runtime_capture_allowed",
+    "runtime_capture_authorization",
+    "runtime_capture_authorized",
+    "runtime_principal_ready",
+    "runtime_ready_alias",
+    "source_ready",
+    "sdk_consumer_readiness",
     "public_identity_allowed",
     "public_identity_ready",
     "public_sdk_ready",
     "runtime_ready",
+    "stable_ready",
+    "stable_claim_allowed",
+    "stable_claim_ready",
+    "stable_release_contract_claim_allowed",
+    "stable_sdk_claim",
+    "stable_sdk_claim_allowed",
+    "stable_sdk_ready",
+    "stable_sdk_readiness",
+    "support_tier_activation_allowed",
+    "support_tier_ready",
+    "release_support_available",
+    "release_support_ready",
+    "package_shape_available",
+    "package_shape_ready",
+    "installed_sdk_package_shape_available",
+    "installed_sdk_package_shape_ready",
+    "cmake_package_ready",
+    "find_package_ready",
+    "plugin_hub_ready",
+    "plugin_hub_publication_ready",
+    "publication_ready",
+    "publication_authorized",
+    "approved_runtime_principal_lifecycle_bundle_routes_to",
+    "approved_runtime_principal_lifecycle_bundle_next_blocker",
+    "approved_runtime_lifecycle_bundle_routes_to",
+    "approved_runtime_lifecycle_bundle_next_blocker",
+    "runtime_lifecycle_evidence_routes_to",
+    "runtime_lifecycle_evidence_next_blocker",
+    "approved_runtime_evidence_routes_to",
+    "approved_runtime_evidence_next_blocker",
+    "principal_start_end_ready",
+    "principal_start_end_runtime_evidence_ready",
+    "runtime_lifecycle_start_end_evidence_ready",
+    "start_end_runtime_evidence_ready",
+    "lifecycle_start_end_evidence_ready",
+    "broadcast_ready",
+    "broadcast_reply_ready",
+    "rcon_ready",
+    "rcon_command_ready",
+    "rcon_reply_ready",
+    "live_ops_allowed",
+    "live_ops_authorization",
+    "live_ops_authorized",
+    "server_ops_allowed",
+    "server_ops_authorized",
+    "server_operations_allowed",
+    "server_operations_authorization",
+    "server_operations_authorized",
+    "workspace_write_allowed",
+    "workspace_write_authorization",
+    "workspace_write_authorized",
+    "workspace_writes_allowed",
+    "workspace_writes_authorization",
+    "workspace_writes_authorized",
+    "complete_sdk_counting_allowed",
+    "complete_sdk_progress",
+    "complete_sdk_ready",
+    "complete_sdk_readiness",
+    "counts_toward_completion",
+    "counts_toward_public",
+    "counts_toward_public_abi",
+    "counts_toward_public_api",
+    "counts_toward_public_header",
+    "counts_toward_public_runtime",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_sdk",
+    "counts_toward_sdk_v1",
+    "counts_toward_v1",
+    "counts_toward_v1_completion",
+    "public_counting_allowed",
+    "runtime_counting_allowed",
+    "sdk_counting_allowed",
+    "v1_counting_allowed",
     "public_header_allowed",
     "public_header_ready",
     "public_contract_allowed",
+    "public_contract_decision_record_contract_review_only",
+    "public_contract_decision_record_current",
+    "public_contract_decision_record_hash_current",
+    "public_contract_decision_record_reviewed",
+    "public_contract_record_current",
+    "public_contract_gate_ready",
+    "public_contract_gate_reviewed",
+    "public_contract_gate_unlocked",
+    "public_header_gate_ready",
+    "public_header_gate_unlocked",
+    "public_header_gate_open",
+    "public_header_gate_resolved",
+    "public_header_gate_cleared",
+    "public_api_gate_ready",
+    "public_api_gate_unlocked",
+    "public_api_gate_open",
+    "public_api_gate_resolved",
+    "public_api_gate_cleared",
+    "public_abi_gate_ready",
+    "public_abi_gate_unlocked",
+    "public_abi_gate_open",
+    "public_abi_gate_resolved",
+    "public_abi_gate_cleared",
     "public_abi_ready",
+    "public_identity_contract_current",
+    "public_identity_contract_hash_current",
+    "public_identity_contract_reviewed",
+    "hash_current_identity_contract_decision_record",
+    "hash_current_identity_public_contract_decision_record",
+    "hash_current_public_contract_decision_record",
+    "reviewed_identity_contract",
+    "reviewed_identity_contract_hash_current",
+    "reviewed_identity_contract_decision_record",
+    "reviewed_identity_public_contract",
+    "reviewed_identity_public_contract_current",
+    "reviewed_identity_public_contract_hash_current",
+    "reviewed_identity_public_contract_contract_review_only",
+    "reviewed_identity_public_contract_record",
+    "reviewed_identity_public_contract_record_hash_current",
+    "reviewed_identity_public_contract_decision_record",
+    "reviewed_identity_public_contract_decision_record_contract_review_only",
     "public_sdk_v1_completion_claim",
     "public_sdk_v1_completion_ready",
+    "p0_progress",
+    "p0_progress_ready",
+    "p0_ready",
+    "p0_unlocked",
+    "p0_sdk_progress",
+    "p0_sdk_progress_ready",
+    "sdk_p0_progress",
+    "sdk_p0_progress_ready",
+    "sdk_p0_ready",
     "real_identity_ready",
     "redaction_evidence_promotes_identity",
+    "resource_handle_allowed",
+    "resource_handle_ready",
+    "resource_handle_supported",
+    "mutation_allowed",
+    "mutation_ready",
+    "mutation_supported",
+    "return_override_allowed",
+    "return_override_ready",
     "v1_completion_claim",
     "v1_completion_ready",
     "v1_completion_evidence",
     "v1_ready",
-}
+} | MULTI_SURFACE_BETA_CAPTURE_FALSE_OR_ZERO_KEYS | MULTI_SURFACE_BETA_CAPTURE_STATUS_KEYS
 EMPTY_PUBLIC_LIST_KEYS = {
     "callback_abi",
     "callback_symbols",
@@ -648,6 +2213,12 @@ EMPTY_PUBLIC_LIST_KEYS = {
     "public_capability_bits_now",
     "public_callbacks",
     "public_callback_abi_now",
+    "public_api_symbols",
+    "public_api_symbols_now",
+    "public_api_symbol_list",
+    "public_symbol_list",
+    "public_symbol_names",
+    "public_symbols",
 }
 SPLIT_CLAIM_NAME_KEYS = {
     "alias",
@@ -666,7 +2237,10 @@ SPLIT_CLAIM_NAME_KEYS = {
     "properties",
 }
 SPLIT_CLAIM_VALUE_KEYS = {
+    "accepted",
     "allowed",
+    "complete",
+    "completed",
     "enabled",
     "readiness",
     "ready",
@@ -689,42 +2263,247 @@ NON_PROMOTIONAL_CLAIM_VALUE_TOKENS = {
     "unavailable",
     "unresolved",
 }
+NON_FALSE_READINESS_ALIAS_KEYS = {
+    "blocker_resolved",
+    "p0_unlocked",
+    "approved_runtime_principal_lifecycle_bundle_next_blocker",
+    "approved_runtime_principal_lifecycle_bundle_routes_to",
+    "approved_runtime_lifecycle_bundle_next_blocker",
+    "approved_runtime_lifecycle_bundle_routes_to",
+    "approved_runtime_evidence_next_blocker",
+    "approved_runtime_evidence_routes_to",
+    "runtime_lifecycle_evidence_next_blocker",
+    "runtime_lifecycle_evidence_routes_to",
+}
 NON_CLAIM_CONTAINER_PATH_FRAGMENTS = (
     ".blocker_details",
     ".blockers",
     ".does_not_resolve",
+    ".exclusions",
+    ".forbidden_now",
+    ".minimum_additional_gates",
+    ".must_remain_false",
+    ".must_remain_blocked",
+    ".negative_consumer_rules",
+    ".non_claim",
     ".non_claims",
+    ".non_counting_artifacts",
+    ".non_counting_artifact_classes",
+    ".p0_dependency_chain",
     ".remaining_blockers",
+    ".remaining_promotion_inputs",
 )
 ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
     "approved_runtime_evidence_present",
+    "complete_accepted_lifecycle_role_triplet_present",
     "runtime_evidence_ready",
 }
+APPROVED_RUNTIME_FALSE_PROMOTION_KEYS = (
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_contract_allowed",
+    "public_readiness",
+    "public_api_allowed",
+    "public_api_ready",
+    "public_api_readiness",
+    "public_abi_ready",
+    "public_abi_readiness",
+    "public_header_ready",
+    "public_header_readiness",
+    "lookup_allowed",
+    "lookup_ready",
+    "identity_lookup_allowed",
+    "identity_lookup_ready",
+    "principal_lookup_allowed",
+    "principal_lookup_ready",
+    "public_lookup_allowed",
+    "public_lookup_ready",
+    "permissions_ready",
+    "permissions_admin_ready",
+    "permissions_admin_public_ready",
+    "permissions_admin_unlocked",
+    "command_response_ready",
+    "command_chat_response_ready",
+    "command_response_unlocked",
+    "commands_ready",
+    "commands_replies_ready",
+    "commands_replies_unlocked",
+    "broadcast_ready",
+    "broadcast_reply_ready",
+    "rcon_ready",
+    "rcon_command_ready",
+    "rcon_reply_ready",
+    "sdk_consumer_ready",
+    "sdk_consumer_readiness",
+    "complete_sdk_counting_allowed",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress",
+    "complete_sdk_progress_contribution",
+    "complete_sdk_ready",
+    "complete_sdk_readiness",
+    "stable_ready",
+    "stable_claim_allowed",
+    "stable_claim_ready",
+    "stable_sdk_ready",
+    "plugin_hub_ready",
+    "plugin_hub_publication_ready",
+    "publication_ready",
+    "publication_authorized",
+    "counts_as_approved_runtime_evidence",
+    "counts_as_runtime_evidence",
+    "p0_progress",
+    "p0_progress_ready",
+    "p0_ready",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
+    "p0_sdk_progress",
+    "p0_sdk_progress_ready",
+    "sdk_progress",
+    "sdk_progress_contribution",
+    "source_ready",
+    "source_supported",
+    "source_overclaim_total_flag_count",
+    "source_overclaim_component_count",
+    "side_lane_source_overclaim_total_flag_count",
+    "sdk_p0_progress",
+    "sdk_p0_progress_ready",
+    "sdk_p0_ready",
+    "public_sdk_v1_completion_ready",
+    "public_sdk_v1_completion_claim",
+    "v1_completion_ready",
+    "v1_completion_evidence",
+    "v1_ready",
+    "runtime_readiness",
+    "runtime_ready_alias",
+    "runtime_work_allowed",
+    "runtime_work_authorized",
+    "runtime_capture_allowed",
+    "runtime_capture_authorized",
+    "live_ops_allowed",
+    "live_ops_authorized",
+    "server_ops_allowed",
+    "server_ops_authorized",
+    "server_operations_allowed",
+    "server_operations_authorized",
+    "workspace_write_allowed",
+    "workspace_write_authorized",
+    "workspace_writes_allowed",
+    "workspace_writes_authorized",
+    "resource_handle_allowed",
+    "resource_handle_ready",
+    "resource_handle_supported",
+    "mutation_allowed",
+    "mutation_ready",
+    "mutation_supported",
+    "return_override_allowed",
+    "return_override_ready",
+)
+PRINCIPAL_START_END_RUNTIME_REQUIRED_FALSE_KEYS = (
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+    "counts_as_approved_runtime_evidence",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_header_allowed",
+    "public_sdk_ready",
+    "runtime_ready",
+    "lookup_ready",
+    "permissions_ready",
+    "commands_ready",
+    "v1_completion_ready",
+    "stable_claim_allowed",
+    "publication_authorized",
+)
+PRINCIPAL_START_END_RUNTIME_OPTIONAL_FALSE_KEYS = (
+    *APPROVED_RUNTIME_FALSE_PROMOTION_KEYS,
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_present",
+    "approved_runtime_evidence_ready",
+    "counts_as_approved_runtime_evidence",
+)
 APPROVED_RUNTIME_REPORT_EXPLICIT_FALSE_KEYS = {
     "accepted_for_contract_review",
     "promotion_ready",
     "public_sdk_ready",
     "runtime_ready",
     "public_header_allowed",
+    "public_contract_allowed",
     "public_abi_ready",
     "v1_completion_ready",
     "v1_completion_evidence",
+    "public_sdk_v1_completion_claim",
 }
 NEGATIVE_CONTEXT_RE = re.compile(
     r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|forbid(?:den|s)?|"
-    r"redact(?:ed|ion)?|excludes?|without|until|missing|blocked|blocker|unavailable|"
+    r"redact(?:ed|ion)?|excludes?|exclusion|after|before|without|until|missing|blocked|blocker|unavailable|"
     r"must[_ -]?not[_ -]?expose|no_)\b",
     re.IGNORECASE,
 )
 APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
     r"(?:"
-    r"public|sdk|abi|capability|callback|header|identity|principal|permission|admin|"
-    r"command|chat|reply|lookup|storage|persist|mutation|return[_ -]?override|resource[_ -]?handle|v1"
-    r").*(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available)"
-    r"|(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available).*"
+    r"public|sdk|abi|capability|callback|header|identity|principal|permission|admin|runtime|stable|"
+    r"command|chat|reply|lookup|storage|persist|mutation|return[_ -]?override|resource[_ -]?handle|"
+    r"v1|p0|phase[_ -]?0"
+    r").*(?:ready|readiness|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|open|opened|cleared|complete|"
+    r"satisfied|passed|passing|supported|available|progress|counting)"
+    r"|(?:ready|readiness|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|open|opened|cleared|complete|"
+    r"satisfied|passed|passing|supported|available|progress|counting).*"
     r"(?:public|sdk|abi|identity|principal|permission|admin|command|chat|reply|lookup|storage|persist|mutation|"
-    r"return[_ -]?override|resource[_ -]?handle|v1)",
+    r"runtime|stable|return[_ -]?override|resource[_ -]?handle|v1|p0|phase[_ -]?0)",
     re.IGNORECASE,
+)
+NON_PROMOTIONAL_PROVENANCE_CONTEXT_KEYS = {
+    "artifact_provenance",
+    "evidence_provenance",
+    "metadata_provenance",
+    "provenance",
+    "provenance_marker",
+    "provenance_markers",
+    "review_provenance",
+    "route_provenance",
+    "snapshot_provenance",
+    "source_marker",
+    "source_markers",
+    "source_provenance",
+    "source_provenances",
+}
+NON_PROMOTIONAL_PROVENANCE_CONTEXT_TERMS = {
+    "accepted_runtime_evidence",
+    "approved_runtime_evidence",
+    "broadcast",
+    "identity_public_contract_decision_record",
+    "installed_runtime",
+    "lifecycle_start_end_evidence",
+    "principal_start_end_runtime_evidence",
+    "public_contract_decision_record",
+    "rcon",
+    "reviewed_hash_current_contract_review_only",
+    "reviewed_identity_public_contract",
+    "runtime_lifecycle_start_end_evidence",
+    "runtime_install",
+    "runtime_installed",
+    "runtime_start_end_evidence",
+    "route_snapshot",
+    "start_end_runtime_evidence",
+}
+NON_PROMOTIONAL_PROVENANCE_STATUS_KEYS = SPLIT_CLAIM_VALUE_KEYS | {
+    "source_accepted",
+    "source_outcome",
+    "source_ready",
+    "source_result",
+    "source_state",
+    "source_status",
+    "source_supported",
+}
+NON_PROMOTIONAL_PROVENANCE_PROGRESS_ALIAS_RE = re.compile(
+    r"(?:^|_)(?:"
+    r"claim_progress|credit|credited|progress|progress_contribution|progress_percent|"
+    r"progress_ratio|readiness_credit|sdk_credit|sdk_completion_credit|"
+    r"v1_completion_credit|public_sdk_credit|counts?(?:_towards?|_toward|_as)?"
+    r")(?:_|$)"
 )
 APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     "public_identity_ready": re.compile(r"public\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
@@ -735,9 +2514,60 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
         r"redaction\s+evidence\s+promotes?\s+(?:public\s+)?(?:player\s+)?identity",
         re.IGNORECASE,
     ),
+    "identity_contract_decision_record_reviewed": re.compile(
+        r"\b(?:reviewed[-_ ]+|accepted[-_ ]+|hash[-_ ]+current[-_ ]+|current[-_ ]+)?"
+        r"identity[-_ ]+(?:public[-_ ]+)?contract[-_ ]+(?:decision[-_ ]+)?record\b"
+        r"[^.;\n]{0,80}\b(?:reviewed|accepted|current|valid|ready|complete|satisfied)\b",
+        re.IGNORECASE,
+    ),
     "public_sdk_ready": re.compile(r"public\s+sdk\s+(?:is\s+)?ready", re.IGNORECASE),
     "public_abi_ready": re.compile(r"public\s+abi\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_api_ready": re.compile(
+        r"public\s+api\s+(?:is\s+)?"
+        r"(?:allowed|available|complete|enabled|exposed|promoted|ready|satisfied|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "runtime_work_authorized": re.compile(
+        r"\bruntime[-_ ]+(?:work|capture)\b[^.;\n]{0,80}\b"
+        r"(?:allowed|authorized|available|enabled|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "operations_authorized": re.compile(
+        r"\b(?:live[-_ ]+ops|server[-_ ]+(?:ops|operations?)|workspace[-_ ]+writes?)\b"
+        r"[^.;\n]{0,80}\b"
+        r"(?:allowed|authorized|available|enabled|promoted|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "runtime_live_status_ready": re.compile(
+        r"\b(?:installed[-_ ]+runtime|runtime[-_ ]+install(?:ed)?|runtime[-_ ]+installed|"
+        r"broadcasts?|rcon)\b[^.;\n]{0,80}\b"
+        r"(?:allowed|available|complete|enabled|live|ok|operational|passed|ready|"
+        r"reachable|sent|sent[-_ ]+ok|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "counts_toward_promotion": re.compile(
+        r"\bcounts?[-_ ]+toward[-_ ]+"
+        r"(?:public|runtime|sdk|v1|complete[-_ ]+sdk|public[-_ ]+(?:sdk|api|abi|header|runtime)|"
+        r"v1[-_ ]+completion)\b",
+        re.IGNORECASE,
+    ),
+    "production_sdk_ready": re.compile(
+        r"\b(?:production|stable|complete)[-_ ]+sdk\b[^.;\n]{0,80}\b"
+        r"(?:allowed|available|claim(?:ed)?|complete|enabled|promoted|ready|readiness|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "sdk_p0_progress": re.compile(
+        r"\b(?:sdk[/ _-]*p0|p0[/ _-]*(?:sdk)?|complete[/ _-]*sdk)"
+        r"[/ _-]*(?:progress|completion|readiness)?\b[^.;\n]{0,80}\b"
+        r"(?:allowed|available|complete|counting|enabled|passed|passing|promoted|ready|satisfied|unlocked)",
+        re.IGNORECASE,
+    ),
     "v1_completion_ready": re.compile(r"v1\s+(?:sdk\s+)?completion\s+(?:is\s+)?ready", re.IGNORECASE),
+    "stable_claim_allowed": re.compile(
+        r"\bstable[-_ ]+claim\s+(?:is\s+)?"
+        r"(?:allowed|available|enabled|granted|ready|supported|unlocked)\b",
+        re.IGNORECASE,
+    ),
     "capability_available": re.compile(r"(?:identity\s+)?capability\s+(?:bit\s+)?(?:is\s+)?available", re.IGNORECASE),
     "downstream_unlocked": re.compile(
         r"(?:identity|principal).*unlock(?:s|ed)?\s+(?:permission|admin|command|chat|reply|lookup|storage)",
@@ -745,10 +2575,64 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     ),
     "lookup_allowed": re.compile(r"(?:player\s+)?lookup\s+(?:is\s+)?allowed", re.IGNORECASE),
     "mutation_allowed": re.compile(r"mutation\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "public_mutable_resource_available": re.compile(
+        r"\b(?:mutable|mutating|writable|writeable)\s+(?:identity|principal|player[-_ ]+identity|resource)"
+        r"[^\.;]{0,80}\b(?:allowed|available|enabled|exposed|promoted|public|ready|supported|unlocked)|"
+        r"\b(?:identity|principal|player[-_ ]+identity|resource)[-_ ]+mutation\b"
+        r"[^\.;]{0,80}\b(?:allowed|available|enabled|exposed|promoted|public|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
     "return_override_allowed": re.compile(r"return[_ -]?override\s+(?:is\s+)?allowed", re.IGNORECASE),
     "resource_handle_supported": re.compile(
         r"resource[_ -]?handle\s+(?:is\s+)?"
         r"(?:available|enabled|exposed|promoted|public|ready|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "contract_review_metadata_public_readiness": re.compile(
+        r"\b(?:reviewed[-_ ]+hash[-_ ]+current[-_ ]+contract[-_ ]+review[-_ ]+only|"
+        r"hash[-_ ]+current[-_ ]+(?:identity[-_ ]+)?(?:public[-_ ]+)?contract[-_ ]+"
+        r"(?:decision[-_ ]+)?record|contract[-_ ]+review[-_ ]+only[-_ ]+(?:record|artifact)|"
+        r"(?:reviewed[-_ ]+)?identity[-_ ]+public[-_ ]+contract[-_ ]+decision[-_ ]+record|"
+        r"public[-_ ]+contract[-_ ]+decision[-_ ]+record)\b[^.;\n]{0,100}\b"
+        r"(?:marks?|sets?|treats?|validates?|certif(?:ies|y|ied)|approv(?:es|ed)|"
+        r"clear(?:s|ed)|unblock(?:s|ed)|opens?|allows?|enables?|satisf(?:ies|y)|resolves?)\b"
+        r"[^.;\n]{0,100}\b(?:public[-_ ]+(?:identity|principal|contract|header|api|abi|sdk|readiness)|"
+        r"runtime[-_ ]+readiness|v1[-_ ]+completion|promotion|obelisk\.player_identity\.v1)\b",
+        re.IGNORECASE,
+    ),
+    "contract_review_artifact_p0_unlock": re.compile(
+        r"\b(?:approved[-_ ]+runtime(?:[-_ ]+principal[-_ ]+lifecycle)?[-_ ]+evidence|"
+        r"runtime[-_ ]+lifecycle[-_ ]+evidence|identifier[-_ ]+redaction(?:[-_ ]+evidence)?|"
+        r"principal[-_ ]+invalidation(?:[-_ ]+policy)?|private[-_ ]+pod[-_ ]+layout(?:[-_ ]+candidate)?|"
+        r"public[-_ ]+abi[-_ ]+preflight(?:[-_ ]+candidate)?|"
+        r"owner[-_ ]+token[-_ ]+sdk[-_ ]+consumer(?:[-_ ]+contract)?|"
+        r"(?:reviewed[-_ ]+)?identity[-_ ]+public[-_ ]+contract[-_ ]+decision[-_ ]+record|"
+        r"public[-_ ]+contract[-_ ]+decision[-_ ]+record|"
+        r"contract[-_ ]+review[-_ ]+only[-_ ]+(?:record|artifact)|"
+        r"proposal[-_ ]+only[-_ ]+header[-_ ]+gate(?:[-_ ]+shape)?|"
+        r"public[-_ ]+header[-_ ]+proposal(?:[-_ ]+shape)?|header[-_ ]+shape)\b"
+        r"[^.;\n]{0,100}\b(?:counts?[-_ ]+toward|credits?|contributes?|unlocks?|opens?|"
+        r"allows?|enables?|satisf(?:ies|y)|resolves?|marks?|sets?)\b[^.;\n]{0,100}\b"
+        r"(?:sdk[/ _-]*p0|p0[/ _-]*(?:sdk)?|phase[-_ ]*0|p0[-_ ]+dependency[-_ ]+chain|"
+        r"dependency[-_ ]+chain|complete[-_ ]+sdk[-_ ]+(?:progress|claim)|downstream[-_ ]+p0)\b",
+        re.IGNORECASE,
+    ),
+    "post_runtime_route_shortcut": re.compile(
+        r"\b(?:after[-_ ]+)?(?:(?:accepted|approved)(?:[-_ ]+approved)?[-_ ]+runtime"
+        r"(?:[-_ ]+(?:principal[-_ ]+)?lifecycle)?[-_ ]+(?:evidence|bundle)|"
+        r"runtime[-_ ]+lifecycle[-_ ]+evidence|"
+        r"approved[-_ ]+runtime[-_ ]+principal[-_ ]+lifecycle[-_ ]+bundle)\b"
+        r"[^.;\n]{0,120}\b(?:advance[sd]?|route[sd]?|next[-_ ]+blocker|unlocks?|"
+        r"opens?|allows?|enables?|marks?|sets?|resolves?|satisf(?:ies|y)|complete[sd]?)\b"
+        r"[^.;\n]{0,120}\b(?:public[-_ ]+header|public[-_ ]+api|public[-_ ]+abi|"
+        r"public[-_ ]+sdk|public[-_ ]+readiness|runtime[-_ ]+readiness|"
+        r"permissions?[/ _-]?admin|permissions?|admin|command[/ _-]?chat[-_ ]+response|"
+        r"command[-_ ]+response|commands?[/ _-]?replies|commands?|complete[-_ ]+sdk|"
+        r"plugin[-_ ]+hub|pluginhub|package[-_ ]+shape|support[-_ ]+tier|broadcasts?|"
+        r"rcon(?:[-_ ]+commands?)?|v1[-_ ]+completion|sdk[/ _-]*p0|"
+        r"p0[/ _-]*(?:sdk)?|phase[-_ ]*0|p0[-_ ]+dependency[-_ ]+chain|"
+        r"downstream[-_ ]+p0|public_header_gate_missing|public_api_gate_missing|"
+        r"public_abi_gate_missing|permissions_admin|command_chat_response|commands_replies)\b",
         re.IGNORECASE,
     ),
     "opaque_principal_promoted": re.compile(
@@ -781,7 +2665,7 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     ),
     "commands_ready": re.compile(
         r"\b(?:command[/ _-]?chat[-_ ]+response|commands?[/ _-]?replies|command[-_ ]+response|"
-        r"command[-_ ]+router|send[-_ ]+chat)\b[^.;\n]{0,80}\b"
+        r"command[-_ ]+router|send[-_ ]+chat|broadcasts?|rcon(?:[-_ ]+commands?)?)\b[^.;\n]{0,80}\b"
         r"(?:available|enabled|exposed|promoted|ready|supported|unlocked)",
         re.IGNORECASE,
     ),
@@ -790,6 +2674,77 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
         r"\b[^.;\n]{0,80}\b(?:allowed|available|enabled|exposed|promoted|public|ready|supported|unlocked)",
         re.IGNORECASE,
     ),
+    "broad_identity_lookup_wording": re.compile(
+        r"\b(?:"
+        r"[A-Za-z0-9_]*(?:Lookup|Resolve|Resolver)[A-Za-z0-9_]*(?:Player|Identity|Principal)[A-Za-z0-9_]*|"
+        r"[A-Za-z0-9_]*(?:Player|Identity|Principal)[A-Za-z0-9_]*(?:Lookup|Resolve|Resolver)[A-Za-z0-9_]*|"
+        r"(?:public[-_ ]+)?(?:player|identity|principal)[-_ ]+(?:lookup|resolver|resolve|resolution)"
+        r"(?:[-_ ]+(?:api|surface|contract|handle|path|symbol|function|capability|support|route))?"
+        r")\b",
+        re.IGNORECASE,
+    ),
+    "public_abi_identity_handle_before_resource_handle": re.compile(
+        r"\bpublic[-_ ]+(?:abi|api|header|contract|callback[-_ ]+abi)\b[^.;\n]{0,120}\b"
+        r"(?:player|identity|principal)[-_ ]+(?:handles?|lookup|resolver|resolve|resolution|resource[-_ ]+handles?)\b"
+        r"[^.;\n]{0,120}\b(?:before|without|ahead[-_ ]+of|prior[-_ ]+to)\b[^.;\n]{0,80}\bResourceHandle\b|"
+        r"\b(?:player|identity|principal)[-_ ]+(?:handles?|lookup|resolver|resolve|resolution|resource[-_ ]+handles?)\b"
+        r"[^.;\n]{0,120}\bpublic[-_ ]+(?:abi|api|header|contract|callback[-_ ]+abi)\b"
+        r"[^.;\n]{0,120}\b(?:before|without|ahead[-_ ]+of|prior[-_ ]+to)\b[^.;\n]{0,80}\bResourceHandle\b",
+        re.IGNORECASE,
+    ),
+    "readiness_noun_overclaim": re.compile(
+        r"\b(?:public[-_ ]+(?:sdk|api|abi|header|contract)?[-_ ]*readiness|runtime[-_ ]+readiness|"
+        r"sdk[-_ ]+consumer[-_ ]+tests?|abi[-_ ]+layout[-_ ]+tests?)\b"
+        r"[^.;\n]{0,80}\b(?:allowed|available|complete|enabled|exposed|passed|passing|promoted|"
+        r"ready|satisfied|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "non_counting_artifact_public_readiness_or_p0": re.compile(
+        r"\b(?:post[-_ ]+reboot(?:[-_ ]+(?:passive[-_ ]+monitor|context|snapshot|log|artifact|report))?|"
+        r"(?:post[-_ ]+reboot[-_ ]+)?passive[-_ ]+monitor(?:[-_ ]+context)?|"
+        r"installed[-_ ]+runtime(?:[-_ ]+(?:check|status|ready|ok))?|runtime[-_ ]+install(?:ed)?(?:[-_ ]+(?:check|status|ready|ok))?|"
+        r"broadcasts?(?:[-_ ]+(?:check|ok|sent|status|notice))?|rcon(?:[-_ ]+(?:check|ok|ready|reachable|status|service|command(?:s)?))?|"
+        r"(?:principal|player)[-_ ]+start[-_ ]+end(?:[-_ ]+(?:runtime[-_ ]+)?(?:evidence|artifact|report|manifest|bundle))?|"
+        r"(?:runtime[-_ ]+)?lifecycle[-_ ]+start[-_ ]+end(?:[-_ ]+(?:evidence|artifact|report|manifest|bundle))?|"
+        r"start[-_ ]+end(?:[-_ ]+(?:runtime[-_ ]+)?(?:evidence|artifact|report|manifest|bundle))?|"
+        r"(?:start|end)[-_ ]+only(?:[-_ ]+(?:runtime[-_ ]+)?(?:evidence|artifact|report|manifest|bundle))?|"
+        r"multi[-_ ]?surface(?:[-_ ]+(?:beta[-_ ]+capture|candidate[-_ ]+queue|"
+        r"capture[-_ ]+(?:plan|pack|queue)|plan[-_ ]+queue))?|"
+        r"beta[-_ ]+capture(?:[-_ ]+(?:plan|pack|queue|artifact|bundle|prep))?|"
+        r"confirmed[-_ ]+beta[-_ ]+notice(?:[-_ ]+json)?|beta[-_ ]+notice(?:[-_ ]+json)?|"
+        r"copied[-_ ]+log(?:[-_ ]+only)?(?:[-_ ]+(?:artifact|evidence|manifest|report|shortcut|candidate[-_ ]+alias|alias))?|"
+        r"post[-_ ]?runtime[-_ ]?bridge(?:[-_ ]?(?:build|builder|report|artifact|manifest))?|"
+        r"bridge[-_ ]?(?:build|builder)[-_ ]?report|shutdown[-_ ]?worker|worker[-_ ]?shutdown|"
+        r"shutdown[-_ ]?(?:report|artifact|manifest)|"
+        r"(?:live[-_ ]+ops[-_ ]+)?sidecar(?:[-_ ]+(?:artifact|manifest|report|candidate[-_ ]+alias|alias))?|"
+        r"diagnostic(?:[-_ ]+only)?(?:[-_ ]+(?:artifact|manifest|report|candidate[-_ ]+alias|alias))?|"
+        r"(?:side[-_ ]?lane[-_ ]?)?source[-_ ]?overclaim(?:ed|s)?(?:[-_ ]+(?:total[-_ ]+flag[-_ ]+count|"
+        r"component[-_ ]+count|summary|diagnostics?|zero))?|source[-_ ]?overclaim[-_ ]?zero|"
+        r"(?:copied[-_ ]+log|sidecar|beta[-_ ]+notice|beta[-_ ]+capture|"
+        r"multi[-_ ]+surface[-_ ]+beta[-_ ]+capture|passive[-_ ]+monitor|diagnostic)"
+        r"[-_ ]+candidate[-_ ]+aliases?|"
+        r"next[-_ ]+actions?(?:[-_ ]+(?:plan|status|report|artifact))?|"
+        r"(?:route|runtime|evidence|identity|lifecycle|public|sdk)[-_ ]+status"
+        r"(?:[-_ ]+(?:report|artifact|manifest|notice|snapshot))?|"
+        r"copied[-_ ]+log[-_ ]+only(?:[-_ ]+(?:artifact|evidence|manifest|report|shortcut))?)\b"
+        r"[^.;\n]{0,120}\b(?:counts?[-_ ]+toward|credits?|contributes?|unlocks?|opens?|"
+        r"allows?|enables?|satisf(?:ies|y)|resolves?|marks?|sets?|promotes?|ready|readiness|"
+        r"complete|progress)\b[^.;\n]{0,120}\b(?:public[-_ ]+(?:identity|principal|contract|header|api|abi|sdk|readiness)|"
+        r"identity[-_ ]+public[-_ ]+contract[-_ ]+gate[-_ ]+missing|"
+        r"sdk[/ _-]*p0|p0[/ _-]*(?:sdk)?|phase[-_ ]*0|p0[-_ ]+dependency[-_ ]+chain|"
+        r"dependency[-_ ]+chain|complete[-_ ]+sdk|runtime[-_ ]+readiness|"
+        r"approved[-_ ]+runtime[-_ ]+evidence(?:[-_ ]+binding)?|runtime\.lifecycle_evidence|"
+        r"v1[-_ ]+completion|"
+        r"obelisk\.player_identity\.v1)?",
+        re.IGNORECASE,
+    ),
+    "helper_derived_readiness": re.compile(
+        r"\b(?:helper[-_ ]+derived[-_ ]+readiness|helper[-_ ]+readiness|derived[-_ ]+readiness)\b"
+        r"[^.;\n]{0,80}\b(?:allowed|available|complete|enabled|exposed|passed|passing|promoted|"
+        r"ready|satisfied|supported|unlocked)",
+        re.IGNORECASE,
+    ),
+    "public_readiness_gate": re.compile(r"\bpublic[-_ ]+readiness\b", re.IGNORECASE),
 }
 PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
     **APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS,
@@ -807,6 +2762,33 @@ PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
         r"\bpublic[-_ ]+contract\s+(?:is\s+)?(?:allowed|ready|available|promoted|enabled|complete)",
         re.IGNORECASE,
     ),
+    "support_tier_ready": re.compile(
+        r"\bsupport[-_ ]+tier(?:[-_ ]+activation)?\s+(?:is\s+)?"
+        r"(?:allowed|available|ready|enabled|activated|promoted|supported)",
+        re.IGNORECASE,
+    ),
+    "plugin_hub_ready": re.compile(
+        r"\b(?:plugin[-_ ]+hub|pluginhub)(?:[-_ ]+(?:readiness|publication|package|support))?"
+        r"\s+(?:is\s+)?(?:allowed|available|ready|enabled|published|promoted|released|supported)",
+        re.IGNORECASE,
+    ),
+    "package_shape_readiness": re.compile(
+        r"\b(?:cmake[-_ ]+package|cmake[-_ ]+config|find[-_ ]+package|"
+        r"obeliskconfig\.cmake|obelisktargets\.cmake|obelisk::obelisk_sdk|"
+        r"installed[-_ ]+sdk[-_ ]+package[-_ ]+shape|sdk[-_ ]+package[-_ ]+shape|"
+        r"package[-_ ]+shape)\b"
+        r"(?:(?!\bor\b)[^\.;]){0,80}\b(?:allowed|available|complete|enabled|open(?:ed|s)?|promoted|"
+        r"ready|supported|unlocked|counts?|claim(?:ed)?)\b|"
+        r"\binstalled[-_ ]+sdk\s+(?:is\s+|are\s+|now\s+)?"
+        r"(?:allowed|available|complete|enabled|promoted|ready|supported|unlocked)\b|"
+        r"\b(?:allowed|available|complete|enabled|open(?:ed|s)?|promoted|ready|supported|"
+        r"unlocked|counts?|claim(?:ed)?)\s+"
+        r"(?:cmake[-_ ]+package|cmake[-_ ]+config|find[-_ ]+package|"
+        r"obeliskconfig\.cmake|obelisktargets\.cmake|obelisk::obelisk_sdk|"
+        r"installed[-_ ]+sdk[-_ ]+package[-_ ]+shape|sdk[-_ ]+package[-_ ]+shape|"
+        r"package[-_ ]+shape)\b",
+        re.IGNORECASE,
+    ),
     "runtime_ready": re.compile(
         r"\bruntime\s+(?:is\s+)?(?:ready|enabled|authorized|available|promoted|supported)",
         re.IGNORECASE,
@@ -821,9 +2803,19 @@ PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
         r"\b(?:ObeliskPlayer[A-Za-z0-9_]*|RegisterPlayer[A-Za-z0-9_]*)\b"
     ),
     "source_artifact_ready_alias": re.compile(
-        r"\b(?:public[-_ ]+sdk|public[-_ ]+header|public[-_ ]+abi|callback[-_ ]+abi|"
-        r"capability[-_ ]+bits?|runtime|promotion|v1[-_ ]+completion)[-_ ]+"
-        r"(?:ready|allowed|available|enabled|promoted|complete|exposed)\b",
+        r"\b(?:public[-_ ]+sdk|public[-_ ]+api|public[-_ ]+header|public[-_ ]+abi|callback[-_ ]+abi|"
+        r"capability[-_ ]+bits?|runtime|promotion|stable[-_ ]+claim|v1[-_ ]+completion|"
+        r"public[-_ ]+readiness)[-_ ]+"
+        r"(?:ready|readiness|allowed|available|enabled|promoted|complete|exposed|satisfied|passed|passing)\b",
+        re.IGNORECASE,
+    ),
+    "header_shape_public_readiness_shortcut": re.compile(
+        r"\b(?:header[-_ ]+shape|public[-_ ]+header[-_ ]+proposal(?:[-_ ]+shape)?|"
+        r"proposal[-_ ]+only[-_ ]+header[-_ ]+gate(?:[-_ ]+shape)?)\b[^.;\n]{0,100}\b"
+        r"(?:marks?|sets?|treats?|validates?|certif(?:ies|y|ied)|approv(?:es|ed)|"
+        r"clear(?:s|ed)|unblock(?:s|ed)|opens?|allows?|enables?|satisf(?:ies|y)|resolves?)\b"
+        r"[^.;\n]{0,100}\b(?:public[-_ ]+(?:identity|principal|contract|header|api|abi|sdk|readiness)|"
+        r"runtime[-_ ]+readiness|v1[-_ ]+completion|promotion|obelisk\.player_identity\.v1)\b",
         re.IGNORECASE,
     ),
 }
@@ -834,11 +2826,24 @@ NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE = re.compile(
     r"identity|principal|steam_?id|steamid|"
     r"player_?(?:id|handle|data_?id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
-    r"register_?player|obelisk_api_capability_player|platform.*id|account.*id",
+    r"register_?player|obelisk_api_capability_player|platform.*id|account.*id|"
+    r"resource_?(?:handle|id|ref|reference|token)|object_?(?:handle|id|identity|lookup|resolve|resolver)|"
+    r"(?:identity|player|principal|resource|object|owner|tribe)_?(?:lookup|resolve|resolver)|"
+    r"permissions?|permission_?(?:check|query|cache)|authorization|(?:^|_)authz?(?:_|$)|"
+    r"access_?control|acl|roles?|privileges?|moderation|moderator|ban|kick|admin(?:_?(?:command|action))?|"
+    r"commands?|command_?(?:router|response|reply|replies)|chat_?(?:command|response|reply|replies)|"
+    r"send_?chat|broadcast|notices?|"
+    r"(?:resource|player|principal|tribe)_?(?:owner|ownership|permission|permissions)|"
+    r"[A-Za-z0-9_]*(?:ResourceHandle|ObjectHandle|OwnerLookup|OwnerResolve|Ownership|Permission|Permissions|"
+    r"Authorization|Authz|AccessControl|ACL|Role|Privilege|Moderation|Moderator|Ban|Kick|Admin|"
+    r"CommandRouter|CommandResponse|CommandReply|CommandReplies|ChatResponse|ChatReply|ChatReplies|SendChat)"
+    r"[A-Za-z0-9_]*|"
+    r"[A-Za-z0-9_]*(?:Lookup|Resolve|Resolver)[A-Za-z0-9_]*",
     re.IGNORECASE,
 )
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_ALLOWLIST = {
     "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+    "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
 }
 IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 
@@ -854,13 +2859,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--approved-runtime-evidence",
         type=Path,
-        required=True,
         help="Approved runtime principal lifecycle evidence manifest.",
+    )
+    parser.add_argument(
+        "--principal-start-end-runtime-evidence",
+        type=Path,
+        help=(
+            "Narrow copied runtime evidence proving principal start/end only. "
+            "This is non-counting contract-review context and never an approved runtime bundle."
+        ),
     )
     parser.add_argument(
         "--identifier-redaction-evidence",
         type=Path,
-        help="Optional sanitized identifier-redaction evidence manifest for contract-review intake only.",
+        default=DEFAULT_IDENTIFIER_REDACTION_EVIDENCE,
+        help="Repo-local sanitized identifier-redaction evidence manifest for contract-review intake only.",
     )
     parser.add_argument(
         "--principal-invalidation-policy",
@@ -905,6 +2918,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
         help="Candidate-only owner-token SDK consumer contract; never promotion evidence.",
     )
+    parser.add_argument(
+        "--identity-public-contract-decision-record",
+        type=Path,
+        default=None,
+        help=(
+            "Repo-local reviewed identity public-contract decision record. "
+            "Accepted records resolve only their hash-bound reviewed decision keys; public header "
+            "routing stays blocked until the full identity contract gate is complete."
+        ),
+    )
     parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
     parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
     parser.add_argument("--runtime-readiness", action="store_true", help="Fail closed for runtime readiness checks.")
@@ -932,9 +2955,425 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(blocker)
 
 
+def forbidden_approved_runtime_source_tokens(value: str) -> list[str]:
+    lowered = value.casefold()
+    return sorted(
+        {
+            token
+            for token in FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS
+            if token in lowered
+        }
+    )
+
+
+def non_promotional_source_reference_tokens(value: str) -> list[str]:
+    tokens = set(forbidden_approved_runtime_source_tokens(value))
+    for token, pattern in SOURCE_PROVENANCE_NON_PROMOTIONAL_ALIAS_PATTERNS.items():
+        if pattern.search(value):
+            tokens.add(token)
+    return sorted(tokens)
+
+
+def add_non_promotional_source_reference(
+    findings: list[dict[str, Any]],
+    label: str,
+    value: Any,
+) -> None:
+    if not isinstance(value, str):
+        return
+    tokens = non_promotional_source_reference_tokens(value)
+    if tokens:
+        findings.append({"path": label, "value": value, "tokens": tokens})
+
+
+def multi_surface_beta_capture_candidate_references(
+    value: Any,
+    label: str = "$",
+    *,
+    include_keys: bool = True,
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    if is_non_claim_container_path(label):
+        return findings
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{label}.{key}"
+            if include_keys and isinstance(key, str) and MULTI_SURFACE_BETA_CAPTURE_ARTIFACT_RE.search(key):
+                findings.append({"path": item_path, "value": key, "tokens": ["multi_surface_beta_capture_material"]})
+            findings.extend(multi_surface_beta_capture_candidate_references(item, item_path, include_keys=include_keys))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            findings.extend(
+                multi_surface_beta_capture_candidate_references(
+                    item,
+                    f"{label}[{index}]",
+                    include_keys=include_keys,
+                )
+            )
+    elif isinstance(value, str):
+        if value in MULTI_SURFACE_BETA_CAPTURE_SCHEMAS or MULTI_SURFACE_BETA_CAPTURE_ARTIFACT_RE.search(value):
+            findings.append({"path": label, "value": value, "tokens": ["multi_surface_beta_capture_material"]})
+    return findings
+
+
+def approved_runtime_report_multi_surface_beta_capture_references(report: dict[str, Any]) -> list[dict[str, Any]]:
+    checked_paths = (
+        ("$.approved_runtime_evidence.schema", report.get("schema")),
+        ("$.approved_runtime_evidence.ready_scope", report.get("ready_scope")),
+        ("$.approved_runtime_evidence.output_artifact_identity", report.get("output_artifact_identity")),
+        ("$.approved_runtime_evidence.source_summary", report.get("source_summary")),
+        ("$.approved_runtime_evidence.operational_window", report.get("operational_window")),
+        (
+            "$.approved_runtime_evidence.approved_runtime_evidence_binding",
+            report.get("approved_runtime_evidence_binding"),
+        ),
+    )
+    findings: list[dict[str, Any]] = []
+    for label, value in checked_paths:
+        findings.extend(multi_surface_beta_capture_candidate_references(value, label))
+    return findings
+
+
+def approved_runtime_binding_shortcut_claims(binding: Any, label: str) -> dict[str, list[dict[str, str]]]:
+    return public_contract_decision_record.approved_runtime_evidence_binding_shortcut_claims(binding, label)
+
+
+def approved_runtime_binding_has_shortcuts(binding: Any, label: str) -> bool:
+    claims = approved_runtime_binding_shortcut_claims(binding, label)
+    return any(claims.values())
+
+
+def add_binding_shortcut_blockers(
+    blockers: list[dict[str, Any]],
+    *,
+    reason_prefix: str,
+    label: str,
+    binding: Any,
+) -> None:
+    claims = approved_runtime_binding_shortcut_claims(binding, label)
+    if claims["non_counting"]:
+        add(
+            blockers,
+            f"{reason_prefix}_non_counting_shortcut_not_accepted",
+            label,
+            claims=claims["non_counting"],
+        )
+    if claims["public_shortcuts"]:
+        add(
+            blockers,
+            f"{reason_prefix}_public_header_api_abi_shortcut_not_accepted",
+            label,
+            claims=claims["public_shortcuts"],
+        )
+
+
+def add_runtime_observer_source_kind_reference(
+    findings: list[dict[str, Any]],
+    label: str,
+    value: Any,
+) -> None:
+    expected = REQUIRED_APPROVED_RUNTIME_SOURCE_PROVENANCE_POLICY["accepted_source_kind"]
+    if value is None:
+        return
+    if value == expected:
+        return
+    tokens = non_promotional_source_reference_tokens(value) if isinstance(value, str) else []
+    findings.append(
+        {
+            "path": label,
+            "value": value,
+            "expected": expected,
+            "tokens": sorted({*tokens, "source_kind_mismatch"}),
+        }
+    )
+
+
+def approved_runtime_non_promotional_source_references(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    add_non_promotional_source_reference(findings, "$.schema", payload.get("schema"))
+    output_identity = payload.get("output_artifact_identity")
+    if isinstance(output_identity, dict):
+        add_non_promotional_source_reference(
+            findings,
+            "$.output_artifact_identity.artifact_kind",
+            output_identity.get("artifact_kind"),
+        )
+        add_non_promotional_source_reference(
+            findings,
+            "$.output_artifact_identity.evidence_pack_id",
+            output_identity.get("evidence_pack_id"),
+        )
+
+    source_summary = payload.get("source_summary")
+    if isinstance(source_summary, dict):
+        evidence = source_summary.get("evidence")
+        if isinstance(evidence, dict):
+            add_runtime_observer_source_kind_reference(
+                findings,
+                "$.source_summary.evidence.kind",
+                evidence.get("kind"),
+            )
+            sources = evidence.get("sources")
+            if isinstance(sources, list):
+                for index, source in enumerate(sources):
+                    if not isinstance(source, dict):
+                        continue
+                    add_non_promotional_source_reference(
+                        findings,
+                        f"$.source_summary.evidence.sources[{index}].path",
+                        source.get("path"),
+                    )
+
+    operational_window = payload.get("operational_window")
+    if isinstance(operational_window, dict):
+        copied_log = operational_window.get("copied_log")
+        if isinstance(copied_log, dict):
+            add_non_promotional_source_reference(
+                findings,
+                "$.operational_window.copied_log.path",
+                copied_log.get("path"),
+            )
+    return findings
+
+
+def validate_approved_runtime_source_provenance_policy(
+    policy: Any,
+    blockers: list[dict[str, Any]],
+    label: str,
+    reason: str,
+) -> None:
+    if policy != REQUIRED_APPROVED_RUNTIME_SOURCE_PROVENANCE_POLICY:
+        add(
+            blockers,
+            reason,
+            label,
+            expected=REQUIRED_APPROVED_RUNTIME_SOURCE_PROVENANCE_POLICY,
+            value=policy,
+        )
+
+
+def approved_runtime_false_promotion_claims(report: dict[str, Any]) -> list[tuple[str, Any]]:
+    return [
+        (key, report.get(key))
+        for key in APPROVED_RUNTIME_FALSE_PROMOTION_KEYS
+        if key in report and not is_closed_readiness_value(normalize_contract_key(key), report.get(key))
+    ]
+
+
+def add_approved_runtime_false_promotion_blockers(
+    blockers: list[dict[str, Any]],
+    claims: list[tuple[str, Any]],
+) -> None:
+    existing = {
+        (blocker.get("reason"), blocker.get("label"))
+        for blocker in blockers
+    }
+    for key, value in claims:
+        reason = f"approved_runtime_evidence_{key}_not_false"
+        label = f"$.approved_runtime_evidence.{key}"
+        if (reason, label) in existing:
+            continue
+        add(blockers, reason, label, value=value)
+        existing.add((reason, label))
+
+
+def approved_runtime_evidence_binding_matches(
+    runtime_report: dict[str, Any],
+    identity_contract_decision_report: dict[str, Any],
+) -> bool:
+    runtime_binding = runtime_report.get("approved_runtime_evidence_binding")
+    decision_binding = identity_contract_decision_report.get("approved_runtime_evidence_binding")
+    return (
+        isinstance(runtime_binding, dict)
+        and isinstance(decision_binding, dict)
+        and decision_binding == runtime_binding
+        and not approved_runtime_binding_has_shortcuts(
+            runtime_binding,
+            "$.approved_runtime_evidence.approved_runtime_evidence_binding",
+        )
+        and not approved_runtime_binding_has_shortcuts(
+            decision_binding,
+            "$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+        )
+        and not multi_surface_beta_capture_candidate_references(
+            runtime_binding,
+            "$.approved_runtime_evidence.approved_runtime_evidence_binding",
+        )
+        and not multi_surface_beta_capture_candidate_references(
+            decision_binding,
+            "$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+        )
+    )
+
+
 def normalize_contract_key(key: object) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+SOURCE_OVERCLAIM_KEY_TOKENS = (
+    "source_overclaim",
+    "source_overclaimed",
+    "source_overclaims",
+    "side_lane_source_overclaim",
+)
+SOURCE_OVERCLAIM_COUNT_KEYS = {
+    "count",
+    "component_count",
+    "flag_count",
+    "progress_flag_count",
+    "readiness_flag_count",
+    "total",
+    "total_flag_count",
+}
+
+
+def is_source_overclaim_key(key_name: str) -> bool:
+    return any(token in key_name for token in SOURCE_OVERCLAIM_KEY_TOKENS)
+
+
+def is_source_overclaim_count_key(key_name: str) -> bool:
+    return (
+        key_name in SOURCE_OVERCLAIM_COUNT_KEYS
+        or "source_overclaim" in key_name
+        and ("count" in key_name or "zero" in key_name or "summary" in key_name)
+    )
+
+
+def zero_source_overclaim_count_value(value: Any) -> bool:
+    if value is False:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value == 0
+    if isinstance(value, str):
+        return is_zero_like_claim_value(value)
+    return False
+
+
+def string_mentions_source_overclaim_zero(value: str) -> bool:
+    normalized = normalize_contract_key(value)
+    return is_source_overclaim_key(normalized) and (
+        "zero" in normalized or "_0" in f"_{normalized}_"
+    )
+
+
+def source_overclaim_zero_overclaims(
+    value: Any,
+    path: str = "$",
+    *,
+    source_overclaim_context: bool = False,
+) -> list[dict[str, Any]]:
+    if (
+        is_non_claim_container_path(path)
+        or ".forbidden_source_aliases" in path
+        or ".forbidden_source_classes" in path
+        or ".forbidden_source_tokens" in path
+        or ".source_artifact_hash_policy" in path
+        or ".source_artifact_freshness.policy" in path
+    ):
+        return []
+    claims: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            if not isinstance(key, str):
+                claims.extend(
+                    source_overclaim_zero_overclaims(
+                        item,
+                        item_path,
+                        source_overclaim_context=source_overclaim_context,
+                    )
+                )
+                continue
+            key_name = normalize_contract_key(key)
+            child_context = source_overclaim_context or is_source_overclaim_key(key_name)
+            if (
+                child_context
+                and is_source_overclaim_count_key(key_name)
+                and zero_source_overclaim_count_value(item)
+            ):
+                claims.append({"path": item_path, "term": "source_overclaim_zero_marker", "value": item})
+            elif is_source_overclaim_key(key_name) and "zero" in key_name and is_nonempty_public_surface_claim_value(item):
+                claims.append({"path": item_path, "term": "source_overclaim_zero_marker", "value": item})
+            elif (
+                child_context
+                and key_name in NON_PROMOTIONAL_PROVENANCE_STATUS_KEYS
+                and is_positive_claim_value(item)
+            ):
+                claims.append({"path": item_path, "term": "source_overclaim_zero_status_alias", "value": item})
+            claims.extend(
+                source_overclaim_zero_overclaims(
+                    item,
+                    item_path,
+                    source_overclaim_context=child_context,
+                )
+            )
+        return claims
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(
+                source_overclaim_zero_overclaims(
+                    item,
+                    f"{path}[{index}]",
+                    source_overclaim_context=source_overclaim_context,
+                )
+            )
+        return claims
+    if isinstance(value, str) and string_mentions_source_overclaim_zero(value):
+        claims.append({"path": path, "term": "source_overclaim_zero_marker", "value": value})
+    return claims
+
+
+def is_zero_like_claim_value(value: Any) -> bool:
+    if value is False:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value == 0
+    if isinstance(value, str):
+        normalized = re.sub(r"[^a-z0-9/]+", "_", value.casefold()).strip("_")
+        return normalized in {"0", "0_0", "0_percent", "0_pct"} or bool(
+            re.fullmatch(r"0[/_]0*[1-9][0-9]*", normalized)
+        )
+    return False
+
+
+def is_closed_readiness_value(readiness_key: str, value: Any) -> bool:
+    if readiness_key in MULTI_SURFACE_BETA_CAPTURE_STATUS_KEYS:
+        if value in (False, None, [], {}):
+            return True
+        if isinstance(value, str):
+            normalized = normalize_contract_key(value)
+            return (
+                normalized in MULTI_SURFACE_BETA_CAPTURE_ALLOWED_STATUS_VALUES
+                or normalized in NON_PROMOTIONAL_CLAIM_VALUE_TOKENS
+            )
+        return False
+    if readiness_key in ZERO_OR_FALSE_READINESS_KEYS:
+        return is_zero_like_claim_value(value)
+    if value in (False, None, [], {}):
+        return True
+    if isinstance(value, str):
+        return normalize_contract_key(value) in NON_PROMOTIONAL_CLAIM_VALUE_TOKENS
+    return value is False
+
+
+def closed_readiness_value(readiness_key: str) -> Any:
+    return 0 if readiness_key in ZERO_OR_FALSE_READINESS_KEYS else False
+
+
+def sanitized_closed_readiness_value(readiness_key: str, value: Any) -> Any:
+    if (
+        readiness_key in MULTI_SURFACE_BETA_CAPTURE_STATUS_KEYS
+        and is_closed_readiness_value(readiness_key, value)
+    ):
+        return value
+    return closed_readiness_value(readiness_key)
+
+
+def is_readiness_overclaim_value(readiness_key: str, value: Any) -> bool:
+    if readiness_key in ZERO_OR_FALSE_READINESS_KEYS or readiness_key in MULTI_SURFACE_BETA_CAPTURE_STATUS_KEYS:
+        return not is_closed_readiness_value(readiness_key, value)
+    return is_positive_claim_value(value)
 
 
 def is_positive_claim_value(value: Any) -> bool:
@@ -944,17 +3383,28 @@ def is_positive_claim_value(value: Any) -> bool:
         return value != 0
     if isinstance(value, list):
         return any(is_positive_claim_value(item) for item in value)
+    if isinstance(value, dict):
+        return any(is_positive_claim_value(item) for item in value.values())
     if isinstance(value, str):
         normalized = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
         return normalized in {
+            "accepted",
             "allowed",
+            "authorized",
             "available",
+            "complete",
             "enabled",
+            "exposed",
+            "granted",
             "live",
             "operational",
+            "passed",
+            "passing",
             "promoted",
             "public",
             "ready",
+            "reviewed",
+            "satisfied",
             "supported",
             "true",
             "unlocked",
@@ -980,12 +3430,57 @@ def is_nonempty_public_surface_claim_value(value: Any) -> bool:
     return False
 
 
+def provenance_value_contains_non_promotional_term(value: Any) -> bool:
+    if isinstance(value, str):
+        normalized = normalize_contract_key(value)
+        return any(term in normalized for term in NON_PROMOTIONAL_PROVENANCE_CONTEXT_TERMS)
+    if isinstance(value, list):
+        return any(provenance_value_contains_non_promotional_term(item) for item in value)
+    if isinstance(value, dict):
+        return any(provenance_value_contains_non_promotional_term(item) for item in value.values())
+    return False
+
+
+def value_marks_non_promotional_provenance_context(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if (
+                normalize_contract_key(key) in NON_PROMOTIONAL_PROVENANCE_CONTEXT_KEYS
+                and provenance_value_contains_non_promotional_term(item)
+            ):
+                return True
+            if isinstance(item, (dict, list)) and value_marks_non_promotional_provenance_context(item):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(value_marks_non_promotional_provenance_context(item) for item in value)
+    return False
+
+
 def split_claim_name_values(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
         return [item for item in value if isinstance(item, str)]
     return []
+
+
+def nested_claim_key_candidates(path: str, key: object) -> set[str]:
+    candidates = {normalize_contract_key(key)}
+    path_parts = [
+        re.sub(r"\[[0-9]+\]", "", part)
+        for part in path.removeprefix("$.").split(".")
+        if part and not part.startswith("[")
+    ]
+    for depth in range(1, 4):
+        prefix = path_parts[-depth:]
+        if prefix:
+            candidates.add(normalize_contract_key("_".join([*prefix, str(key)])))
+    return candidates
+
+
+def first_claim_key(candidates: set[str], claim_keys: set[str]) -> str | None:
+    return next((candidate for candidate in candidates if candidate in claim_keys), None)
 
 
 def split_claim_overclaims(value: dict[str, Any], path: str) -> list[dict[str, Any]]:
@@ -1001,24 +3496,62 @@ def split_claim_overclaims(value: dict[str, Any], path: str) -> list[dict[str, A
         if normalize_contract_key(key) in SPLIT_CLAIM_VALUE_KEYS
     ]
     overclaims: list[dict[str, Any]] = []
+    if value_marks_non_promotional_provenance_context(value):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            key_name = normalize_contract_key(key)
+            if key_name in NON_PROMOTIONAL_PROVENANCE_STATUS_KEYS and is_positive_claim_value(item):
+                overclaims.append(
+                    {
+                        "path": item_path,
+                        "term": "non_promotional_provenance_status_alias",
+                        "value": item,
+                    }
+                )
+            if (
+                NON_PROMOTIONAL_PROVENANCE_PROGRESS_ALIAS_RE.search(key_name)
+                and is_nonempty_public_surface_claim_value(item)
+            ):
+                overclaims.append(
+                    {
+                        "path": item_path,
+                        "term": "non_promotional_provenance_progress_alias",
+                        "value": item,
+                    }
+                )
     for claim_name in declared_claim_names:
         claim_key = normalize_contract_key(claim_name)
         positive_claim = any(is_positive_claim_value(item) for item in declared_claim_values)
+        nonclosed_readiness_claim = (
+            claim_key in READINESS_FALSE_KEYS
+            and any(is_readiness_overclaim_value(claim_key, item) for item in declared_claim_values)
+        )
         public_surface_list_claim = (
             claim_key in EMPTY_PUBLIC_LIST_KEYS
+            and any(is_nonempty_public_surface_claim_value(item) for item in declared_claim_values)
+        )
+        nonfalse_shortcut_claim = (
+            claim_key in NON_FALSE_READINESS_ALIAS_KEYS
             and any(is_nonempty_public_surface_claim_value(item) for item in declared_claim_values)
         )
         if (
             claim_key in READINESS_FALSE_KEYS
             or claim_key in EMPTY_PUBLIC_LIST_KEYS
             or APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(claim_key) is not None
-        ) and (positive_claim or public_surface_list_claim):
+        ) and (positive_claim or nonclosed_readiness_claim or public_surface_list_claim or nonfalse_shortcut_claim):
             overclaims.append({"path": path, "term": "split_readiness_alias", "value": value})
     return overclaims
 
 
 def is_non_claim_container_path(path: str) -> bool:
     return any(fragment in path for fragment in NON_CLAIM_CONTAINER_PATH_FRAGMENTS)
+
+
+def is_allowed_required_sequence_gate_text(path: str, value: str) -> bool:
+    return any(
+        path.endswith(f".v1_sequence_gate[{index}]") and value == expected
+        for index, expected in enumerate(REQUIRED_SEQUENCE_GATE)
+    )
 
 
 def alias_guardrails_false() -> dict[str, bool]:
@@ -1032,6 +3565,14 @@ def validate_alias_guardrails(decisions: dict[str, Any], blockers: list[dict[str
         return
     for key in sorted(REQUIRED_ALIAS_GUARDRAILS_FALSE):
         if aliases.get(key) is not False:
+            add(
+                blockers,
+                "alias_guardrail_not_false",
+                f"$.alias_guardrails.{key}",
+                value=aliases.get(key),
+            )
+    for key in sorted(OPTIONAL_ALIAS_GUARDRAILS_FALSE):
+        if key in aliases and aliases.get(key) is not False:
             add(
                 blockers,
                 "alias_guardrail_not_false",
@@ -1071,7 +3612,7 @@ def has_negative_context(value: str, match_start: int) -> bool:
     return bool(
         re.search(
             r"\b(?:after|before|forbidden|unavailable|blocked|redacted|cannot|can't|false|missing|not|"
-            r"unresolved|until)\b|"
+            r"exclusion|unresolved|until)\b|"
             r"\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
             suffix,
             re.IGNORECASE,
@@ -1079,26 +3620,61 @@ def has_negative_context(value: str, match_start: int) -> bool:
     )
 
 
+def has_non_counting_artifact_negative_context(value: str, match_start: int) -> bool:
+    normalized = re.sub(
+        r"identity[-_ ]+public[-_ ]+contract[-_ ]+gate[-_ ]+missing",
+        "identity public contract gate",
+        value,
+        flags=re.IGNORECASE,
+    )
+    return has_negative_context(normalized, match_start)
+
+
+def has_post_runtime_route_shortcut_negative_context(value: str, match_start: int) -> bool:
+    window = value[max(0, match_start - 120) : match_start + 260]
+    return re.search(
+        r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|must\s+not|"
+        r"forbid(?:den|s)?|without|unavailable|blocked\s+from)\b",
+        window,
+        re.IGNORECASE,
+    ) is not None
+
+
+def public_abi_identity_handle_negative_context(value: str, match_start: int) -> bool:
+    window = value[max(0, match_start - 120) : match_start + 220]
+    return re.search(
+        r"\b(?:no|not|does\s+not|do\s+not|must\s+not|cannot|can't|forbid(?:den|s)?|excludes?|"
+        r"blocked|unavailable)\b",
+        window,
+        re.IGNORECASE,
+    ) is not None
+
+
 def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dict[str, Any]]:
     overclaims: list[dict[str, Any]] = []
+    if path == "$":
+        overclaims.extend(source_overclaim_zero_overclaims(report))
     if isinstance(report, dict):
         overclaims.extend(split_claim_overclaims(report, path))
         for key, item in report.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
-            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+            claim_candidates = nested_claim_key_candidates(path, key)
+            readiness_key = first_claim_key(claim_candidates, READINESS_FALSE_KEYS)
+            public_list_key = first_claim_key(claim_candidates, EMPTY_PUBLIC_LIST_KEYS)
+            if readiness_key is None and public_list_key is None:
                 overclaims.extend(public_text_overclaims(str(key), item_path))
-            if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+            if public_list_key is not None and item != []:
                 overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
             if (
-                normalized_key in READINESS_FALSE_KEYS
-                and not (path == "$" and normalized_key in APPROVED_RUNTIME_REPORT_EXPLICIT_FALSE_KEYS)
-                and item is not False
+                readiness_key is not None
+                and not (path == "$" and readiness_key in APPROVED_RUNTIME_REPORT_EXPLICIT_FALSE_KEYS)
+                and not is_closed_readiness_value(readiness_key, item)
             ):
                 overclaims.append({"path": item_path, "term": "readiness_alias", "value": item})
             if (
                 normalized_key not in ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS
-                and normalized_key not in READINESS_FALSE_KEYS
+                and readiness_key is None
                 and item not in (False, None, [], {})
                 and APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(normalized_key)
             ):
@@ -1110,9 +3686,20 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
     elif isinstance(report, str):
         if is_non_claim_container_path(path) or path.endswith(".next_blocker"):
             return overclaims
+        if is_allowed_required_sequence_gate_text(path, report):
+            return overclaims
         for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
             for match in pattern.finditer(report):
-                if has_negative_context(report, match.start()):
+                if term == "public_abi_identity_handle_before_resource_handle":
+                    if public_abi_identity_handle_negative_context(report, match.start()):
+                        continue
+                elif term == "non_counting_artifact_public_readiness_or_p0":
+                    if has_non_counting_artifact_negative_context(report, match.start()):
+                        continue
+                elif term == "post_runtime_route_shortcut":
+                    if has_post_runtime_route_shortcut_negative_context(report, match.start()):
+                        continue
+                elif has_negative_context(report, match.start()):
                     continue
                 overclaims.append({"path": path, "term": term, "value": report})
                 break
@@ -1121,21 +3708,49 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
 
 def public_text_overclaims(value: Any, path: str = "$") -> list[dict[str, str]]:
     claims: list[dict[str, str]] = []
+    if path == "$":
+        claims.extend(source_overclaim_zero_overclaims(value))
     if isinstance(value, dict):
         claims.extend(split_claim_overclaims(value, path))
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
-            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+            claim_candidates = nested_claim_key_candidates(path, key)
+            readiness_key = first_claim_key(claim_candidates, READINESS_FALSE_KEYS)
+            public_list_key = first_claim_key(claim_candidates, EMPTY_PUBLIC_LIST_KEYS)
+            if readiness_key is not None and (
+                is_readiness_overclaim_value(readiness_key, item)
+                or (
+                    readiness_key in NON_FALSE_READINESS_ALIAS_KEYS
+                    and is_nonempty_public_surface_claim_value(item)
+                )
+            ):
+                claims.append({"path": item_path, "term": "readiness_alias", "value": item})
+            if public_list_key is not None and is_nonempty_public_surface_claim_value(item):
+                claims.append({"path": item_path, "term": "public_surface_list", "value": item})
+            if readiness_key is None and public_list_key is None:
                 claims.extend(public_text_overclaims(str(key), item_path))
             claims.extend(public_text_overclaims(item, item_path))
     elif isinstance(value, list):
         for index, item in enumerate(value):
             claims.extend(public_text_overclaims(item, f"{path}[{index}]"))
     elif isinstance(value, str):
+        if is_non_claim_container_path(path):
+            return claims
+        if is_allowed_required_sequence_gate_text(path, value):
+            return claims
         for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
             for match in pattern.finditer(value):
-                if has_negative_context(value, match.start()):
+                if term == "public_abi_identity_handle_before_resource_handle":
+                    if public_abi_identity_handle_negative_context(value, match.start()):
+                        continue
+                elif term == "non_counting_artifact_public_readiness_or_p0":
+                    if has_non_counting_artifact_negative_context(value, match.start()):
+                        continue
+                elif term == "post_runtime_route_shortcut":
+                    if has_post_runtime_route_shortcut_negative_context(value, match.start()):
+                        continue
+                elif has_negative_context(value, match.start()):
                     continue
                 claims.append({"path": path, "term": term, "value": value})
                 break
@@ -1193,21 +3808,51 @@ def safe_resolve_input_path(path: Path, label: str, blockers: list[dict[str, Any
         return None
 
 
+def missing_approved_runtime_report() -> dict[str, Any]:
+    return {
+        "ready": False,
+        "accepted_for_contract_review": False,
+        "approved_runtime_evidence_binding": None,
+        "approved_runtime_evidence_present": False,
+        "runtime_evidence_ready": False,
+        "promotion_ready": False,
+        "public_contract_allowed": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_api_ready": False,
+        "public_abi_ready": False,
+        "public_readiness": False,
+        "runtime_readiness": False,
+        "public_header_allowed": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_ready": False,
+        "v1_completion_ready": False,
+        "v1_completion_evidence": False,
+        "remaining_blockers": ["approved_runtime_evidence_missing"],
+    }
+
+
 def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         payload = approved_evidence.load_json(path)
     except (OSError, SystemExit) as exc:
         add(blockers, "approved_runtime_evidence_unreadable", "$.approved_runtime_evidence", error=str(exc))
-        return {
-            "ready": False,
-            "approved_runtime_evidence_present": False,
-            "runtime_evidence_ready": False,
-            "remaining_blockers": ["approved_runtime_evidence_missing"],
-        }
+        return missing_approved_runtime_report()
 
     validation = approved_evidence.validate_manifest(payload, check_mode="consume")
     report = approved_evidence.build_report(payload, validation, check_mode="consume")
     accepted = not validation.blockers
+    non_promotional_sources = approved_runtime_non_promotional_source_references(payload)
+    if non_promotional_sources:
+        add(
+            blockers,
+            "approved_runtime_evidence_non_promotional_sources_claimed",
+            "$.approved_runtime_evidence.source_provenance",
+            sources=non_promotional_sources,
+        )
+        accepted = False
     if validation.blockers:
         add(
             blockers,
@@ -1216,13 +3861,45 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
             reasons=[blocker["reason"] for blocker in validation.blockers],
         )
     else:
-        overclaims = approved_runtime_report_overclaims(report)
+        overclaims = approved_runtime_report_overclaims(payload) + approved_runtime_report_overclaims(report)
         if overclaims:
             add(
                 blockers,
                 "approved_runtime_evidence_report_public_readiness_overclaim",
                 "$.approved_runtime_evidence",
                 overclaims=overclaims,
+            )
+            accepted = False
+        if report.get("schema") != approved_evidence.REPORT_SCHEMA:
+            add(
+                blockers,
+                "approved_runtime_evidence_report_schema_mismatch",
+                "$.approved_runtime_evidence.schema",
+                value=report.get("schema"),
+            )
+            accepted = False
+        if report.get("mode") != "consume":
+            add(
+                blockers,
+                "approved_runtime_evidence_mode_mismatch",
+                "$.approved_runtime_evidence.mode",
+                value=report.get("mode"),
+            )
+            accepted = False
+        if report.get("ready_scope") != REQUIRED_APPROVED_RUNTIME_READY_SCOPE:
+            add(
+                blockers,
+                "approved_runtime_evidence_ready_scope_mismatch",
+                "$.approved_runtime_evidence.ready_scope",
+                value=report.get("ready_scope"),
+            )
+            accepted = False
+        if report.get("remaining_blockers") != []:
+            add(
+                blockers,
+                "approved_runtime_evidence_remaining_blockers_not_empty",
+                "$.approved_runtime_evidence.remaining_blockers",
+                value=report.get("remaining_blockers"),
             )
             accepted = False
         if report.get("next_blocker") != "identity_public_contract_gate_missing":
@@ -1253,6 +3930,36 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                 blockers,
                 "approved_runtime_evidence_runtime_ready_missing",
                 "$.approved_runtime_evidence.runtime_evidence_ready",
+            )
+            accepted = False
+        observed_runtime_cases = report.get("observed_runtime_cases")
+        if observed_runtime_cases != REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES:
+            add(
+                blockers,
+                "approved_runtime_evidence_observed_runtime_cases_mismatch",
+                "$.approved_runtime_evidence.observed_runtime_cases",
+                expected=REQUIRED_APPROVED_RUNTIME_OBSERVED_CASES,
+                value=observed_runtime_cases,
+            )
+            accepted = False
+        consumer_cases = report.get("consumer_cases")
+        if consumer_cases != REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES:
+            add(
+                blockers,
+                "approved_runtime_evidence_consumer_cases_mismatch",
+                "$.approved_runtime_evidence.consumer_cases",
+                expected=REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+                value=consumer_cases,
+            )
+            accepted = False
+        consumer_boundary_assertions = report.get("consumer_boundary_assertions")
+        if consumer_boundary_assertions != REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES:
+            add(
+                blockers,
+                "approved_runtime_evidence_consumer_boundary_assertions_mismatch",
+                "$.approved_runtime_evidence.consumer_boundary_assertions",
+                expected=REQUIRED_APPROVED_RUNTIME_CONSUMER_CASES,
+                value=consumer_boundary_assertions,
             )
             accepted = False
         resolved_inputs = report.get("resolved_inputs")
@@ -1290,22 +3997,307 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                         unexpected=unexpected_inputs,
                     )
                     accepted = False
-    for key in (
-        "promotion_ready",
-        "public_sdk_ready",
-        "runtime_ready",
-        "public_header_allowed",
-        "public_contract_allowed",
-        "public_abi_ready",
-        "v1_completion_ready",
-        "v1_completion_evidence",
-        "public_sdk_v1_completion_claim",
-    ):
-        if key in report and report.get(key) is not False:
-            add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
+        if "accepted_for_contract_review" in report and report.get("accepted_for_contract_review") is not False:
+            add(
+                blockers,
+                "approved_runtime_evidence_report_false_only_key_not_false",
+                "$.approved_runtime_evidence.accepted_for_contract_review",
+                value=report.get("accepted_for_contract_review"),
+            )
             accepted = False
+    false_promotion_claims = approved_runtime_false_promotion_claims(report)
+    if false_promotion_claims:
+        add_approved_runtime_false_promotion_blockers(blockers, false_promotion_claims)
+        accepted = False
     report["accepted_for_contract_review"] = accepted
+    report["approved_runtime_evidence_binding"] = (
+        public_contract_decision_record.approved_runtime_evidence_binding_from_manifest(payload)
+        if accepted
+        else None
+    )
+    report["source_provenance_policy"] = {
+        "non_promotional_sources_rejected": True,
+        "accepted_source_kind": REQUIRED_APPROVED_RUNTIME_SOURCE_PROVENANCE_POLICY["accepted_source_kind"],
+        "checked_manifest_paths": [
+            "$.schema",
+            "$.output_artifact_identity.artifact_kind",
+            "$.output_artifact_identity.evidence_pack_id",
+            "$.source_summary.evidence.kind",
+            "$.source_summary.evidence.sources[].path",
+            "$.operational_window.copied_log.path",
+            ],
+            "forbidden_source_tokens": list(FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS),
+            "forbidden_source_aliases": sorted(SOURCE_PROVENANCE_NON_PROMOTIONAL_ALIAS_PATTERNS),
+            "findings": non_promotional_sources,
+        }
     return report
+
+
+def missing_principal_start_end_runtime_report() -> dict[str, Any]:
+    return {
+        "provided": False,
+        "accepted_for_contract_review": False,
+        "principal_start_end_runtime_evidence_present": False,
+        "principal_start_end_runtime_evidence_ready": False,
+        "resolved_inputs": [],
+        "does_not_resolve": sorted(PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_completion_ready": False,
+        "stable_claim_allowed": False,
+        "publication_authorized": False,
+        "blockers": ["principal_start_end_runtime_evidence_missing"],
+    }
+
+
+def principal_start_end_runtime_report(path: Path | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    if path is None:
+        return missing_principal_start_end_runtime_report()
+    payload = safe_load_json(path, "principal_start_end_runtime_evidence", blockers)
+    if payload is None:
+        report = missing_principal_start_end_runtime_report()
+        report["provided"] = True
+        return report
+
+    accepted = True
+    local_blockers: list[str] = []
+
+    def reject(reason: str, label: str, **extra: Any) -> None:
+        nonlocal accepted
+        accepted = False
+        local_blockers.append(reason)
+        add(blockers, reason, label, **extra)
+
+    if payload.get("schema") != PRINCIPAL_START_END_RUNTIME_EVIDENCE_SCHEMA:
+        reject(
+            "principal_start_end_runtime_evidence_schema_mismatch",
+            "$.principal_start_end_runtime_evidence.schema",
+            value=payload.get("schema"),
+        )
+    if payload.get("ready_scope") != PRINCIPAL_START_END_READY_SCOPE:
+        reject(
+            "principal_start_end_runtime_evidence_ready_scope_mismatch",
+            "$.principal_start_end_runtime_evidence.ready_scope",
+            value=payload.get("ready_scope"),
+        )
+    for key in (
+        "ready",
+        "accepted_for_contract_review",
+        "principal_start_end_runtime_evidence_present",
+        "principal_start_end_runtime_evidence_ready",
+    ):
+        if payload.get(key) is not True:
+            reject(
+                f"principal_start_end_runtime_evidence_{key}_not_true",
+                f"$.principal_start_end_runtime_evidence.{key}",
+                value=payload.get(key),
+            )
+    if payload.get("next_review_blocker") != PRINCIPAL_START_END_NEXT_REVIEW_BLOCKER:
+        reject(
+            "principal_start_end_runtime_evidence_next_blocker_mismatch",
+            "$.principal_start_end_runtime_evidence.next_review_blocker",
+            value=payload.get("next_review_blocker"),
+        )
+
+    resolved_inputs = payload.get("resolved_inputs")
+    if resolved_inputs != [PRINCIPAL_START_END_RESOLVED_INPUT]:
+        reject(
+            "principal_start_end_runtime_evidence_resolved_inputs_mismatch",
+            "$.principal_start_end_runtime_evidence.resolved_inputs",
+            value=resolved_inputs,
+        )
+    does_not_resolve = payload.get("does_not_resolve")
+    if not isinstance(does_not_resolve, list) or not PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS.issubset(
+        set(item for item in does_not_resolve if isinstance(item, str))
+    ):
+        reject(
+            "principal_start_end_runtime_evidence_does_not_resolve_missing_strict_inputs",
+            "$.principal_start_end_runtime_evidence.does_not_resolve",
+            value=does_not_resolve,
+        )
+    remaining_runtime_inputs = payload.get("remaining_runtime_inputs")
+    if not isinstance(remaining_runtime_inputs, list) or not PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS.issubset(
+        set(item for item in remaining_runtime_inputs if isinstance(item, str))
+    ):
+        reject(
+            "principal_start_end_runtime_evidence_remaining_runtime_inputs_missing_strict_inputs",
+            "$.principal_start_end_runtime_evidence.remaining_runtime_inputs",
+            value=remaining_runtime_inputs,
+        )
+
+    strict_runtime_blockers = payload.get("strict_approved_runtime_evidence_blockers")
+    if not (
+        isinstance(strict_runtime_blockers, list)
+        and PRINCIPAL_START_END_MISSING_CHECK_JOIN_BLOCKER
+        in [item for item in strict_runtime_blockers if isinstance(item, str)]
+    ):
+        reject(
+            "principal_start_end_runtime_evidence_missing_explicit_checkjoin_blocker",
+            "$.principal_start_end_runtime_evidence.strict_approved_runtime_evidence_blockers",
+            value=strict_runtime_blockers,
+        )
+
+    report_blockers = payload.get("blockers")
+    if report_blockers not in ([], None):
+        reject(
+            "principal_start_end_runtime_evidence_report_blockers_present",
+            "$.principal_start_end_runtime_evidence.blockers",
+            value=report_blockers,
+        )
+
+    for key in PRINCIPAL_START_END_RUNTIME_REQUIRED_FALSE_KEYS:
+        if payload.get(key) is not False:
+            reject(
+                f"principal_start_end_runtime_evidence_{key}_not_false",
+                f"$.principal_start_end_runtime_evidence.{key}",
+                value=payload.get(key),
+            )
+    for key in dict.fromkeys(PRINCIPAL_START_END_RUNTIME_OPTIONAL_FALSE_KEYS):
+        if key in PRINCIPAL_START_END_RUNTIME_REQUIRED_FALSE_KEYS:
+            continue
+        if key in payload and payload.get(key) is not False:
+            reject(
+                f"principal_start_end_runtime_evidence_{key}_not_false",
+                f"$.principal_start_end_runtime_evidence.{key}",
+                value=payload.get(key),
+            )
+
+    diagnostic = payload.get("diagnostic_coverage")
+    if isinstance(diagnostic, dict) and diagnostic.get("diagnostic_candidates_count_as_evidence") is not False:
+        reject(
+            "principal_start_end_runtime_evidence_diagnostic_candidates_count_as_evidence_not_false",
+            "$.principal_start_end_runtime_evidence.diagnostic_coverage.diagnostic_candidates_count_as_evidence",
+            value=diagnostic.get("diagnostic_candidates_count_as_evidence"),
+        )
+
+    non_claims = payload.get("non_claims")
+    required_non_claim_fragments = (
+        "not the approved three-role lifecycle evidence bundle",
+        "does not promote public identity",
+    )
+    if not isinstance(non_claims, list) or not all(
+        any(isinstance(item, str) and fragment in item for item in non_claims)
+        for fragment in required_non_claim_fragments
+    ):
+        reject(
+            "principal_start_end_runtime_evidence_non_claims_missing_required",
+            "$.principal_start_end_runtime_evidence.non_claims",
+            value=non_claims,
+        )
+
+    return {
+        **payload,
+        "provided": True,
+        "accepted_for_contract_review": accepted,
+        "principal_start_end_runtime_evidence_present": accepted
+        and payload.get("principal_start_end_runtime_evidence_present") is True,
+        "principal_start_end_runtime_evidence_ready": accepted
+        and payload.get("principal_start_end_runtime_evidence_ready") is True,
+        "resolved_inputs": [PRINCIPAL_START_END_RESOLVED_INPUT] if accepted else [],
+        "next_review_blocker": payload.get("next_review_blocker"),
+        "remaining_runtime_inputs": remaining_runtime_inputs,
+        "strict_approved_runtime_evidence_blockers": strict_runtime_blockers,
+        "blockers": local_blockers,
+    }
+
+
+def identity_public_contract_decision_record_report(
+    path: Path | None,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if path is None:
+        return {
+            "provided": False,
+            "accepted_for_contract_review": False,
+            "record_valid": False,
+            "record_valid_scope": None,
+            "contract_review_only": False,
+            "hash_bound_to_current_source_artifacts": False,
+            "reviewed_hash_current_contract_review_only": False,
+            "reviewed_template_only": False,
+            "strict_accepted_decision_record": False,
+            "accepted_post_runtime_decision_record": False,
+            "accepted_as_next_identity_contract_input": False,
+            "public_header_readiness_from_decision_record": False,
+            "resolved_decision_keys": [],
+            "next_blocker": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+            "promotion_ready": False,
+            "public_contract_allowed": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "public_api_ready": False,
+            "public_sdk_ready": False,
+            "public_readiness": False,
+            "runtime_ready": False,
+            "runtime_readiness": False,
+            "lookup_ready": False,
+            "permissions_ready": False,
+            "commands_ready": False,
+            "v1_ready": False,
+            "v1_completion_ready": False,
+            "v1_completion_evidence": False,
+            "live_ops_authorized": False,
+            "server_operations_authorized": False,
+            "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "public_api_symbols_now": [],
+            "blockers": [],
+        }
+
+    validation_blockers: list[dict[str, Any]] = []
+    payload = public_contract_decision_record.load_record(path, validation_blockers)
+    if payload is not None:
+        validation_blockers.extend(
+            public_contract_decision_record.validate_record(payload, check_mode="consume")
+        )
+    report = public_contract_decision_record.build_report(
+        payload,
+        validation_blockers,
+        check_mode="consume",
+    )
+    accepted = (
+        report.get("record_valid") is True
+        and report.get("record_valid_scope") == public_contract_decision_record.RECORD_VALID_SCOPE
+        and report.get("ready_scope") == public_contract_decision_record.READY_SCOPE
+        and report.get("contract_review_only") is True
+        and report.get("accepted_for_contract_review") is True
+        and report.get("hash_bound_to_current_source_artifacts") is True
+        and report.get("reviewed_hash_current_contract_review_only") is True
+    )
+    if not accepted:
+        add(
+            blockers,
+            "identity_public_contract_decision_record_not_accepted",
+            "$.identity_public_contract_decision_record",
+            reasons=report.get("blockers", []),
+        )
+    reviewed_template_only = (
+        report.get("record_valid") is True
+        and report.get("hash_bound_to_current_source_artifacts") is True
+        and report.get("reviewed_hash_current_contract_review_only") is True
+        and report.get("accepted_for_contract_review") is not True
+    )
+    return {
+        **report,
+        "provided": True,
+        "accepted_for_contract_review": accepted,
+        "reviewed_template_only": reviewed_template_only,
+        "strict_accepted_decision_record": accepted,
+        "accepted_post_runtime_decision_record": False,
+        "accepted_as_next_identity_contract_input": False,
+        "public_header_readiness_from_decision_record": False,
+    }
 
 
 def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1535,7 +4527,7 @@ def planning_source_verification_report(
                 f"$.source_bound_planning_manifest_verification.{key}",
                 value=report.get(key),
             )
-    accepted = (
+    provenance_verified = (
         report.get("valid") is True
         and report.get("accepted_for_planning") is True
         and report.get("planning_only") is True
@@ -1554,8 +4546,10 @@ def planning_source_verification_report(
     )
     return {
         "provided": True,
-        "accepted_for_contract_review": accepted,
-        "resolved_input": REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT if accepted else None,
+        "accepted_for_contract_review": False,
+        "resolved_input": None,
+        "provenance_verified": provenance_verified,
+        "provenance_only": True,
         "planning_only": report.get("planning_only") is True,
         "snapshot_root": report.get("snapshot_root"),
         "verify_existing_dir": report.get("verify_existing_dir"),
@@ -1740,8 +4734,13 @@ def public_abi_preflight_candidate_report(
         "public_contract_allowed": False,
         "public_header_allowed": False,
         "public_abi_ready": False,
+        "public_api_ready": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
         "v1_completion_evidence": False,
         "public_header_symbols_now": [],
+        "public_api_symbols_now": [],
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
         "contract_review_inputs_accepted": report.get("contract_review_inputs_accepted", {}),
@@ -1808,11 +4807,16 @@ def owner_token_sdk_consumer_contract_report(
             public_header_path,
             contract_blockers,
         )
+        public_header_contract_scan = owner_token_sdk_consumer.scan_public_header_contract(
+            public_header_path,
+            contract_blockers,
+        )
         owner_token_sdk_consumer.validate_manifest(payload, preflight_payload, contract_blockers)
         report = owner_token_sdk_consumer.build_report(
             payload,
             contract_blockers,
             preflight_report=preflight_report,
+            public_header_contract_scan=public_header_contract_scan,
         )
     except (ImportError, OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
         add(
@@ -1884,7 +4888,19 @@ def sanitize_non_promotional_report(
         for key, item in value.items():
             item_path = f"{path}.{key}"
             normalized_key = normalize_contract_key(key)
-            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+            claim_candidates = nested_claim_key_candidates(path, key)
+            readiness_key = first_claim_key(claim_candidates, READINESS_FALSE_KEYS)
+            public_list_key = first_claim_key(claim_candidates, EMPTY_PUBLIC_LIST_KEYS)
+            if normalized_key == "ready":
+                if readiness_key is not None and not is_closed_readiness_value(readiness_key, item):
+                    add(blockers, "nested_readiness_flag_not_false", item_path, input=input_label, value=item)
+                sanitized[key] = (
+                    sanitized_closed_readiness_value(readiness_key, item)
+                    if readiness_key is not None
+                    else False
+                )
+                continue
+            if readiness_key is None and public_list_key is None:
                 for claim in public_text_overclaims(str(key), item_path):
                     add(
                         blockers,
@@ -1899,13 +4915,13 @@ def sanitize_non_promotional_report(
                 and path != root_path
                 and item_path.endswith(NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES)
             )
-            if normalized_key in READINESS_FALSE_KEYS and not contract_review_allowed:
-                if item is not False:
+            if readiness_key is not None and not contract_review_allowed:
+                if not is_closed_readiness_value(readiness_key, item):
                     add(blockers, "nested_readiness_flag_not_false", item_path, input=input_label, value=item)
-                sanitized[key] = False
-            elif normalized_key in EMPTY_PUBLIC_LIST_KEYS:
+                sanitized[key] = sanitized_closed_readiness_value(readiness_key, item)
+            elif public_list_key is not None:
                 if item != []:
-                    add(blockers, f"nested_{normalized_key}_not_empty", item_path, input=input_label, value=item)
+                    add(blockers, f"nested_{public_list_key}_not_empty", item_path, input=input_label, value=item)
                 sanitized[key] = []
             else:
                 sanitized[key] = sanitize_non_promotional_report(
@@ -1970,6 +4986,85 @@ def require_string_list_contains(
     missing = missing_required(values, required)
     if missing:
         add(blockers, reason, label, missing=missing)
+
+
+def validate_permissions_admin_query_only_planning(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    label: str,
+) -> None:
+    if not isinstance(value, dict):
+        add(blockers, "permissions_admin_query_only_planning_missing", label)
+        return
+
+    if value.get("status") != REQUIRED_PERMISSIONS_ADMIN_QUERY_ONLY_STATUS:
+        add(
+            blockers,
+            "permissions_admin_query_only_status_mismatch",
+            f"{label}.status",
+            value=value.get("status"),
+        )
+    for key in (
+        "public_contract_allowed",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "v1_completion_evidence",
+        "complete_sdk_counting_allowed",
+    ):
+        if value.get(key) is not False:
+            add(
+                blockers,
+                "permissions_admin_query_only_flag_not_false",
+                f"{label}.{key}",
+                value=value.get(key),
+            )
+    require_string_list_contains(
+        value,
+        "required_policy",
+        REQUIRED_PERMISSIONS_ADMIN_QUERY_ONLY_POLICY,
+        blockers,
+        "permissions_admin_query_only_policy_missing",
+        f"{label}.required_policy",
+    )
+    require_string_list_contains(
+        value,
+        "forbidden_until_separate_promotion",
+        REQUIRED_PERMISSIONS_ADMIN_FORBIDDEN_UNTIL_PROMOTION,
+        blockers,
+        "permissions_admin_query_only_forbidden_terms_missing",
+        f"{label}.forbidden_until_separate_promotion",
+    )
+    require_string_list_contains(
+        value,
+        "non_counting_artifacts",
+        REQUIRED_PERMISSIONS_ADMIN_NON_COUNTING_ARTIFACTS,
+        blockers,
+        "permissions_admin_query_only_non_counting_artifacts_missing",
+        f"{label}.non_counting_artifacts",
+    )
+
+    certificate = value.get("required_identity_promotion_certificate")
+    certificate_label = f"{label}.required_identity_promotion_certificate"
+    if not isinstance(certificate, dict):
+        add(blockers, "permissions_admin_identity_promotion_certificate_requirement_missing", certificate_label)
+        return
+    for key, expected in REQUIRED_PLAYER_IDENTITY_PROMOTION_CERTIFICATE_REQUIREMENTS.items():
+        if certificate.get(key) != expected:
+            add(
+                blockers,
+                "permissions_admin_identity_promotion_certificate_requirement_mismatch",
+                f"{certificate_label}.{key}",
+                expected=expected,
+                value=certificate.get(key),
+            )
+    if certificate.get("missing_mismatched_or_stale_certificate_counts") is not False:
+        add(
+            blockers,
+            "permissions_admin_identity_promotion_certificate_non_counting_flag_not_false",
+            f"{certificate_label}.missing_mismatched_or_stale_certificate_counts",
+            value=certificate.get("missing_mismatched_or_stale_certificate_counts"),
+        )
 
 
 def strip_c_comments_and_strings(text: str) -> str:
@@ -2038,7 +5133,7 @@ def strip_c_comments_and_strings(text: str) -> str:
 
 
 def public_header_identity_tokens(path: Path) -> list[dict[str, Any]]:
-    text = path.read_text(encoding="utf-8")
+    text = without_native_prototype_symbols(path.read_text(encoding="utf-8"), header_only=True)
     stripped = strip_c_comments_and_strings(text)
     detected: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -2405,10 +5500,334 @@ def validate_required_before_public_header(decisions: dict[str, Any], blockers: 
 
     separation = by_id.get("separation.no_commands_permissions_persistence")
     if separation is not None:
+        separation_label = "$.required_before_public_header[separation.no_commands_permissions_persistence]"
         sequence_gate = string_list(separation.get("v1_sequence_gate"))
         if sequence_gate != REQUIRED_SEQUENCE_GATE:
-            add(blockers, "separation_sequence_gate_mismatch", "$.required_before_public_header[separation.no_commands_permissions_persistence].v1_sequence_gate")
+            add(blockers, "separation_sequence_gate_mismatch", f"{separation_label}.v1_sequence_gate")
         require_string_list_contains(separation, "forbidden_in_identity_contract", REQUIRED_SEPARATION_FORBIDDEN, blockers, "separation_forbidden_downstream_surfaces_missing", "$.required_before_public_header[separation.no_commands_permissions_persistence].forbidden_in_identity_contract")
+        validate_permissions_admin_query_only_planning(
+            separation.get("permissions_admin_query_only_planning"),
+            blockers,
+            f"{separation_label}.permissions_admin_query_only_planning",
+        )
+
+
+def unresolved_required_before_public_header_ids(decisions: dict[str, Any]) -> list[str]:
+    requirements = decisions.get("required_before_public_header")
+    if not isinstance(requirements, list):
+        return REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_DECISION_KEYS.copy()
+    return [
+        item["id"]
+        for item in requirements
+        if isinstance(item, dict)
+        and isinstance(item.get("id"), str)
+        and item.get("status") != "resolved"
+    ]
+
+
+def remaining_post_approved_runtime_evidence_decision_keys(decisions: dict[str, Any]) -> list[str]:
+    # Public-header prerequisites are deliberately not clearable by this readiness route.
+    # The reviewed decision record can remove only the contract-review decision keys below;
+    # ABI/header/SDK prerequisites stay as unresolved input to the later header gate.
+    remaining = REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_BASE_DECISION_KEYS.copy()
+    seen = set(remaining)
+    for key in REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS:
+        if key not in seen:
+            remaining.append(key)
+            seen.add(key)
+    return remaining
+
+
+def identity_contract_decision_record_shortcut_claims(
+    report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    claims: list[dict[str, Any]] = []
+    for key in IDENTITY_CONTRACT_DECISION_RECORD_SHORTCUT_FALSE_KEYS:
+        if key in report and not is_closed_readiness_value(normalize_contract_key(key), report.get(key)):
+            claims.append(
+                {
+                    "path": f"$.identity_public_contract_decision_record.{key}",
+                    "term": "header_or_public_readiness_shortcut",
+                    "value": report.get(key),
+                }
+            )
+    for key in EMPTY_PUBLIC_LIST_KEYS:
+        if key in report and is_nonempty_public_surface_claim_value(report.get(key)):
+            claims.append(
+                {
+                    "path": f"$.identity_public_contract_decision_record.{key}",
+                    "term": "public_surface_list",
+                    "value": report.get(key),
+                }
+            )
+    if report.get("next_blocker") == NEXT_BLOCKER_AFTER_IDENTITY_CONTRACT_REVIEW:
+        claims.append(
+            {
+                "path": "$.identity_public_contract_decision_record.next_blocker",
+                "term": "public_header_gate_shortcut",
+                "value": report.get("next_blocker"),
+            }
+        )
+    resolved_decision_keys = report.get("resolved_decision_keys")
+    if isinstance(resolved_decision_keys, list):
+        pre_header_keys = sorted(
+            {
+                key
+                for key in resolved_decision_keys
+                if isinstance(key, str) and key in REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_BASE_DECISION_KEYS
+            }
+        )
+        if pre_header_keys:
+            claims.append(
+                {
+                    "path": "$.identity_public_contract_decision_record.resolved_decision_keys",
+                    "term": "pre_header_requirement_shortcut",
+                    "value": pre_header_keys,
+                }
+            )
+    return claims
+
+
+def validate_post_approved_runtime_evidence_gate(
+    decisions: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    gate = decisions.get("post_approved_runtime_evidence_gate")
+    if not isinstance(gate, dict):
+        add(blockers, "post_approved_runtime_evidence_gate_missing", "$.post_approved_runtime_evidence_gate")
+        return
+
+    expected_gate_keys = {
+        "id",
+        "status",
+        "active_after_resolved_input",
+        "reported_current_blocker",
+        "next_blocker",
+        "required_unresolved_decision_keys",
+        "auditable_inputs",
+        "next_required_artifact",
+        "offline_preparation",
+        "non_claim",
+        *REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_FALSE_FLAGS,
+    }
+    unexpected_gate_keys = sorted(set(gate) - expected_gate_keys)
+    if unexpected_gate_keys:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_unexpected_route_extras",
+            "$.post_approved_runtime_evidence_gate",
+            unexpected=unexpected_gate_keys,
+        )
+    if gate.get("id") != "identity_public_contract_gate.reviewed_identity_public_contract":
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_id_mismatch",
+            "$.post_approved_runtime_evidence_gate.id",
+            value=gate.get("id"),
+        )
+    if gate.get("status") != "blocked/review-required":
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_status_mismatch",
+            "$.post_approved_runtime_evidence_gate.status",
+            value=gate.get("status"),
+        )
+    if gate.get("active_after_resolved_input") != REQUIRED_RESOLVED_INPUT:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_active_input_mismatch",
+            "$.post_approved_runtime_evidence_gate.active_after_resolved_input",
+            value=gate.get("active_after_resolved_input"),
+        )
+    for key in ("reported_current_blocker", "next_blocker"):
+        if gate.get(key) != NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE:
+            add(
+                blockers,
+                f"post_approved_runtime_evidence_gate_{key}_mismatch",
+                f"$.post_approved_runtime_evidence_gate.{key}",
+                value=gate.get(key),
+            )
+    if string_list(gate.get("required_unresolved_decision_keys")) != (
+        REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_DECISION_KEYS
+    ):
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_required_decision_keys_mismatch",
+            "$.post_approved_runtime_evidence_gate.required_unresolved_decision_keys",
+            expected=REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_DECISION_KEYS,
+            observed=gate.get("required_unresolved_decision_keys"),
+        )
+    audit_inputs = string_list(gate.get("auditable_inputs"))
+    if audit_inputs is None or set(audit_inputs) != REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_AUDIT_INPUTS:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_auditable_inputs_mismatch",
+            "$.post_approved_runtime_evidence_gate.auditable_inputs",
+            expected=sorted(REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_AUDIT_INPUTS),
+            observed=gate.get("auditable_inputs"),
+        )
+    if gate.get("next_required_artifact") != REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_next_required_artifact_mismatch",
+            "$.post_approved_runtime_evidence_gate.next_required_artifact",
+            expected=REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT,
+            observed=gate.get("next_required_artifact"),
+        )
+    if gate.get("offline_preparation") != REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_OFFLINE_PREPARATION:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_offline_preparation_mismatch",
+            "$.post_approved_runtime_evidence_gate.offline_preparation",
+            expected=REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_OFFLINE_PREPARATION,
+            observed=gate.get("offline_preparation"),
+        )
+    next_required_artifact = gate.get("next_required_artifact")
+    observed_alias_policy = (
+        next_required_artifact.get("non_counting_candidate_alias_policy")
+        if isinstance(next_required_artifact, dict)
+        else None
+    )
+    if observed_alias_policy != REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_COUNTING_CANDIDATE_ALIAS_POLICY:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_non_counting_candidate_alias_policy_mismatch",
+            "$.post_approved_runtime_evidence_gate.next_required_artifact.non_counting_candidate_alias_policy",
+            expected=REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_COUNTING_CANDIDATE_ALIAS_POLICY,
+            observed=observed_alias_policy,
+        )
+    for key in REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_FALSE_FLAGS:
+        if gate.get(key) is not False:
+            add(
+                blockers,
+                f"post_approved_runtime_evidence_gate_{key}_not_false",
+                f"$.post_approved_runtime_evidence_gate.{key}",
+                value=gate.get(key),
+            )
+    for key in POST_APPROVED_RUNTIME_EVIDENCE_FALSE_ONLY_ALIAS_FLAGS:
+        if key in gate and gate.get(key) is not False:
+            add(
+                blockers,
+                f"post_approved_runtime_evidence_gate_{key}_not_false",
+                f"$.post_approved_runtime_evidence_gate.{key}",
+                value=gate.get(key),
+            )
+    if gate.get("non_claim") != REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM:
+        add(
+            blockers,
+            "post_approved_runtime_evidence_gate_non_claim_mismatch",
+            "$.post_approved_runtime_evidence_gate.non_claim",
+            value=gate.get("non_claim"),
+        )
+
+
+def validate_post_runtime_identity_contract_checklist_policy(
+    decisions: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    policy = decisions.get("post_runtime_identity_contract_checklist_policy")
+    if not isinstance(policy, dict):
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_missing",
+            "$.post_runtime_identity_contract_checklist_policy",
+            observed=policy,
+        )
+        return
+    if policy != REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY:
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_mismatch",
+            "$.post_runtime_identity_contract_checklist_policy",
+            expected=REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY,
+            observed=policy,
+        )
+    if policy.get("required_item_ids") != POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS:
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_required_item_ids_mismatch",
+            "$.post_runtime_identity_contract_checklist_policy.required_item_ids",
+            expected=POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS,
+            observed=policy.get("required_item_ids"),
+        )
+    if policy.get("must_remain_false") != list(POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_FALSE_FLAGS):
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_must_remain_false_mismatch",
+            "$.post_runtime_identity_contract_checklist_policy.must_remain_false",
+            expected=list(POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_FALSE_FLAGS),
+            observed=policy.get("must_remain_false"),
+        )
+    items = policy.get("items")
+    if not isinstance(items, list):
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_items_not_list",
+            "$.post_runtime_identity_contract_checklist_policy.items",
+            observed=items,
+        )
+        return
+    expected_items = {
+        item["id"]: item for item in REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY["items"]
+    }
+    observed_ids = [
+        item.get("id") if isinstance(item, dict) else None
+        for item in items
+    ]
+    if observed_ids != POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS:
+        add(
+            blockers,
+            "post_runtime_identity_contract_checklist_policy_item_order_mismatch",
+            "$.post_runtime_identity_contract_checklist_policy.items",
+            expected=POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS,
+            observed=observed_ids,
+        )
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            add(
+                blockers,
+                "post_runtime_identity_contract_checklist_policy_item_not_object",
+                f"$.post_runtime_identity_contract_checklist_policy.items[{index}]",
+                observed=item,
+            )
+            continue
+        expected_item = expected_items.get(item.get("id"))
+        if expected_item is None:
+            continue
+        for key in ("checker", "required_next_action", "blocks_until", "review_scope", "non_claim"):
+            if item.get(key) != expected_item.get(key):
+                add(
+                    blockers,
+                    f"post_runtime_identity_contract_checklist_policy_item_{key}_mismatch",
+                    f"$.post_runtime_identity_contract_checklist_policy.items[{index}].{key}",
+                    item_id=item.get("id"),
+                    expected=expected_item.get(key),
+                    observed=item.get(key),
+                )
+        for key in (
+            "counts_as_public_readiness",
+            "counts_toward_public_sdk",
+            "counts_toward_p0_dependency_chain_claim",
+            "accepted_for_public_header_gate_review",
+            "public_header_allowed",
+            "promotion_ready",
+        ):
+            if item.get(key) is not False:
+                add(
+                    blockers,
+                    f"post_runtime_identity_contract_checklist_policy_item_{key}_not_false",
+                    f"$.post_runtime_identity_contract_checklist_policy.items[{index}].{key}",
+                    item_id=item.get("id"),
+                    value=item.get(key),
+                )
+        if item.get("p0_progress_contribution") != 0:
+            add(
+                blockers,
+                "post_runtime_identity_contract_checklist_policy_item_p0_progress_contribution_not_zero",
+                f"$.post_runtime_identity_contract_checklist_policy.items[{index}].p0_progress_contribution",
+                item_id=item.get("id"),
+                value=item.get("p0_progress_contribution"),
+            )
 
 
 def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -2474,7 +5893,29 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             add(blockers, "approved_runtime_evidence_intake_status_mismatch", "$.approved_runtime_evidence_intake.status")
         if intake.get("resolved_input") != REQUIRED_RESOLVED_INPUT:
             add(blockers, "approved_runtime_evidence_intake_resolved_input_mismatch", "$.approved_runtime_evidence_intake.resolved_input")
-        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if intake.get("required_checker") != "scripts/check_player_identity_public_contract_readiness.py":
+            add(blockers, "approved_runtime_evidence_intake_checker_mismatch", "$.approved_runtime_evidence_intake.required_checker")
+        validate_approved_runtime_source_provenance_policy(
+            intake.get("source_provenance_policy"),
+            blockers,
+            "$.approved_runtime_evidence_intake.source_provenance_policy",
+            "approved_runtime_evidence_intake_source_provenance_policy_mismatch",
+        )
+        if intake.get("non_claim") != REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM:
+            add(blockers, "approved_runtime_evidence_intake_non_claim_mismatch", "$.approved_runtime_evidence_intake.non_claim")
+        for key in (
+            "promotion_ready",
+            "public_contract_allowed",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_api_ready",
+            "public_abi_ready",
+            "public_header_allowed",
+            "lookup_ready",
+            "permissions_ready",
+            "commands_ready",
+            "v1_completion_evidence",
+        ):
             if intake.get(key) is not False:
                 add(blockers, f"approved_runtime_evidence_intake_{key}_not_false", f"$.approved_runtime_evidence_intake.{key}")
 
@@ -2652,6 +6093,8 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             "approved_runtime_evidence_not_sufficient_minimum_gates_missing",
             "$.approved_runtime_evidence_not_sufficient.minimum_additional_gates",
         )
+    validate_post_approved_runtime_evidence_gate(decisions, blockers)
+    validate_post_runtime_identity_contract_checklist_policy(decisions, blockers)
 
     forbidden = decisions.get("forbidden_public_contract")
     if not isinstance(forbidden, list) or not REQUIRED_FORBIDDEN.issubset(set(forbidden)):
@@ -2811,6 +6254,7 @@ def contract_gate_input_details(
     decisions: dict[str, Any],
     *,
     runtime_input_resolved: bool,
+    runtime_start_end_context_present: bool = False,
     redaction_report: dict[str, Any],
     principal_policy_report: dict[str, Any],
     planning_source_report: dict[str, Any],
@@ -2820,21 +6264,21 @@ def contract_gate_input_details(
     accepted_review_inputs: set[str] = set()
     if runtime_input_resolved:
         accepted_review_inputs.add(REQUIRED_RESOLVED_INPUT)
-    if redaction_report.get("accepted_for_contract_review") is True:
-        accepted_review_inputs.add(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
-    if principal_policy_report.get("accepted_for_policy_review") is True:
-        accepted_review_inputs.add(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
-    if planning_source_report.get("accepted_for_contract_review") is True:
-        accepted_review_inputs.add(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
-    if public_abi_preflight_report.get("contract_review_inputs_accepted", {}).get(
-        "abi.public_pod_contract.private_layout_candidate"
-    ) is True:
-        accepted_review_inputs.add("abi.public_pod_contract.private_layout_candidate")
-    if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
-        accepted_review_inputs.add(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
-    if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True:
-        accepted_review_inputs.add(REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT)
-    accepted_review_inputs.add("separation.no_commands_permissions_persistence")
+        if redaction_report.get("accepted_for_contract_review") is True:
+            accepted_review_inputs.add(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
+        if principal_policy_report.get("accepted_for_policy_review") is True:
+            accepted_review_inputs.add(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
+        if planning_source_report.get("accepted_for_contract_review") is True:
+            accepted_review_inputs.add(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
+        if public_abi_preflight_report.get("contract_review_inputs_accepted", {}).get(
+            "abi.public_pod_contract.private_layout_candidate"
+        ) is True:
+            accepted_review_inputs.add("abi.public_pod_contract.private_layout_candidate")
+        if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
+            accepted_review_inputs.add(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
+        if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True:
+            accepted_review_inputs.add(REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT)
+        accepted_review_inputs.add("separation.no_commands_permissions_persistence")
 
     manifest_inputs = decisions.get("contract_gate_inputs")
     if not isinstance(manifest_inputs, list):
@@ -2858,13 +6302,33 @@ def contract_gate_input_details(
                 REQUIRED_CONTRACT_GATE_INPUTS[input_id]["remaining_promotion_inputs"]
             )
         resolved_review_inputs = [item for item in review_inputs if item in accepted_review_inputs]
+        missing_review_inputs = [item for item in review_inputs if item not in accepted_review_inputs]
+        strict_review_inputs_unresolved = (
+            [REQUIRED_RESOLVED_INPUT]
+            if input_id == REQUIRED_RESOLVED_INPUT
+            and runtime_start_end_context_present
+            and not runtime_input_resolved
+            else []
+        )
+        non_counting_review_inputs_present = (
+            [PRINCIPAL_START_END_RESOLVED_INPUT]
+            if input_id == REQUIRED_RESOLVED_INPUT
+            and runtime_start_end_context_present
+            and not runtime_input_resolved
+            else []
+        )
         details.append(
             {
                 "id": input_id,
                 "status": "unresolved",
                 "review_inputs": review_inputs,
                 "review_inputs_resolved": resolved_review_inputs,
-                "review_inputs_missing": [item for item in review_inputs if item not in accepted_review_inputs],
+                "review_inputs_missing": missing_review_inputs,
+                "strict_review_inputs_unresolved": strict_review_inputs_unresolved,
+                "non_counting_review_inputs_present": non_counting_review_inputs_present,
+                "review_inputs_non_counting_until": None
+                if runtime_input_resolved or input_id == "runtime.lifecycle_evidence"
+                else REQUIRED_RESOLVED_INPUT,
                 "remaining_promotion_inputs": remaining_promotion_inputs,
                 "promotion_blocker_resolved": False,
                 "promotion_ready": False,
@@ -2878,9 +6342,672 @@ def contract_gate_input_details(
     return details
 
 
+def remaining_contract_review_inputs(contract_gate_details: list[dict[str, Any]]) -> list[str]:
+    remaining: list[str] = []
+    seen: set[str] = set()
+    for detail in contract_gate_details:
+        missing_inputs = []
+        for key in ("review_inputs_missing", "strict_review_inputs_unresolved"):
+            missing = detail.get(key, [])
+            if isinstance(missing, list):
+                missing_inputs.extend(missing)
+        for item in missing_inputs:
+            if isinstance(item, str) and item not in seen:
+                remaining.append(item)
+                seen.add(item)
+    return remaining
+
+
+def public_identity_non_promotional_reasons(
+    runtime_evidence_accepted: bool,
+    principal_start_end_runtime_evidence_accepted: bool = False,
+) -> list[str]:
+    if runtime_evidence_accepted:
+        evidence_reason = (
+            "runtime lifecycle evidence intake has consume-only scope; "
+            "identity promotion remains blocked pending reviewed identity-contract evidence"
+        )
+    elif principal_start_end_runtime_evidence_accepted:
+        evidence_reason = (
+            "principal start/end runtime evidence has contract-review-only scope; rejected-start "
+            "CheckJoin proof and the approved runtime bundle remain unresolved"
+        )
+    else:
+        evidence_reason = (
+            "runtime principal lifecycle evidence is absent; identity promotion remains blocked "
+            "pending accepted runtime lifecycle evidence and reviewed identity-contract evidence"
+        )
+    return [
+        evidence_reason,
+        "planning-only, passive, diagnostic, preflight/window, receipt, sidecar, scoped-statement, "
+        "certificate, multi-surface beta capture plan/pack/queue, and readiness-alias artifacts "
+        "cannot resolve runtime.lifecycle_evidence or identity promotion",
+        "candidate/privacy/lifetime/ABI artifacts are review inputs only and add no header "
+        "symbols, capability bits, callbacks, lookup, persistence, mutation, return override, runtime "
+        "gate state, SDK/API/ABI gate state, permissions/admin, command/chat surfaces, or v1 completion",
+        "identity_public_contract_gate review must still cover privacy, lifetime/invalidation, "
+        "process-local scope, POD ABI, owner-token lifecycle, SDK consumer behavior, and append-only "
+        "layout tests; header, capability, and callback topics remain closed",
+    ]
+
+
+def post_approved_runtime_evidence_gate_report(
+    decisions: dict[str, Any],
+    *,
+    runtime_evidence_accepted: bool,
+    runtime_contract_input_kind: str = "approved_runtime_principal_lifecycle_evidence",
+    identity_contract_decision_report: dict[str, Any],
+    gate_inputs_valid: bool,
+) -> dict[str, Any]:
+    gate = decisions.get("post_approved_runtime_evidence_gate")
+    if not isinstance(gate, dict):
+        gate = {}
+    decision_record_accepted = (
+        gate_inputs_valid
+        and runtime_evidence_accepted
+        and identity_contract_decision_report.get("accepted_for_contract_review") is True
+    )
+    remaining_decision_keys = remaining_post_approved_runtime_evidence_decision_keys(decisions)
+    if decision_record_accepted:
+        resolved_keys = set(identity_contract_decision_report.get("resolved_decision_keys", []))
+        remaining_decision_keys = [key for key in remaining_decision_keys if key not in resolved_keys]
+    identity_contract_gate_complete = False
+    next_required_artifact = gate.get("next_required_artifact")
+    if decision_record_accepted:
+        next_required_artifact = {
+            **REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT,
+            "status": "accepted_for_contract_review",
+        }
+    return {
+        "id": gate.get("id"),
+        "status": gate.get("status"),
+        "active": runtime_evidence_accepted,
+        "runtime_contract_input_kind": runtime_contract_input_kind if runtime_evidence_accepted else "none",
+        "accepted_decision_record_as_next_identity_contract_input": decision_record_accepted,
+        "public_header_readiness_from_decision_record": False,
+        "accepted_decision_record_opens_public_header_gate": False,
+        "runtime_evidence_contract_review_currentness": identity_contract_decision_report.get(
+            "runtime_evidence_contract_review_currentness",
+            public_contract_decision_record.REQUIRED_RUNTIME_CONTRACT_CURRENTNESS_DIAGNOSTIC,
+        ),
+        "identity_contract_gate_complete": identity_contract_gate_complete,
+        "active_after_resolved_input": gate.get("active_after_resolved_input"),
+        "reported_current_blocker": gate.get("reported_current_blocker"),
+        "next_blocker": gate.get("next_blocker"),
+        "required_unresolved_decision_keys": gate.get("required_unresolved_decision_keys", []),
+        "remaining_unresolved_decision_keys": remaining_decision_keys,
+        "auditable_inputs": gate.get("auditable_inputs", []),
+        "next_required_artifact": next_required_artifact,
+        "offline_preparation": gate.get(
+            "offline_preparation",
+            REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_OFFLINE_PREPARATION,
+        ),
+        "non_counting_candidate_alias_policy": (
+            REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NON_COUNTING_CANDIDATE_ALIAS_POLICY
+        ),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "public_readiness": False,
+        "runtime_ready": False,
+        "runtime_readiness": False,
+        "stable_ready": False,
+        "stable_claim_allowed": False,
+        "stable_claim_ready": False,
+        "stable_sdk_ready": False,
+        "plugin_hub_ready": False,
+        "plugin_hub_publication_ready": False,
+        "publication_ready": False,
+        "publication_authorized": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "permissions_admin_ready": False,
+        "permissions_admin_public_ready": False,
+        "permissions_admin_unlocked": False,
+        "commands_ready": False,
+        "command_response_ready": False,
+        "command_chat_response_ready": False,
+        "commands_replies_ready": False,
+        "v1_ready": False,
+        "v1_completion_ready": False,
+        "v1_completion_evidence": False,
+        "public_sdk_v1_completion_ready": False,
+        "complete_sdk_ready": False,
+        "complete_sdk_counting_allowed": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "resource_handle_ready": False,
+        "resource_handle_supported": False,
+        "mutation_allowed": False,
+        "mutation_ready": False,
+        "return_override_allowed": False,
+        "live_ops_authorized": False,
+        "server_operations_authorized": False,
+        "workspace_writes_authorized": False,
+        "runtime_capture_authorized": False,
+        "reads_live_logs": False,
+        "non_claim": gate.get("non_claim"),
+    }
+
+
+def post_runtime_public_identity_gap_summary(
+    *,
+    runtime_evidence_accepted: bool,
+    identity_contract_decision_accepted: bool,
+    current_blocker: str,
+    next_blocker: str,
+) -> dict[str, Any]:
+    missing_review_keys = (
+        []
+        if identity_contract_decision_accepted or not runtime_evidence_accepted
+        else list(REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS)
+    )
+    remaining_header_keys = (
+        list(POST_RUNTIME_PUBLIC_IDENTITY_HEADER_DECISION_GAP_KEYS)
+        if runtime_evidence_accepted
+        else []
+    )
+    remaining_identity_keys = missing_review_keys + remaining_header_keys
+    return {
+        "active": runtime_evidence_accepted,
+        "current_blocker": current_blocker,
+        "next_blocker": next_blocker,
+        "only_valid_post_runtime_route": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+        "candidate_preflight_review_aliases_count": False,
+        "approved_runtime_bundle_consumed": runtime_evidence_accepted,
+        "approved_runtime_evidence_scope": "consume_only_contract_review_input",
+        "approved_runtime_resolved_input": REQUIRED_RESOLVED_INPUT if runtime_evidence_accepted else None,
+        "runtime_bundle_consumed_decision_keys": (
+            list(POST_RUNTIME_APPROVED_BUNDLE_CONSUMED_DECISION_KEYS)
+            if runtime_evidence_accepted
+            else []
+        ),
+        "missing_identity_contract_review_decision_keys": missing_review_keys,
+        "remaining_public_header_decision_keys": remaining_header_keys,
+        "smallest_remaining_public_identity_decision_keys": (
+            remaining_identity_keys if runtime_evidence_accepted else []
+        ),
+        "deferred_downstream_surface_gaps": POST_RUNTIME_DEFERRED_DOWNSTREAM_SURFACE_GAPS,
+        "downstream_surfaces_deferred_until_identity_promotion": [
+            "permissions_admin",
+            "command_chat_response",
+            "commands_replies",
+            "player_lookup",
+            "storage_persistence",
+        ],
+        "permissions_admin_opened": False,
+        "permissions_admin_ready": False,
+        "permissions_admin_public_ready": False,
+        "permissions_admin_unlocked": False,
+        "command_response_ready": False,
+        "command_chat_response_ready": False,
+        "commands_replies_ready": False,
+        "promotion_ready": False,
+        "public_contract_allowed": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_sdk_ready": False,
+        "public_readiness": False,
+        "runtime_ready": False,
+        "runtime_readiness": False,
+        "stable_ready": False,
+        "stable_claim_allowed": False,
+        "stable_claim_ready": False,
+        "stable_sdk_ready": False,
+        "plugin_hub_ready": False,
+        "plugin_hub_publication_ready": False,
+        "publication_ready": False,
+        "publication_authorized": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_completion_evidence": False,
+        "public_sdk_v1_completion_ready": False,
+        "complete_sdk_ready": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "non_claim": (
+            "A checker-accepted approved runtime bundle only consumes the runtime lifecycle evidence "
+            "input and routes to identity_public_contract_gate_missing; the remaining keys are public "
+            "identity contract/header review gaps and do not open permissions/admin, commands, lookup, "
+            "public API/ABI/header, SDK readiness, runtime readiness, P0 progress, or v1 completion."
+        ),
+    }
+
+
+def post_runtime_contract_gap_diagnostic(
+    *,
+    runtime_evidence_accepted: bool,
+    identity_contract_decision_accepted: bool,
+    identity_contract_decision_report: dict[str, Any],
+    current_blocker: str,
+    next_blocker: str,
+    post_runtime_evidence_gate: dict[str, Any],
+) -> dict[str, Any]:
+    immediate_missing_artifacts = []
+    if runtime_evidence_accepted and not identity_contract_decision_accepted:
+        immediate_missing_artifacts.append("reviewed_identity_public_contract_decision_record")
+    record_blockers = identity_contract_decision_report.get("blockers", [])
+    if not isinstance(record_blockers, list):
+        record_blockers = []
+    next_required_artifact = post_runtime_evidence_gate.get("next_required_artifact")
+    if not isinstance(next_required_artifact, dict):
+        next_required_artifact = REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT
+    missing_review_keys = (
+        []
+        if identity_contract_decision_accepted or not runtime_evidence_accepted
+        else list(REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS)
+    )
+    remaining_header_keys = (
+        list(POST_RUNTIME_PUBLIC_IDENTITY_HEADER_DECISION_GAP_KEYS)
+        if runtime_evidence_accepted
+        else []
+    )
+    remaining_decision_keys = post_runtime_evidence_gate.get("remaining_unresolved_decision_keys", [])
+    if not isinstance(remaining_decision_keys, list):
+        remaining_decision_keys = []
+    return {
+        "active": runtime_evidence_accepted,
+        "fail_closed": True,
+        "current_blocker": current_blocker,
+        "next_blocker": next_blocker,
+        "only_valid_post_runtime_route": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+        "approved_runtime_bundle_consumed": runtime_evidence_accepted,
+        "approved_runtime_evidence_scope": (
+            "consume_only_contract_review_input"
+            if runtime_evidence_accepted
+            else "missing_approved_runtime_bundle"
+        ),
+        "reviewed_decision_record_status": (
+            "accepted_for_contract_review"
+            if identity_contract_decision_accepted
+            else "missing_or_not_accepted"
+            if runtime_evidence_accepted
+            else "blocked_until_approved_runtime_evidence"
+        ),
+        "immediate_missing_artifacts": immediate_missing_artifacts,
+        "next_required_artifact": next_required_artifact,
+        "decision_record_blockers": record_blockers if runtime_evidence_accepted else [],
+        "missing_identity_contract_review_decision_keys": missing_review_keys,
+        "remaining_public_header_decision_keys": remaining_header_keys,
+        "remaining_unresolved_decision_keys": remaining_decision_keys,
+        "deferred_downstream_surface_gaps": POST_RUNTIME_DEFERRED_DOWNSTREAM_SURFACE_GAPS,
+        "blocked_surfaces_must_remain_false": POST_RUNTIME_CONTRACT_GAP_DIAGNOSTIC_BLOCKED_SURFACES,
+        "offline_preparation": post_runtime_evidence_gate.get("offline_preparation"),
+        "does_not_unlock_identity_public_contract_gate": True,
+        "does_not_unlock_public_header_gate": True,
+        "promotion_ready": False,
+        "public_contract_allowed": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_sdk_ready": False,
+        "public_readiness": False,
+        "runtime_ready": False,
+        "runtime_readiness": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "non_claim": REQUIRED_POST_RUNTIME_CONTRACT_GAP_DIAGNOSTIC_NON_CLAIM,
+    }
+
+
+def post_runtime_identity_contract_checklist_item(item: dict[str, Any]) -> dict[str, Any]:
+    policy = POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_POLICY_BY_ID.get(item.get("id"), {})
+    return {
+        **item,
+        "required_next_action": policy.get("required_next_action"),
+        "blocks_until": policy.get("blocks_until"),
+        "review_scope": policy.get("review_scope"),
+        "counts_as_public_readiness": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_contribution": 0,
+        "complete_sdk_claim_progress_contribution": 0,
+        "accepted_for_public_header_gate_review": False,
+        "public_header_allowed": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "v1_completion_evidence": False,
+        "non_claim": REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_ITEM_NON_CLAIM,
+    }
+
+
+def post_runtime_identity_contract_checklist(
+    *,
+    runtime_evidence_accepted: bool,
+    identity_contract_decision_accepted: bool,
+    current_blocker: str,
+    next_blocker: str,
+    redaction_report: dict[str, Any],
+    principal_policy_report: dict[str, Any],
+    planning_source_report: dict[str, Any],
+    public_abi_preflight_report: dict[str, Any],
+    owner_token_sdk_consumer_report: dict[str, Any],
+    post_runtime_evidence_gate: dict[str, Any],
+    header_fail_closed_path: dict[str, Any],
+) -> dict[str, Any]:
+    reviewed_contract_status = (
+        "accepted_for_contract_review"
+        if identity_contract_decision_accepted
+        else "missing_or_not_accepted"
+        if runtime_evidence_accepted
+        else "blocked_until_approved_runtime_evidence"
+    )
+    immediate_next_artifact = (
+        REQUIRED_PUBLIC_HEADER_GATE_NEXT_REQUIRED_ARTIFACT
+        if identity_contract_decision_accepted
+        else REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT
+        if runtime_evidence_accepted
+        else {
+            "id": "approved_runtime_principal_lifecycle_evidence_bundle",
+            "checker": "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py",
+            "required_resolved_input": REQUIRED_RESOLVED_INPUT,
+            "status": "missing_or_not_accepted",
+        }
+    )
+    reviewed_contract_missing_keys = (
+        []
+        if identity_contract_decision_accepted or not runtime_evidence_accepted
+        else list(REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS)
+    )
+    remaining_public_header_keys = (
+        list(POST_RUNTIME_PUBLIC_IDENTITY_HEADER_DECISION_GAP_KEYS)
+        if runtime_evidence_accepted
+        else []
+    )
+    checklist_items = [
+        {
+            "id": "approved_runtime_principal_lifecycle_evidence_bundle",
+            "status": "accepted" if runtime_evidence_accepted else "missing_or_not_accepted",
+            "checker": "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py",
+            "resolved_input": REQUIRED_RESOLVED_INPUT if runtime_evidence_accepted else None,
+            "counts_as_reviewed_identity_contract": False,
+        },
+        {
+            "id": "reviewed_identity_public_contract_decision_record",
+            "status": reviewed_contract_status,
+            "checker": "scripts/check_player_identity_public_contract_decision_record.py",
+            "must_bind_to_approved_runtime_evidence": True,
+            "must_bind_current_source_artifacts": True,
+            "must_resolve_decision_keys": REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_REVIEW_DECISION_KEYS,
+            "missing_decision_keys": reviewed_contract_missing_keys,
+            "accepted_for_public_header_gate_review": False,
+        },
+        {
+            "id": "identifier_redaction_evidence",
+            "status": (
+                "accepted_for_contract_review"
+                if redaction_report.get("accepted_for_contract_review") is True
+                else "missing_or_not_accepted"
+            ),
+            "checker": REQUIRED_IDENTIFIER_REDACTION_CHECKER,
+            "resolved_input": (
+                REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT
+                if redaction_report.get("accepted_for_contract_review") is True
+                else None
+            ),
+            "promotion_ready": False,
+        },
+        {
+            "id": "principal_invalidation_policy",
+            "status": (
+                "accepted_for_policy_review"
+                if principal_policy_report.get("accepted_for_policy_review") is True
+                else "missing_or_not_accepted"
+            ),
+            "checker": REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER,
+            "resolved_input": (
+                PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT
+                if principal_policy_report.get("accepted_for_policy_review") is True
+                else None
+            ),
+            "promotion_ready": False,
+        },
+        {
+            "id": "public_abi_preflight_candidate",
+            "status": (
+                "accepted_for_candidate_review"
+                if public_abi_preflight_report.get("accepted_for_candidate_review") is True
+                else "missing_or_not_accepted"
+            ),
+            "checker": REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER,
+            "resolved_input": (
+                REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT
+                if public_abi_preflight_report.get("accepted_for_candidate_review") is True
+                else None
+            ),
+            "public_abi_ready": False,
+        },
+        {
+            "id": "owner_token_sdk_consumer_contract",
+            "status": (
+                "accepted_for_candidate_review"
+                if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True
+                else "missing_or_not_accepted"
+            ),
+            "checker": REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_CHECKER,
+            "resolved_input": (
+                REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT
+                if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True
+                else None
+            ),
+            "sdk_consumer_ready": False,
+        },
+        {
+            "id": "source_bound_planning_manifest_verification",
+            "status": (
+                "accepted_for_contract_review"
+                if planning_source_report.get("accepted_for_contract_review") is True
+                else "provenance_only" if planning_source_report.get("provenance_verified") is True else "missing_or_not_accepted"
+            ),
+            "checker": REQUIRED_PLANNING_SOURCE_VERIFICATION_CHECKER,
+            "resolved_input": (
+                REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT
+                if planning_source_report.get("accepted_for_contract_review") is True
+                else None
+            ),
+            "promotion_ready": False,
+        },
+        {
+            "id": "player_identity_public_header_gate_proposal",
+            "status": (
+                "candidate_only_fail_closed_next_artifact"
+                if identity_contract_decision_accepted
+                else "blocked_until_reviewed_identity_contract"
+                if runtime_evidence_accepted
+                else "blocked_until_approved_runtime_evidence"
+            ),
+            "checker": "scripts/check_player_identity_public_header_gate.py",
+            "next_fail_closed_blocker": header_fail_closed_path.get("next_fail_closed_blocker"),
+            "public_header_allowed": False,
+        },
+    ]
+    checklist_items = [
+        post_runtime_identity_contract_checklist_item(item) for item in checklist_items
+    ]
+    return {
+        "present": True,
+        "active": runtime_evidence_accepted,
+        "fail_closed": True,
+        "current_blocker": current_blocker,
+        "next_blocker": next_blocker,
+        "runtime_evidence_status": (
+            "accepted" if runtime_evidence_accepted else "missing_or_not_accepted"
+        ),
+        "reviewed_identity_contract_status": reviewed_contract_status,
+        "approved_runtime_resolved_input": (
+            REQUIRED_RESOLVED_INPUT if runtime_evidence_accepted else None
+        ),
+        "only_valid_post_runtime_route": NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+        "after_reviewed_contract_fail_closed_blocker": (
+            header_fail_closed_path.get("next_fail_closed_blocker")
+        ),
+        "immediate_next_artifact": immediate_next_artifact,
+        "policy": REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_POLICY,
+        "required_item_ids": POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_IDS,
+        "items": checklist_items,
+        "missing_review_decision_keys": reviewed_contract_missing_keys,
+        "remaining_public_header_decision_keys": remaining_public_header_keys,
+        "remaining_unresolved_decision_keys": post_runtime_evidence_gate.get(
+            "remaining_unresolved_decision_keys",
+            [],
+        ),
+        "must_remain_false": list(POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_FALSE_FLAGS),
+        "accepted_for_public_header_gate_review": False,
+        "promotion_ready": False,
+        "public_contract_allowed": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "runtime_readiness": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "non_claim": REQUIRED_POST_RUNTIME_IDENTITY_CONTRACT_CHECKLIST_NON_CLAIM,
+    }
+
+
+def public_header_fail_closed_path(
+    *,
+    runtime_evidence_accepted: bool,
+    identity_contract_decision_accepted: bool,
+    current_blocker: str,
+) -> dict[str, Any]:
+    if not runtime_evidence_accepted:
+        status = "blocked_until_strict_approved_runtime_evidence"
+        next_fail_closed_blocker = "approved_runtime_evidence_missing"
+        next_required_artifact: dict[str, Any] | None = None
+    elif not identity_contract_decision_accepted:
+        status = "blocked_until_reviewed_identity_public_contract_decision_record"
+        next_fail_closed_blocker = NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE
+        next_required_artifact = REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT
+    else:
+        status = "candidate_public_header_gate_review_available_fail_closed"
+        next_fail_closed_blocker = NEXT_BLOCKER_AFTER_IDENTITY_CONTRACT_REVIEW
+        next_required_artifact = REQUIRED_PUBLIC_HEADER_GATE_NEXT_REQUIRED_ARTIFACT
+
+    return {
+        "active_after_strict_approved_runtime_evidence": runtime_evidence_accepted,
+        "active_after_accepted_reviewed_identity_contract": identity_contract_decision_accepted,
+        "status": status,
+        "current_blocker": current_blocker,
+        "next_fail_closed_blocker": next_fail_closed_blocker,
+        "next_required_artifact": next_required_artifact,
+        "required_sequence": [
+            {
+                "id": "approved_runtime_principal_lifecycle_evidence_bundle",
+                "status": "accepted" if runtime_evidence_accepted else "missing_or_not_accepted",
+                "resolved_input": REQUIRED_RESOLVED_INPUT if runtime_evidence_accepted else None,
+                "strict_checker_report_required": True,
+            },
+            {
+                "id": "reviewed_identity_public_contract_decision_record",
+                "status": (
+                    "accepted_for_contract_review"
+                    if identity_contract_decision_accepted
+                    else "missing_or_not_accepted"
+                    if runtime_evidence_accepted
+                    else "blocked_until_strict_runtime_evidence"
+                ),
+                "must_bind_to_approved_runtime_evidence": True,
+                "must_bind_current_source_artifacts": True,
+                "accepted_shortcut_aliases": False,
+            },
+            {
+                "id": "player_identity_public_header_gate_proposal",
+                "status": (
+                    "candidate_only_fail_closed_next_artifact"
+                    if identity_contract_decision_accepted
+                    else "blocked_until_reviewed_identity_contract"
+                ),
+                "checker": "scripts/check_player_identity_public_header_gate.py",
+                "accepted_for_header_gate_review": False,
+                "public_header_allowed": False,
+            },
+        ],
+        "shortcut_aliases_allowed": False,
+        "candidate_aliases_count": False,
+        "accepted_decision_record_opens_public_header_gate": False,
+        "public_header_readiness_from_decision_record": False,
+        "public_header_gate_ready": False,
+        "public_header_gate_unlocked": False,
+        "promotion_ready": False,
+        "public_contract_allowed": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "runtime_readiness": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "must_remain_false": list(REQUIRED_PUBLIC_HEADER_FAIL_CLOSED_PATH_FALSE_FLAGS),
+        "non_claim": REQUIRED_PUBLIC_HEADER_FAIL_CLOSED_PATH_NON_CLAIM,
+    }
+
+
 def build_report(
     decisions: dict[str, Any],
     runtime_report: dict[str, Any],
+    identity_contract_decision_report: dict[str, Any],
     redaction_report: dict[str, Any],
     private_candidate_contract: dict[str, Any],
     public_header_report: dict[str, Any],
@@ -2890,11 +7017,73 @@ def build_report(
     planning_source_report: dict[str, Any] | None = None,
     public_abi_preflight_report: dict[str, Any] | None = None,
     owner_token_sdk_consumer_report: dict[str, Any] | None = None,
+    principal_start_end_runtime_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     principal_policy_report = principal_policy_report or {}
     planning_source_report = planning_source_report or {}
     public_abi_preflight_report = public_abi_preflight_report or {}
     owner_token_sdk_consumer_report = owner_token_sdk_consumer_report or {}
+    principal_start_end_runtime_report = principal_start_end_runtime_report or {}
+    runtime_false_promotion_claims = approved_runtime_false_promotion_claims(runtime_report)
+    add_approved_runtime_false_promotion_blockers(blockers, runtime_false_promotion_claims)
+    runtime_multi_surface_beta_capture_claims = approved_runtime_report_multi_surface_beta_capture_references(
+        runtime_report
+    )
+    if runtime_multi_surface_beta_capture_claims:
+        add(
+            blockers,
+            "approved_runtime_evidence_multi_surface_beta_capture_candidate_artifact_not_counting",
+            "$.approved_runtime_evidence",
+            claims=runtime_multi_surface_beta_capture_claims,
+        )
+    add_binding_shortcut_blockers(
+        blockers,
+        reason_prefix="approved_runtime_evidence_binding",
+        label="$.approved_runtime_evidence.approved_runtime_evidence_binding",
+        binding=runtime_report.get("approved_runtime_evidence_binding"),
+    )
+    decision_binding_multi_surface_beta_capture_claims = multi_surface_beta_capture_candidate_references(
+        identity_contract_decision_report.get("approved_runtime_evidence_binding"),
+        "$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+    )
+    if decision_binding_multi_surface_beta_capture_claims:
+        add(
+            blockers,
+            "identity_public_contract_decision_record_multi_surface_beta_capture_binding_not_counting",
+            "$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+            claims=decision_binding_multi_surface_beta_capture_claims,
+        )
+    add_binding_shortcut_blockers(
+        blockers,
+        reason_prefix="identity_public_contract_decision_record_approved_runtime_evidence_binding",
+        label="$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+        binding=identity_contract_decision_report.get("approved_runtime_evidence_binding"),
+    )
+    identity_contract_decision_shortcut_claims = identity_contract_decision_record_shortcut_claims(
+        identity_contract_decision_report
+    )
+    if identity_contract_decision_shortcut_claims:
+        add(
+            blockers,
+            "identity_public_contract_decision_record_header_gate_shortcut_not_counting",
+            "$.identity_public_contract_decision_record",
+            claims=identity_contract_decision_shortcut_claims,
+        )
+    approved_runtime_intake_blockers = [
+        blocker["reason"]
+        for blocker in blockers
+        if str(blocker.get("reason", "")).startswith("approved_runtime_evidence_intake")
+    ]
+    if approved_runtime_intake_blockers and not any(
+        blocker.get("reason") == "approved_runtime_evidence_not_accepted"
+        for blocker in blockers
+    ):
+        add(
+            blockers,
+            "approved_runtime_evidence_not_accepted",
+            "$.approved_runtime_evidence",
+            reasons=approved_runtime_intake_blockers,
+        )
     runtime_evidence_accepted = (
         runtime_report.get("accepted_for_contract_review") is True
         and runtime_report.get("approved_runtime_evidence_present") is True
@@ -2902,9 +7091,60 @@ def build_report(
         and runtime_report.get("promotion_ready") is False
         and runtime_report.get("public_sdk_ready") is False
         and runtime_report.get("runtime_ready") is False
+        and not runtime_false_promotion_claims
+        and not runtime_multi_surface_beta_capture_claims
+        and not approved_runtime_intake_blockers
     )
-    if not runtime_evidence_accepted:
+    principal_start_end_runtime_evidence_accepted = (
+        principal_start_end_runtime_report.get("accepted_for_contract_review") is True
+        and principal_start_end_runtime_report.get("principal_start_end_runtime_evidence_present") is True
+        and principal_start_end_runtime_report.get("principal_start_end_runtime_evidence_ready") is True
+        and principal_start_end_runtime_report.get("approved_runtime_evidence_present") is False
+        and principal_start_end_runtime_report.get("approved_runtime_evidence_ready") is False
+        and principal_start_end_runtime_report.get("runtime_ready") is False
+        and principal_start_end_runtime_report.get("public_sdk_ready") is False
+    )
+    runtime_contract_input_accepted = runtime_evidence_accepted
+    runtime_contract_input_kind = (
+        "approved_runtime_principal_lifecycle_evidence"
+        if runtime_evidence_accepted
+        else "none"
+    )
+    if not runtime_contract_input_accepted:
         add(blockers, "approved_runtime_evidence_missing_or_not_ready", "$.approved_runtime_evidence")
+    identity_contract_decision_binding_matches = (
+        runtime_evidence_accepted
+        and approved_runtime_evidence_binding_matches(runtime_report, identity_contract_decision_report)
+    )
+    identity_contract_decision_binding_blocked = (
+        identity_contract_decision_report.get("provided") is True
+        and identity_contract_decision_report.get("accepted_for_contract_review") is True
+        and not identity_contract_decision_binding_matches
+    )
+    if identity_contract_decision_binding_blocked:
+        add(
+            blockers,
+            "identity_public_contract_decision_record_approved_runtime_evidence_binding_not_accepted",
+            "$.identity_public_contract_decision_record.approved_runtime_evidence_binding",
+            required_input=REQUIRED_RESOLVED_INPUT,
+            runtime_contract_input_kind=runtime_contract_input_kind,
+            strict_approved_runtime_evidence_accepted=runtime_evidence_accepted,
+        )
+    identity_contract_decision_accepted = (
+        runtime_evidence_accepted
+        and identity_contract_decision_binding_matches
+        and identity_contract_decision_report.get("accepted_for_contract_review") is True
+        and not identity_contract_decision_shortcut_claims
+    )
+    if runtime_evidence_accepted and not identity_contract_decision_accepted:
+        add(
+            blockers,
+            "identity_public_contract_decision_record_missing_or_not_accepted",
+            "$.identity_public_contract_decision_record",
+            required_input=REQUIRED_RESOLVED_INPUT,
+            runtime_contract_input_kind=runtime_contract_input_kind,
+            strict_approved_runtime_evidence_accepted=runtime_evidence_accepted,
+        )
     if check_mode != "consume":
         add(blockers, f"{check_mode}_blocked_until_player_identity_public_contract_promotion", "$.promotion_blockers")
 
@@ -2917,27 +7157,99 @@ def build_report(
     resolved_inputs = []
     if runtime_evidence_accepted:
         resolved_inputs.append(REQUIRED_RESOLVED_INPUT)
+    if runtime_contract_input_accepted:
         if redaction_report.get("accepted_for_contract_review") is True:
             resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
         if planning_source_report.get("accepted_for_contract_review") is True:
             resolved_inputs.append(REQUIRED_PLANNING_SOURCE_VERIFICATION_RESOLVED_INPUT)
         if principal_policy_report.get("accepted_for_policy_review") is True:
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
+        if public_abi_preflight_report.get("contract_review_inputs_accepted", {}).get(
+            "abi.public_pod_contract.private_layout_candidate"
+        ) is True:
+            resolved_inputs.append("abi.public_pod_contract.private_layout_candidate")
+        if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
+            resolved_inputs.append(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
+        if owner_token_sdk_consumer_report.get("accepted_for_candidate_review") is True:
+            resolved_inputs.append(REQUIRED_OWNER_TOKEN_SDK_CONSUMER_CONTRACT_RESOLVED_INPUT)
+        resolved_inputs.append("separation.no_commands_permissions_persistence")
     runtime_input_resolved = runtime_evidence_accepted
+    non_promotional_reasons = public_identity_non_promotional_reasons(
+        runtime_evidence_accepted,
+        principal_start_end_runtime_evidence_accepted,
+    )
+    post_runtime_evidence_gate = post_approved_runtime_evidence_gate_report(
+        decisions,
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        runtime_contract_input_kind=runtime_contract_input_kind,
+        identity_contract_decision_report=identity_contract_decision_report,
+        gate_inputs_valid=accepted_for_contract_review,
+    )
+    identity_contract_gate_complete = post_runtime_evidence_gate.get("identity_contract_gate_complete") is True
+    identity_contract_decision_keys = (
+        identity_contract_decision_report.get("resolved_decision_keys", [])
+        if identity_contract_decision_accepted
+        else []
+    )
+    identity_contract_decision_non_counting_until = (
+        None
+        if identity_contract_decision_accepted or not identity_contract_decision_report.get("provided")
+        else REQUIRED_RESOLVED_INPUT
+    )
     current_blocker = (
         NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE
         if runtime_evidence_accepted
         else "approved_runtime_evidence_missing"
     )
+    post_runtime_gap_summary = post_runtime_public_identity_gap_summary(
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        identity_contract_decision_accepted=identity_contract_decision_accepted,
+        current_blocker=current_blocker,
+        next_blocker=current_blocker,
+    )
+    post_runtime_contract_gap = post_runtime_contract_gap_diagnostic(
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        identity_contract_decision_accepted=identity_contract_decision_accepted,
+        identity_contract_decision_report=identity_contract_decision_report,
+        current_blocker=current_blocker,
+        next_blocker=current_blocker,
+        post_runtime_evidence_gate=post_runtime_evidence_gate,
+    )
+    header_fail_closed_path = public_header_fail_closed_path(
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        identity_contract_decision_accepted=identity_contract_decision_accepted,
+        current_blocker=current_blocker,
+    )
+    post_runtime_identity_checklist = post_runtime_identity_contract_checklist(
+        runtime_evidence_accepted=runtime_evidence_accepted,
+        identity_contract_decision_accepted=identity_contract_decision_accepted,
+        current_blocker=current_blocker,
+        next_blocker=current_blocker,
+        redaction_report=redaction_report,
+        principal_policy_report=principal_policy_report,
+        planning_source_report=planning_source_report,
+        public_abi_preflight_report=public_abi_preflight_report,
+        owner_token_sdk_consumer_report=owner_token_sdk_consumer_report,
+        post_runtime_evidence_gate=post_runtime_evidence_gate,
+        header_fail_closed_path=header_fail_closed_path,
+    )
+    post_runtime_evidence_gate = {
+        **post_runtime_evidence_gate,
+        "public_header_fail_closed_path": header_fail_closed_path,
+        "post_runtime_identity_contract_checklist": post_runtime_identity_checklist,
+    }
     contract_gate_details = contract_gate_input_details(
         decisions,
         runtime_input_resolved=runtime_input_resolved,
+        runtime_start_end_context_present=principal_start_end_runtime_evidence_accepted
+        and not runtime_evidence_accepted,
         redaction_report=redaction_report,
         principal_policy_report=principal_policy_report,
         planning_source_report=planning_source_report,
         public_abi_preflight_report=public_abi_preflight_report,
         owner_token_sdk_consumer_report=owner_token_sdk_consumer_report,
     )
+    remaining_review_inputs = remaining_contract_review_inputs(contract_gate_details)
     return {
         "schema": REPORT_SCHEMA,
         "surface": decisions.get("surface"),
@@ -2946,14 +7258,96 @@ def build_report(
         "ready_scope": "contract_review_input_only",
         "accepted_for_contract_review": accepted_for_contract_review,
         "resolved_inputs": resolved_inputs,
+        "contract_review_inputs_resolved": resolved_inputs,
+        "remaining_contract_review_inputs": remaining_review_inputs,
+        "remaining_post_runtime_inputs": post_runtime_evidence_gate.get(
+            "remaining_unresolved_decision_keys",
+            [],
+        ),
+        "runtime_contract_input": {
+            "accepted_for_contract_review": runtime_contract_input_accepted,
+            "kind": runtime_contract_input_kind,
+            "resolved_input": (
+                REQUIRED_RESOLVED_INPUT
+                if runtime_evidence_accepted
+                else None
+            ),
+            "strict_approved_runtime_evidence_accepted": runtime_evidence_accepted,
+            "principal_start_end_runtime_evidence_accepted": (
+                principal_start_end_runtime_evidence_accepted
+            ),
+            "approved_runtime_principal_lifecycle_evidence_bundle_resolved": runtime_evidence_accepted,
+            "strict_runtime_lifecycle_evidence_still_unresolved": not runtime_evidence_accepted,
+            "does_not_resolve": (
+                sorted(PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS)
+                if principal_start_end_runtime_evidence_accepted and not runtime_evidence_accepted
+                else []
+            ),
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "stable_ready": False,
+            "stable_claim_allowed": False,
+            "stable_claim_ready": False,
+            "stable_sdk_ready": False,
+            "plugin_hub_ready": False,
+            "plugin_hub_publication_ready": False,
+            "publication_ready": False,
+            "publication_authorized": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+        },
         "promotion_ready": False,
         "public_sdk_ready": False,
+        "public_readiness": False,
         "runtime_ready": False,
+        "runtime_readiness": False,
+        "stable_ready": False,
+        "stable_claim_allowed": False,
+        "stable_claim_ready": False,
+        "stable_sdk_ready": False,
+        "plugin_hub_ready": False,
+        "plugin_hub_publication_ready": False,
+        "publication_ready": False,
+        "publication_authorized": False,
         "public_contract_allowed": False,
         "public_header_allowed": False,
+        "public_abi_ready": False,
+        "public_api_ready": False,
+        "lookup_ready": False,
+        "permissions_ready": False,
+        "commands_ready": False,
+        "v1_ready": False,
+        "v1_completion_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "complete_sdk_counting_allowed": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "resource_handle_ready": False,
+        "resource_handle_supported": False,
+        "mutation_allowed": False,
+        "mutation_ready": False,
+        "return_override_allowed": False,
+        "live_ops_authorized": False,
+        "server_operations_authorized": False,
+        "workspace_writes_authorized": False,
+        "runtime_capture_authorized": False,
+        "reads_live_logs": False,
         "public_contract_gate_aliases": alias_guardrails_false(),
         "identity_public_contract_gate_missing": {
             "active": current_blocker == NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+            "runtime_evidence_contract_review_currentness": post_runtime_evidence_gate.get(
+                "runtime_evidence_contract_review_currentness"
+            ),
             "cannot_unlock_without": [
                 "reviewed public identity contract",
                 "privacy, redaction, logging, and persistence semantics",
@@ -2962,8 +7356,183 @@ def build_report(
                 "SDK consumer and append-only ABI tests",
                 "promotion certificate or equivalent reviewed release artifact",
             ],
+            "next_auditable_blocker": {
+                "id": post_runtime_evidence_gate.get("id"),
+                "required_unresolved_decision_keys": post_runtime_evidence_gate.get(
+                    "required_unresolved_decision_keys"
+                ),
+                "auditable_inputs": post_runtime_evidence_gate.get("auditable_inputs"),
+                "next_required_artifact": post_runtime_evidence_gate.get("next_required_artifact"),
+                "offline_preparation": post_runtime_evidence_gate.get("offline_preparation"),
+            },
+            "post_runtime_contract_gap_diagnostic": post_runtime_contract_gap,
+            "post_runtime_identity_contract_checklist": post_runtime_identity_checklist,
+            "non_counting_candidate_alias_policy": post_runtime_evidence_gate.get(
+                "non_counting_candidate_alias_policy"
+            ),
             "redactionEvidencePromotesIdentity": False,
+            "stable_ready": False,
+            "stable_claim_allowed": False,
+            "stable_claim_ready": False,
+            "stable_sdk_ready": False,
+            "plugin_hub_ready": False,
+            "plugin_hub_publication_ready": False,
+            "publication_ready": False,
+            "publication_authorized": False,
         },
+        "post_approved_runtime_evidence_gate": post_runtime_evidence_gate,
+        "post_runtime_public_header_fail_closed_path": header_fail_closed_path,
+        "runtime_evidence_contract_review_currentness": {
+            **public_contract_decision_record.REQUIRED_RUNTIME_CONTRACT_CURRENTNESS_DIAGNOSTIC,
+            "runtime_evidence_accepted": runtime_evidence_accepted,
+            "reviewed_decision_record_accepted": identity_contract_decision_accepted,
+            "current_blocker": current_blocker,
+            "next_blocker": current_blocker,
+            "candidate_preflight_review_aliases_count": False,
+            "permissions_admin_unlocked_from_runtime_evidence": False,
+            "command_surface_unlocked_from_runtime_evidence": False,
+        },
+        "post_runtime_public_identity_gap_summary": post_runtime_gap_summary,
+        "post_runtime_contract_gap_diagnostic": post_runtime_contract_gap,
+        "post_runtime_identity_contract_checklist": post_runtime_identity_checklist,
+        "public_header_gate_missing": {
+            "active": current_blocker == NEXT_BLOCKER_AFTER_IDENTITY_CONTRACT_REVIEW,
+            "fail_closed_path": header_fail_closed_path,
+            "next_required_artifact": REQUIRED_PUBLIC_HEADER_GATE_NEXT_REQUIRED_ARTIFACT,
+            "cannot_unlock_without": [
+                "approved runtime principal lifecycle evidence bundle",
+                "public header proposal review",
+                "append-only ABI layout tests",
+                "installed SDK consumer tests",
+                "owner-token lifecycle cleanup tests",
+                "public SDK completion checker non-counting guardrail update",
+            ],
+            "promotion_ready": False,
+            "public_contract_allowed": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "public_api_ready": False,
+            "public_sdk_ready": False,
+            "public_readiness": False,
+            "runtime_ready": False,
+            "runtime_readiness": False,
+            "stable_ready": False,
+            "stable_claim_allowed": False,
+            "stable_claim_ready": False,
+            "stable_sdk_ready": False,
+            "plugin_hub_ready": False,
+            "plugin_hub_publication_ready": False,
+            "publication_ready": False,
+            "publication_authorized": False,
+            "lookup_ready": False,
+            "permissions_ready": False,
+            "commands_ready": False,
+        "v1_ready": False,
+        "v1_completion_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "complete_sdk_counting_allowed": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "resource_handle_ready": False,
+        "resource_handle_supported": False,
+        "mutation_allowed": False,
+        "mutation_ready": False,
+        "return_override_allowed": False,
+        "live_ops_authorized": False,
+        "server_operations_authorized": False,
+        "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "non_claim": (
+                "The public header gate proposal is review-only until the approved runtime bundle, "
+                "append-only ABI tests, SDK consumer tests, and owner-token cleanup tests pass; it does "
+                "not add header symbols, capability bits, callbacks, lookup, downstream surfaces, "
+                "runtime readiness, SDK readiness, or v1 completion."
+            ),
+        },
+        "identity_public_contract_decision_record": {
+            "provided": identity_contract_decision_report.get("provided") is True,
+            "accepted_for_contract_review": identity_contract_decision_accepted,
+            "record_valid": identity_contract_decision_report.get("record_valid") is True,
+            "hash_bound_to_current_source_artifacts": identity_contract_decision_report.get(
+                "hash_bound_to_current_source_artifacts"
+            )
+            is True,
+            "reviewed_template_only": (
+                identity_contract_decision_report.get("reviewed_template_only") is True
+            ),
+            "strict_accepted_decision_record": (
+                identity_contract_decision_report.get("strict_accepted_decision_record") is True
+            ),
+            "accepted_post_runtime_decision_record": identity_contract_decision_accepted,
+            "accepted_as_next_identity_contract_input": identity_contract_decision_accepted,
+            "public_header_readiness_from_decision_record": False,
+            "contract_review_only": identity_contract_decision_report.get("contract_review_only") is True,
+            "reviewed_hash_current_contract_review_only": identity_contract_decision_report.get(
+                "reviewed_hash_current_contract_review_only"
+            )
+            is True,
+            "approved_runtime_evidence_binding_matches_accepted_runtime_evidence": (
+                identity_contract_decision_binding_matches
+            ),
+            "approved_runtime_evidence_binding_required_input": REQUIRED_RESOLVED_INPUT,
+            "source_artifact_freshness": identity_contract_decision_report.get(
+                "source_artifact_freshness",
+                {},
+            ),
+            "runtime_evidence_contract_review_currentness": identity_contract_decision_report.get(
+                "runtime_evidence_contract_review_currentness",
+                public_contract_decision_record.REQUIRED_RUNTIME_CONTRACT_CURRENTNESS_DIAGNOSTIC,
+            ),
+            "identity_contract_gate_complete": identity_contract_gate_complete,
+            "resolved_decision_keys": identity_contract_decision_keys,
+            "review_inputs_non_counting_until": identity_contract_decision_non_counting_until,
+            "next_blocker": identity_contract_decision_report.get("next_blocker"),
+            "promotion_ready": False,
+            "public_contract_allowed": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "public_api_ready": False,
+            "public_sdk_ready": False,
+            "public_readiness": False,
+            "runtime_ready": False,
+            "runtime_readiness": False,
+            "stable_ready": False,
+            "stable_claim_allowed": False,
+            "stable_claim_ready": False,
+            "stable_sdk_ready": False,
+            "plugin_hub_ready": False,
+            "plugin_hub_publication_ready": False,
+            "publication_ready": False,
+            "publication_authorized": False,
+            "lookup_ready": False,
+            "permissions_ready": False,
+            "commands_ready": False,
+        "v1_ready": False,
+        "v1_completion_ready": False,
+        "v1_completion_evidence": False,
+        "complete_sdk_ready": False,
+        "complete_sdk_counting_allowed": False,
+        "p0_progress_ready": False,
+        "sdk_p0_progress_ready": False,
+        "resource_handle_ready": False,
+        "resource_handle_supported": False,
+        "mutation_allowed": False,
+        "mutation_ready": False,
+        "return_override_allowed": False,
+        "live_ops_authorized": False,
+        "server_operations_authorized": False,
+        "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "public_api_symbols_now": [],
+            "blockers": identity_contract_decision_report.get("blockers", []),
+        },
+        "public_identity_non_promotional_reasons": non_promotional_reasons,
         "public_header_symbols_now": decisions.get("public_header_symbols_now"),
         "public_capability_bits_now": decisions.get("public_capability_bits_now"),
         "public_callback_abi_now": decisions.get("public_callback_abi_now"),
@@ -3003,8 +7572,113 @@ def build_report(
             "approved_runtime_evidence_present": runtime_report.get("approved_runtime_evidence_present") is True,
             "runtime_evidence_ready": runtime_report.get("runtime_evidence_ready") is True,
             "promotion_ready": False,
+            "public_contract_allowed": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
+            "public_api_ready": False,
+            "public_abi_ready": False,
+            "public_readiness": False,
+            "runtime_readiness": False,
+            "stable_ready": False,
+            "stable_claim_allowed": False,
+            "stable_claim_ready": False,
+            "stable_sdk_ready": False,
+            "plugin_hub_ready": False,
+            "plugin_hub_publication_ready": False,
+            "publication_ready": False,
+            "publication_authorized": False,
+            "public_header_allowed": False,
+            "lookup_ready": False,
+            "permissions_ready": False,
+            "commands_ready": False,
+            "v1_ready": False,
+            "v1_completion_ready": False,
+            "v1_completion_evidence": False,
+            "complete_sdk_ready": False,
+            "complete_sdk_counting_allowed": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "p0_progress_ready": False,
+            "sdk_p0_progress_ready": False,
+            "complete_sdk_claim_progress_contribution": 0,
+            "p0_dependency_chain_claim_progress_contribution": 0,
+            "resource_handle_ready": False,
+            "resource_handle_supported": False,
+            "mutation_allowed": False,
+            "mutation_ready": False,
+            "return_override_allowed": False,
+            "live_ops_authorized": False,
+            "server_operations_authorized": False,
+            "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "source_provenance_policy": runtime_report.get("source_provenance_policy", {}),
+        },
+        "principal_start_end_runtime_evidence": {
+            "provided": principal_start_end_runtime_report.get("provided") is True,
+            "accepted_for_contract_review": principal_start_end_runtime_evidence_accepted,
+            "principal_start_end_runtime_evidence_present": principal_start_end_runtime_report.get(
+                "principal_start_end_runtime_evidence_present"
+            )
+            is True,
+            "principal_start_end_runtime_evidence_ready": principal_start_end_runtime_report.get(
+                "principal_start_end_runtime_evidence_ready"
+            )
+            is True,
+            "resolved_input": (
+                PRINCIPAL_START_END_RESOLVED_INPUT
+                if principal_start_end_runtime_evidence_accepted
+                else None
+            ),
+            "next_review_blocker": principal_start_end_runtime_report.get("next_review_blocker"),
+            "remaining_runtime_inputs": principal_start_end_runtime_report.get(
+                "remaining_runtime_inputs", []
+            ),
+            "strict_approved_runtime_evidence_blockers": principal_start_end_runtime_report.get(
+                "strict_approved_runtime_evidence_blockers", []
+            ),
+            "approved_runtime_evidence_present": False,
+            "approved_runtime_evidence_ready": False,
+            "approved_runtime_principal_lifecycle_evidence_bundle_resolved": False,
+            "does_not_resolve": sorted(PRINCIPAL_START_END_STRICT_UNRESOLVED_INPUTS),
+            "promotion_ready": False,
+            "public_contract_allowed": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_api_ready": False,
+            "public_abi_ready": False,
+            "public_readiness": False,
+            "runtime_readiness": False,
+            "public_header_allowed": False,
+            "lookup_ready": False,
+            "permissions_ready": False,
+            "commands_ready": False,
+            "v1_ready": False,
+            "v1_completion_ready": False,
+            "v1_completion_evidence": False,
+            "complete_sdk_ready": False,
+            "counts_toward_public_sdk": False,
+            "counts_toward_runtime": False,
+            "counts_toward_v1_completion": False,
+            "counts_toward_complete_sdk_claim": False,
+            "counts_toward_p0_dependency_chain_claim": False,
+            "p0_progress_ready": False,
+            "sdk_p0_progress_ready": False,
+            "resource_handle_ready": False,
+            "resource_handle_supported": False,
+            "mutation_allowed": False,
+            "mutation_ready": False,
+            "return_override_allowed": False,
+            "live_ops_authorized": False,
+            "server_operations_authorized": False,
+            "workspace_writes_authorized": False,
+            "runtime_capture_authorized": False,
+            "reads_live_logs": False,
+            "blockers": principal_start_end_runtime_report.get("blockers", []),
+            "non_claims": principal_start_end_runtime_report.get("non_claims", []),
         },
         "identifier_redaction_evidence": {
             "provided": redaction_report.get("provided") is True,
@@ -3058,11 +7732,13 @@ def build_report(
         },
         "owner_token_sdk_consumer_contract": owner_token_sdk_consumer_report,
         "non_claims": [
-            "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
+            "approved runtime evidence intake does not add public identity, lookup, public API/ABI/header symbols, capability bits, callbacks, SDK/runtime readiness, permissions/admin, command/chat surfaces, mutation, return override, or v1 completion readiness",
+            "principal start/end runtime evidence is non-counting contract-review context only; it is not the approved runtime principal lifecycle evidence bundle and does not resolve runtime.lifecycle_evidence, rejected-start CheckJoin proof, SDK/runtime/public readiness, or publication",
             NON_PROMOTIONAL_EVIDENCE_DENIAL,
-            "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
-            "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker or prove runtime lifecycle ordering",
-            "source-bound planning manifest verification is provenance for contract-review inputs only and does not promote public SDK/header/runtime readiness",
+            "multi-surface beta capture plan/pack/queue artifacts are candidate-only preparation; they cannot satisfy approved_runtime_evidence_binding, public identity contract readiness, runtime readiness, public SDK readiness, SDK/P0 progress, or v1 completion",
+            "identifier-redaction evidence intake does not resolve the full privacy blocker or make public identity, lookup, SDK/runtime/API/ABI, permissions/admin, command/chat, or v1 completion promotion-ready",
+            "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker, prove runtime lifecycle ordering, or make public identity/downstream surfaces promotion-ready",
+            "source-bound planning manifest verification is provenance for contract-review inputs only and does not promote public identity, lookup, public SDK/API/ABI/header/runtime readiness, permissions/admin, command/chat surfaces, or v1 completion",
             "public ABI preflight candidate intake is candidate-only and does not resolve public ABI layout, SDK consumer tests, lifecycle cleanup, or v1 completion",
         ],
     }
@@ -3077,7 +7753,27 @@ def main() -> int:
         validate_decisions(decisions, blockers)
     private_candidate_contract = load_private_candidate_contract(decisions, args.private_candidate_contract, blockers)
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
-    runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
+    if args.approved_runtime_evidence and args.principal_start_end_runtime_evidence:
+        add(
+            blockers,
+            "runtime_evidence_sources_ambiguous",
+            "$.runtime_contract_input",
+            provided=["approved_runtime_evidence", "principal_start_end_runtime_evidence"],
+        )
+    if args.approved_runtime_evidence:
+        runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
+    else:
+        runtime_report = missing_approved_runtime_report()
+        if not args.principal_start_end_runtime_evidence:
+            add(blockers, "runtime_evidence_input_missing", "$.runtime_contract_input")
+    principal_start_end_report = principal_start_end_runtime_report(
+        args.principal_start_end_runtime_evidence,
+        blockers,
+    )
+    identity_contract_decision_report = identity_public_contract_decision_record_report(
+        args.identity_public_contract_decision_record,
+        blockers,
+    )
     redaction_report = identifier_redaction_report(args.identifier_redaction_evidence, blockers)
     planning_source_report = planning_source_verification_report(
         args.planning_source_snapshot_root,
@@ -3100,6 +7796,7 @@ def main() -> int:
     report = build_report(
         decisions,
         runtime_report,
+        identity_contract_decision_report,
         redaction_report,
         private_candidate_contract,
         public_header_report,
@@ -3109,6 +7806,7 @@ def main() -> int:
         planning_source_report,
         public_abi_preflight_report,
         owner_token_sdk_consumer_report,
+        principal_start_end_runtime_report=principal_start_end_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

@@ -596,7 +596,7 @@ def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, ob
 def build_report(root: Path, max_depth: int) -> dict[str, object]:
     try:
         manifest_paths = candidate_manifest_paths(root, max_depth)
-    except SystemExit as exc:
+    except (SystemExit, OSError) as exc:
         return {
             "schema": REPORT_SCHEMA,
             "status": "blocked",
@@ -605,7 +605,10 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             "manifests_scanned": 0,
             "candidate_packs": [],
             "accepted_pack": None,
-            "reasons": [reason("wrong_target_scope", path=str(root), detail=str(exc))],
+            "reasons": [reason(
+                "artifact_root_unavailable" if isinstance(exc, OSError) else "wrong_target_scope",
+                path=str(root), detail=str(exc),
+            )],
             "required_targets": list(REQUIRED_TARGETS),
             "required_target_set": player_identity_target_set_expectation_fields(),
             "accepted_for_candidate_planning": False,

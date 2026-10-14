@@ -12,12 +12,18 @@ The install root must be supplied as a positional argument.
 Install output is package-shape evidence only; it is not runtime/live-ops approval,
 Plugin Hub readiness/publication, support-tier activation, a stable SDK claim, or v1 SDK
 completion.
+Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency
+chain 0/4, stable_claim_allowed=false, active blocker
+approved_runtime_evidence_missing. Summary: SDK 0/12, P0 0/4, stable=false.
 
 Options:
   --dry-run              Print actions without changing files.
   --backup-existing      Back up replaced runtime .so files with a timestamp suffix.
   --build-dir <dir>      Use a specific CMake build directory (default: build or OBELISK_BUILD_DIR).
   -h, --help             Show this help.
+
+Set OBELISK_ALLOW_SERVER_ROOT_WRITES=1 to install to the approved live central root
+/servidor/ark/obelisk. Other /servidor/ark paths remain rejected.
 
 EOF
 }
@@ -27,6 +33,7 @@ DRY_RUN=0
 BACKUP_EXISTING=0
 BUILD_DIR_INPUT="${OBELISK_BUILD_DIR:-build}"
 ROOT_SET=0
+SERVER_ROOT="/servidor/ark"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -75,10 +82,10 @@ if [[ "${BUILD_DIR_INPUT}" == /* ]]; then
 else
     BUILD_DIR="${REPO_DIR}/${BUILD_DIR_INPUT}"
 fi
-STAMP="$(date +%Y%m%d-%H%M%S)"
-STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
-SDK_STAGE_ROOT="${ROOT}/.install-sdk.${STAMP}.$$"
-ROLLBACK_ROOT="${ROOT}/.install-rollback.${STAMP}.$$"
+STAMP=""
+STAGE_ROOT=""
+SDK_STAGE_ROOT=""
+ROLLBACK_ROOT=""
 TEMP_PATHS=()
 PUBLISHED_RUNTIME_PATHS=()
 PUBLISHED_SDK_PATHS=()
@@ -86,6 +93,59 @@ declare -A RUNTIME_ROLLBACK_SNAPSHOTS=()
 declare -A RUNTIME_ROLLBACK_EXISTED=()
 declare -A SDK_ROLLBACK_SNAPSHOTS=()
 declare -A SDK_ROLLBACK_EXISTED=()
+
+is_under_path() {
+    local path="$1"
+    local parent="$2"
+
+    [[ "${path}" == "${parent}" || "${path}" == "${parent}/"* ]]
+}
+
+reject_protected_path() {
+    local label="$1"
+    local action="$2"
+    local path="$3"
+    local absolute_path
+    local resolved_path
+    local allowed_live_root
+
+    absolute_path="$(realpath -s -m "${path}")"
+    resolved_path="$(realpath -m "${path}")"
+    allowed_live_root=0
+    if [[ "${OBELISK_ALLOW_SERVER_ROOT_WRITES:-0}" == "1" &&
+          "${label}" == "Install root" &&
+          "${absolute_path}" == "${SERVER_ROOT}/obelisk" &&
+          "${resolved_path}" == "${SERVER_ROOT}/obelisk" ]]; then
+        allowed_live_root=1
+    fi
+
+    if [[ "${allowed_live_root}" != "1" ]] && is_under_path "${absolute_path}" "${SERVER_ROOT}"; then
+        printf '%s must not %s protected server root %s: %s\n' \
+            "${label}" "${action}" "${SERVER_ROOT}" "${absolute_path}" >&2
+        exit 2
+    fi
+
+    if [[ "${allowed_live_root}" != "1" ]] && is_under_path "${resolved_path}" "${SERVER_ROOT}"; then
+        printf '%s must not %s protected server root %s: %s\n' \
+            "${label}" "${action}" "${SERVER_ROOT}" "${resolved_path}" >&2
+        exit 2
+    fi
+}
+
+reject_symlink_path_components() {
+    local label="$1"
+    local path="$2"
+    local lexical_path
+    local resolved_path
+
+    lexical_path="$(realpath -s -m "${path}")"
+    resolved_path="$(realpath -m "${path}")"
+    if [[ "${lexical_path}" != "${resolved_path}" ]]; then
+        printf '%s must not resolve through symlink path components: %s -> %s\n' \
+            "${label}" "${path}" "${resolved_path}" >&2
+        exit 2
+    fi
+}
 
 run() {
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -119,10 +179,28 @@ validate_root() {
         exit 2
     fi
 
+    reject_protected_path "Install root" "write under" "${ROOT}"
+
     if [[ -L "${ROOT}" ]]; then
         echo "Install root must not be a symlink: ${ROOT}" >&2
         exit 2
     fi
+    reject_symlink_path_components "Install root" "${ROOT}"
+    if [[ -e "${ROOT}" && ! -d "${ROOT}" ]]; then
+        echo "Install root must be a directory or absent path: ${ROOT}" >&2
+        exit 2
+    fi
+}
+
+validate_build_dir() {
+    reject_protected_path "Build dir" "read from" "${BUILD_DIR}"
+}
+
+initialize_install_paths() {
+    STAMP="$(date +%Y%m%d-%H%M%S)"
+    STAGE_ROOT="${ROOT}/.install-runtime.${STAMP}.$$"
+    SDK_STAGE_ROOT="${ROOT}/.install-sdk.${STAMP}.$$"
+    ROLLBACK_ROOT="${ROOT}/.install-rollback.${STAMP}.$$"
 }
 
 validate_managed_subpaths() {
@@ -132,7 +210,55 @@ validate_managed_subpaths() {
             echo "Managed install path must not be a symlink: ${ROOT}/${subpath}" >&2
             exit 2
         fi
+        if [[ -e "${ROOT}/${subpath}" && ! -d "${ROOT}/${subpath}" ]]; then
+            echo "Managed install path must be a directory: ${ROOT}/${subpath}" >&2
+            exit 2
+        fi
     done
+}
+
+validate_managed_artifact_path() {
+    local path="$1"
+
+    if [[ -L "${path}" ]]; then
+        echo "Managed install artifact must not be a symlink: ${path}" >&2
+        return 1
+    fi
+    if [[ -e "${path}" && ! -f "${path}" ]]; then
+        echo "Managed install artifact must be a regular file: ${path}" >&2
+        return 1
+    fi
+}
+
+validate_managed_artifact_paths() {
+    local path
+    for path in "$@"; do
+        if ! validate_managed_artifact_path "${path}"; then
+            exit 2
+        fi
+    done
+}
+
+validate_managed_install_layout() {
+    validate_managed_subpaths \
+        "lib" \
+        "plugins" \
+        "include" \
+        "include/obelisk" \
+        "lib/cmake" \
+        "lib/cmake/Obelisk" \
+        "config" \
+        "logs" \
+        "state" \
+        "state/instances"
+
+    validate_managed_artifact_paths \
+        "${ROOT}/lib/libsubhook.so" \
+        "${ROOT}/lib/libobelisk.so" \
+        "${ROOT}/include/obelisk/ObeliskApi.h" \
+        "${ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake" \
+        "${ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake" \
+        "${ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
 }
 
 cleanup_temp_paths() {
@@ -140,9 +266,15 @@ cleanup_temp_paths() {
         for temp_path in "${TEMP_PATHS[@]}"; do
             rm -f "${temp_path}"
         done
-        rm -rf "${STAGE_ROOT}"
-        rm -rf "${SDK_STAGE_ROOT}"
-        rm -rf "${ROLLBACK_ROOT}"
+        if [[ -n "${STAGE_ROOT}" ]]; then
+            rm -rf "${STAGE_ROOT}"
+        fi
+        if [[ -n "${SDK_STAGE_ROOT}" ]]; then
+            rm -rf "${SDK_STAGE_ROOT}"
+        fi
+        if [[ -n "${ROLLBACK_ROOT}" ]]; then
+            rm -rf "${ROLLBACK_ROOT}"
+        fi
     fi
 }
 trap cleanup_temp_paths EXIT
@@ -216,6 +348,7 @@ rollback_sdk_publish() {
 publish_runtime_file() {
     local tmp="$1"
     local dst="$2"
+    validate_managed_artifact_path "${dst}" || return
     mv -f "${tmp}" "${dst}" || return
     PUBLISHED_RUNTIME_PATHS+=("${dst}")
 }
@@ -229,6 +362,7 @@ publish_sdk_file() {
         echo "Required staged SDK artifact not found: ${src}" >&2
         return 1
     fi
+    validate_managed_artifact_path "${dst}" || return
     TEMP_PATHS+=("${tmp}")
     install -m 644 "${src}" "${tmp}"
     mv -f "${tmp}" "${dst}" || return
@@ -260,6 +394,89 @@ sdk_package_files() {
         "lib/cmake/Obelisk/ObeliskTargets.cmake"
 }
 
+validate_staged_sdk_package_shape() {
+    local expected_files
+    local actual_files
+    local cmake_package_dir="${SDK_STAGE_ROOT}/lib/cmake/Obelisk"
+    local targets_file="${cmake_package_dir}/ObeliskTargets.cmake"
+    local private_export_offenders
+    local readiness_claim_offenders
+
+    expected_files="$(sdk_package_files | LC_ALL=C sort)"
+    actual_files="$(
+        cd "${SDK_STAGE_ROOT}" &&
+            find include lib/cmake/Obelisk -type f -printf '%p\n' | LC_ALL=C sort
+    )"
+    if [[ "${actual_files}" != "${expected_files}" ]]; then
+        echo "Staged SDK package published unexpected files" >&2
+        echo "Expected:" >&2
+        printf '%s\n' "${expected_files}" >&2
+        echo "Actual:" >&2
+        printf '%s\n' "${actual_files}" >&2
+        return 1
+    fi
+
+    if ! grep -F 'add_library(Obelisk::obelisk_sdk INTERFACE IMPORTED)' "${targets_file}" >/dev/null; then
+        echo "Staged SDK package did not export Obelisk::obelisk_sdk as an interface imported target" >&2
+        cat "${targets_file}" >&2
+        return 1
+    fi
+
+    private_export_offenders="$(
+        grep -RInE \
+            'IMPORTED_(IMPLIB|LINK_DEPENDENT_LIBRARIES|LOCATION|OBJECTS|SONAME)|INTERFACE_LINK_(LIBRARIES|OPTIONS)|Obelisk::obelisk([^_[:alnum:]]|$)|Obelisk::subhook([^_[:alnum:]]|$)|libobelisk[.]so|libsubhook[.]so|(^|[;"[:space:]])(-l)?(dl|pthread)([;"[:space:]]|$)|(^|[[:space:]])-pthread([[:space:]]|$)' \
+            "${cmake_package_dir}" || true
+    )"
+    if [[ -n "${private_export_offenders}" ]]; then
+        echo "Staged SDK CMake package exposed runtime/private linkage or imported binary locations" >&2
+        printf '%s\n' "${private_export_offenders}" >&2
+        return 1
+    fi
+
+    local required_package_shape_markers=(
+        'set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")'
+        'set(Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED FALSE)'
+        'set(Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED FALSE)'
+        'set(Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED FALSE)'
+        'set(Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED FALSE)'
+        'set(Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED FALSE)'
+        'set(Obelisk_V1_COMPLETION_CLAIM_ALLOWED FALSE)'
+        'set(Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED FALSE)'
+        'set(Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED FALSE)'
+        'set(Obelisk_SDK_BLOCKER_PROMOTION_COUNT 0)'
+        'set(Obelisk_SDK_BLOCKER_PROMOTION_TOTAL 12)'
+        'set(Obelisk_P0_DEPENDENCY_COUNT 0)'
+        'set(Obelisk_P0_DEPENDENCY_TOTAL 4)'
+        'set(Obelisk_ACTIVE_COMPLETION_BLOCKER "approved_runtime_evidence_missing")'
+        'set(Obelisk_FIND_PACKAGE_SDK_PACKAGE_SHAPE_ONLY TRUE)'
+        'set(Obelisk_EXACT_VERSION_REQUESTS_ALLOWED FALSE)'
+        'set(Obelisk_FIND_PACKAGE_VERSION_IS_STABLE_SDK_CLAIM FALSE)'
+        'set(Obelisk_FIND_PACKAGE_SDK_IS_PUBLIC_PACKAGE_READINESS FALSE)'
+        'set(Obelisk_FIND_PACKAGE_SDK_IS_V1_COMPLETION_EVIDENCE FALSE)'
+    )
+    local package_shape_marker
+    for package_shape_marker in "${required_package_shape_markers[@]}"; do
+        if ! grep -F "${package_shape_marker}" \
+            "${cmake_package_dir}/ObeliskConfig.cmake" >/dev/null; then
+            echo "Staged SDK CMake package missed package-shape non-claim marker: ${package_shape_marker}" >&2
+            cat "${cmake_package_dir}/ObeliskConfig.cmake" >&2
+            return 1
+        fi
+    done
+
+    readiness_claim_offenders="$(
+        grep -RInEi \
+            'set\([[:space:]]*Obelisk_[A-Za-z0-9_]*(READY|READINESS|ACCEPTED|APPROVED|CONTRACT_REVIEW|COMPLETE|SDK_COMPLETE|CLAIM|PROMOTION|COUNTS_TOWARD|PACKAGE_PUBLICATION|PACKAGE_AVAILABLE|STABLE_SDK|V1_COMPLETION|SUPPORT_TIER|PLUGIN_HUB|PUBLIC_PACKAGE|PUBLIC_SDK|PUBLIC_HEADER|PACKAGE_SHAPE|SDK_CONSUMER|ABI_LAYOUT|C_ABI|STRUCT_SIZE)[A-Za-z0-9_]*[[:space:]]+(TRUE|ON|1)[[:space:]]*\)' \
+            "${cmake_package_dir}" |
+            grep -vF 'Obelisk_FIND_PACKAGE_SDK_PACKAGE_SHAPE_ONLY TRUE' || true
+    )"
+    if [[ -n "${readiness_claim_offenders}" ]]; then
+        echo "Staged SDK CMake package exposed positive readiness/public-claim markers" >&2
+        printf '%s\n' "${readiness_claim_offenders}" >&2
+        return 1
+    fi
+}
+
 stage_sdk_package() {
     run rm -rf "${SDK_STAGE_ROOT}"
     if ! run cmake --install "${BUILD_DIR}" --prefix "${SDK_STAGE_ROOT}" --component SDK; then
@@ -274,6 +491,7 @@ stage_sdk_package() {
                 return 1
             fi
         done < <(sdk_package_files)
+        validate_staged_sdk_package_shape
     fi
 }
 
@@ -286,6 +504,8 @@ install_runtime_package() {
     local obelisk_tmp
     prepare_staged_file 755 "${BUILD_DIR}/_deps/subhook-build/libsubhook.so" "${subhook_dst}" subhook_tmp
     prepare_staged_file 755 "${STAGE_ROOT}/lib/libobelisk.so" "${obelisk_dst}" obelisk_tmp
+    validate_managed_artifact_path "${subhook_dst}" || return
+    validate_managed_artifact_path "${obelisk_dst}" || return
     backup_existing "${subhook_dst}"
     backup_existing "${obelisk_dst}"
     if [[ "${DRY_RUN}" == "1" ]]; then
@@ -303,16 +523,18 @@ install_runtime_package() {
 }
 
 publish_staged_sdk_package() {
-    run mkdir -p "${ROOT}/include/obelisk" "${ROOT}/lib/cmake/Obelisk"
+    run mkdir -p "${ROOT}/include/obelisk" "${ROOT}/lib/cmake/Obelisk" || return
 
     local relative
     if [[ "${DRY_RUN}" == "1" ]]; then
         while IFS= read -r relative; do
+            validate_managed_artifact_path "${ROOT}/${relative}" || return
             run install -m 644 "${SDK_STAGE_ROOT}/${relative}" "${ROOT}/${relative}.incoming.$$"
             run mv -f "${ROOT}/${relative}.incoming.$$" "${ROOT}/${relative}"
         done < <(sdk_package_files)
     else
         while IFS= read -r relative; do
+            validate_managed_artifact_path "${ROOT}/${relative}" || return
             snapshot_sdk_destination "${ROOT}/${relative}"
         done < <(sdk_package_files)
         while IFS= read -r relative; do
@@ -327,17 +549,9 @@ publish_staged_sdk_package() {
 }
 
 validate_root
-validate_managed_subpaths \
-    "lib" \
-    "plugins" \
-    "include" \
-    "include/obelisk" \
-    "lib/cmake" \
-    "lib/cmake/Obelisk" \
-    "config" \
-    "logs" \
-    "state" \
-    "state/instances"
+validate_build_dir
+initialize_install_paths
+validate_managed_install_layout
 
 run mkdir -p \
     "${ROOT}/lib" \
@@ -347,6 +561,9 @@ run mkdir -p \
     "${ROOT}/config" \
     "${ROOT}/logs" \
     "${ROOT}/state/instances"
+
+validate_root
+validate_managed_install_layout
 
 validate_build_artifacts
 stage_sdk_package
@@ -361,6 +578,7 @@ fi
 if [[ "${DRY_RUN}" == "1" ]]; then
     echo "DRY-RUN: Obelisk install would publish runtime/SDK package-shape artifacts to ${ROOT}"
 else
-    echo "Obelisk installed to ${ROOT}"
+    echo "Obelisk runtime/SDK package-shape artifacts installed to ${ROOT}"
 fi
 echo "Install layout/package-shape evidence only; no runtime/live-ops approval, Plugin Hub readiness/publication, support-tier activation, stable SDK claim, or v1 SDK completion is granted."
+echo "Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4, stable_claim_allowed=false, active blocker approved_runtime_evidence_missing. Summary: SDK 0/12, P0 0/4, stable=false."

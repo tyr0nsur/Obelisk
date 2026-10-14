@@ -222,6 +222,197 @@ class BuildNativeUFunctionRegistrationStaticDiscoveryTests(unittest.TestCase):
         )
         self.assertIn("does_not_promote_public_sdk", payload["non_claims"])
 
+    def test_lifecycle_triplet_sources_are_candidate_only_and_guidance_non_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            elf = SyntheticElf(base=0x300000)
+            for name, string_vma, registration_vma, thunk_vma in (
+                ("CheckJoinInProgress", 0x309100, 0x301140, 0x302700),
+                ("HandleNewPlayer", 0x309140, 0x3011A0, 0x302740),
+                ("OnLogout", 0x309180, 0x301200, 0x302780),
+                ("K2_PostLogin", 0x3091C0, 0x301260, 0x3027C0),
+            ):
+                elf.add_target(
+                    name=name,
+                    string_vma=string_vma,
+                    registration_vma=registration_vma,
+                    thunk_vma=thunk_vma,
+                )
+            digest = elf.write(binary)
+
+            result = self.run_script(
+                "--binary",
+                str(binary),
+                "--expected-binary-sha256",
+                digest,
+                "--target-set",
+                "players-lifecycle-anchor-candidates",
+                "--run-id",
+                "lifecycle-triplet-candidate-only",
+                "--json",
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "candidate")
+        self.assertTrue(payload["accepted_for_orientation"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["approved_runtime_evidence"])
+        self.assertEqual(payload["sdk_progress_contribution"], 0)
+        self.assertEqual(payload["p0_dependency_progress_contribution"], 0)
+        self.assertEqual(payload["v1_completion_progress_contribution"], 0)
+        self.assertNotIn("one_or_more_targets_blocked", {blocker["reason"] for blocker in payload["blockers"]})
+        self.assertEqual(
+            payload["preplan_scope"]["approved_lifecycle_triplet_source_targets"],
+            [
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(
+            payload["preplan_scope"]["non_anchor_guidance_only_targets"],
+            [
+                "GameMode.K2_PostLogin",
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            ],
+        )
+        triplet_requirement = payload["preplan_scope"]["approved_runtime_triplet_requirement"]
+        self.assertFalse(triplet_requirement["approved_runtime_evidence_present"])
+        self.assertFalse(triplet_requirement["approved_runtime_evidence_ready"])
+        self.assertFalse(triplet_requirement["static_evidence_can_replace_runtime_triplet"])
+        self.assertEqual(
+            [
+                "ShooterGameMode.HandleNewPlayer(1,1)",
+                "ShooterGameMode.CheckJoinInProgress(1,0)",
+                "ShooterGameMode.OnLogout(matched)",
+            ],
+            [entry["required_runtime_shape"] for entry in triplet_requirement["required_exact_triplet"]],
+        )
+        self.assertEqual(
+            payload["registrar_clusters"],
+            [
+                {
+                    "registrar_target_vma": "0x302220",
+                    "targets": [
+                        "ShooterGameMode.CheckJoinInProgress",
+                        "ShooterGameMode.HandleNewPlayer",
+                        "ShooterGameMode.OnLogout",
+                    ],
+                }
+            ],
+        )
+
+        targets = {target["target"]: target for target in payload["targets"]}
+        for target_name in (
+            "ShooterGameMode.CheckJoinInProgress",
+            "ShooterGameMode.HandleNewPlayer",
+            "ShooterGameMode.OnLogout",
+        ):
+            with self.subTest(target=target_name):
+                target = targets[target_name]
+                orientation = target["lifecycle_static_orientation"]
+                self.assertEqual(target["status"], "candidate")
+                self.assertTrue(target["blocks_report_on_failure"])
+                self.assertFalse(target["non_anchor_guidance_only"])
+                self.assertTrue(orientation["approved_runtime_triplet_source"])
+                self.assertTrue(orientation["candidate_static_orientation_allowed"])
+                self.assertFalse(orientation["approved_runtime_evidence"])
+                self.assertFalse(orientation["promotion_ready"])
+                self.assertFalse(orientation["runtime_ready"])
+                self.assertFalse(orientation["public_sdk_ready"])
+                self.assertEqual(orientation["sdk_progress_contribution"], 0)
+                self.assertEqual(orientation["p0_dependency_progress_contribution"], 0)
+                self.assertEqual(target["discovery_summary"]["registration_candidate_count"], 1)
+                self.assertIsNotNone(target["selected_candidate"])
+
+        checkjoin = targets["ShooterGameMode.CheckJoinInProgress"]["lifecycle_static_orientation"]
+        self.assertFalse(checkjoin["static_lifecycle_anchor_source"])
+        self.assertTrue(checkjoin["rejected_start_observer_triplet_source"])
+        self.assertEqual(checkjoin["source_role"], "rejected_start_observer_triplet_source")
+        self.assertEqual(checkjoin["required_runtime_shape"], "ShooterGameMode.CheckJoinInProgress(1,0)")
+        self.assertEqual(checkjoin["required_copied_bool_fields"], ["bIsFromLogin", "ReturnValue"])
+        self.assertEqual(checkjoin["required_copied_bool_values"], ["1", "0"])
+        self.assertFalse(checkjoin["bare_source_alias_counts_as_runtime_evidence"])
+        self.assertFalse(checkjoin["static_evidence_can_replace_runtime_triplet"])
+        for target_name in ("ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"):
+            orientation = targets[target_name]["lifecycle_static_orientation"]
+            self.assertTrue(orientation["static_lifecycle_anchor_source"])
+            self.assertFalse(orientation["rejected_start_observer_triplet_source"])
+            self.assertEqual(orientation["source_role"], "static_lifecycle_anchor_source")
+
+        k2 = targets["GameMode.K2_PostLogin"]
+        self.assertEqual(k2["status"], "guidance_only")
+        self.assertFalse(k2["blocks_report_on_failure"])
+        self.assertTrue(k2["non_anchor_guidance_only"])
+        self.assertEqual(k2["discovery_summary"]["registration_candidate_count"], 1)
+        self.assertIsNotNone(k2["selected_candidate"])
+        self.assertEqual(k2["blockers"], [])
+        self.assertEqual(k2["non_blocking_findings"], [])
+        self.assertFalse(k2["lifecycle_static_orientation"]["approved_runtime_triplet_source"])
+        self.assertFalse(k2["lifecycle_static_orientation"]["candidate_static_orientation_allowed"])
+        self.assertTrue(k2["lifecycle_static_orientation"]["chronology_only_non_anchor"])
+
+        for target_name in (
+            "ShooterGameMode.OnPostLogin__DelegateSignature",
+            "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+        ):
+            with self.subTest(target=target_name):
+                target = targets[target_name]
+                self.assertEqual(target["status"], "guidance_only")
+                self.assertFalse(target["blocks_report_on_failure"])
+                self.assertTrue(target["non_anchor_guidance_only"])
+                self.assertEqual(target["blockers"], [])
+                self.assertEqual(
+                    target["non_blocking_findings"],
+                    [{"reason": "target_name_string_not_found"}],
+                )
+                self.assertFalse(target["lifecycle_static_orientation"]["approved_runtime_triplet_source"])
+                self.assertFalse(target["lifecycle_static_orientation"]["candidate_static_orientation_allowed"])
+                self.assertTrue(target["lifecycle_static_orientation"]["delegate_signature_guidance_only"])
+
+    def test_single_lifecycle_source_cannot_substitute_for_exact_triplet(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            elf = SyntheticElf(base=0x320000)
+            elf.add_target(
+                name="HandleNewPlayer",
+                string_vma=0x329140,
+                registration_vma=0x3211A0,
+                thunk_vma=0x322740,
+            )
+            digest = elf.write(binary)
+
+            result = self.run_script(
+                "--binary",
+                str(binary),
+                "--expected-binary-sha256",
+                digest,
+                "--target",
+                "ShooterGameMode.HandleNewPlayer",
+                "--run-id",
+                "single-lifecycle-source-blocked",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("approved_lifecycle_triplet_source_target_set_incomplete", reasons)
+        self.assertEqual(
+            payload["preplan_scope"]["missing_approved_lifecycle_triplet_source_targets"],
+            [
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(payload["targets"][0]["target_set_memberships"], [])
+
     def test_candidate_window_provenance_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

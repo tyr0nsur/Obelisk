@@ -28,18 +28,23 @@ Current planning-only evidence:
   Durable source-bound second-source lifecycle-anchor evidence is currently limited to
   `HandleNewPlayer` and `OnLogout`; historical all-six output is scratch triage unless
   materialized into an approved offline artifact/root with hash binding;
+- rejected-start triplet orientation is separate from lifecycle-anchor binding:
+  `ShooterGameMode.CheckJoinInProgress(1,0)` is the only approved
+  `session_start_rejected` source for the current copied sibling-set evidence route;
 - principal policy: candidate-only process-local opaque principal policy exists, but
   runtime evidence and public ABI review remain missing;
 - runtime readiness: false.
 
-The first runtime observer must consume only the two exact lifecycle anchors below. Other
-player/admin/login/chat targets remain out of scope.
+The first approved runtime evidence route must consume only the two exact lifecycle
+anchors plus the rejected-start triplet source below. Other player/admin/login/chat
+targets remain out of scope.
 
 ## Exact Runtime Targets
 
 The only first-window targets are:
 
 - `ShooterGameMode.HandleNewPlayer`
+- `ShooterGameMode.CheckJoinInProgress`
 - `ShooterGameMode.OnLogout`
 
 Accepted shapes are exact:
@@ -48,14 +53,22 @@ Accepted shapes are exact:
   `NewPlayer:ObjectProperty@0/8`, `PlayerData:ObjectProperty@8/8`,
   `PlayerCharacter:ObjectProperty@16/8`, `bIsFromLogin:BoolProperty@24/1`,
   `ReturnValue:BoolProperty@25/1`.
+- `ShooterGameMode.CheckJoinInProgress`: `ParmsSize=17`, `NumParms=3`,
+  `bIsFromLogin:BoolProperty@0/1`, `NewPlayer:ObjectProperty@8/8`,
+  `ReturnValue:BoolProperty@16/1`.
 - `ShooterGameMode.OnLogout`: `ParmsSize=8`, `NumParms=1`,
   `Exiting:ObjectProperty@0/8`.
 
 `HandleNewPlayer` is a candidate `session_start` observation only when the call is seen
 after the original `ProcessEvent` returns and the copied bool bytes are canonical
-`bIsFromLogin=1` and `ReturnValue=1`. Any other canonical bool combination is
-`session_start_rejected` with `principal_action=none`, not a principal start. A
-non-canonical bool byte rejects the record.
+`bIsFromLogin=1` and `ReturnValue=1`. Other `HandleNewPlayer` bool combinations are
+diagnostic only and are not approved `session_start_rejected` evidence for the current
+sibling-set route. A non-canonical bool byte rejects the record.
+
+`CheckJoinInProgress` is the only approved `session_start_rejected` source for the
+current route, and only with canonical copied bool values `bIsFromLogin=1` and
+`ReturnValue=0`, reported as exact runtime shape
+`ShooterGameMode.CheckJoinInProgress(1,0)` with `principal_action=none`.
 
 `OnLogout` is a candidate `session_end` observation only after exact shape recognition.
 The observer logs an invalidation-shaped event, but it does not prove active-candidate
@@ -110,7 +123,8 @@ Budget reservation order:
 
 1. static gate and marker checks;
 2. supported binary SHA check;
-3. exact cheap target prefilter for `HandleNewPlayer` or `OnLogout`;
+3. exact cheap target prefilter for `HandleNewPlayer`, `CheckJoinInProgress`, or
+   `OnLogout`;
 4. positive budget reservation;
 5. exact reflected metadata and parameter shape validation;
 6. copied redacted log emission only if validation succeeds.
@@ -136,22 +150,25 @@ Allowed copied bool fields:
 
 - `ShooterGameMode.HandleNewPlayer.bIsFromLogin`
 - `ShooterGameMode.HandleNewPlayer.ReturnValue`
+- `ShooterGameMode.CheckJoinInProgress.bIsFromLogin`
+- `ShooterGameMode.CheckJoinInProgress.ReturnValue`
 
 Allowed redacted fields:
 
 - `ShooterGameMode.HandleNewPlayer.NewPlayer`
 - `ShooterGameMode.HandleNewPlayer.PlayerData`
 - `ShooterGameMode.HandleNewPlayer.PlayerCharacter`
+- `ShooterGameMode.CheckJoinInProgress.NewPlayer`
 - `ShooterGameMode.OnLogout.Exiting`
 
 `principal_action=candidate_created` is allowed only for post-original
 `HandleNewPlayer` with canonical `bIsFromLogin=1` and `ReturnValue=1`.
-`principal_action=none` is required for every `session_start_rejected` combination such
-as `0,1`, `1,0`, or `0,0`. Approved runtime evidence intake currently requires the
-canonical rejected anchor `bIsFromLogin=0` and `ReturnValue=1`; other safe rejected
-combinations are observer-acceptable diagnostics only and are not sufficient for the
-approved-evidence manifest. `principal_action=candidate_invalidated` is allowed for exact
-`OnLogout`, but it remains private evidence and must not be consumed by public plugins.
+`principal_action=none` is required for `CheckJoinInProgress(1,0)`, the only approved
+`session_start_rejected` source for the current evidence route. Safe rejected
+`HandleNewPlayer` combinations remain observer diagnostics only and are not sufficient
+for the approved-evidence manifest. `principal_action=candidate_invalidated` is allowed
+for exact `OnLogout`, but it remains private evidence and must not be consumed by public
+plugins.
 
 Do not log player names, Steam/EOS/platform ids, IP-like values, tribe ids, transfer ids,
 saved player data ids, controller identity, player-state identity, character identity,
@@ -234,7 +251,8 @@ should prove:
 - gate-denied paths do not read metadata or params and do not reserve budget;
 - unsupported SHA, zero budget, non-target name, wrong shape, and non-canonical bools
   clear copied output;
-- exact `HandleNewPlayer` and `OnLogout` fixture shapes are the only accepted targets;
+- exact `HandleNewPlayer`, `CheckJoinInProgress`, and `OnLogout` fixture shapes are the
+  only accepted targets for the current approved sibling-set route;
 - object fields are redacted and never copied, logged, hashed, or converted into identity;
 - stable posture rejects the observer env and marker names;
 - dispatch remains disabled and non-zero dispatch budget fails closed.

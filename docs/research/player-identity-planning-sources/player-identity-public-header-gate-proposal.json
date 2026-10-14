@@ -1,0 +1,336 @@
+{
+  "schema": "obelisk.player-identity-public-header-gate-proposal.v1",
+  "surface": "obelisk.player_identity.v1",
+  "artifact_status": "proposal_only",
+  "visibility": "header_gate_planning_contract",
+  "active_after_blocker": "public_header_gate_missing",
+  "candidate_only": true,
+  "accepted_for_header_gate_review": true,
+  "promotion_ready": false,
+  "public_contract_allowed": false,
+  "public_header_allowed": false,
+  "public_abi_ready": false,
+  "public_api_ready": false,
+  "public_sdk_ready": false,
+  "runtime_ready": false,
+  "lookup_ready": false,
+  "permissions_ready": false,
+  "commands_ready": false,
+  "v1_completion_evidence": false,
+  "source_artifacts": {
+    "public_abi_preflight_candidate": "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json",
+    "owner_token_sdk_consumer_contract": "docs/research/player-identity-planning-sources/player-identity-owner-token-sdk-consumer-contract.json",
+    "reviewed_identity_public_contract_decision_record": "docs/research/player-identity-planning-sources/reviewed-identity-public-contract-decision-record.json"
+  },
+  "proposed_header": {
+    "capability_bit": {
+      "name": "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_EVENTS",
+      "value": "1ull << 12",
+      "append_after": "OBELISK_API_CAPABILITY_TIMERS"
+    },
+    "abi_versions": [
+      "OBELISK_PLAYER_PRINCIPAL_EVENT_ABI_VERSION",
+      "OBELISK_PLAYER_PRINCIPAL_DESCRIPTOR_ABI_VERSION"
+    ],
+    "public_constants": {
+      "status": "proposal_only_not_public",
+      "candidate_vocabulary_source": "docs/player_identity_public_contract_decisions.json#proposed_public_pod_abi_candidate",
+      "ordered_groups": [
+        {
+          "field": "event_kind",
+          "descriptor_mask_field": "supported_event_kind_mask",
+          "constants": [
+            {
+              "candidate_value": "session_start",
+              "name": "OBELISK_PLAYER_PRINCIPAL_EVENT_KIND_SESSION_START",
+              "value": "1ull << 0",
+              "mask": "0x0000000000000001ull"
+            },
+            {
+              "candidate_value": "session_start_rejected",
+              "name": "OBELISK_PLAYER_PRINCIPAL_EVENT_KIND_SESSION_START_REJECTED",
+              "value": "1ull << 1",
+              "mask": "0x0000000000000002ull"
+            },
+            {
+              "candidate_value": "session_end",
+              "name": "OBELISK_PLAYER_PRINCIPAL_EVENT_KIND_SESSION_END",
+              "value": "1ull << 2",
+              "mask": "0x0000000000000004ull"
+            }
+          ],
+          "supported_mask": {
+            "name": "OBELISK_PLAYER_PRINCIPAL_EVENT_KIND_SUPPORTED_MASK",
+            "value": "0x0000000000000007ull"
+          }
+        },
+        {
+          "field": "principal_scope_flags",
+          "descriptor_mask_field": "supported_scope_flags",
+          "constants": [
+            {
+              "candidate_value": "callback_local",
+              "name": "OBELISK_PLAYER_PRINCIPAL_SCOPE_FLAG_CALLBACK_LOCAL",
+              "value": "1ull << 0",
+              "mask": "0x0000000000000001ull"
+            },
+            {
+              "candidate_value": "process_local",
+              "name": "OBELISK_PLAYER_PRINCIPAL_SCOPE_FLAG_PROCESS_LOCAL",
+              "value": "1ull << 1",
+              "mask": "0x0000000000000002ull"
+            },
+            {
+              "candidate_value": "restart_local_planning_only",
+              "name": "OBELISK_PLAYER_PRINCIPAL_SCOPE_FLAG_RESTART_LOCAL_PLANNING_ONLY",
+              "value": "1ull << 2",
+              "mask": "0x0000000000000004ull"
+            }
+          ],
+          "supported_mask": {
+            "name": "OBELISK_PLAYER_PRINCIPAL_SCOPE_FLAGS_SUPPORTED_MASK",
+            "value": "0x0000000000000007ull"
+          }
+        },
+        {
+          "field": "principal_state_flags",
+          "descriptor_mask_field": "supported_state_flags",
+          "constants": [
+            {
+              "candidate_value": "candidate_created",
+              "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAG_CANDIDATE_CREATED",
+              "value": "1ull << 0",
+              "mask": "0x0000000000000001ull"
+            },
+            {
+              "candidate_value": "candidate_invalidated",
+              "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAG_CANDIDATE_INVALIDATED",
+              "value": "1ull << 1",
+              "mask": "0x0000000000000002ull"
+            },
+            {
+              "candidate_value": "candidate_rejected",
+              "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAG_CANDIDATE_REJECTED",
+              "value": "1ull << 2",
+              "mask": "0x0000000000000004ull"
+            },
+            {
+              "candidate_value": "stale_generation",
+              "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAG_STALE_GENERATION",
+              "value": "1ull << 3",
+              "mask": "0x0000000000000008ull"
+            },
+            {
+              "candidate_value": "unsupported_scope",
+              "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAG_UNSUPPORTED_SCOPE",
+              "value": "1ull << 4",
+              "mask": "0x0000000000000010ull"
+            }
+          ],
+          "supported_mask": {
+            "name": "OBELISK_PLAYER_PRINCIPAL_STATE_FLAGS_SUPPORTED_MASK",
+            "value": "0x000000000000001full"
+          }
+        },
+        {
+          "field": "invalidation_reason_flags",
+          "descriptor_mask_field": "supported_invalidation_reason_flags",
+          "constants": [
+            {
+              "candidate_value": "logout",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_LOGOUT",
+              "value": "1ull << 0",
+              "mask": "0x0000000000000001ull"
+            },
+            {
+              "candidate_value": "disconnect",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_DISCONNECT",
+              "value": "1ull << 1",
+              "mask": "0x0000000000000002ull"
+            },
+            {
+              "candidate_value": "transfer",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_TRANSFER",
+              "value": "1ull << 2",
+              "mask": "0x0000000000000004ull"
+            },
+            {
+              "candidate_value": "reconnect",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_RECONNECT",
+              "value": "1ull << 3",
+              "mask": "0x0000000000000008ull"
+            },
+            {
+              "candidate_value": "duplicate_observation",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_DUPLICATE_OBSERVATION",
+              "value": "1ull << 4",
+              "mask": "0x0000000000000010ull"
+            },
+            {
+              "candidate_value": "server_restart",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_SERVER_RESTART",
+              "value": "1ull << 5",
+              "mask": "0x0000000000000020ull"
+            },
+            {
+              "candidate_value": "stale_controller_or_playerstate",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_STALE_CONTROLLER_OR_PLAYERSTATE",
+              "value": "1ull << 6",
+              "mask": "0x0000000000000040ull"
+            },
+            {
+              "candidate_value": "failed_evidence_validation",
+              "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASON_FAILED_EVIDENCE_VALIDATION",
+              "value": "1ull << 7",
+              "mask": "0x0000000000000080ull"
+            }
+          ],
+          "supported_mask": {
+            "name": "OBELISK_PLAYER_PRINCIPAL_INVALIDATION_REASONS_SUPPORTED_MASK",
+            "value": "0x00000000000000ffull"
+          }
+        },
+        {
+          "field": "contract_flags",
+          "descriptor_mask_field": "contract_flags",
+          "constants": [
+            {
+              "candidate_value": "copied_payload",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_COPIED_PAYLOAD",
+              "value": "1ull << 0",
+              "mask": "0x0000000000000001ull"
+            },
+            {
+              "candidate_value": "callback_local_payload_lifetime",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_CALLBACK_LOCAL_PAYLOAD_LIFETIME",
+              "value": "1ull << 1",
+              "mask": "0x0000000000000002ull"
+            },
+            {
+              "candidate_value": "process_local_principal_handle",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_PROCESS_LOCAL_PRINCIPAL_HANDLE",
+              "value": "1ull << 2",
+              "mask": "0x0000000000000004ull"
+            },
+            {
+              "candidate_value": "no_lookup",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_NO_LOOKUP",
+              "value": "1ull << 3",
+              "mask": "0x0000000000000008ull"
+            },
+            {
+              "candidate_value": "no_persistence",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_NO_PERSISTENCE",
+              "value": "1ull << 4",
+              "mask": "0x0000000000000010ull"
+            },
+            {
+              "candidate_value": "no_permissions_or_commands_authority",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_NO_PERMISSIONS_OR_COMMANDS_AUTHORITY",
+              "value": "1ull << 5",
+              "mask": "0x0000000000000020ull"
+            },
+            {
+              "candidate_value": "no_mutation",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_NO_MUTATION",
+              "value": "1ull << 6",
+              "mask": "0x0000000000000040ull"
+            },
+            {
+              "candidate_value": "no_return_override",
+              "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAG_NO_RETURN_OVERRIDE",
+              "value": "1ull << 7",
+              "mask": "0x0000000000000080ull"
+            }
+          ],
+          "supported_mask": {
+            "name": "OBELISK_PLAYER_PRINCIPAL_CONTRACT_FLAGS_SUPPORTED_MASK",
+            "value": "0x00000000000000ffull"
+          }
+        }
+      ]
+    },
+    "structs": [
+      {
+        "name": "ObeliskPlayerPrincipalEvent",
+        "size": 80,
+        "alignment": 8,
+        "fields": [
+          {"name": "abi_version", "type": "uint32_t", "offset": 0, "size": 4},
+          {"name": "struct_size", "type": "uint32_t", "offset": 4, "size": 4},
+          {"name": "event_kind", "type": "uint64_t", "offset": 8, "size": 8},
+          {"name": "principal_handle", "type": "uint64_t", "offset": 16, "size": 8},
+          {"name": "principal_generation", "type": "uint64_t", "offset": 24, "size": 8},
+          {"name": "principal_scope_flags", "type": "uint64_t", "offset": 32, "size": 8},
+          {"name": "principal_state_flags", "type": "uint64_t", "offset": 40, "size": 8},
+          {"name": "invalidation_reason_flags", "type": "uint64_t", "offset": 48, "size": 8},
+          {"name": "event_sequence", "type": "uint64_t", "offset": 56, "size": 8},
+          {"name": "server_process_epoch", "type": "uint64_t", "offset": 64, "size": 8},
+          {"name": "reserved", "type": "uint64_t", "offset": 72, "size": 8, "zero_required": true}
+        ]
+      },
+      {
+        "name": "ObeliskPlayerPrincipalDescriptor",
+        "size": 48,
+        "alignment": 8,
+        "fields": [
+          {"name": "abi_version", "type": "uint32_t", "offset": 0, "size": 4},
+          {"name": "struct_size", "type": "uint32_t", "offset": 4, "size": 4},
+          {"name": "supported_event_kind_mask", "type": "uint64_t", "offset": 8, "size": 8},
+          {"name": "supported_scope_flags", "type": "uint64_t", "offset": 16, "size": 8},
+          {"name": "supported_state_flags", "type": "uint64_t", "offset": 24, "size": 8},
+          {"name": "supported_invalidation_reason_flags", "type": "uint64_t", "offset": 32, "size": 8},
+          {"name": "contract_flags", "type": "uint64_t", "offset": 40, "size": 8}
+        ]
+      }
+    ],
+    "callback_typedef": "ObeliskPlayerPrincipalEventCallback",
+    "api_slots": [
+      "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+      "UnregisterPlayerPrincipalEventWithOwnerToken",
+      "DescribePlayerPrincipalEventContract"
+    ],
+    "api_slots_append_after": "UnregisterTimerWithOwnerToken"
+  },
+  "required_before_public_header": [
+    "approved_runtime_principal_lifecycle_evidence_bundle",
+    "abi.layout",
+    "sdk.consumer",
+    "lifecycle.owner_cleanup",
+    "public header guardrail update",
+    "public SDK completion checker remains non-counting until downstream P0 surfaces are promoted"
+  ],
+  "forbidden_public_surface": [
+    "lookup",
+    "resolve",
+    "permissions/admin",
+    "command response",
+    "commands/replies",
+    "send-chat identity",
+    "storage",
+    "persistence",
+    "mutation",
+    "return override",
+    "ResourceHandle",
+    "SteamID",
+    "EOS ID",
+    "UniqueNetId",
+    "PlayerDataID",
+    "player name",
+    "tribe id",
+    "network address",
+    "UE pointer",
+    "FName/GObjects indices"
+  ],
+  "non_claims": [
+    "proposal-only header gate review input",
+    "does not add public header symbols",
+    "does not add capability bits",
+    "does not expose callbacks",
+    "does not promote obelisk.player_identity.v1",
+    "does not make public_header_allowed true",
+    "does not make public_abi_ready, public_sdk_ready, runtime_ready, permissions_ready, commands_ready, or v1_completion_evidence true",
+    "does not treat reviewed contract aliases, runtime-window planning, copied-log/sidecar/beta/passive/runtime-presence/diagnostic artifacts, package-shape/support-tier artifacts, no-users status, generic approval aliases, status reports, or public ABI/header shortcut claims as header gate readiness",
+    "does not expose lookup, persistence, permissions/admin, commands/replies, send-chat identity, mutation, return override, ResourceHandle, platform ids, player names, tribe ids, network addresses, UE pointers, FName/GObjects indices, or raw ProcessEvent params"
+  ]
+}

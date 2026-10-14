@@ -1,0 +1,541 @@
+{
+  "schema": "obelisk.players-lifecycle-anchor-candidates-all-six-planning-gap.v1",
+  "artifact_status": "planning_gap",
+  "planning_only": true,
+  "target_set": "players-lifecycle-anchor-candidates",
+  "readiness_classification": "planning_only",
+  "artifact_identity": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "base_fixture_root": "tests/fixtures/ufunction_snapshots",
+    "base_source_artifact_ids": [
+      "artifact_sha256:62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78",
+      "capture_id:base-identity-core",
+      "evidence_pack_id:player-identity-base-core-evidence-pack"
+    ],
+    "build_type": "repo_fixture_planning_gap",
+    "obelisk_commit": "e55b75c",
+    "path_redacted": true,
+    "target_set_revision": "reflection_target_sets.py:players-lifecycle-anchor-candidates"
+  },
+  "operational_consolidation": {
+    "approved_triplet_sources": {
+      "targets": [
+        "ShooterGameMode.HandleNewPlayer",
+        "ShooterGameMode.CheckJoinInProgress",
+        "ShooterGameMode.OnLogout"
+      ],
+      "targets_meaning": "source-name labels for the required runtime triplet only; not lifecycle anchor bindings, approved runtime evidence, or public SDK progress",
+      "static_lifecycle_anchor_targets": [
+        "ShooterGameMode.HandleNewPlayer",
+        "ShooterGameMode.OnLogout"
+      ],
+      "observer_rejected_start_targets": [
+        "ShooterGameMode.CheckJoinInProgress"
+      ],
+      "exact_rejected_start_role_policy": {
+        "role": "session_start_rejected",
+        "target": "ShooterGameMode.CheckJoinInProgress",
+        "required_copied_bool_fields": [
+          "bIsFromLogin",
+          "ReturnValue"
+        ],
+        "required_copied_bool_values": [
+          "1",
+          "0"
+        ],
+        "required_event_boundary": "post-original copied observer event accepted by analyzer/bundle/approved-checker chain",
+        "disallowed_substitutes": [
+          "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+          "passive snapshots",
+          "diagnostic-only lines"
+        ],
+        "status": "exact_role_only"
+      },
+      "chronology_only_non_anchor_targets": [
+        "GameMode.K2_PostLogin"
+      ],
+      "only_these_targets_may_source_approved_triplet_roles": true,
+      "k2_postlogin_status": "non_anchor_chronology_only_property_fname_mismatch_rejected",
+      "all_six_planning_gap_evidence_status": "non_evidence"
+    },
+    "durable_lifecycle_anchor_roles": [
+      {
+        "role": "session_start",
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "can_source_session_start_rejected": false,
+        "accepted_runtime_shapes": [
+          "bIsFromLogin=1,ReturnValue=1 creates a candidate",
+          "HandleNewPlayer rejected-start tuples are superseded non-evidence for the current rejected-start route"
+        ]
+      },
+      {
+        "role": "session_end",
+        "target": "ShooterGameMode.OnLogout",
+        "can_source_session_start_rejected": false,
+        "accepted_runtime_shapes": [
+          "session_end_invalidated with correlation_status=matched"
+        ]
+      }
+    ],
+    "observer_only_alternative": {
+      "role": "session_start_rejected",
+      "target": "ShooterGameMode.CheckJoinInProgress",
+      "accepted_runtime_shape": "post-original copied bIsFromLogin=1,ReturnValue=0 with no principal creation",
+      "required_copied_bool_fields": [
+        "bIsFromLogin",
+        "ReturnValue"
+      ],
+      "required_copied_bool_values": [
+        "1",
+        "0"
+      ],
+      "disallowed_substitutes": [
+        "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+        "passive snapshots",
+        "diagnostic-only lines"
+      ],
+      "not_promoted_anchor": true
+    },
+    "rejected_anchor_guidance": [
+      {
+        "target": "GameMode.K2_PostLogin",
+        "reason": "chronology-only diagnostic; FName drift is not lifecycle role evidence"
+      },
+      {
+        "target": "ShooterGameMode.OnPostLogin__DelegateSignature",
+        "reason": "delegate signature guidance only; no accepted player-principal lifecycle role"
+      },
+      {
+        "target": "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+        "reason": "delegate signature guidance only; no accepted player-principal lifecycle role"
+      }
+    ],
+    "all_six_gap": "six committed base fixtures plus historical /tmp scratch acceptance are not a durable distinct candidate root and do not create second-source, runtime, public SDK, release, or v1 readiness",
+    "passive_diagnostic_boundary": "passive lines, diagnostic candidates, observed FName chains, and complete passive triplets remain non-evidence until a copied approved sibling-set bundle passes consume-mode validation",
+    "source_bound_drift_diagnostics": {
+      "status": "validated_planning_diagnostic_non_evidence",
+      "checked_by": "scripts/build_player_identity_planning_source_manifests.py --verify-existing-dir",
+      "diagnostic_artifact": "players-lifecycle-handle-new-player-fname-mismatch-ragnarok-20260604.json",
+      "base_fixture_targets_checked": [
+        "ShooterGameMode.HandleNewPlayer",
+        "ShooterGameMode.OnLogout"
+      ],
+      "base_fixture_fields_checked": [
+        "property_order",
+        "fixture_expected_name_indices",
+        "base_fixture_path",
+        "base_fixture_sha256"
+      ],
+      "latest_unbound_passive_context": {
+        "source": "worker_prompt_redacted_monitor_context",
+        "status": "unverified_passive_diagnostic_non_evidence",
+        "readiness_effect": "none",
+        "approved_runtime_evidence": false,
+        "can_update_fixture_expectations": false,
+        "counts_as_second_source_layout_evidence": false,
+        "observed_first_property_deltas": [
+          {
+            "target": "ShooterGameMode.HandleNewPlayer",
+            "expected_name_index": 28411,
+            "observed_name_index": 28422,
+            "delta": 11
+          },
+          {
+            "target": "ShooterGameMode.OnLogout",
+            "expected_name_index": 28543,
+            "observed_name_index": 28554,
+            "delta": 11
+          }
+        ],
+        "required_resolution": "distinct sanitized lifecycle snapshot root or approved copied observer event bundle; passive FName deltas alone remain non-evidence"
+      },
+      "readiness_effect": "none",
+      "approved_runtime_evidence": false,
+      "runtime_ready": false,
+      "public_sdk_ready": false
+    },
+    "latest_checkjoin_runtime_gap": {
+      "schema": "obelisk.player-principal-lifecycle-checkjoin-runtime-gap.v1",
+      "status": "blocked_no_approved_runtime_evidence",
+      "classification": "planning_only_non_evidence",
+      "observations": [
+        {
+          "id": "theisland_exact_checkjoin_1_0_stale_order_mismatched",
+          "target_hint": {
+            "instance": "arkserver2",
+            "map": "TheIsland"
+          },
+          "observed_shape": "CheckJoinInProgress(1,0)",
+          "fresh_window": false,
+          "rejection_reason": "stale_or_order_mismatched_with_required_sibling_roles",
+          "approved_runtime_evidence": false,
+          "counts_as_approved_runtime_evidence": false
+        },
+        {
+          "id": "ragnarok_fresh_window_diagnostics_checkjoin_0_0",
+          "target_hint": {
+            "instance": "arkserver",
+            "map": "Ragnarok"
+          },
+          "observed_shapes": [
+            "session_start",
+            "session_end",
+            "duplicate_session_start",
+            "diagnostic_candidates",
+            "CheckJoinInProgress(0,0)"
+          ],
+          "fresh_window": true,
+          "rejection_reason": "missing exact CheckJoinInProgress(1,0) accepted observer event; diagnostic and 0,0 material is non-evidence",
+          "approved_runtime_evidence": false,
+          "counts_as_approved_runtime_evidence": false
+        },
+        {
+          "id": "latest_clean_theisland_retry_missing_checkjoin_1_0",
+          "target_hint": {
+            "instance": "arkserver2",
+            "map": "TheIsland"
+          },
+          "observed_shapes": [
+            "required CheckJoinInProgress(1,0) accepted observer event absent"
+          ],
+          "fresh_window": true,
+          "diagnostic_candidates": "disabled",
+          "rejection_reason": "clean direct TheIsland remains a stimulus clue but did not reproduce the missing accepted session_start_rejected role in the latest retry",
+          "approved_runtime_evidence": false,
+          "counts_as_approved_runtime_evidence": false
+        }
+      ],
+      "rejected_hypotheses": [
+        "stale/order-mismatched TheIsland CheckJoinInProgress(1,0) can be reused",
+        "Ragnarok fresh CheckJoinInProgress(0,0) can satisfy the rejected-start role",
+        "diagnostic candidate lines can substitute for accepted copied observer events",
+        "duplicate start/end-only windows can clear approved_runtime_evidence_missing",
+        "the latest clean TheIsland miss disproves direct TheIsland as the fastest candidate route",
+        "cluster transfer should be the primary next route after the Ragnarok transfer-oriented retry produced start/end, duplicate start, diagnostics, and CheckJoinInProgress(0,0)",
+        "rapid reconnect timing can be tried inside the primary evidence window without risking duplicate role or order-mismatch blockers"
+      ],
+      "candidate_only_next_action": {
+        "id": "clean_theisland_fresh_window_without_diagnostics",
+        "target_hint": {
+          "instance": "arkserver2",
+          "map": "TheIsland"
+        },
+        "diagnostic_candidates": "disabled",
+        "window_requirement": "fresh copied post-original sibling-set window with exact CheckJoinInProgress(1,0), not a stale/order-mismatched replay",
+        "status": "candidate_only_non_evidence",
+        "requires_separate_current_turn_operator_scope": true,
+        "authorized_by_this_artifact": false,
+        "approved_runtime_evidence": false,
+        "counts_as_approved_runtime_evidence": false,
+        "counts_as_runtime_evidence": false,
+        "counts_as_sdk_evidence": false,
+        "runtime_ready": false,
+        "public_sdk_ready": false
+      },
+      "candidate_only_next_tester_plan": {
+        "schema": "obelisk.player-principal-lifecycle-checkjoin-tester-plan.v1",
+        "status": "planning_only_non_evidence",
+        "requires_separate_current_turn_operator_scope": true,
+        "authorized_by_this_artifact": false,
+        "diagnostic_candidates": "disabled",
+        "dispatch_limit": 0,
+        "log_limit": 10,
+        "ranked_routes": [
+          {
+            "rank": 1,
+            "id": "direct_theisland_join",
+            "target_hint": {
+              "instance": "arkserver2",
+              "map": "TheIsland"
+            },
+            "route_type": "direct_join",
+            "why_first": "TheIsland has the strongest exact CheckJoinInProgress(1,0) stimulus clue; the latest clean miss is negative context but cluster/reconnect paths have higher duplicate/order risk.",
+            "tester_choreography": [
+              "use a fresh approved TheIsland window with no diagnostic candidates",
+              "one tester joins TheIsland directly from outside the cluster path",
+              "tester remains connected after the accepted HandleNewPlayer session_start",
+              "if approved accepted-event tail monitoring sees CheckJoinInProgress(1,0), ask the same tester to leave once for matched OnLogout",
+              "if CheckJoinInProgress(1,0) does not appear before the approved window expires, close the window as missing-role evidence instead of adding retries"
+            ]
+          },
+          {
+            "rank": 2,
+            "id": "cluster_transfer_separate_window",
+            "route_type": "cluster_transfer",
+            "why_not_first": "The latest transfer-oriented Ragnarok window produced start/end, duplicate start, diagnostics, and CheckJoinInProgress(0,0), not the required 1,0.",
+            "tester_choreography": [
+              "run only in a separate fresh approved window after direct TheIsland is closed",
+              "make transfer into the target the first player action for that window",
+              "do not create a direct HandleNewPlayer anchor and then transfer inside the same capture"
+            ]
+          },
+          {
+            "rank": 3,
+            "id": "single_reconnect_fallback",
+            "route_type": "reconnect_timing",
+            "why_last": "Reconnects naturally risk session_end before session_start_rejected, duplicate session_start, stale logout correlation, and sequence-budget loss.",
+            "tester_choreography": [
+              "use only as a separate single-attempt negative test if direct join and transfer both fail",
+              "do not run rapid reconnect loops in the primary evidence window",
+              "stop after the first duplicate role, unsupported CheckJoin tuple, matched session_end, or missing-role timeout"
+            ]
+          }
+        ],
+        "budget_protection": [
+          "do not mix direct join, cluster transfer, and reconnect in one window",
+          "do not let the accepted-start tester leave before the CheckJoinInProgress(1,0) role is attempted or the window is closed missing-role",
+          "do not add a second successful join after the first accepted session_start",
+          "stop after the first matched session_end or duplicate accepted role",
+          "preserve unsupported CheckJoinInProgress tuples and duplicate start/end-only material as negative runtime context"
+        ],
+        "required_event_order": [
+          "ShooterGameMode.HandleNewPlayer(1,1)",
+          "ShooterGameMode.CheckJoinInProgress(1,0)",
+          "ShooterGameMode.OnLogout()"
+        ],
+        "approved_runtime_evidence": false,
+        "counts_as_approved_runtime_evidence": false,
+        "counts_as_runtime_evidence": false,
+        "counts_as_sdk_evidence": false,
+        "runtime_ready": false,
+        "public_sdk_ready": false
+      },
+      "approved_runtime_evidence": false,
+      "counts_as_approved_runtime_evidence": false,
+      "counts_as_runtime_evidence": false,
+      "counts_as_sdk_evidence": false,
+      "runtime_ready": false,
+      "public_sdk_ready": false
+    }
+  },
+  "base_fixture_targets": [
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/GameMode.K2_PostLogin.snapshot.json",
+      "base_fixture_sha256": "a1082fd50c7234f79f9be32c565edb9cb5de1691eb4fe78d9c97a7c2babaa6ff",
+      "chronology_only_non_anchor": true,
+      "current_approved_triplet_source": false,
+      "lifecycle_anchor_binding_status": "diagnostic_only_rejected_fname_drift_not_role_evidence",
+      "num_parms": 1,
+      "parms_size": 8,
+      "property_order": [
+        "NewPlayer"
+      ],
+      "target": "GameMode.K2_PostLogin"
+    },
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.CheckJoinInProgress.snapshot.json",
+      "base_fixture_sha256": "3b38ce4d991cb28e547850128412e78e11eac1f32b6fdd15fd756fc485552ef2",
+      "current_approved_triplet_source": true,
+      "current_rejected_start_observer_alternative": true,
+      "lifecycle_anchor_binding_status": "observer_alternative_only_not_promoted_anchor",
+      "num_parms": 3,
+      "parms_size": 17,
+      "property_order": [
+        "bIsFromLogin",
+        "NewPlayer",
+        "ReturnValue"
+      ],
+      "target": "ShooterGameMode.CheckJoinInProgress"
+    },
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.HandleNewPlayer.snapshot.json",
+      "base_fixture_sha256": "a9b3049dc221f128924ff0c6eb45287bf630dfaea4e4ab33bbf93647a5d3361b",
+      "current_approved_triplet_source": true,
+      "current_promoted_durable_source_bound_lifecycle_evidence": true,
+      "current_runtime_recognizer_accepts_known_fname_drift_chains": true,
+      "num_parms": 5,
+      "parms_size": 26,
+      "property_order": [
+        "NewPlayer",
+        "PlayerData",
+        "PlayerCharacter",
+        "bIsFromLogin",
+        "ReturnValue"
+      ],
+      "target": "ShooterGameMode.HandleNewPlayer"
+    },
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnLogout.snapshot.json",
+      "base_fixture_sha256": "e79e416a408bbe652a31f58c710cfeb03daa0acf2e0ebef55a7ba61c83a414aa",
+      "current_approved_triplet_source": true,
+      "current_promoted_durable_source_bound_lifecycle_evidence": true,
+      "current_runtime_recognizer_accepts_known_fname_drift_chains": true,
+      "num_parms": 1,
+      "parms_size": 8,
+      "property_order": [
+        "Exiting"
+      ],
+      "target": "ShooterGameMode.OnLogout"
+    },
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnPostLogin__DelegateSignature.snapshot.json",
+      "base_fixture_sha256": "a80bb3c96a9cc2fcb43bfa60212c57cff22208ad4503623fbdb1b695e9f6a9ff",
+      "current_approved_triplet_source": false,
+      "num_parms": 1,
+      "parms_size": 8,
+      "property_order": [
+        "NewPlayer"
+      ],
+      "target": "ShooterGameMode.OnPostLogin__DelegateSignature"
+    },
+    {
+      "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnStartNewPlayer__DelegateSignature.snapshot.json",
+      "base_fixture_sha256": "f8173cc5db97a78844eb2c720c1713179216a47cb5219de0864d41a76e959a3d",
+      "current_approved_triplet_source": false,
+      "num_parms": 1,
+      "parms_size": 8,
+      "property_order": [
+        "NewPlayer"
+      ],
+      "target": "ShooterGameMode.OnStartNewPlayer__DelegateSignature"
+    }
+  ],
+  "historical_scratch_comparison": {
+    "accepted_targets": 6,
+    "accepted_targets_meaning": "scratch comparison target count only; not durable second-source evidence, lifecycle anchor binding, approved runtime evidence, or public SDK progress",
+    "comparison_report_sha256": "11974bcb4ef3fc1707a53d931e93b61f000e372db826468d13859547c151e352",
+    "durable": false,
+    "readiness_report_sha256": "a4baa4822c8811759eab068447e4f1ee01285383025e6f7429017a01ede70d6c",
+    "source_note": "docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md",
+    "status": "scratch_triage_only",
+    "why_not_durable": [
+      "scratch roots were under /tmp",
+      "distinct candidate snapshots are not present in the owned durable planning-source directory",
+      "current committed all-six fixture root is a single source"
+    ]
+  },
+  "required_distinct_candidate_source": {
+    "artifact_sha256": "56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb",
+    "capture_id": "vanilla-gdb-core",
+    "evidence_pack_id": "player-identity-vanilla-gdb-core-evidence-pack",
+    "snapshot_root_status": "missing_from_owned_durable_scope"
+  },
+  "durable_all_six_comparison": {
+    "accepted": false,
+    "provided": false,
+    "reason": "distinct_non_tmp_candidate_snapshot_root_missing",
+    "evidence_scope_when_materialized": "planning_layout_intake_only_not_second_source",
+    "does_not_satisfy": [
+      "second_source_readiness",
+      "approved_runtime_evidence",
+      "public_sdk_readiness",
+      "runtime_readiness",
+      "release_readiness",
+      "v1_completion"
+    ],
+    "minimal_patch_needed": [
+      "materialize or recreate the six vanilla candidate snapshots outside /tmp under an approved non-protected offline or repo fixture root",
+      "preserve complete evidence identity on every snapshot: ark_binary_sha256, artifact_sha256, capture_id, evidence_pack_id, source=offline_core, status=candidate-only",
+      "run scripts/compare_reflection_snapshots.py --base-root tests/fixtures/ufunction_snapshots --candidate-root <durable-candidate-root> --target-set players-lifecycle-anchor-candidates --readiness-report --planning-layout-intake --json",
+      "record the resulting report path and sha256 here only as planning_layout_intake evidence",
+      "do not add the four non-promoted targets to accepted lifecycle anchor binding or public readiness inputs",
+      "do not treat K2_PostLogin FName drift or lifecycle delegate signatures as accepted lifecycle role evidence",
+      "preserve ShooterGameMode.CheckJoinInProgress as a session_start_rejected observer alternative only, not a promoted lifecycle anchor"
+    ]
+  },
+  "current_durable_source_bound_lifecycle_anchor_evidence": {
+    "accepted_targets": [
+      "ShooterGameMode.HandleNewPlayer",
+      "ShooterGameMode.OnLogout"
+    ],
+    "accepted_targets_meaning": "source-bound static lifecycle anchor bindings only; excludes CheckJoinInProgress and does not replace approved runtime triplet evidence",
+    "observer_only_rejected_start_alternatives": [
+      {
+        "target": "ShooterGameMode.CheckJoinInProgress",
+        "accepted_shape": "post-original copied bIsFromLogin=1,ReturnValue=0 with no principal creation",
+        "required_copied_bool_fields": [
+          "bIsFromLogin",
+          "ReturnValue"
+        ],
+        "required_copied_bool_values": [
+          "1",
+          "0"
+        ],
+        "disallowed_substitutes": [
+          "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+          "passive snapshots",
+          "diagnostic-only lines"
+        ],
+        "status": "observer_alternative_only_not_lifecycle_anchor"
+      }
+    ],
+    "source": "players-identity-lifecycle-anchor-candidates.json plus players-lifecycle-anchor-static-report.json",
+    "status": "unchanged"
+  },
+  "current_approved_triplet_sources": {
+    "accepted_targets": [
+      "ShooterGameMode.HandleNewPlayer",
+      "ShooterGameMode.CheckJoinInProgress",
+      "ShooterGameMode.OnLogout"
+    ],
+    "accepted_targets_meaning": "source-name labels for the required runtime triplet only; not lifecycle anchor bindings, approved runtime evidence, or public SDK progress",
+    "static_lifecycle_anchor_targets": [
+      "ShooterGameMode.HandleNewPlayer",
+      "ShooterGameMode.OnLogout"
+    ],
+    "observer_rejected_start_targets": [
+      "ShooterGameMode.CheckJoinInProgress"
+    ],
+    "exact_rejected_start_role_policy": {
+      "role": "session_start_rejected",
+      "target": "ShooterGameMode.CheckJoinInProgress",
+      "required_copied_bool_fields": [
+        "bIsFromLogin",
+        "ReturnValue"
+      ],
+      "required_copied_bool_values": [
+        "1",
+        "0"
+      ],
+      "required_event_boundary": "post-original copied observer event accepted by analyzer/bundle/approved-checker chain",
+      "disallowed_substitutes": [
+        "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+        "passive snapshots",
+        "diagnostic-only lines"
+      ],
+      "status": "exact_role_only"
+    },
+    "chronology_only_non_anchor_targets": [
+      "GameMode.K2_PostLogin"
+    ],
+    "guidance_only_non_triplet_targets": [
+      "GameMode.K2_PostLogin",
+      "ShooterGameMode.OnPostLogin__DelegateSignature",
+      "ShooterGameMode.OnStartNewPlayer__DelegateSignature"
+    ],
+    "all_six_planning_gap_evidence_status": "non_evidence"
+  },
+  "promotion_gate": {
+    "blockers": [
+      "target_set_not_release_readiness",
+      "approved_runtime_evidence_missing",
+      "distinct_non_tmp_candidate_snapshot_root_missing"
+    ],
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "ready": false,
+    "ready_scope": "planning_only",
+    "runtime_ready": false
+  },
+  "does_not_satisfy_blockers": [
+    "approved_runtime_evidence_missing",
+    "public_player_identity_missing",
+    "public_sdk_readiness_missing",
+    "runtime_lifecycle_ordering_missing",
+    "principal_invalidation_semantics_missing"
+  ],
+  "non_claims": [
+    "planning gap artifact only",
+    "does not promote the all-six comparison as durable second-source evidence",
+    "does not change accepted lifecycle anchor binding beyond ShooterGameMode.HandleNewPlayer and ShooterGameMode.OnLogout",
+    "does not change approved lifecycle triplet sources beyond ShooterGameMode.HandleNewPlayer, ShooterGameMode.CheckJoinInProgress, and ShooterGameMode.OnLogout",
+    "accepted_targets fields in this planning-gap artifact describe scoped source lists or scratch counts only; they are not approved runtime evidence",
+    "does not promote ShooterGameMode.CheckJoinInProgress beyond a rejected-start observer alternative",
+    "does not promote GameMode.K2_PostLogin beyond non-anchor chronology-only diagnostics",
+    "does not promote lifecycle delegate signatures beyond guidance-only diagnostics",
+    "does not treat known HandleNewPlayer or OnLogout FName drift-chain recognition as second-source layout evidence by itself",
+    "does not clear approved_runtime_evidence_missing",
+    "does not promote public player identity, public Player SDK, runtime readiness, release readiness, or v1 completion",
+    "does not expose UE pointers, raw params, FName/GObjects indices, lookup, ResourceHandle, mutation, or return override"
+  ]
+}

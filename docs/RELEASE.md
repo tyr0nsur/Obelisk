@@ -23,6 +23,40 @@ Read scope labels literally:
   evidence, not public SDK surface, and are rejected by the release gate until replaced by
   a separately promoted target set.
 
+Current release-scope non-authorization: this document grants no current-turn exact
+live-op scope, no current-turn exact approval for operations, Discord send, server/log
+read, marker/env change, protected live-server filesystem access, deploy/restart,
+GitHub/release publication, Plugin Hub publication, public SDK readiness, or stable v1
+claim. Historical TheIsland/Ragnarok/Genesis2 material, historical server names, the
+latest release-readiness pass, public reachability, request packs, status reports,
+`progress_normalization_trace`, source_overclaim diagnostics,
+`source_overclaim_total_flag_count=0`, release-readiness passes, passive observation,
+the latest validation pass, six-agent closure notes, Codex cache cleanup,
+passive player evidence, passive player summaries, passive summaries,
+passive snapshots, passive monitor ticks, passive monitor output, passive monitors,
+passive triplets, beta tester notices, beta notices, future beta notices, Discord notice
+drafts, package-shape installs, package installs, explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+install/package success, package-shape install success, install/package-shape checks,
+support-tier labels, package shape, package-shape/public package readiness, Plugin Hub
+planning, scoped non-complete release statements, side-lane candidates/accounting, prior
+approvals, historical live approvals/map names, historical approvals/map names, closure requests,
+and tests
+are not live authorization, runtime evidence, SDK evidence, approved in-game evidence,
+SDK/P0 progress, live-op authorization, Discord authorization, publication authority,
+runtime readiness, public SDK readiness, stable SDK readiness, Plugin Hub readiness,
+support-tier activation, stable SDK claims, or stable claims. They may be cited only as
+chronology/request context; they remain non-authorizing/non-evidence unless a claim names
+both the current-turn exact approval for the scoped action and the accepted checker
+evidence for the evidence result.
+Current route state remains SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
+`approved_runtime_evidence_missing`.
+A separately recorded standing live authority, if one exists for named operations, is
+authorization only; it does not supply runtime evidence, SDK/P0 progress, public SDK
+readiness, publication authority, stable SDK readiness, Plugin Hub readiness,
+support-tier activation, package-shape/public package readiness, or a stable/complete SDK
+claim.
+
 ## Scope
 
 Release scope is intentionally narrower than the active research roadmap. Post-RC
@@ -63,11 +97,13 @@ Included:
   text, send mode, copied-payload flag, and process-local sequence only. It is a
   notification contract for plugins that parse their own text locally, not a command SDK,
   chat send/moderation API, sender identity API, UE lookup path, mutation surface, or
-  return-override authority. Runtime producer delivery has accepted copied-log validation
-  with 18 accepted delivery events covering send modes `0,1,2,3` through the
-  `enable-chat-events` path during an approved operator-selected beta-test window, with no
-  privacy blockers; historical `enable-chat-reflection` observer logs do not satisfy that
-  gate.
+  return-override authority. Historical, surface-local runtime producer delivery has
+  accepted copied-log validation with 18 accepted delivery events covering send modes
+  `0,1,2,3` through the `enable-chat-events` path during an operator-selected beta-test
+  window, with no privacy blockers. This is v0.1-rc chat delivery evidence only, not
+  current P0 approved runtime evidence, current-turn live-op approval, SDK/P0 progress,
+  public SDK readiness, or v1 completion; historical `enable-chat-reflection` observer
+  logs do not satisfy that gate.
 - Process-local owner-token timers as a v0.1 core primitive: one-shot/repeating callbacks,
   zero-failure handles, explicit unregister, exception containment, and owner cleanup on
   plugin init failure/unload. They are not UE/gameplay timers, gameplay/module timer APIs,
@@ -141,6 +177,10 @@ clean worktree. Keep those checks in this script instead of adding parallel CI r
 checks with different defaults. A final RC or stable candidate must also pass the
 second-source readiness gate below on a clean worktree with the accepted snapshot root
 configured.
+The default CI release-readiness job runs this core-first baseline without the v1
+completion option. Do not add `--require-v1-sdk-completion` to that default job; use it
+only for an explicit stable SDK claim attempt with a reviewed release statement and
+current gate evidence.
 
 This core-first gate is necessary package/readiness evidence for `v0.1.x` RC/stable
 candidates, but it is not a `v1.0` complete-SDK gate. A `v1.0` claim must still satisfy
@@ -158,8 +198,25 @@ That option runs `scripts/check_public_sdk_v1_completion.py` before the core bui
 On the current post-RC tree it must fail closed because `v1_completion_required=false`,
 `stable_release_contract.claim_allowed=false`, unresolved experimental surfaces remain,
 and v1 blocker IDs are still planning or not promoted/excluded by release statement. The
-release-statement path is mandatory for the v1 gate and must name every non-promoted
-blocker as excluded or post-v1.
+release-readiness wrapper still requires an explicit `--v1-sdk-release-statement`; the
+checker CLI also uses `docs/SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md` by default when
+that durable scoped statement exists. In either path, statement rows must name every
+non-promoted blocker as excluded or post-v1 before they satisfy wording bookkeeping.
+Current route state remains SDK blocker promotion `0/12`, P0 dependency chain `0/4`,
+`stable_claim_allowed=false`, and active blocker `approved_runtime_evidence_missing`.
+Core-first release gates, the latest release-readiness pass, package-shape installs,
+package installs, explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+install/package-shape checks, Plugin Hub planning, side-lane accounting, and scoped
+non-complete release statement bookkeeping must not be reinterpreted as route completion,
+runtime readiness, publication authority, support-tier activation, Plugin Hub readiness,
+or a stable SDK claim. Nested/split report aliases for package shape, scoped
+release-statement outcomes, passive evidence, passive player evidence, passive monitor
+ticks, passive monitors, side lanes, Plugin Hub, CMake/header checks, public reachability,
+`progress_normalization_trace`, source_overclaim diagnostics,
+`source_overclaim_total_flag_count=0`, release-readiness passes, historical live
+approvals/map names, historical approvals/map names, beta notices, or support-tier labels
+must not increment SDK blocker or P0 dependency-chain progress.
 
 To validate only the scoped wording of a draft statement while the full v1 gate remains
 intentionally blocked, use:
@@ -200,7 +257,6 @@ scripts/check_release_readiness.sh \
   --ufunction-second-source-root <second-source-ufunction-snapshots> \
   --ufunction-second-source-target-set minimal-second-source-intake \
   --ufunction-second-source-target-set structure-observer-intake \
-  --ufunction-second-source-target-set item-return-only-policy-slice \
   --ufunction-second-source-target-set chat-message-intake \
   --second-source-report-dir /tmp/obelisk-rc-second-source
 ```
@@ -226,7 +282,8 @@ push a stale tag.
 
 The promotion check always includes the public RC UFunction target sets:
 `minimal-second-source-intake`, `structure-observer-intake`,
-`item-return-only-policy-slice`, and `chat-message-intake`. The check still needs a
+and `chat-message-intake`. Item return-only evidence remains planning-only/internal
+backing evidence and is not a public RC/default target set. The check still needs a
 configured second-source snapshot root, either through
 `OBELISK_UFUNCTION_SECOND_SOURCE_ROOT` or `--ufunction-second-source-root`; without one,
 the gate fails closed with missing second-source evidence. Explicit
@@ -263,7 +320,9 @@ return overrides, runtime negative samples, or public `ResourceHandle`.
 Pass sanitized second-source snapshot roots into the same gate and keep JSON reports as
 promotion artifacts. Write the report directory outside the repository
 or under an ignored artifact path; unignored in-repo report paths are rejected before the
-release build starts so the final clean-worktree check stays meaningful:
+release build starts so the final clean-worktree check stays meaningful. The report
+directory must be new or empty; the gate rejects stale generated report roots instead of
+mixing historical JSON with a fresh candidate run:
 
 ```bash
 scripts/check_release_readiness.sh \
@@ -290,10 +349,10 @@ registration, owner-scoped unregister, plugin-owner cleanup on init failure and 
 ABI layout tests, installed SDK consumer tests, and release docs naming each promoted
 target set. Runtime-observer summaries do not satisfy this SDK contract gate. The first
 promoted event family is `GameplayPolicyEvent`, backed by the accepted
-`structure-observer-intake` evidence, the accepted ReturnValue-only
-`item-return-only-policy-slice` evidence, plus the accepted compact inventory/structure
+`structure-observer-intake` evidence plus the accepted compact inventory/structure
 layouts from `minimal-second-source-intake`, and declared in
-`docs/public_gameplay_events.json`.
+`docs/public_gameplay_events.json`. ReturnValue-only item-return evidence remains
+planning-only/internal backing and does not count as a public RC/default target set.
 The fresh structure-backed evidence is
 [`2026-05-29-structure-observer-intake-refresh.md`](research/2026-05-29-structure-observer-intake-refresh.md)
 and is layout-only support for copied/redacted policy backing.
@@ -316,10 +375,10 @@ lifecycle, and cross-instance semantics.
 
 The default second-source gate is intentionally scoped to the public RC UFunction target
 sets: `minimal-second-source-intake`, `structure-observer-intake`,
-`item-return-only-policy-slice`, and `chat-message-intake`. Mission target sets such as
-`mission-compact-intake` are not part of that gate, and scalar-candidate summaries are
-review aids only, not RC scope. Transfer target sets such as `transfer-ufunction-intake`
-are also not part of the default gate. ScriptStruct target sets such as
+and `chat-message-intake`. Item-return, Mission, and Transfer target sets such as
+`item-return-only-policy-slice`, `mission-compact-intake`, and
+`transfer-ufunction-intake` are not part of that gate, and scalar-candidate summaries are
+review aids only, not RC scope. ScriptStruct target sets such as
 `transfer-scriptstruct` are internal/layout-only until a separate promoted target set is
 classified as release readiness; passing `--scriptstruct-second-source-root` is valid only
 with a ScriptStruct target set that has gone through that promotion.
@@ -359,7 +418,7 @@ Review artifacts:
 
 Runtime-observer log summaries are review artifacts, not a release gate and not
 second-source promotion evidence. Use them only on copied or sanitized logs when reviewing
-an approved observer capture:
+a capture whose live collection was separately scoped and approved at the time:
 
 ```bash
 python3 scripts/analyze_runtime_observer_log.py --fail-on-quality-blockers <copied-log>
@@ -394,9 +453,12 @@ indices, raw params, mutation, or return overrides. SDK acceptance for this even
 layout coverage, accepted `chat-message-intake` second-source comparison,
 `ChatEventDispatcher` copy/lifetime tests, plugin-manager owner-token
 registration/unregister tests, and installed SDK consumer coverage. The runtime producer
-exists behind the `enable-chat-events` marker/env path, observer-debug approval, SHA, and
-positive dispatch budget. An approved copied-log delivery validation with 18 accepted
-delivery events covering send modes `0,1,2,3` now exists for that path; further beta
+exists only when a current-turn scoped observer-debug run also has the
+`enable-chat-events` marker/env path, supported binary SHA, and positive dispatch budget.
+Historical, surface-local accepted copied-log delivery
+validation with 18 accepted delivery events covering send modes `0,1,2,3` exists for
+that v0.1-rc path only; it is not current P0 approved runtime evidence, current-turn
+live-op approval, SDK/P0 progress, public SDK readiness, or v1 completion. Further beta
 observation is regression/revalidation only unless a new promotion gate is defined. It
 still does not promote commands, identity, moderation/blocking, mutation, return
 overrides, or UE internals. Do not count `enable-chat-reflection` observer evidence for
@@ -425,8 +487,8 @@ scripts/check_linuxgsm_wrapper_drift.sh \
   --installed <ark-binary-dir>/ObeliskRun.sh
 ```
 
-10. If this release candidate followed an approved runtime experiment, confirm quiet stable
-   posture on the same approved validation adapter target. If no runtime experiment was
+10. If this release candidate followed a current-turn approved runtime experiment, confirm quiet stable
+   posture on the same current-turn approved validation adapter target. If no runtime experiment was
    part of the release validation, keep this release check offline and skip live harness
    inspection.
 

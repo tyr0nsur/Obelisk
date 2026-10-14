@@ -33,6 +33,19 @@ import check_player_identity_runtime_principal_lifecycle_approved_evidence as ap
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence  # noqa: E402
 import check_permissions_admin_query_failclosed_contract as permissions_admin_query_failclosed  # noqa: E402
 import check_command_chat_response_public_readiness as command_chat_response_public_readiness  # noqa: E402
+from reflection_target_sets import (  # noqa: E402
+    NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
+    PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS,
+    PLAYER_LIFECYCLE_EXACT_TARGETS,
+    PLAYER_LIFECYCLE_GUIDANCE_ONLY_NON_TRIPLET_TARGETS,
+    PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS,
+    PLAYER_LIFECYCLE_TARGET_SET,
+    RELEASE_READINESS_TARGET_SETS,
+    TARGET_SET_REVISION_SCHEMA,
+    TARGET_SET_REVISION_SOURCE,
+    target_set_catalog_hygiene_issues,
+    target_set_name_promotion_aliases,
+)
 
 
 SCHEMA = "obelisk.offline-artifact-gate-result.v1"
@@ -93,9 +106,11 @@ TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT = {
         },
     }
 }
-TRANSFER_SCRIPTSTRUCT_TARGETS = set(TRANSFER_SCRIPTSTRUCT_BOOL_TAIL_CONTRACT) | {
+TRANSFER_SCRIPTSTRUCT_TARGET_LIST = [
     "PrimalLocalProfile.ARKTributeDino",
-}
+    "PrimalLocalProfile.ArkTributePlayerData",
+]
+TRANSFER_SCRIPTSTRUCT_TARGETS = set(TRANSFER_SCRIPTSTRUCT_TARGET_LIST)
 TARGET_SET_COVERAGE_SCHEMA = "obelisk.redacted-ufunction-target-set-coverage.v1"
 REDACTED_UFUNCTION_ARTIFACT_HYGIENE_SCHEMA = "obelisk.redacted-ufunction-artifact-hygiene.v1"
 RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA = "obelisk.rc-ufunction-second-source-root-manifest.v1"
@@ -114,6 +129,18 @@ RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA = "obelisk.resource-handle-serial-scan.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_PROVENANCE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.provenance.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_CONSUME_GATE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.consume-gate-expectation.v1"
 READINESS_REPORT_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
+READINESS_TARGET_SET_COVERAGE_SCHEMA = "obelisk.reflection-snapshot-readiness-target-set-coverage.v1"
+READINESS_REPORT_ALLOWED_READY_TRUE_PATHS = frozenset(
+    (
+        "$.promotion_gate.ready",
+        "$.promotion_gate.layout_ready",
+    )
+)
+READINESS_REPORT_REQUIRED_PROMOTION_GATE_FALSE_KEYS = {
+    "promotion_ready": "readiness_report_promotion_ready_not_false",
+    "public_sdk_ready": "readiness_report_public_sdk_ready_not_false",
+    "runtime_ready": "readiness_report_runtime_ready_not_false",
+}
 UOBJECT_FLAG_POLICY_REPORT_SCHEMA = "obelisk.uobject-flag-policy-report.v1"
 UOBJECT_FLAG_TRANSITION_MATRIX_SCHEMA = "obelisk.uobject-flag-transition-matrix.v1"
 UOBJECT_FLAG_SAMPLE_REPORT_SCHEMA = "obelisk.uobject-flag-sample-report.v1"
@@ -198,73 +225,214 @@ WEAK_HELPER_STATIC_POLARITY_PROVENANCE_SCHEMAS = UOBJECT_FLAG_TRANSITION_PROVENA
 }
 WEAK_HELPER_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 DEFAULT_WORKSPACE_ROOT = Path("/servidor/ark/workspace-offline")
-PATH_KEY_RE = re.compile(r"(?:^|_)(paths?|files?|sources?|artifacts?|binaries|binary|cores?|stdouts?|stderrs?|copied_to)$")
+PATH_KEY_RE = re.compile(
+    r"(?:^|_)(paths?|files?|sources?|artifacts?|binaries|binary|cores?|stdouts?|stderrs?|copied_to|sidecars?|provenance)$"
+)
 SEMANTIC_INPUT_NAME_MAX_LENGTH = 128
 REQUIRED_REDACTED_SIGNATURE_NON_PROMOTED_SURFACES = {
     "class_identity",
+    "complete_sdk",
     "cross_binary_portability",
     "lookup",
     "mutation",
     "object_identity",
+    "p0_dependency_chain",
+    "public_reachability",
     "public_sdk",
+    "redacted_signatures",
     "resource_handle",
     "return_override",
+    "runtime_hooks",
+    "source_markers",
+    "stable_sdk",
+    "target_set_lists",
+    "v1_completion",
 }
+REQUIRED_REDACTED_SIGNATURE_ARTIFACT_IDENTITY_KEYS = {
+    "ark_binary_sha256",
+    "path_redacted",
+    "source_artifact_ids",
+    "target_set_revision",
+    "target_set_revision_schema",
+    "target_set_revision_source_sha256",
+}
+REDACTED_SIGNATURE_SOURCE_ARTIFACT_ID_RE = re.compile(
+    r"^(?:artifact_sha256:[0-9a-f]{64}|(?:capture_id|evidence_pack_id):[A-Za-z0-9][A-Za-z0-9._-]{0,127})$"
+)
 READY_OVERCLAIM_KEYS = {
     "cross_binary_portability_ready",
     "lookup_ready",
     "mutation_ready",
+    "object_lookup_ready",
     "promoted",
     "promote_ready",
     "promotion_ready",
+    "public_identity_ready",
+    "public_route_ready",
     "public_resource_handle_ready",
     "post_callback_resource_handle_ready",
     "public_sdk_ready",
     "resource_handle_ready",
+    "return_override",
+    "route_ready",
+    "route_readiness",
     "return_override_ready",
+    "runtime_identity_ready",
+    "runtime_route_ready",
     "runtime_ready",
+    "stable_sdk",
+    "stable_sdk_ready",
 }
 GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS = {
+    "consume_gate_ready",
     "complete_sdk",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_readiness_satisfied",
+    "contributes_to_public_sdk_v1",
+    "contributes_to_v1_completion",
+    "counts_for_public_sdk_v1",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
     "full_sdk",
+    "inventory_public_contract",
+    "mutation",
     "lookup_ready",
     "mutation_ready",
+    "object_lookup",
+    "object_lookup_ready",
+    "p0_dependency_chain_ready",
+    "p0_dependency_chain_readiness_satisfied",
+    "planning_layout_readiness_satisfied",
     "promote_ready",
     "promoted",
     "promotion_ready",
     "public_abi_ready",
     "public_api_ready",
     "public_header_allowed",
+    "public_identity",
+    "public_identity_ready",
     "public_ready",
     "public_release_ready",
+    "public_route_ready",
     "public_runtime_ready",
     "public_sdk_complete",
     "public_sdk_ready",
+    "public_sdk_readiness_satisfied",
     "public_sdk_v1_complete",
     "public_sdk_v1_ready",
     "release_readiness",
+    "release_readiness_satisfied",
     "release_ready",
     "return_override_ready",
+    "return_override",
+    "route_progress_ready",
+    "route_readiness",
+    "route_readiness_satisfied",
+    "route_ready",
     "runtime_hook_ready",
     "runtime_hooks_ready",
+    "runtime_identity",
+    "runtime_identity_ready",
     "runtime_promoted",
     "runtime_promotion_ready",
+    "runtime_route_ready",
     "runtime_ready",
+    "runtime_readiness_satisfied",
+    "sdk_readiness_satisfied",
     "sdk_complete",
     "sdk_completion",
     "sdk_ready",
     "sdk_v1_complete",
     "sdk_v1_ready",
+    "side_lane_counts_toward_v1",
+    "second_source_readiness_satisfied",
+    "side_lane_readiness_satisfied",
+    "stable_sdk_readiness_satisfied",
+    "stable_sdk",
+    "stable_sdk_ready",
+    "static_evidence_validated",
+    "target_set_promoted",
+    "transfer_runtime_ready",
     "v1_complete",
     "v1_completion",
+    "v1_completion_readiness_satisfied",
     "v1_ready",
     "v1_sdk_complete",
     "v1_sdk_ready",
 }
+GENERIC_FORBIDDEN_TRUE_CLAIM_PATH_SUFFIXES = {
+    "artifact_identity_approved",
+    "consume_gate_ready",
+    "inventory_public_contract",
+    "side_lane_counts_toward_v1",
+    "static_evidence_validated",
+    "target_set_promoted",
+    "transfer_runtime_ready",
+}
+GENERIC_POSITIVE_ACCOUNTING_KEYS = {
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress_contribution",
+    "counts_toward_v1",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_progress_contribution",
+    "public_route_progress_contribution",
+    "public_sdk_progress_contribution",
+    "route_progress_contribution",
+    "sdk_completion_progress_contribution",
+    "sdk_progress_contribution",
+    "stable_sdk_progress_contribution",
+    "runtime_progress_contribution",
+    "runtime_route_progress_contribution",
+    "v1_completion_contribution",
+    "v1_completion_progress_contribution",
+}
+SOURCE_MARKER_REACHABILITY_CONTEXT_KEYS = {
+    "public_reachability",
+    "public_reachability_status",
+    "public_reachable",
+    "publicly_reachable",
+    "source_marker",
+    "source_marker_status",
+    "source_markers",
+    "source_readiness",
+    "source_ready",
+    "source_status",
+}
+SOURCE_MARKER_REACHABILITY_CONTEXT_FRAGMENTS = (
+    "public_reachability",
+    "public_reachable",
+    "source_marker",
+    "source_markers",
+)
+SOURCE_MARKER_REACHABILITY_POSITIVE_STATUS_VALUES = {
+    "accepted",
+    "active",
+    "available",
+    "complete",
+    "enabled",
+    "promoted",
+    "public",
+    "public_ready",
+    "ready",
+    "release_ready",
+    "release_supported",
+    "runtime",
+    "runtime_ready",
+    "sdk_ready",
+    "stable",
+    "stable_ready",
+    "supported",
+    "true",
+    "validated",
+    "v1_ready",
+}
 RC_UFUNCTION_TARGET_SETS = (
     "minimal-second-source-intake",
     "structure-observer-intake",
-    "item-return-only-policy-slice",
     "chat-message-intake",
 )
 REQUIRED_RC_UFUNCTION_NON_CLAIMS = {
@@ -303,17 +471,25 @@ REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS = {
 }
 REQUIRED_READINESS_NON_PROMOTED_SURFACES = {
     "class_identity",
+    "complete_sdk",
     "cross_binary_portability",
     "inventory_identity",
+    "inventory_sdk",
     "item_identity",
+    "items_sdk",
     "lookup",
     "mutation",
     "object_identity",
     "public_sdk",
+    "p0_dependency_chain",
     "raw_params",
     "resource_handle",
     "return_override",
     "runtime_hooks",
+    "v1_completion",
+}
+REQUIRED_READINESS_DOES_NOT_SATISFY = set(NON_AUTHORIZING_READY_DOES_NOT_SATISFY) | {
+    "release_readiness",
 }
 REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS = {
     "PrimalItem.AllowEquipItem.ReturnValue",
@@ -765,8 +941,21 @@ REQUIRED_STRUCTURE_BUILD_POLICY_NON_CLAIMS = {
 
 
 def is_negative_boundary_statement(text: str) -> bool:
-    stripped = text.strip()
-    return stripped.startswith(("does not", "do not", "not "))
+    stripped = text.strip().casefold()
+    normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+    normalized = re.sub(r"[^a-zA-Z0-9]+", " ", normalized).strip().casefold()
+    return stripped.startswith(("does not", "do not", "not ")) or normalized.startswith(
+        ("does not", "do not", "not ")
+    )
+
+
+NEGATED_OR_BLOCKED_RE = re.compile(
+    r"\b(?:"
+    r"blocked|candidate-only|candidate only|does not|do not|excluded|must not|"
+    r"missing|not|no|non-claim|non claim|non-promoting|remain|remains|"
+    r"unpromoted|unproven|without"
+    r")\b"
+)
 
 
 REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS = {
@@ -1764,6 +1953,115 @@ def normalized_claim_key(key: str) -> str:
     return re.sub(r"[^a-zA-Z0-9]+", "_", key).strip("_").casefold()
 
 
+def normalized_claim_words(value: str) -> str:
+    return normalized_claim_key(value).replace("_", " ")
+
+
+SCHEMA_PROVENANCE_PROMOTION_ALIASES = frozenset(
+    (
+        "gobjects_identity",
+        "gobjects_lookup",
+        "identity_accepted",
+        "identity_evidence",
+        "identity_lookup",
+        "identity_ready",
+        "identity_readiness",
+        "mutation",
+        "object_identity",
+        "object_lookup",
+        "public_identity",
+        "resource_handle",
+        "resourcehandle",
+        "return_override",
+        "runtime_identity",
+        "stable_sdk",
+    )
+)
+
+
+def schema_or_provenance_alias_context_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    return (
+        normalized == "schema"
+        or normalized.endswith("_schema")
+        or normalized in {"catalog_alias", "provenance_alias", "schema_alias"}
+        or normalized.endswith("_catalog_alias")
+        or normalized.endswith("_provenance_alias")
+        or normalized.endswith("_schema_alias")
+    )
+
+
+def schema_provenance_promotion_aliases(value: object) -> list[str]:
+    if not isinstance(value, str) or not value:
+        return []
+    return [
+        alias
+        for alias in target_set_name_promotion_aliases(value)
+        if alias in SCHEMA_PROVENANCE_PROMOTION_ALIASES
+    ]
+
+
+def collect_schema_provenance_promotion_alias_blockers(
+    value: object,
+    *,
+    label: str,
+    reason_prefix: str,
+    trail: str = "$",
+    alias_context: bool = False,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            child_context = alias_context or schema_or_provenance_alias_context_key(str(key))
+            if isinstance(child, str) and child_context:
+                aliases = schema_provenance_promotion_aliases(child)
+                if aliases:
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_promotion_alias",
+                            "label": f"{label}:{child_trail}",
+                            "value": child,
+                            "aliases": aliases,
+                        }
+                    )
+            elif isinstance(child, (dict, list)):
+                blockers.extend(
+                    collect_schema_provenance_promotion_alias_blockers(
+                        child,
+                        label=label,
+                        reason_prefix=reason_prefix,
+                        trail=child_trail,
+                        alias_context=child_context if isinstance(child, list) else alias_context,
+                    )
+                )
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_trail = f"{trail}[{index}]"
+            if isinstance(child, str) and alias_context:
+                aliases = schema_provenance_promotion_aliases(child)
+                if aliases:
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_promotion_alias",
+                            "label": f"{label}:{child_trail}",
+                            "value": child,
+                            "aliases": aliases,
+                        }
+                    )
+            elif isinstance(child, (dict, list)):
+                blockers.extend(
+                    collect_schema_provenance_promotion_alias_blockers(
+                        child,
+                        label=label,
+                        reason_prefix=reason_prefix,
+                        trail=child_trail,
+                        alias_context=alias_context,
+                    )
+                )
+    return blockers
+
+
 def is_ready_overclaim_key(key: str) -> bool:
     normalized = normalized_claim_key(key)
     if normalized in READY_OVERCLAIM_KEYS:
@@ -1771,9 +2069,18 @@ def is_ready_overclaim_key(key: str) -> bool:
     resource_subjects = (
         "resource_handle",
         "resourcehandle",
+        "gobjects_identity",
+        "gobjects_lookup",
+        "identity_evidence",
+        "identity_lookup",
+        "mutation",
         "object_identity",
         "object_lookup",
+        "public_identity",
         "resource_lookup",
+        "runtime_identity",
+        "return_override",
+        "stable_sdk",
         "post_callback_resource_handle",
     )
     readiness_contexts = (
@@ -1806,11 +2113,104 @@ def collect_ready_overclaims(value: object, *, trail: str = "$") -> list[tuple[s
 
 
 def collect_generic_forbidden_true_claims(value: object, *, trail: str = "$") -> list[tuple[str, bool]]:
+    def is_forbidden_true_claim_path(child_trail: str) -> bool:
+        leaf = normalized_claim_key(child_trail.rsplit(".", 1)[-1])
+        normalized_trail = normalized_claim_key(child_trail)
+        if leaf in GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS or normalized_trail in GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS:
+            return True
+        return any(
+            normalized_trail.endswith(f"_{suffix}") or normalized_trail == suffix
+            for suffix in GENERIC_FORBIDDEN_TRUE_CLAIM_PATH_SUFFIXES
+        )
+
     return [
         (child_trail, child)
         for child_trail, child in collect_bool_fields(value, trail=trail)
-        if child is True and child_trail.rsplit(".", 1)[-1] in GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS
+        if child is True and is_forbidden_true_claim_path(child_trail)
     ]
+
+
+def collect_generic_positive_accounting_claims(value: object, *, trail: str = "$") -> list[tuple[str, int | float]]:
+    found: list[tuple[str, int | float]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized = normalized_claim_key(str(key))
+            if (
+                normalized in GENERIC_POSITIVE_ACCOUNTING_KEYS
+                and isinstance(child, (int, float))
+                and not isinstance(child, bool)
+                and child > 0
+            ):
+                found.append((child_trail, child))
+            elif isinstance(child, (dict, list)):
+                found.extend(collect_generic_positive_accounting_claims(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(collect_generic_positive_accounting_claims(child, trail=f"{trail}[{index}]"))
+    return found
+
+
+def source_marker_reachability_context_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    return normalized in SOURCE_MARKER_REACHABILITY_CONTEXT_KEYS or any(
+        fragment in normalized for fragment in SOURCE_MARKER_REACHABILITY_CONTEXT_FRAGMENTS
+    )
+
+
+def positive_source_marker_reachability_value(value: object) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value > 0
+    if not isinstance(value, str):
+        return False
+    normalized = normalized_claim_key(value)
+    return (
+        normalized in SOURCE_MARKER_REACHABILITY_POSITIVE_STATUS_VALUES
+        or normalized.endswith("_ready")
+        or normalized.endswith("_promoted")
+    )
+
+
+def collect_source_marker_reachability_overclaims(
+    value: object,
+    *,
+    trail: str = "$",
+    claim_context: bool = False,
+) -> list[tuple[str, object]]:
+    found: list[tuple[str, object]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            child_context = claim_context or source_marker_reachability_context_key(str(key))
+            if child_context and positive_source_marker_reachability_value(child):
+                found.append((child_trail, child))
+            if isinstance(child, (dict, list)):
+                found.extend(
+                    collect_source_marker_reachability_overclaims(
+                        child,
+                        trail=child_trail,
+                        claim_context=child_context,
+                    )
+                )
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_trail = f"{trail}[{index}]"
+            if claim_context and positive_source_marker_reachability_value(child):
+                found.append((child_trail, child))
+            if isinstance(child, (dict, list)):
+                found.extend(
+                    collect_source_marker_reachability_overclaims(
+                        child,
+                        trail=child_trail,
+                        claim_context=claim_context,
+                    )
+                )
+    elif claim_context and positive_source_marker_reachability_value(value):
+        found.append((trail, value))
+    return found
 
 
 def validate_static_orientation_report_contract(payload: dict[str, Any], *, label: str) -> list[dict[str, Any]]:
@@ -1830,6 +2230,52 @@ def validate_static_orientation_report_contract(payload: dict[str, Any], *, labe
                 "label": f"{label}:$.inputs.input_addresses",
             }
         )
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="static_orientation_report",
+            include_ready_overclaims=True,
+        )
+    )
+    blockers.extend(
+        collect_external_clone_source_policy_blockers(
+            payload,
+            label=label,
+            reason_prefix="static_orientation_report",
+        )
+    )
+
+    if payload.get("schema") == "obelisk.native-ufunction-registration-static-discovery.v1":
+        preplan_scope = payload.get("preplan_scope")
+        if isinstance(preplan_scope, dict) and preplan_scope.get("target_set") == PLAYER_LIFECYCLE_TARGET_SET:
+            approved_targets = preplan_scope.get("approved_lifecycle_triplet_source_targets")
+            expected_targets = list(PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS)
+            if not isinstance(approved_targets, list) or set(approved_targets) != set(expected_targets):
+                blockers.append(
+                    {
+                        "reason": "static_orientation_report_lifecycle_triplet_source_targets_not_exact",
+                        "label": f"{label}:$.preplan_scope.approved_lifecycle_triplet_source_targets",
+                        "expected": expected_targets,
+                        "recorded": approved_targets,
+                    }
+                )
+            requirement = preplan_scope.get("approved_runtime_triplet_requirement")
+            if isinstance(requirement, dict):
+                if requirement.get("approved_runtime_evidence_present") is not False:
+                    blockers.append(
+                        {
+                            "reason": "static_orientation_report_lifecycle_runtime_evidence_overclaim",
+                            "label": f"{label}:$.preplan_scope.approved_runtime_triplet_requirement.approved_runtime_evidence_present",
+                        }
+                    )
+                if requirement.get("static_evidence_can_replace_runtime_triplet") is not False:
+                    blockers.append(
+                        {
+                            "reason": "static_orientation_report_lifecycle_static_replaces_runtime_overclaim",
+                            "label": f"{label}:$.preplan_scope.approved_runtime_triplet_requirement.static_evidence_can_replace_runtime_triplet",
+                        }
+                    )
 
     return blockers
 
@@ -1838,12 +2284,20 @@ def collect_candidate_public_overclaims(
     value: object,
     *,
     allowed_prefixes: tuple[str, ...] = (),
+    require_promotional_context_for_bare_subjects: bool = True,
 ) -> list[tuple[str, str, str]]:
     forbidden = {
         "resourcehandle": "resourcehandle",
         "resource handle": "resource_handle",
+        "resource handle evidence": "resource_handle_evidence",
         "public api": "public_api",
         "public sdk": "public_sdk",
+        "public promotion": "public_promotion",
+        "public lookup": "public_lookup",
+        "public identity": "public_identity",
+        "public mutation": "public_mutation",
+        "public return override": "public_return_override",
+        "public route": "public_route",
         "item sdk": "public_sdk",
         "items sdk": "public_sdk",
         "mission sdk": "public_sdk",
@@ -1852,22 +2306,85 @@ def collect_candidate_public_overclaims(
         "transfers sdk": "public_sdk",
         "lookup safe": "lookup_safe",
         "lookup ready": "lookup_ready",
+        "lookup available": "lookup_available",
+        "lookup supported": "lookup_supported",
+        "identity ready": "identity_ready",
+        "identity accepted": "identity_accepted",
+        "identity evidence": "identity_evidence",
+        "mutation ready": "mutation_ready",
+        "mutation promoted": "mutation_promoted",
+        "progress ready": "progress_ready",
         "post-callback lookup ready": "post_callback_lookup_ready",
         "post callback lookup ready": "post_callback_lookup_ready",
         "public object identity": "public_object_identity",
+        "object identity ready": "object_identity_ready",
+        "object identity evidence": "object_identity_evidence",
+        "object lookup": "object_lookup",
         "public callback": "public_callback",
-        "runtime ready": "runtime_ready",
+        "route promoted": "route_promoted",
+        "route ready": "route_ready",
+        "public runtime": "public_runtime",
+        "runtime identity": "runtime_identity",
         "runtime promotion": "runtime_promotion",
+        "runtime ready": "runtime_ready",
+        "runtime hook": "runtime_hook",
+        "runtime hooks": "runtime_hooks",
         "runtime hook ready": "runtime_hook_ready",
+        "runtime validation": "runtime_validation",
+        "runtime wiring": "runtime_wiring",
+        "mutation allowed": "mutation_allowed",
+        "mutation safe": "mutation_safe",
+        "mutation supported": "mutation_supported",
+        "return override ready": "return_override_ready",
+        "return override promoted": "return_override_promoted",
+        "return override allowed": "return_override_allowed",
+        "return override safe": "return_override_safe",
+        "return override supported": "return_override_supported",
+        "stable sdk": "stable_sdk",
+        "stable sdk ready": "stable_sdk_ready",
+        "stable sdk readiness": "stable_sdk_readiness",
+        "gobjects lookup": "gobjects_lookup",
+        "gobjects identity": "gobjects_identity",
     }
+    bare_subject_reasons = {"mutation", "resourcehandle", "resource_handle", "return_override"}
+    subject_context_re = re.compile(
+        r"\b(?:"
+        r"identity|lookup|mutation|override|public|sdk"
+        r")\b"
+    )
     found: list[tuple[str, str, str]] = []
     for trail, raw_value in collect_string_fields(value):
         if any(trail.startswith(prefix) for prefix in allowed_prefixes):
             continue
         text = raw_value.casefold()
+        normalized_text = normalized_claim_words(raw_value)
+        compact_text = normalized_text.replace(" ", "")
+        promotional_context = re.search(
+            r"\b(?:accepted|allowed|available|enabled|promoted|promotion|ready|supported|validated)\b",
+            text,
+        ) or re.search(
+            r"\b(?:accepted|allowed|available|enabled|promoted|promotion|ready|supported|validated)\b",
+            normalized_text,
+        )
+        subject_context = promotional_context is not None or subject_context_re.search(normalized_text) is not None
+        if (
+            is_negative_boundary_statement(text)
+            or NEGATED_OR_BLOCKED_RE.search(text) is not None
+            or NEGATED_OR_BLOCKED_RE.search(normalized_text) is not None
+        ):
+            continue
         for needle, reason in forbidden.items():
-            if needle in text:
-                found.append((trail, raw_value, reason))
+            normalized_needle = normalized_claim_words(needle)
+            compact_needle = normalized_needle.replace(" ", "")
+            if not (needle in text or normalized_needle in normalized_text or compact_needle in compact_text):
+                continue
+            if (
+                require_promotional_context_for_bare_subjects
+                and reason in bare_subject_reasons
+                and not subject_context
+            ):
+                continue
+            found.append((trail, raw_value, reason))
     return found
 
 
@@ -1878,8 +2395,10 @@ def collect_promoted_status_overclaims(
 ) -> list[tuple[str, str]]:
     promoted_status_keys = {
         "promotion_status",
+        "progress_status",
         "readiness_status",
         "release_status",
+        "route_status",
         "sdk_status",
         "status",
     }
@@ -1887,13 +2406,459 @@ def collect_promoted_status_overclaims(
     for trail, raw_value in collect_string_fields(value):
         if any(trail.startswith(prefix) for prefix in allowed_prefixes):
             continue
-        key = trail.rsplit(".", 1)[-1]
+        key = normalized_claim_key(trail.rsplit(".", 1)[-1])
         if key not in promoted_status_keys:
             continue
         normalized = raw_value.casefold().replace("_", "-").strip()
         if normalized in {"promoted", "promotion-ready", "public-sdk-ready", "ready", "runtime-ready"}:
             found.append((trail, raw_value))
     return found
+
+
+def collect_positive_ready_alias_bools(
+    value: object,
+    *,
+    trail: str = "$",
+    allowed_paths: frozenset[str] = frozenset(),
+) -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized = normalized_claim_key(str(key))
+            if child is True and normalized == "ready" and child_trail not in allowed_paths:
+                found.append(child_trail)
+            elif isinstance(child, (dict, list)):
+                found.extend(
+                    collect_positive_ready_alias_bools(
+                        child,
+                        trail=child_trail,
+                        allowed_paths=allowed_paths,
+                    )
+                )
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(
+                    collect_positive_ready_alias_bools(
+                        child,
+                        trail=f"{trail}[{index}]",
+                        allowed_paths=allowed_paths,
+                    )
+                )
+    return found
+
+
+def target_set_name_alias_blockers(
+    target_sets: list[str],
+    *,
+    label: str,
+    reason: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    for target_set in target_sets:
+        aliases = target_set_name_promotion_aliases(target_set)
+        if aliases:
+            blockers.append(
+                {
+                    "reason": reason,
+                    "label": label,
+                    "target_set": target_set,
+                    "aliases": aliases,
+                }
+            )
+    return blockers
+
+
+def collect_promotion_gate_ready_overclaims(value: object, *, trail: str = "$") -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized = normalized_claim_key(str(key))
+            if normalized == "promotion_gate" and isinstance(child, dict) and child.get("ready") is True:
+                found.append(f"{child_trail}.ready")
+            if isinstance(child, (dict, list)):
+                found.extend(collect_promotion_gate_ready_overclaims(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(collect_promotion_gate_ready_overclaims(child, trail=f"{trail}[{index}]"))
+    return found
+
+
+def collect_candidate_only_manifest_overclaim_blockers(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    reason_prefix: str,
+    allowed_status_prefixes: tuple[str, ...] = (),
+    allowed_ready_paths: frozenset[str] = frozenset(),
+    include_ready_overclaims: bool = False,
+    include_status_overclaims: bool = True,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if include_ready_overclaims:
+        for trail, _ in collect_ready_overclaims(payload):
+            blockers.append({"reason": f"{reason_prefix}_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail in collect_positive_ready_alias_bools(payload, allowed_paths=allowed_ready_paths):
+        blockers.append({"reason": f"{reason_prefix}_ready_alias_overclaim", "label": f"{label}:{trail}"})
+    for trail, _ in collect_generic_forbidden_true_claims(payload):
+        blockers.append({"reason": f"{reason_prefix}_generic_true_claim_overclaim", "label": f"{label}:{trail}"})
+    for trail, value in collect_generic_positive_accounting_claims(payload):
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_positive_accounting_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
+    for trail, value in collect_source_marker_reachability_overclaims(payload):
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_source_marker_reachability_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
+    if include_status_overclaims:
+        for trail, value in collect_promoted_status_overclaims(payload, allowed_prefixes=allowed_status_prefixes):
+            blockers.append(
+                {
+                    "reason": f"{reason_prefix}_status_alias_overclaim",
+                    "label": f"{label}:{trail}",
+                    "value": value,
+                }
+            )
+    return blockers
+
+
+EXTERNAL_CLONE_SOURCE_NAMES = {
+    "arkserverapi": "ArkServerApi",
+    "aseapi": "AseApi",
+    "nextgenplugins": "NextGenPlugins",
+}
+EXTERNAL_CLONE_SOURCE_CONTEXT_KEYS = {
+    "clone",
+    "clones",
+    "external_clone",
+    "external_clones",
+    "external_source",
+    "external_sources",
+    "origin",
+    "origins",
+    "provenance",
+    "reference",
+    "references",
+    "source",
+    "source_origin",
+    "source_origins",
+    "source_provenance",
+    "sources",
+    "upstream",
+    "upstreams",
+}
+EXTERNAL_CLONE_FORBIDDEN_SOURCE_RE = re.compile(
+    r"(?:"
+    r"abi|address|addresses|behavior|call|code|constant|constants|control_?flow|"
+    r"copy|copied|implementation|implementations|layout|layouts|memory|offset|offsets|"
+    r"param|params|parameter|parameters|property|properties|schema|sdk|source_?code|"
+    r"vtable|vtables|windows|msvc|runtime|hook|hooks|process_?event|p0|complete|"
+    r"public|identity|lookup|mutation|resource_?handle|resourcehandle|return_?override|"
+    r"ready|readiness|promot|validated"
+    r")",
+    re.IGNORECASE,
+)
+EXTERNAL_CLONE_ALLOWED_ONLY_RE = re.compile(
+    r"(?:^|_)(?:"
+    r"demand|demand_?signal|demand_?signals|discovery_?name|name|names|naming|"
+    r"name_?signal|source_?name|source_?names"
+    r")(?:_only)?(?:_|$)",
+    re.IGNORECASE,
+)
+
+
+def external_clone_names_in_text(value: str) -> list[str]:
+    normalized = normalized_claim_key(value)
+    compact = normalized.replace("_", "")
+    names = []
+    for compact_name, display_name in EXTERNAL_CLONE_SOURCE_NAMES.items():
+        if compact_name in compact:
+            names.append(display_name)
+    return names
+
+
+def external_clone_source_context_key(key: object) -> bool:
+    normalized = normalized_claim_key(str(key))
+    return normalized in EXTERNAL_CLONE_SOURCE_CONTEXT_KEYS or (
+        "source" in normalized and "sha256" not in normalized
+    )
+
+
+def external_clone_source_forbidden_text(value: str) -> str | None:
+    normalized = normalized_claim_key(value)
+    words = normalized.replace("_", " ")
+    if NEGATED_OR_BLOCKED_RE.search(words):
+        return None
+    if EXTERNAL_CLONE_ALLOWED_ONLY_RE.search(normalized) and not EXTERNAL_CLONE_FORBIDDEN_SOURCE_RE.search(normalized):
+        return None
+    match = EXTERNAL_CLONE_FORBIDDEN_SOURCE_RE.search(normalized)
+    return match.group(0) if match else None
+
+
+def external_clone_names_in_node(value: object) -> list[str]:
+    names: set[str] = set()
+    for _, text in collect_string_fields(value):
+        names.update(external_clone_names_in_text(text))
+    for _, key in collect_key_names(value):
+        names.update(external_clone_names_in_text(key))
+    return sorted(names)
+
+
+def collect_external_clone_forbidden_source_terms(
+    value: object,
+    *,
+    trail: str = "$",
+) -> list[tuple[str, object, str]]:
+    found: list[tuple[str, object, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            key_reason = external_clone_source_forbidden_text(str(key))
+            if key_reason is not None and child not in (False, None, "", [], {}):
+                found.append((child_trail, child, key_reason))
+            if isinstance(child, str):
+                value_reason = external_clone_source_forbidden_text(child)
+                if value_reason is not None:
+                    found.append((child_trail, child, value_reason))
+            elif isinstance(child, (dict, list)):
+                found.extend(collect_external_clone_forbidden_source_terms(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_trail = f"{trail}[{index}]"
+            if isinstance(child, str):
+                value_reason = external_clone_source_forbidden_text(child)
+                if value_reason is not None:
+                    found.append((child_trail, child, value_reason))
+            elif isinstance(child, (dict, list)):
+                found.extend(collect_external_clone_forbidden_source_terms(child, trail=child_trail))
+    return found
+
+
+def collect_external_clone_source_policy_blockers(
+    value: object,
+    *,
+    label: str,
+    reason_prefix: str,
+    trail: str = "$",
+    source_context: bool = False,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        if source_context:
+            clone_names = external_clone_names_in_node(value)
+            if clone_names:
+                for bad_trail, bad_value, reason in collect_external_clone_forbidden_source_terms(value, trail=trail):
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_external_clone_source_overclaim",
+                            "label": f"{label}:{bad_trail}",
+                            "clone_sources": clone_names,
+                            "forbidden": reason,
+                            "value": bad_value,
+                        }
+                    )
+                return blockers
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            child_context = source_context or external_clone_source_context_key(key)
+            if isinstance(child, str) and child_context:
+                clone_names = external_clone_names_in_text(child)
+                reason = external_clone_source_forbidden_text(child)
+                if clone_names and reason is not None:
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_external_clone_source_overclaim",
+                            "label": f"{label}:{child_trail}",
+                            "clone_sources": clone_names,
+                            "forbidden": reason,
+                            "value": child,
+                        }
+                    )
+            elif isinstance(child, (dict, list)):
+                blockers.extend(
+                    collect_external_clone_source_policy_blockers(
+                        child,
+                        label=label,
+                        reason_prefix=reason_prefix,
+                        trail=child_trail,
+                        source_context=child_context,
+                    )
+                )
+    elif isinstance(value, list):
+        if source_context:
+            clone_names = external_clone_names_in_node(value)
+            if clone_names:
+                for bad_trail, bad_value, reason in collect_external_clone_forbidden_source_terms(value, trail=trail):
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_external_clone_source_overclaim",
+                            "label": f"{label}:{bad_trail}",
+                            "clone_sources": clone_names,
+                            "forbidden": reason,
+                            "value": bad_value,
+                        }
+                    )
+                return blockers
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                blockers.extend(
+                    collect_external_clone_source_policy_blockers(
+                        child,
+                        label=label,
+                        reason_prefix=reason_prefix,
+                        trail=f"{trail}[{index}]",
+                        source_context=source_context,
+                    )
+                )
+            elif isinstance(child, str) and source_context:
+                clone_names = external_clone_names_in_text(child)
+                reason = external_clone_source_forbidden_text(child)
+                if clone_names and reason is not None:
+                    blockers.append(
+                        {
+                            "reason": f"{reason_prefix}_external_clone_source_overclaim",
+                            "label": f"{label}:{trail}[{index}]",
+                            "clone_sources": clone_names,
+                            "forbidden": reason,
+                            "value": child,
+                        }
+                    )
+    return blockers
+
+
+PUBLIC_BOUNDARY_ALIAS_SUBJECT_RE = re.compile(
+    r"(?:"
+    r"resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|"
+    r"public_?lookup|public_?identity|public_?sdk|complete_?sdk|v1_?completion|"
+    r"post_?callback_?(?:lookup|handle|object_?validity|validity)|"
+    r"lookup_?privacy|privacy_?boundary|resource_?handle_?lifetime|handle_?lifetime|"
+    r"serial_?scan|flag_?reports?|uobject_?flags?|weak_?helper|caller_?rows?|"
+    r"offline_?artifact_?gate|artifact_?gate|"
+    r"package_?support|package_?label|support_?tier|support_?label|support_?status|"
+    r"runtime_?status"
+    r")",
+    re.IGNORECASE,
+)
+PUBLIC_BOUNDARY_ALIAS_CONTEXT_RE = re.compile(
+    r"(?:"
+    r"public|sdk|v1|abi|release|promot|ready|readiness|status|support|tier|label|"
+    r"accepted|acceptance|approved|approval|available|enabled|validated|stable|"
+    r"complete|completion|lookup|identity|handle|post_?callback|runtime"
+    r")",
+    re.IGNORECASE,
+)
+PUBLIC_BOUNDARY_ALIAS_POSITIVE_VALUE_RE = re.compile(
+    r"(?:^|_)(?:"
+    r"accepted|approved|available|cleared|complete|enabled|included|passed|promoted|"
+    r"proven|ready|resolved|satisfied|stable|supported|unblocked|unlocked|validated|"
+    r"yes|true"
+    r")(?:_|$)",
+    re.IGNORECASE,
+)
+PUBLIC_BOUNDARY_ALIAS_NEGATED_RE = re.compile(
+    r"(?:^|_)(?:"
+    r"blocked|candidate_blocked|does_not|do_not|excluded|missing|must_not|no|non_claim|"
+    r"non_promoted|not|not_claimed|not_promoted|reject|rejected|required|"
+    r"dependency|depends|before|redacted|unchanged|unpromoted|unproven|without"
+    r")(?:_|$)",
+    re.IGNORECASE,
+)
+
+
+def public_boundary_alias_path(path: str) -> bool:
+    normalized = normalized_claim_key(path)
+    if PUBLIC_BOUNDARY_ALIAS_NEGATED_RE.search(normalized):
+        return False
+    return bool(
+        PUBLIC_BOUNDARY_ALIAS_SUBJECT_RE.search(normalized)
+        and PUBLIC_BOUNDARY_ALIAS_CONTEXT_RE.search(normalized)
+    )
+
+
+def positive_public_boundary_alias_value(value: object) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value > 0
+    if isinstance(value, str):
+        normalized = normalized_claim_key(value)
+        if PUBLIC_BOUNDARY_ALIAS_NEGATED_RE.search(normalized):
+            return False
+        return PUBLIC_BOUNDARY_ALIAS_POSITIVE_VALUE_RE.search(normalized) is not None
+    return False
+
+
+def collect_public_boundary_alias_overclaims(value: object, *, trail: str = "$") -> list[tuple[str, object]]:
+    found: list[tuple[str, object]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if public_boundary_alias_path(child_trail) and positive_public_boundary_alias_value(child):
+                found.append((child_trail, child))
+            if isinstance(child, (dict, list)):
+                found.extend(collect_public_boundary_alias_overclaims(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_trail = f"{trail}[{index}]"
+            if public_boundary_alias_path(child_trail) and positive_public_boundary_alias_value(child):
+                found.append((child_trail, child))
+            if isinstance(child, (dict, list)):
+                found.extend(collect_public_boundary_alias_overclaims(child, trail=child_trail))
+    return found
+
+
+def collect_public_boundary_alias_overclaim_blockers(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "reason": f"{reason_prefix}_public_boundary_alias_overclaim",
+            "label": f"{label}:{trail}",
+            "value": value,
+        }
+        for trail, value in collect_public_boundary_alias_overclaims(payload)
+    ]
+
+
+def target_set_catalog_hygiene_blockers(
+    target_sets: list[str],
+    *,
+    label: str,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    if not target_sets:
+        return []
+    issues = target_set_catalog_hygiene_issues()
+    if not issues:
+        return []
+    blockers: list[dict[str, Any]] = []
+    for issue in issues:
+        blocker: dict[str, Any] = {
+            "reason": f"{reason_prefix}_target_set_catalog_hygiene_failed",
+            "label": label,
+            "issue": issue,
+        }
+        if isinstance(issue, dict):
+            if isinstance(issue.get("target_set"), str):
+                blocker["target_set"] = issue["target_set"]
+            if isinstance(issue.get("reason"), str):
+                blocker["catalog_reason"] = issue["reason"]
+        blockers.append(blocker)
+    return blockers
 
 
 def collect_source_artifact_id_values(source_artifact_ids: list[object]) -> tuple[dict[str, list[str]], list[dict[str, Any]]]:
@@ -1909,6 +2874,49 @@ def collect_source_artifact_id_values(source_artifact_ids: list[object]) -> tupl
             continue
         parsed_source_ids[key].append(value)
     return parsed_source_ids, blockers
+
+
+def source_artifact_id_duplicate_blockers(
+    source_artifact_ids: object,
+    *,
+    label: str,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(source_artifact_ids, list):
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    string_source_ids = [source_id for source_id in source_artifact_ids if isinstance(source_id, str)]
+    duplicate_entries = duplicate_strings(string_source_ids)
+    if duplicate_entries:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_source_ids_duplicate",
+                "label": label,
+                "duplicates": duplicate_entries,
+            }
+        )
+
+    values_by_kind: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
+    for source_id in string_source_ids:
+        key, separator, value = source_id.partition(":")
+        if separator and key in values_by_kind:
+            values_by_kind[key].append(value)
+
+    for key, values in values_by_kind.items():
+        duplicates = duplicate_strings(values)
+        if not duplicates:
+            continue
+        reason_field = "source_artifact_hash" if key == "artifact_sha256" else key
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_{reason_field}_duplicate",
+                "label": label,
+                "field": key,
+                "duplicates": duplicates,
+            }
+        )
+    return blockers
 
 
 def is_safe_semantic_input_name(value: object) -> bool:
@@ -2100,6 +3108,52 @@ def duplicate_strings(values: list[str]) -> list[str]:
     return duplicates
 
 
+def known_target_set_targets(target_set: str) -> list[str] | None:
+    try:
+        from reflection_target_sets import TARGET_SETS
+    except ImportError:
+        return None
+
+    entries = TARGET_SETS.get(target_set)
+    if entries is None:
+        return None
+    targets: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, str):
+            continue
+        if entry not in seen:
+            targets.append(entry)
+            seen.add(entry)
+    return targets
+
+
+def known_target_set_schemas(target_set: str) -> list[str] | None:
+    targets = known_target_set_targets(target_set)
+    if targets is None:
+        return None
+    schemas: set[str] = set()
+    for target in targets:
+        schema, separator, _ = target.partition(":")
+        schemas.add(schema if separator else "")
+    return sorted(schemas)
+
+
+def known_target_set_metadata(target_set: str) -> dict[str, str] | None:
+    try:
+        from reflection_target_sets import target_set_module_lane, target_set_readiness_classification
+    except ImportError:
+        return None
+
+    try:
+        return {
+            "module_lane": target_set_module_lane(target_set),
+            "readiness_classification": target_set_readiness_classification(target_set),
+        }
+    except KeyError:
+        return None
+
+
 def known_ufunction_target_set_targets(target_set: str) -> list[str] | None:
     try:
         from reflection_target_sets import TARGET_SETS
@@ -2138,6 +3192,130 @@ def known_ufunction_target_set_metadata(target_set: str) -> dict[str, str] | Non
         return None
 
 
+def target_set_revision_source_sha256_from_records(
+    records: list[dict[str, Any]],
+    *,
+    target_schema_filter: str,
+) -> str:
+    material = {
+        "schema": TARGET_SET_REVISION_SCHEMA,
+        "source": TARGET_SET_REVISION_SOURCE,
+        "target_schema_filter": target_schema_filter,
+        "target_sets": sorted(records, key=lambda item: str(item.get("name", ""))),
+    }
+    return hashlib.sha256(canonical_json_bytes(material)).hexdigest()
+
+
+def ufunction_target_set_revision_records(target_sets: list[str]) -> list[dict[str, Any]] | None:
+    records: list[dict[str, Any]] = []
+    for target_set in sorted(set(target_sets)):
+        targets = known_ufunction_target_set_targets(target_set)
+        metadata = known_ufunction_target_set_metadata(target_set)
+        if targets is None or metadata is None:
+            return None
+        records.append(
+            {
+                "name": target_set,
+                "module_lane": metadata["module_lane"],
+                "readiness_classification": metadata["readiness_classification"],
+                "targets": targets,
+            }
+        )
+    return records
+
+
+def ufunction_target_set_revision_source_sha256(target_sets: list[str]) -> str | None:
+    records = ufunction_target_set_revision_records(target_sets)
+    if records is None:
+        return None
+    return target_set_revision_source_sha256_from_records(
+        records,
+        target_schema_filter=RC_UFUNCTION_SNAPSHOT_SCHEMA,
+    )
+
+
+def all_target_set_revision_records(target_sets: list[str]) -> list[dict[str, Any]] | None:
+    records: list[dict[str, Any]] = []
+    for target_set in sorted(set(target_sets)):
+        targets = known_target_set_targets(target_set)
+        metadata = known_target_set_metadata(target_set)
+        if targets is None or metadata is None:
+            return None
+        records.append(
+            {
+                "name": target_set,
+                "module_lane": metadata["module_lane"],
+                "readiness_classification": metadata["readiness_classification"],
+                "targets": targets,
+            }
+        )
+    return records
+
+
+def all_target_set_revision_source_sha256(target_sets: list[str]) -> str | None:
+    records = all_target_set_revision_records(target_sets)
+    if records is None:
+        return None
+    return target_set_revision_source_sha256_from_records(records, target_schema_filter="all")
+
+
+def validate_target_set_revision_source_fields(
+    value: dict[str, Any],
+    *,
+    label: str,
+    declared_target_sets: list[str],
+    expected_source_sha256: str | None,
+    reason_prefix: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not declared_target_sets:
+        return blockers
+    if value.get("target_set_revision_schema") != TARGET_SET_REVISION_SCHEMA:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_target_set_revision_schema_mismatch",
+                "label": f"{label}.target_set_revision_schema",
+                "expected": TARGET_SET_REVISION_SCHEMA,
+                "recorded": value.get("target_set_revision_schema"),
+            }
+        )
+    if "target_set_revision_source" in value and value.get("target_set_revision_source") != TARGET_SET_REVISION_SOURCE:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_target_set_revision_source_mismatch",
+                "label": f"{label}.target_set_revision_source",
+                "expected": TARGET_SET_REVISION_SOURCE,
+                "recorded": value.get("target_set_revision_source"),
+            }
+        )
+    source_sha256 = value.get("target_set_revision_source_sha256")
+    if not isinstance(source_sha256, str) or SHA256_RE.fullmatch(source_sha256) is None:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_target_set_revision_source_sha256_invalid",
+                "label": f"{label}.target_set_revision_source_sha256",
+                "recorded": source_sha256,
+            }
+        )
+    elif expected_source_sha256 is None:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_target_set_revision_source_sha256_unavailable",
+                "label": f"{label}.target_set_revision_source_sha256",
+            }
+        )
+    elif source_sha256 != expected_source_sha256:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_target_set_revision_source_sha256_mismatch",
+                "label": f"{label}.target_set_revision_source_sha256",
+                "expected": expected_source_sha256,
+                "recorded": source_sha256,
+            }
+        )
+    return blockers
+
+
 def expected_rc_ufunction_target_sources() -> dict[str, list[str]] | None:
     try:
         from reflection_target_sets import TARGET_SETS
@@ -2165,6 +3343,61 @@ def rc_manifest_relative_path_blockers(value: object, *, label: str) -> list[dic
     if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
         return [{"reason": "rc_ufunction_manifest_snapshot_relative_path_invalid", "label": label, "recorded": value}]
     return []
+
+
+def rc_snapshot_target_key(payload: dict[str, Any]) -> str | None:
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], dict):
+        return None
+    identity = targets[0].get("target")
+    if not isinstance(identity, dict):
+        return None
+    outer = identity.get("outer_name")
+    name = identity.get("name")
+    if not isinstance(outer, str) or not isinstance(name, str):
+        return None
+    return f"{RC_UFUNCTION_SNAPSHOT_SCHEMA}:{outer}.{name}"
+
+
+def validate_rc_manifest_snapshot_payload(
+    snapshot_path: Path,
+    *,
+    expected_target: object,
+    label: str,
+) -> list[dict[str, Any]]:
+    payload, load_blockers = load_json(snapshot_path)
+    if payload is None:
+        return load_blockers
+
+    blockers: list[dict[str, Any]] = []
+    if payload.get("schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
+        blockers.append(
+            {
+                "reason": "rc_ufunction_manifest_snapshot_file_schema_mismatch",
+                "label": f"{label}.relative_path",
+                "recorded_schema": payload.get("schema"),
+            }
+        )
+        return blockers
+
+    actual_target = rc_snapshot_target_key(payload)
+    if actual_target is None:
+        blockers.append(
+            {
+                "reason": "rc_ufunction_manifest_snapshot_file_target_invalid",
+                "label": f"{label}.relative_path",
+            }
+        )
+    elif actual_target != expected_target:
+        blockers.append(
+            {
+                "reason": "rc_ufunction_manifest_snapshot_file_target_mismatch",
+                "label": f"{label}.relative_path",
+                "expected": expected_target,
+                "recorded": actual_target,
+            }
+        )
+    return blockers
 
 
 def validate_rc_manifest_no_absolute_strings(payload: dict[str, Any], *, label: str) -> list[dict[str, Any]]:
@@ -2349,8 +3582,29 @@ def validate_rc_ufunction_second_source_root_manifest(
                     }
                 )
             elif snapshot_path is not None and snapshot_path.is_file():
-                actual_sha256 = sha256_file(snapshot_path)
-                if actual_sha256 != snapshot_sha256:
+                try:
+                    actual_sha256 = checked_sha256_file(snapshot_path)
+                except SymlinkPathError as exc:
+                    blockers.append(
+                        {
+                            "reason": "rc_ufunction_manifest_snapshot_path_is_symlink",
+                            "label": f"{snapshot_label}.relative_path",
+                            "symlink_component": str(exc.component),
+                        }
+                    )
+                    actual_sha256 = None
+                except OSError as exc:
+                    blockers.append(
+                        {
+                            "reason": "rc_ufunction_manifest_snapshot_file_unreadable",
+                            "label": f"{snapshot_label}.relative_path",
+                            "detail": str(exc),
+                        }
+                    )
+                    actual_sha256 = None
+                if actual_sha256 is None:
+                    pass
+                elif actual_sha256 != snapshot_sha256:
                     blockers.append(
                         {
                             "reason": "rc_ufunction_manifest_snapshot_sha256_mismatch",
@@ -2358,6 +3612,14 @@ def validate_rc_ufunction_second_source_root_manifest(
                             "expected": actual_sha256,
                             "recorded": snapshot_sha256,
                         }
+                    )
+                else:
+                    blockers.extend(
+                        validate_rc_manifest_snapshot_payload(
+                            snapshot_path,
+                            expected_target=target,
+                            label=snapshot_label,
+                        )
                     )
             evidence = snapshot.get("evidence")
             if not isinstance(evidence, dict):
@@ -2416,12 +3678,49 @@ def validate_target_set_coverage(
             }
         )
     require_complete_named_coverage = bool(target_sets or source_target_sets)
+    coverage_declared_entries = coverage.get("declared_target_sets")
+    coverage_declares_named_sets = isinstance(coverage_declared_entries, list) and bool(coverage_declared_entries)
+    coverage_claims_exact = (
+        coverage.get("status") == "complete"
+        or coverage.get("complete") is True
+        or coverage.get("exact_coverage") is True
+    )
     if not strict and not require_complete_named_coverage:
+        if coverage_declares_named_sets:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_target_set_coverage_declared_without_top_level_target_sets",
+                    "label": f"{source_label}:$.target_set_coverage.declared_target_sets",
+                }
+            )
+        if coverage_claims_exact:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_target_set_coverage_exact_without_top_level_target_sets",
+                    "label": f"{source_label}:$.target_set_coverage",
+                }
+            )
         return blockers
 
     declared = [(target_set, "manifest") for target_set in target_sets] + [
         (target_set, "snapshot") for target_set in source_target_sets
     ]
+    source_overlap = sorted(set(target_sets).intersection(source_target_sets))
+    if source_overlap:
+        blockers.append(
+            {
+                "reason": "signature_manifest_target_set_source_overlap",
+                "label": f"{source_label}:$.target_set_coverage",
+                "target_sets": source_overlap,
+            }
+        )
+    blockers.extend(
+        target_set_name_alias_blockers(
+            [target_set for target_set, _ in declared],
+            label=f"{source_label}:$.target_set_coverage",
+            reason="signature_manifest_target_set_name_promotion_alias",
+        )
+    )
     expanded: dict[str, list[str]] = {}
     target_set_metadata: dict[str, dict[str, str]] = {}
     for target_set, _ in declared:
@@ -2448,6 +3747,19 @@ def validate_target_set_coverage(
         else:
             target_set_metadata[target_set] = metadata
 
+    if declared:
+        blockers.extend(
+            validate_target_set_revision_source_fields(
+                coverage,
+                label=f"{source_label}:$.target_set_coverage",
+                declared_target_sets=[target_set for target_set, _ in declared],
+                expected_source_sha256=ufunction_target_set_revision_source_sha256(
+                    [target_set for target_set, _ in declared]
+                ),
+                reason_prefix="signature_manifest_target_set_coverage",
+            )
+        )
+
     expected_targets = unique_ordered(
         [
             target
@@ -2466,6 +3778,7 @@ def validate_target_set_coverage(
     recorded_emitted = coverage.get("emitted_targets")
     recorded_missing = coverage.get("missing_targets")
     recorded_unexpected = coverage.get("unexpected_targets")
+    exact_coverage = bool(declared) and not missing_targets and not unexpected_targets
 
     if recorded_expected != expected_targets:
         blockers.append(
@@ -2513,6 +3826,35 @@ def validate_target_set_coverage(
             }
         )
 
+    if coverage.get("exact_coverage") is not exact_coverage:
+        blockers.append(
+            {
+                "reason": "signature_manifest_target_set_exact_coverage_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.exact_coverage",
+                "expected": exact_coverage,
+                "recorded": coverage.get("exact_coverage"),
+            }
+        )
+    expected_scope = "declared_named_target_sets" if declared else "unscoped_direct_snapshots"
+    if coverage.get("coverage_scope") != expected_scope:
+        blockers.append(
+            {
+                "reason": "signature_manifest_target_set_coverage_scope_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.coverage_scope",
+                "expected": expected_scope,
+                "recorded": coverage.get("coverage_scope"),
+            }
+        )
+    recorded_blockers = coverage.get("blockers")
+    if exact_coverage and recorded_blockers != []:
+        blockers.append(
+            {
+                "reason": "signature_manifest_target_set_coverage_blockers_present",
+                "label": f"{source_label}:$.target_set_coverage.blockers",
+                "recorded": recorded_blockers,
+            }
+        )
+
     expected_status = "complete" if declared else "not_declared"
     if coverage.get("status") != expected_status:
         blockers.append(
@@ -2536,6 +3878,29 @@ def validate_target_set_coverage(
     if not isinstance(entries, list):
         blockers.append({"reason": "signature_manifest_declared_target_sets_not_list", "label": f"{source_label}:$.target_set_coverage.declared_target_sets"})
         return blockers
+    row_keys = [
+        f"{entry.get('source')}:{entry.get('name')}"
+        for entry in entries
+        if isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and isinstance(entry.get("source"), str)
+    ]
+    duplicate_row_keys = duplicate_strings(row_keys)
+    duplicate_row_names = duplicate_strings(
+        [
+            entry.get("name")
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+        ]
+    )
+    if duplicate_row_keys or duplicate_row_names:
+        blockers.append(
+            {
+                "reason": "signature_manifest_duplicate_target_set_coverage_rows",
+                "label": f"{source_label}:$.target_set_coverage.declared_target_sets",
+                "duplicates": sorted(set(duplicate_row_keys + duplicate_row_names)),
+            }
+        )
     if len(entries) != len(declared):
         blockers.append(
             {
@@ -2608,6 +3973,24 @@ def validate_target_set_coverage(
                     "label": f"{source_label}:{trail}",
                 }
             )
+        for trail in collect_positive_ready_alias_bools(
+            entry,
+            trail=f"$.target_set_coverage.declared_target_sets[{index}]",
+        ):
+            blockers.append(
+                {
+                    "reason": "signature_manifest_declared_target_set_readiness_overclaim",
+                    "label": f"{source_label}:{trail}",
+                }
+            )
+        for trail, value in collect_promoted_status_overclaims(entry):
+            blockers.append(
+                {
+                    "reason": "signature_manifest_declared_target_set_status_overclaim",
+                    "label": f"{entry_label}:{trail}",
+                    "value": value,
+                }
+            )
         for trail, _, reason in collect_candidate_public_overclaims(entry):
             blockers.append(
                 {
@@ -2638,16 +4021,89 @@ def validate_target_set_coverage(
     return blockers
 
 
+def redacted_signature_has_target_set_claim(payload: dict[str, Any]) -> bool:
+    for key in ("target_sets", "source_target_sets"):
+        values = payload.get(key)
+        if isinstance(values, list) and any(isinstance(item, str) and item for item in values):
+            return True
+    coverage = payload.get("target_set_coverage")
+    if not isinstance(coverage, dict):
+        return False
+    entries = coverage.get("declared_target_sets")
+    if isinstance(entries, list):
+        for entry in entries:
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str) and entry["name"]:
+                return True
+    return False
+
+
+def validate_redacted_signature_source_artifact_ids(
+    identity: dict[str, Any],
+    *,
+    source_label: str,
+    require_complete_identity: bool,
+) -> list[dict[str, Any]]:
+    source_artifact_ids = identity.get("source_artifact_ids")
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(source_artifact_ids, list):
+        return [
+            {
+                "reason": "signature_manifest_artifact_identity_source_ids_invalid",
+                "label": f"{source_label}:$.artifact_identity.source_artifact_ids",
+            }
+        ]
+    if require_complete_identity and not source_artifact_ids:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_source_ids_missing",
+                "label": f"{source_label}:$.artifact_identity.source_artifact_ids",
+            }
+        )
+    blockers.extend(
+        source_artifact_id_duplicate_blockers(
+            source_artifact_ids,
+            label=f"{source_label}:$.artifact_identity.source_artifact_ids",
+            reason_prefix="signature_manifest_artifact_identity",
+        )
+    )
+    present_source_id_kinds: set[str] = set()
+    for index, source_id in enumerate(source_artifact_ids):
+        if not isinstance(source_id, str) or REDACTED_SIGNATURE_SOURCE_ARTIFACT_ID_RE.fullmatch(source_id) is None:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_artifact_identity_source_id_invalid",
+                    "label": f"{source_label}:$.artifact_identity.source_artifact_ids[{index}]",
+                    "recorded": source_id,
+                }
+            )
+            continue
+        kind, _, _ = source_id.partition(":")
+        present_source_id_kinds.add(kind)
+    if require_complete_identity and source_artifact_ids:
+        required_source_id_kinds = {"artifact_sha256", "capture_id", "evidence_pack_id"}
+        missing_source_id_kinds = sorted(required_source_id_kinds - present_source_id_kinds)
+        if missing_source_id_kinds:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_artifact_identity_source_ids_incomplete",
+                    "label": f"{source_label}:$.artifact_identity.source_artifact_ids",
+                    "missing": missing_source_id_kinds,
+                }
+            )
+    return blockers
+
+
 def validate_redacted_signature_artifact_identity(
     payload: dict[str, Any],
     *,
     source_label: str,
     expected_binary_sha256: str | None,
+    require_complete_identity: bool,
 ) -> tuple[str | None, list[dict[str, Any]]]:
     identity = payload.get("artifact_identity")
     blockers: list[dict[str, Any]] = []
     if identity is None:
-        if expected_binary_sha256 is not None:
+        if expected_binary_sha256 is not None or require_complete_identity:
             blockers.append(
                 {
                     "reason": "signature_manifest_missing_artifact_identity",
@@ -2660,9 +4116,27 @@ def validate_redacted_signature_artifact_identity(
         return None, [{"reason": "signature_manifest_artifact_identity_not_object", "label": f"{source_label}:$.artifact_identity"}]
 
     for trail, _ in collect_path_fields(identity, trail="$.artifact_identity"):
+        if trail.startswith("$.artifact_identity.source_artifact_ids"):
+            continue
         blockers.append({"reason": "signature_manifest_artifact_identity_path_present", "label": f"{source_label}:{trail}"})
     if identity.get("path_redacted") is not True:
         blockers.append({"reason": "signature_manifest_artifact_identity_path_not_redacted", "label": f"{source_label}:$.artifact_identity.path_redacted"})
+    if require_complete_identity and set(identity) != REQUIRED_REDACTED_SIGNATURE_ARTIFACT_IDENTITY_KEYS:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_fields_mismatch",
+                "label": f"{source_label}:$.artifact_identity",
+                "expected": sorted(REQUIRED_REDACTED_SIGNATURE_ARTIFACT_IDENTITY_KEYS),
+                "recorded": sorted(identity),
+            }
+        )
+    blockers.extend(
+        validate_redacted_signature_source_artifact_ids(
+            identity,
+            source_label=source_label,
+            require_complete_identity=require_complete_identity,
+        )
+    )
 
     recorded_sha = identity.get("ark_binary_sha256")
     if not isinstance(recorded_sha, str) or SHA256_RE.fullmatch(recorded_sha) is None:
@@ -2684,6 +4158,104 @@ def validate_redacted_signature_artifact_identity(
             }
         )
     return recorded_sha, blockers
+
+
+def validate_redacted_signature_target_set_revision(
+    payload: dict[str, Any],
+    *,
+    source_label: str,
+    declared_target_sets: list[str],
+) -> list[dict[str, Any]]:
+    identity = payload.get("artifact_identity")
+    if not isinstance(identity, dict):
+        return []
+    revision = identity.get("target_set_revision")
+
+    blockers: list[dict[str, Any]] = []
+    expected_source_sha256 = ufunction_target_set_revision_source_sha256(declared_target_sets) if declared_target_sets else None
+    blockers.extend(
+        validate_target_set_revision_source_fields(
+            identity,
+            label=f"{source_label}:$.artifact_identity",
+            declared_target_sets=declared_target_sets,
+            expected_source_sha256=expected_source_sha256,
+            reason_prefix="signature_manifest_artifact_identity",
+        )
+    )
+    if not isinstance(revision, str) or not revision:
+        if declared_target_sets or "target_set_revision" in identity:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_artifact_identity_target_set_revision_invalid",
+                    "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                    "recorded": revision,
+                }
+            )
+        return blockers
+
+    aliases = target_set_name_promotion_aliases(revision.removeprefix("reflection_target_sets.py:"))
+    if aliases:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_target_set_revision_promotion_alias",
+                "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                "recorded": revision,
+                "aliases": aliases,
+            }
+        )
+
+    prefix = "reflection_target_sets.py:"
+    if not revision.startswith(prefix):
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_target_set_revision_schema_mismatch",
+                "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                "expected_prefix": prefix,
+                "recorded": revision,
+            }
+        )
+        return blockers
+    revision_names = [
+        item
+        for item in re.split(r"[,;+\s]+", revision[len(prefix) :])
+        if item
+    ]
+    if revision_names == ["test-fixture"] and not declared_target_sets:
+        return blockers
+    if not declared_target_sets:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_target_set_revision_without_declared_target_sets",
+                "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                "recorded": revision,
+            }
+        )
+        return blockers
+    declared_set = set(declared_target_sets)
+    revision_set = set(revision_names)
+    duplicate_revision_names = sorted(
+        name
+        for name, count in Counter(revision_names).items()
+        if count > 1
+    )
+    if duplicate_revision_names:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_target_set_revision_duplicate",
+                "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                "duplicates": duplicate_revision_names,
+            }
+        )
+    if revision_set != declared_set:
+        blockers.append(
+            {
+                "reason": "signature_manifest_artifact_identity_target_set_revision_stale",
+                "label": f"{source_label}:$.artifact_identity.target_set_revision",
+                "expected_declared_target_sets": sorted(declared_set),
+                "recorded": revision,
+            }
+        )
+    return blockers
 
 
 def validate_redacted_signature_embedded_provenance(
@@ -2757,6 +4329,14 @@ def validate_redacted_signature_embedded_provenance(
                 "recorded_sidecar_sha256": sidecar_sha256,
             }
         )
+    blockers.extend(
+        collect_external_clone_source_policy_blockers(
+            provenance,
+            label=label,
+            reason_prefix="signature_manifest_input_snapshot_provenance",
+            source_context=True,
+        )
+    )
     return blockers
 
 
@@ -2770,6 +4350,8 @@ def validate_redacted_signature_claim_wording(payload: dict[str, Any], *, source
         "public sdk ready": "public_sdk_ready",
         "public sdk support": "public_sdk_support",
         "sdk ready": "sdk_ready",
+        "stable sdk ready": "stable_sdk_ready",
+        "stable sdk readiness": "stable_sdk_readiness",
         "release ready": "release_ready",
         "runtime ready": "runtime_ready",
         "runtime hook ready": "runtime_hook_ready",
@@ -2780,6 +4362,10 @@ def validate_redacted_signature_claim_wording(payload: dict[str, Any], *, source
         "mutation ready": "mutation_ready",
         "return override ready": "return_override_ready",
         "public callback ready": "public_callback_ready",
+        "public route ready": "public_route_ready",
+        "route progress": "route_progress",
+        "route ready": "route_ready",
+        "runtime route ready": "runtime_route_ready",
     }
     for trail, raw_value in collect_string_fields(payload):
         if any(trail.startswith(prefix) for prefix in allowed_prefixes):
@@ -2825,10 +4411,18 @@ def validate_redacted_signature_manifest(
     if payload.get("schema") != REDACTED_UFUNCTION_SIGNATURE_SCHEMA:
         return []
     blockers: list[dict[str, Any]] = []
+    blockers.extend(
+        collect_schema_provenance_promotion_alias_blockers(
+            payload,
+            label=source_label,
+            reason_prefix="signature_manifest_schema_provenance",
+        )
+    )
     recorded_binary_sha256, identity_blockers = validate_redacted_signature_artifact_identity(
         payload,
         source_label=source_label,
         expected_binary_sha256=expected_binary_sha256,
+        require_complete_identity=redacted_signature_has_target_set_claim(payload),
     )
     blockers.extend(identity_blockers)
     snapshot_root = payload.get("snapshot_root")
@@ -2844,6 +4438,9 @@ def validate_redacted_signature_manifest(
     input_snapshot_count = 0
     generated_from = payload.get("generated_from")
     generated_snapshot_ids: dict[str, str] = {}
+    generated_snapshot_id_counts: Counter[str] = Counter()
+    generated_snapshot_sha256_counts: Counter[str] = Counter()
+    generated_snapshot_targets_by_id: dict[str, list[str] | None] = {}
     if not isinstance(generated_from, dict):
         blockers.append({"reason": "signature_manifest_missing_generated_from", "label": f"{source_label}:$.generated_from"})
     else:
@@ -2871,8 +4468,48 @@ def validate_redacted_signature_manifest(
                     blockers.append({"reason": "signature_manifest_input_snapshot_path_present", "label": f"{source_label}:{trail}"})
                 snapshot_id = snapshot.get("id")
                 sha256 = snapshot.get("sha256")
+                snapshot_targets: list[str] | None = None
+                if "targets" in snapshot:
+                    raw_targets = snapshot.get("targets")
+                    if (
+                        not isinstance(raw_targets, list)
+                        or not raw_targets
+                        or any(not isinstance(target, str) or not target for target in raw_targets)
+                    ):
+                        blockers.append(
+                            {
+                                "reason": "signature_manifest_input_snapshot_targets_invalid",
+                                "label": f"{snapshot_label}.targets",
+                                "recorded": raw_targets,
+                            }
+                        )
+                    else:
+                        snapshot_targets = list(raw_targets)
+                        duplicate_snapshot_targets = duplicate_strings(snapshot_targets)
+                        if duplicate_snapshot_targets:
+                            blockers.append(
+                                {
+                                    "reason": "signature_manifest_input_snapshot_targets_duplicate",
+                                    "label": f"{snapshot_label}.targets",
+                                    "duplicates": duplicate_snapshot_targets,
+                                }
+                            )
+                elif "target" in snapshot:
+                    raw_target = snapshot.get("target")
+                    if not isinstance(raw_target, str) or not raw_target:
+                        blockers.append(
+                            {
+                                "reason": "signature_manifest_input_snapshot_target_invalid",
+                                "label": f"{snapshot_label}.target",
+                                "recorded": raw_target,
+                            }
+                        )
+                    else:
+                        snapshot_targets = [raw_target]
                 if not isinstance(snapshot_id, str) or not snapshot_id:
                     blockers.append({"reason": "signature_manifest_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                else:
+                    generated_snapshot_id_counts[snapshot_id] += 1
                 if not isinstance(sha256, str) or SHA256_RE.fullmatch(sha256) is None:
                     blockers.append(
                         {
@@ -2883,6 +4520,9 @@ def validate_redacted_signature_manifest(
                     )
                 if isinstance(snapshot_id, str) and isinstance(sha256, str):
                     generated_snapshot_ids[snapshot_id] = sha256
+                    generated_snapshot_targets_by_id[snapshot_id] = snapshot_targets
+                if isinstance(sha256, str) and SHA256_RE.fullmatch(sha256) is not None:
+                    generated_snapshot_sha256_counts[sha256] += 1
                 if "provenance" in snapshot:
                     blockers.extend(
                         validate_redacted_signature_embedded_provenance(
@@ -2892,6 +4532,32 @@ def validate_redacted_signature_manifest(
                             expected_binary_sha256=recorded_binary_sha256 or expected_binary_sha256,
                         )
                     )
+            duplicate_snapshot_ids = sorted(
+                snapshot_id
+                for snapshot_id, count in generated_snapshot_id_counts.items()
+                if count > 1
+            )
+            if duplicate_snapshot_ids:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_input_snapshot_ids_duplicate",
+                        "label": f"{source_label}:$.generated_from.input_snapshots",
+                        "duplicates": duplicate_snapshot_ids,
+                    }
+                )
+            duplicate_snapshot_sha256s = sorted(
+                sha256
+                for sha256, count in generated_snapshot_sha256_counts.items()
+                if count > 1
+            )
+            if duplicate_snapshot_sha256s:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_input_snapshot_sha256_duplicate",
+                        "label": f"{source_label}:$.generated_from.input_snapshots",
+                        "duplicates": duplicate_snapshot_sha256s,
+                    }
+                )
     missing_targets = payload.get("missing_targets")
     missing_target_count = len(missing_targets) if isinstance(missing_targets, list) else 0
     if missing_targets is not None and not isinstance(missing_targets, list):
@@ -2911,6 +4577,41 @@ def validate_redacted_signature_manifest(
                     "duplicates": duplicates,
                 }
             )
+        blockers.extend(
+            target_set_name_alias_blockers(
+                target_sets,
+                label=f"{source_label}:$.target_sets",
+                reason="signature_manifest_target_set_name_promotion_alias",
+            )
+        )
+        for target_set in target_sets:
+            target_set_schemas = known_target_set_schemas(target_set)
+            if target_set_schemas is not None and any(schema != RC_UFUNCTION_SNAPSHOT_SCHEMA for schema in target_set_schemas):
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_target_set_schema_mismatch",
+                        "label": f"{source_label}:$.target_sets",
+                        "target_set": target_set,
+                        "schemas": target_set_schemas,
+                    }
+                )
+            ufunction_targets = known_ufunction_target_set_targets(target_set)
+            if ufunction_targets is None:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_unknown_target_set_name",
+                        "label": f"{source_label}:$.target_sets",
+                        "target_set": target_set,
+                    }
+                )
+            elif not ufunction_targets:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_target_set_without_ufunction_targets",
+                        "label": f"{source_label}:$.target_sets",
+                        "target_set": target_set,
+                    }
+                )
     source_target_sets = payload.get("source_target_sets", [])
     source_target_set_count = 0
     if not isinstance(source_target_sets, list) or any(not isinstance(item, str) or not item for item in source_target_sets):
@@ -2926,6 +4627,78 @@ def validate_redacted_signature_manifest(
                     "duplicates": duplicates,
                 }
             )
+        blockers.extend(
+            target_set_name_alias_blockers(
+                source_target_sets,
+                label=f"{source_label}:$.source_target_sets",
+                reason="signature_manifest_source_target_set_name_promotion_alias",
+            )
+        )
+        for target_set in source_target_sets:
+            target_set_schemas = known_target_set_schemas(target_set)
+            if target_set_schemas is not None and any(schema != RC_UFUNCTION_SNAPSHOT_SCHEMA for schema in target_set_schemas):
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_source_target_set_schema_mismatch",
+                        "label": f"{source_label}:$.source_target_sets",
+                        "target_set": target_set,
+                        "schemas": target_set_schemas,
+                    }
+                )
+            ufunction_targets = known_ufunction_target_set_targets(target_set)
+            if ufunction_targets is None:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_unknown_source_target_set_name",
+                        "label": f"{source_label}:$.source_target_sets",
+                        "target_set": target_set,
+                    }
+                )
+            elif not ufunction_targets:
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_source_target_set_without_ufunction_targets",
+                        "label": f"{source_label}:$.source_target_sets",
+                        "target_set": target_set,
+                    }
+                )
+    if isinstance(target_sets, list) and isinstance(source_target_sets, list):
+        overlap = sorted(
+            {
+                target_set
+                for target_set in target_sets
+                if isinstance(target_set, str) and target_set in source_target_sets
+            }
+        )
+        if overlap:
+            blockers.append(
+                {
+                    "reason": "signature_manifest_target_set_source_overlap",
+                    "label": f"{source_label}:$.source_target_sets",
+                    "target_sets": overlap,
+                }
+            )
+    declared_revision_target_sets = [
+        item
+        for values in (target_sets, source_target_sets)
+        if isinstance(values, list)
+        for item in values
+        if isinstance(item, str)
+    ]
+    blockers.extend(
+        target_set_catalog_hygiene_blockers(
+            declared_revision_target_sets,
+            label=f"{source_label}:$.target_sets",
+            reason_prefix="signature_manifest",
+        )
+    )
+    blockers.extend(
+        validate_redacted_signature_target_set_revision(
+            payload,
+            source_label=source_label,
+            declared_target_sets=declared_revision_target_sets,
+        )
+    )
     recorded_snapshot_count = payload.get("snapshot_count")
     if recorded_snapshot_count != input_snapshot_count:
         blockers.append(
@@ -2998,6 +4771,14 @@ def validate_redacted_signature_manifest(
                     "label": f"{source_label}:$.safety_summary",
                 }
             )
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=source_label,
+            reason_prefix="signature_manifest",
+            include_ready_overclaims=True,
+        )
+    )
     signatures = payload.get("signatures")
     signatures_list: list[dict[str, Any]] = []
     copied_scalar_by_kind: Counter[str] = Counter()
@@ -3020,6 +4801,21 @@ def validate_redacted_signature_manifest(
                         "reason": "signature_manifest_signature_status_not_candidate_only",
                         "label": f"{signature_label}.signature_status",
                         "recorded_status": signature.get("signature_status"),
+                    }
+                )
+            target = signature.get("target")
+            if not isinstance(target, str) or not target:
+                blockers.append({"reason": "signature_manifest_signature_target_invalid", "label": f"{signature_label}.target"})
+            elif (
+                "." not in target
+                or normalized_claim_key(target) in {"redacted", "ufunction_redacted", "target_redacted"}
+                or normalized_claim_key(target).startswith(("redacted_", "unknown_"))
+            ):
+                blockers.append(
+                    {
+                        "reason": "signature_manifest_signature_target_not_exact_ufunction_name",
+                        "label": f"{signature_label}.target",
+                        "recorded_target": target,
                     }
                 )
             promotion_blockers = signature.get("promotion_blockers")
@@ -3063,6 +4859,18 @@ def validate_redacted_signature_manifest(
                         "recorded_sha256": source_sha256,
                     }
                 )
+            if isinstance(source_snapshot, str) and isinstance(target, str):
+                source_targets = generated_snapshot_targets_by_id.get(source_snapshot)
+                if isinstance(source_targets, list) and target not in source_targets:
+                    blockers.append(
+                        {
+                            "reason": "signature_manifest_source_snapshot_target_mismatch",
+                            "label": f"{signature_label}.source_snapshot",
+                            "source_snapshot": source_snapshot,
+                            "target": target,
+                            "recorded_source_targets": source_targets,
+                        }
+                    )
             for trail, raw_value in collect_bool_fields(signature, trail=f"$.signatures[{index}]"):
                 key = trail.rsplit(".", 1)[-1]
                 if raw_value is True and is_ready_overclaim_key(key):
@@ -3102,6 +4910,34 @@ def validate_redacted_signature_manifest(
         for signature in signatures_list
         if isinstance(signature.get("target"), str)
     ]
+    historical_coverage_marker = is_historical_missing_target_set_coverage_marker(payload)
+    require_generated_target_metadata = (
+        strict_target_set_coverage or redacted_signature_has_target_set_claim(payload)
+    ) and not historical_coverage_marker
+    generated_snapshot_targets: list[str] = []
+    missing_target_metadata_ids: list[str] = []
+    for snapshot_id, snapshot_targets in generated_snapshot_targets_by_id.items():
+        if snapshot_targets is None:
+            missing_target_metadata_ids.append(snapshot_id)
+            continue
+        generated_snapshot_targets.extend(snapshot_targets)
+    if require_generated_target_metadata and missing_target_metadata_ids:
+        blockers.append(
+            {
+                "reason": "signature_manifest_input_snapshot_targets_missing",
+                "label": f"{source_label}:$.generated_from.input_snapshots",
+                "snapshot_ids": sorted(missing_target_metadata_ids),
+            }
+        )
+    if generated_snapshot_targets and signature_targets != generated_snapshot_targets:
+        blockers.append(
+            {
+                "reason": "signature_manifest_generated_snapshot_targets_mismatch",
+                "label": f"{source_label}:$.generated_from.input_snapshots",
+                "expected": signature_targets,
+                "recorded": generated_snapshot_targets,
+            }
+        )
     blockers.extend(
         validate_target_set_coverage(
             payload,
@@ -3213,6 +5049,20 @@ def validate_redacted_signature_manifest(
                     }
                 )
     blockers.extend(validate_redacted_signature_claim_wording(payload, source_label=source_label))
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "signature_manifest_readiness_overclaim", "label": f"{source_label}:{trail}"})
+    for trail, _ in collect_generic_forbidden_true_claims(payload):
+        blockers.append({"reason": "signature_manifest_generic_true_claim_overclaim", "label": f"{source_label}:{trail}"})
+    for trail in collect_positive_ready_alias_bools(payload):
+        blockers.append({"reason": "signature_manifest_ready_alias_overclaim", "label": f"{source_label}:{trail}"})
+    for trail, value in collect_generic_positive_accounting_claims(payload):
+        blockers.append(
+            {
+                "reason": "signature_manifest_positive_accounting_overclaim",
+                "label": f"{source_label}:{trail}",
+                "value": value,
+            }
+        )
     for trail, raw_value in collect_string_fields(payload):
         if raw_value == "redacted":
             continue
@@ -3496,6 +5346,11 @@ def validate_weak_helper_caller_mode_manifest(
     for forbidden in ("pending-kill", "destroyed", "unreachable"):
         if any(forbidden in value for value in lower_strings):
             blockers.append({"reason": "weak_helper_ue_lifecycle_name_overclaim", "label": source_label, "forbidden": forbidden})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.builder_contract.not_promoted",),
+    ):
+        blockers.append({"reason": f"weak_helper_public_overclaim_{reason}", "label": f"{source_label}:{trail}"})
     return blockers
 
 
@@ -3510,6 +5365,20 @@ def validate_redacted_scriptstruct_signature_manifest(
     blockers: list[dict[str, Any]] = []
     if payload.get("snapshot_root") != "redacted":
         blockers.append({"reason": "scriptstruct_signature_snapshot_root_not_redacted", "label": f"{source_label}:$.snapshot_root"})
+    for key in ("target_sets", "source_target_sets"):
+        values = payload.get(key, [])
+        if values is None:
+            values = []
+        if not isinstance(values, list) or any(not isinstance(item, str) or not item for item in values):
+            blockers.append({"reason": f"scriptstruct_signature_{key}_invalid", "label": f"{source_label}:$.{key}"})
+        else:
+            blockers.extend(
+                target_set_name_alias_blockers(
+                    values,
+                    label=f"{source_label}:$.{key}",
+                    reason=f"scriptstruct_signature_{key}_name_promotion_alias",
+                )
+            )
     generated_from = payload.get("generated_from")
     if not isinstance(generated_from, dict):
         blockers.append({"reason": "scriptstruct_signature_missing_generated_from", "label": f"{source_label}:$.generated_from"})
@@ -3553,6 +5422,39 @@ def validate_redacted_scriptstruct_signature_manifest(
             )
         if mode == "promote":
             blockers.append({"reason": "promote_mode_scriptstruct_signature_candidate_only", "label": f"{source_label}:$.safety_summary"})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "scriptstruct_signature_readiness_overclaim", "label": f"{source_label}:{trail}"})
+    for trail, _ in collect_generic_forbidden_true_claims(payload):
+        blockers.append({"reason": "scriptstruct_signature_generic_true_claim_overclaim", "label": f"{source_label}:{trail}"})
+    for trail in collect_positive_ready_alias_bools(payload):
+        blockers.append({"reason": "scriptstruct_signature_ready_alias_overclaim", "label": f"{source_label}:{trail}"})
+    for trail, value in collect_generic_positive_accounting_claims(payload):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_positive_accounting_overclaim",
+                "label": f"{source_label}:{trail}",
+                "value": value,
+            }
+        )
+    for trail, value in collect_source_marker_reachability_overclaims(payload):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_source_marker_reachability_overclaim",
+                "label": f"{source_label}:{trail}",
+                "value": value,
+            }
+        )
+    for trail, value in collect_promoted_status_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.not_promoted_surfaces"),
+    ):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_status_alias_overclaim",
+                "label": f"{source_label}:{trail}",
+                "value": value,
+            }
+        )
     signatures = payload.get("signatures")
     if not isinstance(signatures, list):
         blockers.append({"reason": "scriptstruct_signature_signatures_not_list", "label": f"{source_label}:$.signatures"})
@@ -3642,24 +5544,44 @@ def validate_transfer_redacted_scriptstruct_target_set_coverage(
                 "recorded": missing_targets,
             }
         )
+    unexpected_targets = coverage.get("unexpected_targets")
+    if unexpected_targets not in ([], None):
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_target_set_coverage_unexpected_targets",
+                "label": f"{source_label}:$.target_set_coverage.unexpected_targets",
+                "recorded": unexpected_targets,
+            }
+        )
+    declared_target_sets = coverage.get("declared_target_sets")
+    if declared_target_sets != [TRANSFER_SCRIPTSTRUCT_TARGET_SET]:
+        blockers.append(
+            {
+                "reason": "scriptstruct_signature_transfer_declared_target_sets_mismatch",
+                "label": f"{source_label}:$.target_set_coverage.declared_target_sets",
+                "expected": [TRANSFER_SCRIPTSTRUCT_TARGET_SET],
+                "recorded": declared_target_sets,
+            }
+        )
     expected_targets = coverage.get("expected_targets")
     observed_targets = coverage.get("observed_targets")
-    if not isinstance(expected_targets, list) or not TRANSFER_SCRIPTSTRUCT_TARGETS.issubset(set(expected_targets)):
+    if expected_targets != TRANSFER_SCRIPTSTRUCT_TARGET_LIST:
         blockers.append(
             {
                 "reason": "scriptstruct_signature_transfer_target_set_coverage_expected_targets_incomplete",
                 "label": f"{source_label}:$.target_set_coverage.expected_targets",
-                "expected": sorted(TRANSFER_SCRIPTSTRUCT_TARGETS),
+                "expected": TRANSFER_SCRIPTSTRUCT_TARGET_LIST,
                 "recorded": expected_targets,
             }
         )
-    if not isinstance(observed_targets, list) or not signature_targets.issubset(set(observed_targets)):
+    if observed_targets != TRANSFER_SCRIPTSTRUCT_TARGET_LIST or signature_targets != TRANSFER_SCRIPTSTRUCT_TARGETS:
         blockers.append(
             {
                 "reason": "scriptstruct_signature_transfer_target_set_coverage_observed_targets_mismatch",
                 "label": f"{source_label}:$.target_set_coverage.observed_targets",
-                "expected": sorted(signature_targets),
+                "expected": TRANSFER_SCRIPTSTRUCT_TARGET_LIST,
                 "recorded": observed_targets,
+                "signature_targets": sorted(signature_targets),
             }
         )
     return blockers
@@ -3844,6 +5766,8 @@ def validate_transfer_redacted_scriptstruct_bool_tail_contract(
 
 def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
+    schema = payload.get("schema")
+    generic_or_unknown_schema = not isinstance(schema, str) or schema not in SUPPORTED_MANIFEST_SCHEMAS
     blockers_value = payload.get("blockers")
     blockers_present = isinstance(blockers_value, list) and len(blockers_value) > 0
     if payload.get("public_gobjects_promotion_ready") is True:
@@ -3856,6 +5780,35 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
         blockers.append({"reason": "research_candidate_marked_runtime_ready", "label": label})
     for trail, _ in collect_generic_forbidden_true_claims(payload):
         blockers.append({"reason": "manifest_forbidden_true_claim_overclaim", "label": f"{label}:{trail}"})
+    for trail, value in collect_generic_positive_accounting_claims(payload):
+        blockers.append(
+            {
+                "reason": "manifest_positive_accounting_progress_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
+    blockers.extend(
+        collect_public_boundary_alias_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="manifest",
+        )
+    )
+    blockers.extend(
+        collect_external_clone_source_policy_blockers(
+            payload,
+            label=label,
+            reason_prefix="manifest",
+        )
+    )
+    if generic_or_unknown_schema and mode in {"intake", "consume"}:
+        for trail in collect_promotion_gate_ready_overclaims(payload):
+            blockers.append({"reason": "manifest_promotion_gate_ready_overclaim", "label": f"{label}:{trail}"})
+        for trail, _ in collect_promoted_status_overclaims(payload):
+            blockers.append({"reason": "manifest_promoted_status_overclaim", "label": f"{label}:{trail}"})
+        for trail, _value, reason in collect_candidate_public_overclaims(payload):
+            blockers.append({"reason": f"manifest_public_overclaim_{reason}", "label": f"{label}:{trail}"})
 
     evidence_status = payload.get("evidence_status")
     if isinstance(evidence_status, dict):
@@ -3876,6 +5829,36 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
             blockers.append({"reason": "promote_mode_manifest_has_non_claims", "label": label})
         if isinstance(blocked_contracts, list) and blocked_contracts:
             blockers.append({"reason": "promote_mode_manifest_has_blocked_contracts", "label": label})
+    return blockers
+
+
+def validate_provenance_claim_aliases(payload: dict[str, Any], *, label: str) -> list[dict[str, Any]]:
+    blockers = collect_candidate_only_manifest_overclaim_blockers(
+        payload,
+        label=label,
+        reason_prefix="provenance",
+        include_ready_overclaims=True,
+    )
+    blockers.extend(
+        collect_schema_provenance_promotion_alias_blockers(
+            payload,
+            label=label,
+            reason_prefix="provenance_schema",
+        )
+    )
+    blockers.extend(
+        collect_external_clone_source_policy_blockers(
+            payload,
+            label=label,
+            reason_prefix="provenance",
+            source_context=True,
+        )
+    )
+    for trail, _value, reason in collect_candidate_public_overclaims(
+        payload,
+        require_promotional_context_for_bare_subjects=True,
+    ):
+        blockers.append({"reason": f"provenance_public_overclaim_{reason}", "label": f"{label}:{trail}"})
     return blockers
 
 
@@ -4338,6 +6321,14 @@ def validate_scriptstruct_inventory_pack_manifest(
         )
     if mode == "promote":
         blockers.append({"reason": "promote_mode_scriptstruct_inventory_candidate_only", "label": label})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="scriptstruct_inventory",
+            include_ready_overclaims=True,
+        )
+    )
     return blockers
 
 
@@ -4525,6 +6516,14 @@ def validate_reflection_inventory_pack_comparison_manifest(
         )
     if mode == "promote":
         blockers.append({"reason": "promote_mode_reflection_inventory_comparison_candidate_only", "label": label})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="reflection_inventory_comparison",
+            include_ready_overclaims=True,
+        )
+    )
     return blockers
 
 
@@ -4628,7 +6627,233 @@ def validate_gobjects_two_core_manifest(payload: dict[str, Any], *, label: str, 
         blockers.append({"reason": "gobjects_two_core_manifest_missing_non_claims", "label": label})
     if mode == "promote":
         blockers.append({"reason": "gobjects_two_core_manifest_promote_mode_blocked", "label": label})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.blocked_contracts", "$.non_claims"),
+    ):
+        blockers.append({"reason": f"gobjects_two_core_manifest_public_overclaim_{reason}", "label": f"{label}:{trail}"})
 
+    return blockers
+
+
+def readiness_report_detail_targets(payload: dict[str, Any]) -> list[str]:
+    targets: list[str] = []
+    seen: set[str] = set()
+    modules = payload.get("modules")
+    if not isinstance(modules, list):
+        return targets
+    for module in modules:
+        if not isinstance(module, dict):
+            continue
+        details = module.get("target_details")
+        if not isinstance(details, list):
+            continue
+        for detail in details:
+            if not isinstance(detail, dict):
+                continue
+            target = detail.get("target")
+            if isinstance(target, str) and target and ":" in target and target not in seen:
+                targets.append(target)
+                seen.add(target)
+    return sorted(targets)
+
+
+def validate_readiness_report_target_set_coverage(
+    payload: dict[str, Any],
+    *,
+    target_sets: list[str],
+    label: str,
+) -> list[dict[str, Any]]:
+    if not target_sets:
+        return []
+
+    coverage = payload.get("target_set_coverage")
+    if not isinstance(coverage, dict):
+        return [{"reason": "readiness_report_missing_target_set_coverage", "label": f"{label}:$.target_set_coverage"}]
+
+    blockers: list[dict[str, Any]] = []
+    if coverage.get("schema") != READINESS_TARGET_SET_COVERAGE_SCHEMA:
+        blockers.append(
+            {
+                "reason": "readiness_report_target_set_coverage_schema_mismatch",
+                "label": f"{label}:$.target_set_coverage.schema",
+                "expected": READINESS_TARGET_SET_COVERAGE_SCHEMA,
+                "recorded": coverage.get("schema"),
+            }
+        )
+
+    expected_target_sets = sorted(target_sets)
+    if coverage.get("target_sets") != expected_target_sets:
+        blockers.append(
+            {
+                "reason": "readiness_report_target_set_coverage_target_sets_mismatch",
+                "label": f"{label}:$.target_set_coverage.target_sets",
+                "expected": expected_target_sets,
+                "recorded": coverage.get("target_sets"),
+            }
+        )
+    blockers.extend(
+        validate_target_set_revision_source_fields(
+            coverage,
+            label=f"{label}:$.target_set_coverage",
+            declared_target_sets=expected_target_sets,
+            expected_source_sha256=all_target_set_revision_source_sha256(expected_target_sets),
+            reason_prefix="readiness_report_target_set_coverage",
+        )
+    )
+
+    expected_targets: list[str] = []
+    expected_seen: set[str] = set()
+    expected_by_target_set: dict[str, list[str]] = {}
+    metadata_by_target_set: dict[str, dict[str, str]] = {}
+    for target_set in expected_target_sets:
+        targets = known_target_set_targets(target_set)
+        if targets is None:
+            blockers.append(
+                {
+                    "reason": "readiness_report_target_set_coverage_unknown_target_set",
+                    "label": f"{label}:$.target_set_coverage",
+                    "target_set": target_set,
+                }
+            )
+            continue
+        expected_by_target_set[target_set] = targets
+        for target in targets:
+            if target not in expected_seen:
+                expected_targets.append(target)
+                expected_seen.add(target)
+        metadata = known_target_set_metadata(target_set)
+        if metadata is None:
+            blockers.append(
+                {
+                    "reason": "readiness_report_target_set_coverage_metadata_unavailable",
+                    "label": f"{label}:$.target_set_coverage",
+                    "target_set": target_set,
+                }
+            )
+        else:
+            metadata_by_target_set[target_set] = metadata
+
+    observed_targets = readiness_report_detail_targets(payload)
+    expected_set = set(expected_targets)
+    observed_set = set(observed_targets)
+    covered_targets = sorted(expected_set & observed_set)
+    missing_targets = sorted(expected_set - observed_set)
+    unexpected_targets = sorted(observed_set - expected_set)
+    complete = not missing_targets and not unexpected_targets
+    checks = (
+        ("expected_targets", sorted(expected_targets), "readiness_report_target_set_coverage_expected_targets_mismatch"),
+        ("observed_targets", observed_targets, "readiness_report_target_set_coverage_observed_targets_mismatch"),
+        ("covered_targets", covered_targets, "readiness_report_target_set_coverage_covered_targets_mismatch"),
+        ("missing_targets", missing_targets, "readiness_report_target_set_coverage_missing_targets_mismatch"),
+        ("unexpected_targets", unexpected_targets, "readiness_report_target_set_coverage_unexpected_targets_mismatch"),
+    )
+    for field, expected, reason in checks:
+        if coverage.get(field) != expected:
+            blockers.append(
+                {
+                    "reason": reason,
+                    "label": f"{label}:$.target_set_coverage.{field}",
+                    "expected": expected,
+                    "recorded": coverage.get(field),
+                }
+            )
+    if coverage.get("complete") is not complete:
+        blockers.append(
+            {
+                "reason": "readiness_report_target_set_coverage_complete_mismatch",
+                "label": f"{label}:$.target_set_coverage.complete",
+                "expected": complete,
+                "recorded": coverage.get("complete"),
+            }
+        )
+    expected_status = "complete" if complete else "incomplete"
+    if coverage.get("status") != expected_status:
+        blockers.append(
+            {
+                "reason": "readiness_report_target_set_coverage_status_mismatch",
+                "label": f"{label}:$.target_set_coverage.status",
+                "expected": expected_status,
+                "recorded": coverage.get("status"),
+            }
+        )
+    if not complete:
+        blockers.append(
+            {
+                "reason": "readiness_report_target_set_coverage_incomplete",
+                "label": f"{label}:$.target_set_coverage",
+                "missing_targets": missing_targets,
+                "unexpected_targets": unexpected_targets,
+            }
+        )
+
+    declared = coverage.get("declared_target_sets")
+    if not isinstance(declared, list):
+        blockers.append(
+            {
+                "reason": "readiness_report_declared_target_sets_not_list",
+                "label": f"{label}:$.target_set_coverage.declared_target_sets",
+            }
+        )
+        return blockers
+    duplicate_declared_names = duplicate_strings(
+        [
+            entry.get("name")
+            for entry in declared
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+        ]
+    )
+    if duplicate_declared_names:
+        blockers.append(
+            {
+                "reason": "readiness_report_duplicate_target_set_coverage_rows",
+                "label": f"{label}:$.target_set_coverage.declared_target_sets",
+                "duplicates": duplicate_declared_names,
+            }
+        )
+    if len(declared) != len(expected_target_sets):
+        blockers.append(
+            {
+                "reason": "readiness_report_declared_target_set_count_mismatch",
+                "label": f"{label}:$.target_set_coverage.declared_target_sets",
+                "expected": len(expected_target_sets),
+                "recorded": len(declared),
+            }
+        )
+
+    for index, entry in enumerate(declared):
+        entry_label = f"{label}:$.target_set_coverage.declared_target_sets[{index}]"
+        if not isinstance(entry, dict):
+            blockers.append({"reason": "readiness_report_declared_target_set_not_object", "label": entry_label})
+            continue
+        if index >= len(expected_target_sets):
+            blockers.append({"reason": "readiness_report_declared_target_set_unexpected", "label": entry_label})
+            continue
+        target_set = expected_target_sets[index]
+        targets = expected_by_target_set.get(target_set, [])
+        target_set_observed = sorted(set(targets) & observed_set)
+        target_set_missing = sorted(set(targets) - observed_set)
+        expected_fields: dict[str, object] = {
+            "name": target_set,
+            "source": "readiness_report",
+            "expected_targets": sorted(targets),
+            "covered_targets": target_set_observed,
+            "missing_targets": target_set_missing,
+            "complete": not target_set_missing,
+        }
+        metadata = metadata_by_target_set.get(target_set)
+        if metadata is not None:
+            expected_fields.update(metadata)
+        for field, expected in expected_fields.items():
+            if entry.get(field) != expected:
+                blockers.append(
+                    {
+                        "reason": f"readiness_report_declared_target_set_{field}_mismatch",
+                        "label": f"{entry_label}.{field}",
+                        "expected": expected,
+                        "recorded": entry.get(field),
+                    }
+                )
     return blockers
 
 
@@ -4644,15 +6869,61 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
 
     if payload.get("gate_mode") != "second_source_promotion":
         blockers.append({"reason": "readiness_report_gate_mode_not_second_source_promotion", "label": label})
-    for key, reason in (
-        ("promotion_ready", "readiness_report_promotion_ready_not_false"),
-        ("public_sdk_ready", "readiness_report_public_sdk_ready_not_false"),
-        ("runtime_ready", "readiness_report_runtime_ready_not_false"),
-    ):
-        if promotion_gate.get(key) not in (None, False):
+    for key, reason in READINESS_REPORT_REQUIRED_PROMOTION_GATE_FALSE_KEYS.items():
+        if promotion_gate.get(key) is not False:
             blockers.append({"reason": reason, "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        if trail not in READINESS_REPORT_ALLOWED_READY_TRUE_PATHS:
+            blockers.append({"reason": "readiness_report_ready_overclaim", "label": f"{label}:{trail}"})
+    for trail, _ in collect_generic_forbidden_true_claims(payload):
+        blockers.append({"reason": "readiness_report_generic_true_claim_overclaim", "label": f"{label}:{trail}"})
+    for trail in collect_positive_ready_alias_bools(
+        payload,
+        allowed_paths=READINESS_REPORT_ALLOWED_READY_TRUE_PATHS,
+    ):
+        blockers.append({"reason": "readiness_report_ready_alias_overclaim", "label": f"{label}:{trail}"})
+    for trail, value in collect_generic_positive_accounting_claims(payload):
+        blockers.append(
+            {
+                "reason": "readiness_report_positive_accounting_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
+    for trail, value in collect_source_marker_reachability_overclaims(payload):
+        blockers.append(
+            {
+                "reason": "readiness_report_source_marker_reachability_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
+    for trail, value in collect_promoted_status_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.not_promoted_surfaces"),
+    ):
+        blockers.append(
+            {
+                "reason": "readiness_report_status_alias_overclaim",
+                "label": f"{label}:{trail}",
+                "value": value,
+            }
+        )
     if mode == "promote":
         blockers.append({"reason": "promote_mode_readiness_report_layout_only", "label": label})
+    does_not_satisfy = payload.get("does_not_satisfy_readiness")
+    if (
+        not isinstance(does_not_satisfy, list)
+        or any(not isinstance(item, str) for item in does_not_satisfy)
+        or not REQUIRED_READINESS_DOES_NOT_SATISFY.issubset(set(does_not_satisfy))
+    ):
+        blockers.append(
+            {
+                "reason": "readiness_report_missing_non_authorizing_boundary",
+                "label": f"{label}:$.does_not_satisfy_readiness",
+                "expected": sorted(REQUIRED_READINESS_DOES_NOT_SATISFY),
+            }
+        )
     target_sets = payload.get("target_sets")
     if not isinstance(target_sets, list) or any(not isinstance(item, str) or not item for item in target_sets):
         blockers.append({"reason": "readiness_report_target_sets_invalid", "label": f"{label}:$.target_sets"})
@@ -4673,6 +6944,13 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
                         "duplicates": duplicate_target_sets,
                     }
                 )
+            blockers.extend(
+                target_set_name_alias_blockers(
+                    target_sets,
+                    label=f"{label}:$.target_sets",
+                    reason="readiness_report_target_set_name_promotion_alias",
+                )
+            )
             unknown_target_sets = sorted({target_set for target_set in target_sets if target_set not in TARGET_SETS})
             if unknown_target_sets:
                 blockers.append(
@@ -4692,6 +6970,24 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
                             "overlaps": overlaps,
                         }
                     )
+            non_release_ready_target_sets = sorted(
+                target_set for target_set in target_sets if target_set not in RELEASE_READINESS_TARGET_SETS
+            )
+            if promotion_gate.get("ready") is True and non_release_ready_target_sets:
+                blockers.append(
+                    {
+                        "reason": "readiness_report_non_release_target_set_ready_overclaim",
+                        "label": f"{label}:$.promotion_gate.ready",
+                        "target_sets": non_release_ready_target_sets,
+                    }
+                )
+            blockers.extend(
+                validate_readiness_report_target_set_coverage(
+                    payload,
+                    target_sets=target_sets,
+                    label=label,
+                )
+            )
 
     if promotion_gate.get("ready") is True:
         if promotion_gate.get("ready_scope") != "layout_only":
@@ -5415,6 +7711,14 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
         ),
     ):
         blockers.append({"reason": f"item_return_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="item_return_policy",
+            include_ready_overclaims=True,
+        )
+    )
 
     return blockers
 
@@ -5776,6 +8080,14 @@ def validate_transfer_baccept_only_policy_slice_manifest(payload: dict[str, Any]
         ),
     ):
         blockers.append({"reason": f"transfer_baccept_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="transfer_baccept_policy",
+            include_ready_overclaims=True,
+        )
+    )
 
     return blockers
 
@@ -5985,6 +8297,14 @@ def validate_mission_copied_bool_policy_slice_manifest(payload: dict[str, Any], 
         for needle, reason in MISSION_COPIED_BOOL_FORBIDDEN_CLAIM_PHRASES.items():
             if needle in text:
                 blockers.append({"reason": f"mission_copied_bool_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="mission_copied_bool_policy",
+            include_ready_overclaims=True,
+        )
+    )
 
     return blockers
 
@@ -6242,6 +8562,14 @@ def validate_structure_return_only_policy_slice_manifest(payload: dict[str, Any]
         text = raw_value.casefold()
         if "structureevents" in text or "structure events" in text:
             blockers.append({"reason": "structure_return_policy_public_overclaim_public_structure_events", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="structure_return_policy",
+            include_ready_overclaims=True,
+        )
+    )
 
     return blockers
 
@@ -6411,6 +8739,14 @@ def validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload: dict[
         text = raw_value.casefold()
         if "structureevents" in text or "structure events" in text:
             blockers.append({"reason": "structure_nonpin_policy_public_overclaim_public_structure_events", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="structure_nonpin_policy",
+            include_ready_overclaims=True,
+        )
+    )
     return blockers
 
 
@@ -6624,6 +8960,14 @@ def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str,
         key = trail.rsplit(".", 1)[-1]
         if key in STRUCTURE_AGGREGATE_FORBIDDEN_TRUE_KEYS:
             blockers.append({"reason": f"structure_aggregate_policy_surface_overclaim_{key}", "label": f"{label}:{trail}"})
+    blockers.extend(
+        collect_candidate_only_manifest_overclaim_blockers(
+            payload,
+            label=label,
+            reason_prefix="structure_aggregate_policy",
+            include_ready_overclaims=True,
+        )
+    )
     return blockers
 
 
@@ -6857,6 +9201,13 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
         if not isinstance(source_artifact_ids, list):
             blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_ids_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
         else:
+            blockers.extend(
+                source_artifact_id_duplicate_blockers(
+                    source_artifact_ids,
+                    label=f"{label}:$.artifact_identity.source_artifact_ids",
+                    reason_prefix="players_identity_first_evidence_artifact_identity",
+                )
+            )
             parsed_source_ids, source_id_blockers = collect_source_artifact_id_values(source_artifact_ids)
             for source_id_blocker in source_id_blockers:
                 blocker = dict(source_id_blocker)
@@ -6899,6 +9250,7 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
         else:
             seen_snapshot_ids: set[str] = set()
             seen_targets: set[str] = set()
+            snapshot_sha256_values: list[str] = []
             for index, snapshot in enumerate(input_snapshots):
                 snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
                 if not isinstance(snapshot, dict):
@@ -6913,12 +9265,23 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
                     seen_snapshot_ids.add(snapshot_id)
                 if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
                     blockers.append({"reason": "players_identity_first_evidence_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                else:
+                    snapshot_sha256_values.append(snapshot_sha256)
                 if not isinstance(snapshot_target, str) or snapshot_target not in REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS:
                     blockers.append({"reason": "players_identity_first_evidence_input_snapshot_target_invalid", "label": f"{snapshot_label}.target"})
                 else:
                     seen_targets.add(snapshot_target)
             if seen_targets != REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS:
                 blockers.append({"reason": "players_identity_first_evidence_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+            duplicate_snapshot_sha256 = duplicate_strings(snapshot_sha256_values)
+            if duplicate_snapshot_sha256:
+                blockers.append(
+                    {
+                        "reason": "players_identity_first_evidence_input_snapshot_sha256_duplicate",
+                        "label": f"{label}:$.generated_from.input_snapshots",
+                        "duplicates": duplicate_snapshot_sha256,
+                    }
+                )
 
     coverage = payload.get("target_set_coverage")
     targets = payload.get("targets")
@@ -6966,11 +9329,40 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     elif coverage.get("schema") != TARGET_SET_COVERAGE_SCHEMA:
         blockers.append({"reason": "players_identity_first_evidence_target_set_coverage_schema_mismatch", "label": f"{label}:$.target_set_coverage.schema", "recorded_schema": coverage.get("schema")})
     else:
+        blockers.extend(
+            validate_target_set_revision_source_fields(
+                coverage,
+                label=f"{label}:$.target_set_coverage",
+                declared_target_sets=["players-identity-lifecycle-intake"],
+                expected_source_sha256=ufunction_target_set_revision_source_sha256(
+                    ["players-identity-lifecycle-intake"]
+                ),
+                reason_prefix="players_identity_first_evidence_target_set_coverage",
+            )
+        )
         declared = coverage.get("declared_target_sets")
         if not isinstance(declared, list) or len(declared) != 1:
             blockers.append({"reason": "players_identity_first_evidence_declared_target_set_count_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets"})
         else:
             entry = declared[0]
+            if isinstance(entry, dict):
+                entry_name = entry.get("name")
+                if isinstance(entry_name, str):
+                    blockers.extend(
+                        target_set_name_alias_blockers(
+                            [entry_name],
+                            label=f"{label}:$.target_set_coverage.declared_target_sets[0].name",
+                            reason="players_identity_first_evidence_declared_target_set_name_promotion_alias",
+                        )
+                    )
+                    if known_ufunction_target_set_targets(entry_name) is None:
+                        blockers.append(
+                            {
+                                "reason": "players_identity_first_evidence_declared_target_set_unknown",
+                                "label": f"{label}:$.target_set_coverage.declared_target_sets[0].name",
+                                "target_set": entry_name,
+                            }
+                        )
             if not isinstance(entry, dict) or entry.get("name") != "players-identity-lifecycle-intake":
                 blockers.append({"reason": "players_identity_first_evidence_declared_target_set_identity_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets[0]"})
             elif entry.get("source") != "manifest":
@@ -7080,6 +9472,78 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     return blockers
 
 
+def validate_players_identity_lifecycle_anchor_candidate_gate_contract(
+    payload: dict[str, Any],
+    *,
+    label: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    artifact_identity = payload.get("artifact_identity")
+    if isinstance(artifact_identity, dict):
+        blockers.extend(
+            source_artifact_id_duplicate_blockers(
+                artifact_identity.get("source_artifact_ids"),
+                label=f"{label}:$.artifact_identity.source_artifact_ids",
+                reason_prefix="players_identity_lifecycle_anchor_candidates_artifact_identity",
+            )
+        )
+
+    anchors = payload.get("candidate_anchors")
+    if not isinstance(anchors, list):
+        return blockers
+
+    triplet_source_only_targets = set(PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS) - set(
+        PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS
+    )
+    guidance_only_targets = set(PLAYER_LIFECYCLE_GUIDANCE_ONLY_NON_TRIPLET_TARGETS)
+    source_snapshot_sha256_values: list[str] = []
+    for index, anchor in enumerate(anchors):
+        if not isinstance(anchor, dict):
+            continue
+        anchor_label = f"{label}:$.candidate_anchors[{index}]"
+        evidence = anchor.get("evidence")
+        if isinstance(evidence, dict):
+            source_snapshot_sha256 = evidence.get("source_snapshot_sha256")
+            if isinstance(source_snapshot_sha256, str) and SHA256_RE.fullmatch(source_snapshot_sha256) is not None:
+                source_snapshot_sha256_values.append(source_snapshot_sha256)
+        target = anchor.get("target")
+        accepted = (
+            anchor.get("accepted") is True
+            or anchor.get("acceptance_status") in lifecycle_anchor_candidates.ACCEPTED_STATUSES
+        )
+        if not accepted or not isinstance(target, str):
+            continue
+        if target in triplet_source_only_targets:
+            blockers.append(
+                {
+                    "reason": "players_identity_lifecycle_anchor_candidates_triplet_source_used_as_static_anchor",
+                    "label": f"{anchor_label}.target",
+                    "target": target,
+                    "required_boundary": "approved runtime triplet source name is not a static lifecycle anchor binding",
+                }
+            )
+        if target in guidance_only_targets:
+            blockers.append(
+                {
+                    "reason": "players_identity_lifecycle_anchor_candidates_guidance_target_used_as_anchor",
+                    "label": f"{anchor_label}.target",
+                    "target": target,
+                    "required_boundary": "guidance-only chronology/delegate target is not a lifecycle anchor binding",
+                }
+            )
+
+    duplicate_source_snapshot_sha256 = duplicate_strings(source_snapshot_sha256_values)
+    if duplicate_source_snapshot_sha256:
+        blockers.append(
+            {
+                "reason": "players_identity_lifecycle_anchor_candidates_source_snapshot_sha256_duplicate",
+                "label": f"{label}:$.candidate_anchors",
+                "duplicates": duplicate_source_snapshot_sha256,
+            }
+        )
+    return blockers
+
+
 def validate_players_identity_lifecycle_anchor_candidates_manifest(
     payload: dict[str, Any],
     *,
@@ -7096,6 +9560,9 @@ def validate_players_identity_lifecycle_anchor_candidates_manifest(
             blocker["label"] = f"{label}:{blocker_label}"
         elif "label" not in blocker:
             blocker["label"] = label
+    blockers.extend(
+        validate_players_identity_lifecycle_anchor_candidate_gate_contract(payload, label=label)
+    )
     for trail, _ in collect_ready_overclaims(payload):
         blockers.append(
             {
@@ -7269,8 +9736,24 @@ def validate_players_identity_runtime_principal_lifecycle_approved_evidence_mani
 
     check_mode = "promote" if mode == "promote" else "consume"
     validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode=check_mode)
+    allowed_runtime_lifecycle_role_alias_blockers = {
+        (
+            "$.source_summary.modules.player_principal_lifecycle.player_principal_lifecycle_event_split_summary.accepted_exact_check_join_observer_event_count",
+            "accepted_exact_check_join_observer_event_count",
+        ),
+        (
+            "$.source_summary.modules.player_principal_lifecycle.player_principal_lifecycle_event_split_summary.observer_event_counts",
+            "observer_event_counts",
+        ),
+    }
     blockers: list[dict[str, Any]] = []
     for blocker in validation.blockers:
+        if (
+            blocker.get("reason") == "forbidden_lifecycle_role_alias_claim"
+            and (blocker.get("label"), blocker.get("value"))
+            in allowed_runtime_lifecycle_role_alias_blockers
+        ):
+            continue
         copied = dict(blocker)
         copied["label"] = f"{label}:{blocker.get('label', '$')}"
         blockers.append(copied)
@@ -7774,6 +10257,16 @@ def validate_resource_handle_revalidation_evaluator_manifest(
                     "label": f"{label}:$.promotion_gate.ready",
                 }
             )
+        for trail, _, reason in collect_candidate_public_overclaims(
+            payload,
+            allowed_prefixes=(
+                "$.blockers",
+                "$.offline_zero_serial_negative_samples_summary.does_not_satisfy_runtime_requirements",
+                "$.output_artifact_identity",
+                "$.promotion_gate.blockers",
+            ),
+        ):
+            blockers.append({"reason": f"resource_handle_revalidation_public_overclaim_{reason}", "label": f"{label}:{trail}"})
         return blockers
 
     if payload.get("post_callback_resource_handle_ready") is not True:
@@ -10659,6 +13152,15 @@ def validate_provenance(
             protected_root=protected_root,
         )
     )
+    blockers.extend(
+        validate_json_protected_root_strings(
+            payload,
+            source_label=provenance_state["resolved"],
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+        )
+    )
+    blockers.extend(validate_provenance_claim_aliases(payload, label=provenance_state["resolved"]))
     if payload.get("schema") != PROVENANCE_SCHEMA:
         blockers.append(
             {
@@ -10743,6 +13245,17 @@ def validate_artifact(
                 }
             )
             artifact_blockers.extend(validate_static_orientation_report_contract(payload, label=label))
+        elif path.suffix == ".json" and schema not in SUPPORTED_MANIFEST_SCHEMAS:
+            artifact_blockers.append(
+                {
+                    "reason": "unsupported_artifact_json_schema",
+                    "label": f"{label}:$.schema",
+                    "recorded_schema": schema,
+                    "supported_schemas": sorted(SUPPORTED_MANIFEST_SCHEMAS),
+                }
+            )
+        if path.suffix == ".json":
+            artifact_blockers.extend(validate_claims(payload, label=label, mode="consume"))
     elif path.suffix == ".json":
         artifact_blockers.extend(payload_blockers)
     provenance, provenance_blockers = validate_provenance(
@@ -10837,7 +13350,7 @@ def validate_artifact_pack_manifest(
         )
         blockers.extend(validate_claims(child_payload, label=str(child_path), mode=mode))
         child_schema = child_payload.get("schema")
-        if isinstance(child_schema, str) and child_schema.startswith("obelisk.") and child_schema not in SUPPORTED_MANIFEST_SCHEMAS:
+        if child_schema not in SUPPORTED_MANIFEST_SCHEMAS:
             blockers.append(
                 {
                     "reason": "unsupported_manifest_schema",
@@ -10846,7 +13359,8 @@ def validate_artifact_pack_manifest(
                     "supported_schemas": sorted(SUPPORTED_MANIFEST_SCHEMAS),
                 }
             )
-        if child_schema not in SUPPORTED_MANIFEST_SCHEMAS or child_schema == ARTIFACT_PACK_MANIFEST_SCHEMA:
+            continue
+        if child_schema == ARTIFACT_PACK_MANIFEST_SCHEMA:
             continue
         _, child_blockers = validate_manifest(
             child_path,

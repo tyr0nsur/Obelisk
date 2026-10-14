@@ -1,12 +1,18 @@
 #include "ProcessEventHook.h"
+#include "NativeChatHook.h"
 #include "ProcessEventCallGuard.h"
 #include "ProcessEventDispatch.h"
+#include "ProcessEventBuffReflection.h"
 #include "ProcessEventChatReflection.h"
+#include "ProcessEventDinoReflection.h"
 #include "ProcessEventInventoryReflection.h"
 #include "ProcessEventItemReflection.h"
+#include "ProcessEventPlayerPrincipalLifecycleApplicator.h"
+#include "ProcessEventPlayerPrincipalLifecycleCorrelation.h"
 #include "ProcessEventPlayerPrincipalLifecycleObserver.h"
 #include "ProcessEventStructureReflection.h"
 #include "core/ItemReturnEventDispatcher.h"
+#include "core/PlayerPrincipalRegistry.h"
 #include "ue/Memory.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
@@ -73,15 +79,26 @@ namespace Obelisk::Hooks
             ActiveProcessEventFrame& operator=(const ActiveProcessEventFrame&) = delete;
         };
 
-        thread_local bool* s_CurrentOriginalProcessEventCalled = nullptr;
+        struct OriginalProcessEventCallStatus
+        {
+            bool* Entered;
+            bool* ReturnedNormally;
+            void* Object;
+            void* Function;
+            void* Parameters;
+            OriginalProcessEventCallStatus* Previous;
+        };
+        thread_local OriginalProcessEventCallStatus* s_CurrentOriginalProcessEventCall = nullptr;
 
         class OriginalProcessEventCallFlagScope
         {
         public:
-            explicit OriginalProcessEventCallFlagScope(bool& originalWasCalled)
-                : m_Previous(s_CurrentOriginalProcessEventCalled)
+            OriginalProcessEventCallFlagScope(bool& originalWasCalled, bool& originalReturnedNormally,
+                                              void* object, void* function, void* parameters)
+                : m_Status{&originalWasCalled, &originalReturnedNormally, object, function, parameters,
+                           s_CurrentOriginalProcessEventCall}
             {
-                s_CurrentOriginalProcessEventCalled = &originalWasCalled;
+                s_CurrentOriginalProcessEventCall = &m_Status;
             }
 
             OriginalProcessEventCallFlagScope(const OriginalProcessEventCallFlagScope&) = delete;
@@ -89,32 +106,45 @@ namespace Obelisk::Hooks
 
             ~OriginalProcessEventCallFlagScope()
             {
-                s_CurrentOriginalProcessEventCalled = m_Previous;
+                s_CurrentOriginalProcessEventCall = m_Status.Previous;
             }
 
         private:
-            bool* m_Previous = nullptr;
+            OriginalProcessEventCallStatus m_Status;
         };
     }
 
     static std::atomic<uint32_t> s_ActiveProcessEventFrames{0};
     static std::atomic<bool> s_RemovingProcessEventHook{false};
     static std::atomic<uint64_t> s_ProcessEventCalls{0};
+    static std::atomic<uint64_t> s_ReflectedBuffCalls{0};
+    static std::atomic<uint64_t> s_ReflectedBuffRejects{0};
     static std::atomic<uint64_t> s_ReflectedChatCalls{0};
     static std::atomic<uint64_t> s_ReflectedChatRejects{0};
     static std::atomic<uint64_t> s_ReflectedChatEventDispatches{0};
     static std::atomic<uint64_t> s_ChatRouteObserverSequences{0};
+    static std::atomic<uint64_t> s_ReflectedDinoCalls{0};
+    static std::atomic<uint64_t> s_ReflectedDinoRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryCalls{0};
     static std::atomic<uint64_t> s_ReflectedInventoryRejects{0};
     static std::atomic<uint64_t> s_ReflectedInventoryDispatches{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnRejects{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnAttempts{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnDispatches{0};
+    static std::atomic<uint64_t> s_ReflectedMissionCalls{0};
+    static std::atomic<uint64_t> s_ReflectedMissionRejects{0};
     static std::atomic<uint64_t> s_PlayerPrincipalLifecycleObservations{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleDiagnosticCandidates{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleFunctionFNameNearMissScans{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleRouteSamples{0};
+    static std::atomic<uint32_t> s_PlayerPrincipalLifecycleApprovedLogRoles{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleRuntimeEvents{0};
     static std::atomic<uint64_t> s_PlayerPrincipalLifecycleRejects{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
+    static std::atomic<uint64_t> s_ReflectedTransferCalls{0};
+    static std::atomic<uint64_t> s_ReflectedTransferRejects{0};
 
     static void WriteAbsoluteJump(uint8_t* at, void* destination)
     {
@@ -287,6 +317,20 @@ namespace Obelisk::Hooks
         return reinterpret_cast<ProcessEvent_t>(s_ProcessEventHook.Trampoline);
     }
 
+    static void InvokeOriginalProcessEvent(ProcessEvent_t original, void* object, void* function, void* params)
+    {
+        auto* status = s_CurrentOriginalProcessEventCall;
+        while (status && (status->Object != object || status->Function != function || status->Parameters != params))
+            status = status->Previous;
+        // Entry prevents recovery from duplicating a throwing UE invocation;
+        // normal return alone qualifies the public lifecycle ORIGINAL_CALLED.
+        if (status)
+            *status->Entered = true;
+        original(object, function, params);
+        if (status)
+            *status->ReturnedNormally = true;
+    }
+
     static void CallOriginalProcessEventFromDetour(void* object, void* function, void* params)
     {
         ProcessEvent_t original = SnapshotOriginalProcessEvent();
@@ -297,9 +341,7 @@ namespace Obelisk::Hooks
             return;
         }
 
-        if (s_CurrentOriginalProcessEventCalled)
-            *s_CurrentOriginalProcessEventCalled = true;
-        original(object, function, params);
+        InvokeOriginalProcessEvent(original, object, function, params);
     }
 
     static void TryCallOriginalProcessEventAfterDetourFailure(
@@ -419,6 +461,15 @@ namespace Obelisk::Hooks
 
         auto* functionObject = static_cast<UObjectProbe*>(function);
         return functionObject->NamePrivate.ComparisonIndex;
+    }
+
+    static int32_t GetFunctionNameNumber(void* function)
+    {
+        if (!Memory::IsReadable(function, sizeof(UObjectProbe)))
+            return -1;
+
+        auto* functionObject = static_cast<UObjectProbe*>(function);
+        return functionObject->NamePrivate.Number;
     }
 
     static bool RuntimeReflectionReader(const void* address, size_t size, void*)
@@ -839,6 +890,138 @@ namespace Obelisk::Hooks
         return GetPlayerPrincipalLifecycleObserverGate().Enabled();
     }
 
+    static bool IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled()
+    {
+        static bool enabled = [] {
+            const char* env = std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES");
+            if (!env || std::strcmp(env, "1") != 0)
+                return false;
+
+            const auto& gate = GetPlayerPrincipalLifecycleObserverGate();
+            if (!gate.Enabled())
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic candidate-only logging disabled: "
+                             "the player principal lifecycle observer gate is not enabled.");
+                return false;
+            }
+
+            OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic candidate-only logging enabled "
+                         "target_set=players-lifecycle-anchor-candidates limit={} "
+                         "params_logged=false identity_logged=false evidence_claim=none principal_claim=none.",
+                         gate.LogLimit);
+            return true;
+        }();
+        return enabled;
+    }
+
+    static uint64_t GetPlayerPrincipalLifecycleFunctionFNameNearMissScanLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv(
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_FUNCTION_FNAME_NEAR_MISS_SCAN_LIMIT");
+            if (!env || env[0] == '\0')
+                return uint64_t{0};
+
+            char* end = nullptr;
+            const unsigned long long parsed = std::strtoull(env, &end, 10);
+            if (!end || *end != '\0' || parsed == 0 || parsed > 10000)
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic function-FName near-miss logging disabled: "
+                             "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_FUNCTION_FNAME_NEAR_MISS_SCAN_LIMIT "
+                             "must be 1..10000.");
+                return uint64_t{0};
+            }
+            return static_cast<uint64_t>(parsed);
+        }();
+        return limit;
+    }
+
+    static bool IsPlayerPrincipalLifecycleFunctionFNameNearMissDiagnosticsEnabled()
+    {
+        static bool enabled = [] {
+            const char* env = std::getenv(
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_FUNCTION_FNAME_NEAR_MISS_DIAGNOSTICS");
+            if (!env || std::strcmp(env, "1") != 0)
+                return false;
+
+            if (!IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled())
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic function-FName near-miss logging disabled: "
+                             "candidate-only lifecycle diagnostics must also be enabled.");
+                return false;
+            }
+
+            const uint64_t scanLimit = GetPlayerPrincipalLifecycleFunctionFNameNearMissScanLimit();
+            if (scanLimit == 0)
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic function-FName near-miss logging disabled: "
+                             "a bounded scan limit is required.");
+                return false;
+            }
+
+            OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic function-FName near-miss logging enabled "
+                         "scan_limit={} params_logged=false identity_logged=false evidence_claim=none "
+                         "principal_claim=none.",
+                         scanLimit);
+            return true;
+        }();
+        return enabled;
+    }
+
+    static uint64_t GetPlayerPrincipalLifecycleRouteSampleLimit()
+    {
+        static uint64_t limit = [] {
+            const char* env = std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_ROUTE_SAMPLE_LIMIT");
+            if (!env || env[0] == '\0')
+                return uint64_t{0};
+
+            char* end = nullptr;
+            const unsigned long long parsed = std::strtoull(env, &end, 10);
+            if (!end || *end != '\0' || parsed == 0 || parsed > 10000)
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic route-sampling disabled: "
+                             "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_ROUTE_SAMPLE_LIMIT must be 1..10000.");
+                return uint64_t{0};
+            }
+            return static_cast<uint64_t>(parsed);
+        }();
+        return limit;
+    }
+
+    static bool IsPlayerPrincipalLifecycleRouteSamplingEnabled()
+    {
+        static bool enabled = [] {
+            const char* env = std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_ROUTE_SAMPLING");
+            if (!env || std::strcmp(env, "1") != 0)
+                return false;
+
+            if (!IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled())
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic route-sampling disabled: "
+                             "candidate-only lifecycle diagnostics must also be enabled.");
+                return false;
+            }
+
+            const uint64_t sampleLimit = GetPlayerPrincipalLifecycleRouteSampleLimit();
+            if (sampleLimit == 0)
+            {
+                OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic route-sampling disabled: "
+                             "a bounded sample limit is required.");
+                return false;
+            }
+
+            OBELISK_WARN("PlayerPrincipalLifecycleDiagnostic route-sampling enabled "
+                         "sample_limit={} params_logged=false identity_logged=false evidence_claim=none "
+                         "principal_claim=none.",
+                         sampleLimit);
+            return true;
+        }();
+        return enabled;
+    }
+
+    constexpr int32_t kCheckJoinInProgressDiagnosticNameIndex = 1845;
+    constexpr int32_t kK2PostLoginDiagnosticNameIndex = 4943;
+
     static uint64_t GetChatReflectionLogLimit()
     {
         static uint64_t limit = [] {
@@ -995,11 +1178,102 @@ namespace Obelisk::Hooks
 
     static bool IsPlayerPrincipalLifecycleObserverActive()
     {
-        const auto& gate = GetPlayerPrincipalLifecycleObserverGate();
-        return IsPlayerPrincipalLifecycleObserverEnabled() &&
-               ProcessEventPlayerPrincipalLifecycleObserver::HasObservationBudgetRemaining(
-                   s_PlayerPrincipalLifecycleObservations,
-                   gate.LogLimit);
+        return IsPlayerPrincipalLifecycleObserverEnabled();
+    }
+
+    static uint64_t NextPlayerPrincipalLifecycleRuntimeEventSequence()
+    {
+        uint64_t current = s_PlayerPrincipalLifecycleRuntimeEvents.fetch_add(1, std::memory_order_relaxed);
+        if (current == UINT64_MAX)
+        {
+            s_PlayerPrincipalLifecycleRuntimeEvents.store(1, std::memory_order_relaxed);
+            return 1;
+        }
+        return current + 1;
+    }
+
+    static uint64_t GetPlayerPrincipalLifecycleServerProcessEpoch()
+    {
+        static const uint64_t epoch = [] {
+            const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+            const uint64_t ticks = now > 0 ? static_cast<uint64_t>(now) : uint64_t{1};
+            const uint64_t pid = static_cast<uint64_t>(getpid());
+            const uint64_t value = ticks ^ (pid << 32) ^ pid;
+            return value == 0 ? uint64_t{1} : value;
+        }();
+        return epoch;
+    }
+
+    static const char* RuntimeReadStatusName(Obelisk::UE::RuntimeReflection::ReadStatus status)
+    {
+        using Obelisk::UE::RuntimeReflection::ReadStatus;
+        switch (status)
+        {
+        case ReadStatus::Ok:
+            return "ok";
+        case ReadStatus::Disabled:
+            return "disabled";
+        case ReadStatus::UnsupportedLayout:
+            return "unsupported_layout";
+        case ReadStatus::InvalidArgument:
+            return "invalid_argument";
+        case ReadStatus::Unreadable:
+            return "unreadable";
+        case ReadStatus::Implausible:
+            return "implausible";
+        case ReadStatus::OutOfBounds:
+            return "out_of_bounds";
+        }
+        return "unknown";
+    }
+
+    static std::string DiagnosticReasonToken(std::string_view reason)
+    {
+        if (reason.empty())
+            return "none";
+
+        std::string token;
+        token.reserve(reason.size());
+        for (char ch : reason)
+        {
+            if ((ch >= 'a' && ch <= 'z') ||
+                (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') ||
+                ch == '_' ||
+                ch == '-')
+            {
+                token.push_back(ch);
+            }
+            else
+            {
+                token.push_back('_');
+            }
+        }
+        if (token.empty())
+            return "none";
+
+        std::string normalized;
+        normalized.reserve(token.size());
+        for (char ch : token)
+        {
+            if (ch >= 'A' && ch <= 'Z')
+                normalized.push_back(static_cast<char>(ch - 'A' + 'a'));
+            else if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9'))
+                normalized.push_back(ch);
+        }
+        if (normalized.find("classobject") != std::string::npos ||
+            normalized.find("params") != std::string::npos ||
+            normalized.find("pointer") != std::string::npos)
+        {
+            return "lifecycle_reflection_rejected";
+        }
+
+        return token;
+    }
+
+    static bool IsPlayerPrincipalCopiedObservationRejected(std::string_view reason)
+    {
+        return reason == "player lifecycle copied observation rejected";
     }
 
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
@@ -1192,6 +1466,112 @@ namespace Obelisk::Hooks
         return value;
     }
 
+    static bool TryLogAcceptedCheckJoinCopiedObservationRejectionDiagnostic(
+        uint64_t diagnosticNumber,
+        int32_t nameIndex,
+        const ProcessEventPlayerPrincipalLifecycleObserver::Gate& gate,
+        void* function,
+        void* params)
+    {
+        if (nameIndex != kCheckJoinInProgressDiagnosticNameIndex)
+            return false;
+
+        Obelisk::UE::RuntimeReflection::MemoryReader diagnosticReader{RuntimeReflectionReader, nullptr};
+        ProcessEventPlayerPrincipalLifecycleObserver::Attempt diagnosticAttempt =
+            ProcessEventPlayerPrincipalLifecycleObserver::TryIdentifyDiagnosticCandidateInvocation(
+                gate,
+                nameIndex,
+                diagnosticReader,
+                function,
+                params);
+        if (diagnosticAttempt.Status !=
+            ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Matched)
+        {
+            return false;
+        }
+
+        ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation diagnosticObservation;
+        if (!ProcessEventPlayerPrincipalLifecycleObserver::TryBuildCopiedLifecycleDiagnosticObservation(
+                diagnosticAttempt.Invocation,
+                diagnosticObservation))
+        {
+            return false;
+        }
+
+        OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                     "fname_index={} post_original=true accepted_lifecycle_target=true "
+                     "reflection_status=matched copy_status=rejected diagnostic_shape=CheckJoinInProgress "
+                     "copied_bool_fields={} copied_bool_values={} redacted_count={} "
+                     "redacted_fields={} params_logged=false identity_logged=false evidence_claim=none.",
+                     diagnosticNumber,
+                     ProcessEventPlayerPrincipalLifecycleObserver::LifecycleDiagnosticCandidateTargetName(
+                         nameIndex),
+                     nameIndex,
+                     LifecycleBoolFieldsCsv(diagnosticObservation),
+                     LifecycleBoolValuesCsv(diagnosticObservation),
+                     diagnosticObservation.RedactedCount,
+                     LifecycleRedactedFieldsCsv(diagnosticObservation));
+        return true;
+    }
+
+    static const char* LifecycleApplyStatusName(
+        ProcessEventPlayerPrincipalLifecycleApplicator::ApplyStatus status)
+    {
+        using ProcessEventPlayerPrincipalLifecycleApplicator::ApplyStatus;
+        switch (status)
+        {
+        case ApplyStatus::UnsupportedObservation:
+            return "unsupported_observation";
+        case ApplyStatus::SessionStartCreated:
+            return "session_start_created";
+        case ApplyStatus::SessionStartAllocationFailed:
+            return "session_start_allocation_failed";
+        case ApplyStatus::SessionStartRejectedNoop:
+            return "session_start_rejected_noop";
+        case ApplyStatus::SessionEndUnresolvedNoop:
+            return "session_end_unresolved_noop";
+        case ApplyStatus::SessionEndInvalidated:
+            return "session_end_invalidated";
+        case ApplyStatus::SessionEndDuplicateNoop:
+            return "session_end_duplicate_noop";
+        case ApplyStatus::SessionEndStaleNoop:
+            return "session_end_stale_noop";
+        case ApplyStatus::RegistryFailure:
+            return "registry_failure";
+        }
+        return "unknown";
+    }
+
+    static const char* LifecycleCorrelationStatusName(
+        const ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation& observation,
+        const Obelisk::Core::PlayerPrincipalToken* logoutCorrelationPrincipal,
+        const ProcessEventPlayerPrincipalLifecycleApplicator::ApplyResult& applyResult)
+    {
+        if (observation.Role != ProcessEventPlayerPrincipalLifecycleObserver::LifecycleRole::SessionEnd)
+            return "not_applicable";
+        if (!logoutCorrelationPrincipal || !logoutCorrelationPrincipal->HasValidShape())
+            return "missing";
+
+        using ProcessEventPlayerPrincipalLifecycleApplicator::ApplyStatus;
+        switch (applyResult.Status)
+        {
+        case ApplyStatus::SessionEndInvalidated:
+            return "matched";
+        case ApplyStatus::SessionEndDuplicateNoop:
+            return "duplicate";
+        case ApplyStatus::SessionEndStaleNoop:
+            return "stale";
+        case ApplyStatus::UnsupportedObservation:
+        case ApplyStatus::SessionStartCreated:
+        case ApplyStatus::SessionStartAllocationFailed:
+        case ApplyStatus::SessionStartRejectedNoop:
+        case ApplyStatus::SessionEndUnresolvedNoop:
+        case ApplyStatus::RegistryFailure:
+            return "unresolved";
+        }
+        return "unresolved";
+    }
+
     static size_t DispatchReflectedItemReturnEventAfterOriginal(
         bool originalWasCalled,
         int32_t nameIndex,
@@ -1273,11 +1653,197 @@ namespace Obelisk::Hooks
         const auto& gate = GetPlayerPrincipalLifecycleObserverGate();
         if (!gate.Enabled())
             return;
+        if (IsPlayerPrincipalLifecycleRouteSamplingEnabled() &&
+            nameIndex >= 0 &&
+            !ProcessEventPlayerPrincipalLifecycleObserver::IsReflectedLifecycleNameIndex(nameIndex))
+        {
+            uint64_t routeSampleNumber = 0;
+            const uint64_t routeSampleLimit = GetPlayerPrincipalLifecycleRouteSampleLimit();
+            if (ProcessEventPlayerPrincipalLifecycleObserver::TryReserveObservationBudget(
+                    s_PlayerPrincipalLifecycleRouteSamples,
+                    routeSampleLimit,
+                    routeSampleNumber) &&
+                ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                    routeSampleNumber,
+                    routeSampleLimit))
+            {
+                OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic route-sample sequence={} "
+                             "fname_index={} fname_number={} post_original=true "
+                             "accepted_lifecycle_target=false reflection_probe=false "
+                             "params_logged=false identity_logged=false evidence_claim=none.",
+                             routeSampleNumber,
+                             nameIndex,
+                             GetFunctionNameNumber(function));
+            }
+        }
+        if (IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled() &&
+            ProcessEventPlayerPrincipalLifecycleObserver::IsLifecycleDiagnosticCandidateNameIndex(nameIndex))
+        {
+            const bool acceptedLifecycleTarget =
+                ProcessEventPlayerPrincipalLifecycleObserver::IsReflectedLifecycleNameIndex(nameIndex);
+            uint64_t diagnosticNumber = 0;
+            if (ProcessEventPlayerPrincipalLifecycleObserver::TryReserveObservationBudget(
+                    s_PlayerPrincipalLifecycleDiagnosticCandidates,
+                    gate.LogLimit,
+                    diagnosticNumber) &&
+                ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                    diagnosticNumber,
+                    gate.LogLimit))
+            {
+                bool diagnosticLogged = false;
+                if (!acceptedLifecycleTarget &&
+                    (nameIndex == kCheckJoinInProgressDiagnosticNameIndex ||
+                     nameIndex == kK2PostLoginDiagnosticNameIndex))
+                {
+                    const bool k2PostLoginDiagnostic = nameIndex == kK2PostLoginDiagnosticNameIndex;
+                    const char* diagnosticShape =
+                        k2PostLoginDiagnostic ? "K2_PostLogin" : "CheckJoinInProgress";
+                    Obelisk::UE::RuntimeReflection::MemoryReader diagnosticReader{RuntimeReflectionReader, nullptr};
+                    ProcessEventPlayerPrincipalLifecycleObserver::Attempt diagnosticAttempt =
+                        ProcessEventPlayerPrincipalLifecycleObserver::TryIdentifyDiagnosticCandidateInvocation(
+                            gate, nameIndex, diagnosticReader, function, params);
+                    if (diagnosticAttempt.Status ==
+                        ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Matched)
+                    {
+                        ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation diagnosticObservation;
+                        if (ProcessEventPlayerPrincipalLifecycleObserver::
+                                TryBuildCopiedLifecycleDiagnosticObservation(
+                                    diagnosticAttempt.Invocation,
+                                    diagnosticObservation))
+                        {
+                            if (k2PostLoginDiagnostic)
+                            {
+                                OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                             "fname_index={} post_original=true accepted_lifecycle_target=false "
+                                             "reflection_status=matched diagnostic_shape={} redacted_count={} "
+                                             "redacted_fields={} params_logged=false identity_logged=false "
+                                             "evidence_claim=none.",
+                                             diagnosticNumber,
+                                             ProcessEventPlayerPrincipalLifecycleObserver::
+                                                 LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                             nameIndex,
+                                             diagnosticShape,
+                                             diagnosticObservation.RedactedCount,
+                                             LifecycleRedactedFieldsCsv(diagnosticObservation));
+                            }
+                            else
+                            {
+                                OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                             "fname_index={} post_original=true accepted_lifecycle_target=false "
+                                             "reflection_status=matched diagnostic_shape={} "
+                                             "copied_bool_fields={} copied_bool_values={} redacted_count={} "
+                                             "redacted_fields={} params_logged=false identity_logged=false "
+                                             "evidence_claim=none.",
+                                             diagnosticNumber,
+                                             ProcessEventPlayerPrincipalLifecycleObserver::
+                                                 LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                             nameIndex,
+                                             diagnosticShape,
+                                             LifecycleBoolFieldsCsv(diagnosticObservation),
+                                             LifecycleBoolValuesCsv(diagnosticObservation),
+                                             diagnosticObservation.RedactedCount,
+                                             LifecycleRedactedFieldsCsv(diagnosticObservation));
+                            }
+                            diagnosticLogged = true;
+                        }
+                        else
+                        {
+                            OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                         "fname_index={} post_original=true accepted_lifecycle_target=false "
+                                         "reflection_status=matched copy_status=rejected "
+                                         "diagnostic_shape={} params_logged=false "
+                                         "identity_logged=false evidence_claim=none.",
+                                         diagnosticNumber,
+                                         ProcessEventPlayerPrincipalLifecycleObserver::
+                                             LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                         nameIndex,
+                                         diagnosticShape);
+                            diagnosticLogged = true;
+                        }
+                    }
+                    else if (diagnosticAttempt.Status ==
+                             ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Rejected)
+                    {
+                        OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                     "fname_index={} post_original=true accepted_lifecycle_target=false "
+                                     "reflection_status=rejected read_status={} reason={} "
+                                     "diagnostic_shape={} params_logged=false "
+                                     "identity_logged=false evidence_claim=none.",
+                                     diagnosticNumber,
+                                     ProcessEventPlayerPrincipalLifecycleObserver::
+                                         LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                     nameIndex,
+                                     RuntimeReadStatusName(diagnosticAttempt.Result.Status),
+                                     DiagnosticReasonToken(diagnosticAttempt.Result.Reason),
+                                     diagnosticShape);
+                        diagnosticLogged = true;
+                    }
+                }
+                if (!diagnosticLogged)
+                {
+                    OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                 "fname_index={} post_original=true accepted_lifecycle_target={} "
+                                 "params_logged=false identity_logged=false evidence_claim=none.",
+                                 diagnosticNumber,
+                                 ProcessEventPlayerPrincipalLifecycleObserver::LifecycleDiagnosticCandidateTargetName(
+                                     nameIndex),
+                                 nameIndex,
+                                 acceptedLifecycleTarget);
+                }
+            }
+        }
+        if (IsPlayerPrincipalLifecycleFunctionFNameNearMissDiagnosticsEnabled() &&
+            !ProcessEventPlayerPrincipalLifecycleObserver::IsReflectedLifecycleNameIndex(nameIndex))
+        {
+            uint64_t scanNumber = 0;
+            if (ProcessEventPlayerPrincipalLifecycleObserver::TryReserveObservationBudget(
+                    s_PlayerPrincipalLifecycleFunctionFNameNearMissScans,
+                    GetPlayerPrincipalLifecycleFunctionFNameNearMissScanLimit(),
+                    scanNumber))
+            {
+                Obelisk::UE::RuntimeReflection::MemoryReader diagnosticReader{
+                    RuntimeReflectionReader,
+                    nullptr,
+                };
+                ProcessEventPlayerPrincipalLifecycleObserver::FunctionFNameNearMissDiagnostic nearMiss;
+                if (ProcessEventPlayerPrincipalLifecycleObserver::TryIdentifyFunctionFNameNearMissDiagnostic(
+                        gate,
+                        nameIndex,
+                        diagnosticReader,
+                        function,
+                        nearMiss))
+                {
+                    uint64_t diagnosticNumber = 0;
+                    if (ProcessEventPlayerPrincipalLifecycleObserver::TryReserveObservationBudget(
+                            s_PlayerPrincipalLifecycleDiagnosticCandidates,
+                            gate.LogLimit,
+                            diagnosticNumber) &&
+                        ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                            diagnosticNumber,
+                            gate.LogLimit))
+                    {
+                        OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                     "fname_index={} post_original=true accepted_lifecycle_target=false "
+                                     "reflection_status=matched read_status={} reason={} "
+                                     "diagnostic_shape=FunctionFNameNearMiss params_logged=false "
+                                     "identity_logged=false evidence_claim=none.",
+                                     diagnosticNumber,
+                                     ProcessEventPlayerPrincipalLifecycleObserver::LifecycleTargetName(
+                                         nearMiss.Function),
+                                     nearMiss.ObservedFunctionNameIndex,
+                                     RuntimeReadStatusName(nearMiss.Result.Status),
+                                     DiagnosticReasonToken(nearMiss.Result.Reason));
+                    }
+                }
+            }
+        }
         if (!ProcessEventPlayerPrincipalLifecycleObserver::IsReflectedLifecycleNameIndex(nameIndex))
+        {
             return;
+        }
 
-        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         uint64_t observationNumber = 0;
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
         ProcessEventPlayerPrincipalLifecycleObserver::Attempt attempt =
             ProcessEventPlayerPrincipalLifecycleObserver::TryObserveInvocation(
                 gate,
@@ -1286,7 +1852,8 @@ namespace Obelisk::Hooks
                 function,
                 params,
                 s_PlayerPrincipalLifecycleObservations,
-                observationNumber);
+                observationNumber,
+                &s_PlayerPrincipalLifecycleApprovedLogRoles);
 
         if (attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Disabled ||
             attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::NonLifecycleFunction ||
@@ -1297,6 +1864,51 @@ namespace Obelisk::Hooks
 
         if (attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Rejected)
         {
+            if (IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled())
+            {
+                uint64_t diagnosticNumber = 0;
+                if (ProcessEventPlayerPrincipalLifecycleObserver::TryReserveObservationBudget(
+                        s_PlayerPrincipalLifecycleDiagnosticCandidates,
+                        gate.LogLimit,
+                        diagnosticNumber) &&
+                    ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                        diagnosticNumber,
+                        gate.LogLimit))
+                {
+                    if (IsPlayerPrincipalCopiedObservationRejected(attempt.Result.Reason))
+                    {
+                        if (!TryLogAcceptedCheckJoinCopiedObservationRejectionDiagnostic(
+                                diagnosticNumber,
+                                nameIndex,
+                                gate,
+                                function,
+                                params))
+                        {
+                            OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                         "fname_index={} post_original=true accepted_lifecycle_target=true "
+                                         "reflection_status=matched copy_status=rejected "
+                                         "params_logged=false identity_logged=false evidence_claim=none.",
+                                         diagnosticNumber,
+                                         ProcessEventPlayerPrincipalLifecycleObserver::
+                                             LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                         nameIndex);
+                        }
+                    }
+                    else
+                    {
+                        OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                     "fname_index={} post_original=true accepted_lifecycle_target=true "
+                                     "reflection_status=rejected read_status={} reason={} "
+                                     "params_logged=false identity_logged=false evidence_claim=none.",
+                                     diagnosticNumber,
+                                     ProcessEventPlayerPrincipalLifecycleObserver::
+                                         LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                     nameIndex,
+                                     RuntimeReadStatusName(attempt.Result.Status),
+                                     DiagnosticReasonToken(attempt.Result.Reason));
+                    }
+                }
+            }
             ++s_PlayerPrincipalLifecycleRejects;
             return;
         }
@@ -1307,28 +1919,101 @@ namespace Obelisk::Hooks
                 attempt,
                 observation))
         {
+            if (IsPlayerPrincipalLifecycleDiagnosticCandidatesEnabled() &&
+                ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                    observationNumber,
+                    gate.LogLimit))
+            {
+                if (!TryLogAcceptedCheckJoinCopiedObservationRejectionDiagnostic(
+                        observationNumber,
+                        nameIndex,
+                        gate,
+                        function,
+                        params))
+                {
+                    OBELISK_INFO("PlayerPrincipalLifecycleDiagnostic candidate sequence={} target={} "
+                                 "fname_index={} post_original=true accepted_lifecycle_target=true "
+                                 "reflection_status=matched copy_status=rejected "
+                                 "params_logged=false identity_logged=false evidence_claim=none.",
+                                 observationNumber,
+                                 ProcessEventPlayerPrincipalLifecycleObserver::
+                                     LifecycleDiagnosticCandidateTargetName(nameIndex),
+                                 nameIndex);
+                }
+            }
             return;
         }
 
-        if (!ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+        const uint64_t runtimeEventSequence =
+            NextPlayerPrincipalLifecycleRuntimeEventSequence();
+        const ProcessEventPlayerPrincipalLifecycleApplicator::ProcessLocalEventContext eventContext{
+            .EventSequence = runtimeEventSequence,
+            .ServerProcessEpoch = GetPlayerPrincipalLifecycleServerProcessEpoch(),
+        };
+        Obelisk::Core::PlayerPrincipalToken correlatedLogoutPrincipal{};
+        const Obelisk::Core::PlayerPrincipalToken* logoutCorrelationPrincipal =
+            ProcessEventPlayerPrincipalLifecycleCorrelation::TryResolveLogoutCorrelation(
+                observation,
+                correlatedLogoutPrincipal)
+            ? &correlatedLogoutPrincipal
+            : nullptr;
+        const ProcessEventPlayerPrincipalLifecycleApplicator::ApplyResult applyResult =
+            ProcessEventPlayerPrincipalLifecycleApplicator::ApplyLifecycleObservationToRegistry(
+            Obelisk::Core::PlayerPrincipalRegistry::Get(),
+            observation,
+            logoutCorrelationPrincipal,
+            &eventContext);
+        ProcessEventPlayerPrincipalLifecycleCorrelation::BindSessionStartCorrelation(
+            Obelisk::Core::PlayerPrincipalRegistry::Get(),
+            observation,
+            applyResult);
+        ProcessEventPlayerPrincipalLifecycleCorrelation::ClearSessionEndCorrelation(
+            observation,
+            applyResult);
+        ProcessEventPlayerPrincipalLifecycleApplicator::DispatchLifecycleApplyResultToInternalSubscribers(
+            applyResult,
+            observation);
+
+        if (ProcessEventPlayerPrincipalLifecycleApplicator::IsApprovedRuntimeEvidenceLoggableApplyResult(
+                observation,
+                logoutCorrelationPrincipal,
+                applyResult) &&
+            !ProcessEventPlayerPrincipalLifecycleObserver::TryReserveApprovedRuntimeEvidenceLogBudget(
+                s_PlayerPrincipalLifecycleObservations,
+                s_PlayerPrincipalLifecycleApprovedLogRoles,
+                observation,
+                gate.LogLimit,
+                observationNumber))
+        {
+            observationNumber = 0;
+        }
+
+        const bool logReserved =
+            ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
                 observationNumber,
-                gate.LogLimit))
+                gate.LogLimit);
+        if (!logReserved)
         {
             return;
         }
 
         OBELISK_INFO("PlayerPrincipalLifecycleObserver event sequence={} role={} target={} post_original=true "
                      "copied_bool_fields={} copied_bool_values={} redacted_count={} redacted_fields={} "
-                     "principal_action={} principal_id_logged=false principal_generation_logged=false "
-                     "delivery_claim=none.",
-                     observationNumber,
+                     "principal_action={} apply_status={} correlation_status={} "
+                     "principal_id_logged=false principal_generation_logged=false delivery_claim=none.",
+                     runtimeEventSequence,
                      ProcessEventPlayerPrincipalLifecycleObserver::LifecycleRoleName(observation.Role),
                      ProcessEventPlayerPrincipalLifecycleObserver::LifecycleTargetName(observation.Function),
                      LifecycleBoolFieldsCsv(observation),
                      LifecycleBoolValuesCsv(observation),
                      observation.RedactedCount,
                      LifecycleRedactedFieldsCsv(observation),
-                     ProcessEventPlayerPrincipalLifecycleObserver::PrincipalActionName(observation.Action));
+                     ProcessEventPlayerPrincipalLifecycleObserver::PrincipalActionName(observation.Action),
+                     LifecycleApplyStatusName(applyResult.Status),
+                     LifecycleCorrelationStatusName(
+                         observation,
+                         logoutCorrelationPrincipal,
+                         applyResult));
     }
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)
@@ -1703,7 +2388,10 @@ namespace Obelisk::Hooks
     {
         ActiveProcessEventFrame activeFrame;
         bool originalWasCalled = false;
-        OriginalProcessEventCallFlagScope originalCallFlag(originalWasCalled);
+        bool originalReturnedNormally = false;
+        OriginalProcessEventCallFlagScope originalCallFlag(originalWasCalled, originalReturnedNormally,
+                                                           object, function, params);
+        NativeChatHook::PlayerLifecycleFrame nativePlayerFrame;
         try
         {
             uint64_t callNumber = ++s_ProcessEventCalls;
@@ -1726,7 +2414,11 @@ namespace Obelisk::Hooks
             const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
             TraceReflectedChatInvocation(nameIndex, function, params);
-            originalWasCalled = DispatchProcessEventCallbacks(
+            NativeChatHook::CapturePlayerLifecycle(object, function, params, nativePlayerFrame);
+            // The invoker marks the frame only when a real trampoline exists.
+            // Dispatch's return value also covers attempted/manual invocations
+            // and therefore cannot establish ORIGINAL_CALLED for lifecycle.
+            DispatchProcessEventCallbacks(
                 nameIndex,
                 object,
                 function,
@@ -1734,6 +2426,8 @@ namespace Obelisk::Hooks
                 hasPreCallbacks,
                 hasPostCallbacks,
                 CallOriginalProcessEventFromDetour);
+
+            NativeChatHook::CompletePlayerLifecycle(nativePlayerFrame, params, originalReturnedNormally);
 
             ObserveChatRouteAfterOriginal(originalWasCalled, nameIndex, function, params);
             DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
@@ -1837,7 +2531,7 @@ namespace Obelisk::Hooks
             return;
         }
 
-        original(object, function, params);
+        InvokeOriginalProcessEvent(original, object, function, params);
     }
 
     bool ProcessEventHook::IsInstalled()

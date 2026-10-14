@@ -23,7 +23,8 @@
       "runtime/core-first RC readiness",
       "internal runtime stability",
       "Foundation/Plugin Hub seed package shape",
-      "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds"
+      "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds",
+      "scoped non-complete release-statement 8/8 bookkeeping"
     ]
   },
   "installed_sdk_package_shape": {
@@ -40,6 +41,7 @@
       "stable_release_contract.claim_allowed",
       "release package readiness or public package availability",
       "Plugin Hub seed/package publication",
+      "Plugin Hub readiness/publication, support-tier activation, public module availability, or package-shape/public package readiness",
       "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces"
     ],
     "non_claim_exports": {
@@ -144,9 +146,9 @@
     "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "That dependency chain must not be documented as permissions/admin being the immediate next public slice; groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.",
     "Commands/replies also depend on obelisk.command_chat_response_path.v1; while that command/chat response path is unpromoted, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted.",
-    "Promoted command/chat response and commands/replies evidence must name promoted identity/principal and permissions prerequisites plus copied response/command ABI, owner-scoped lifecycle, privacy/redaction, abuse/rate-limit, audit, and command lifecycle boundaries before those rows can support v1 release-claim accounting.",
+    "Downstream chat interaction evidence must name promoted identity/principal and permissions prerequisites plus copied response ABI, owner-scoped lifecycle, privacy/redaction, abuse/rate-limit, audit, and lifecycle boundaries before those rows can support v1 release-claim accounting.",
     "Static thunk orientation, passive ChatMessageEvent parsing, candidate vtable slots, raw ProcessEvent callbacks, and legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence.",
-    "Promoted permissions/admin structured evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in v1_required_dependency_chain, bound by reviewed evidence artifact hash, before permissions/admin can count toward complete-SDK accounting.",
+    "Promoted permissions/admin structured evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in v1_required_dependency_chain, bound by reviewed evidence artifact hash, before permissions/admin can count toward complete-SDK accounting; diagnostic/passive/scoped statement artifacts and missing, mismatched, stale, or hash-unbound certificates are non-counting.",
     "Installed-SDK foundation examples before identity/principal are limited to lifecycle/config/logging, descriptors, and process-local timers; they are package-shape/contributor-readiness examples only. Plugin Hub seed/package publication remains post-SDK-complete, and neither these examples nor passive chat routing are enough for v1 completion; passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
     "Plugin Hub remains post-SDK-complete planning: no seed/package publication, intake prioritization, production module availability, or support-tier activation may be inferred from v0.1 RC surfaces, installed SDK package shape, foundation examples, or promoted-experimental copied-data seeds.",
@@ -162,9 +164,12 @@
     "scripts/check_command_permission_route_gate.py is a planning-only aggregate posture check for the identity/principal -> permissions/admin -> command response -> commands/replies dependency chain; a passing report is not release evidence, public ABI readiness, runtime readiness, command router readiness, reply/send-chat readiness, or v1 completion evidence.",
     "While player identity waits on approved copied runtime principal lifecycle evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> command response -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
-    "scripts/check_public_sdk_v1_completion.py reports stable_release_contract_claim_allowed as the manifest switch and stable_claim_allowed as the final computed gate result; stable_claim_allowed must remain false whenever any checker blocker remains.",
+    "scripts/check_public_sdk_v1_completion.py reports the manifest-level stable release switch and final stable SDK gate result; that gate must remain false whenever any checker blocker remains.",
     "scripts/check_public_sdk_v1_completion.py reports v1_sdk_blocker_outcomes as accounting-only prioritization for the 12 blockers; those rows do not approve complete/full/production/stable SDK wording.",
     "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied signals are copied-data seeds only; individually or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
+    "Scoped non-complete release-statement outcomes may list 8/8 required non-P0 post-v1/excluded rows, including the Mission/Transfer/Dino/Tribe/Buff umbrella and all five leaf exclusions, but that is bookkeeping only: it contributes 0/12 complete-SDK progress, 0/4 P0 dependency-chain progress with obelisk.player_identity.v1 blocked first, no stable SDK claim, no public module availability, no support-tier activation, no Plugin Hub readiness/publication, and no package-shape or public package readiness.",
+    "Installed runtime status, broadcasts, RCON OK checks, passive monitor output, and start/end partial lifecycle observations are operational context only; they contribute 0/12 complete-SDK progress and 0/4 P0 dependency-chain progress and do not promote public identity, permissions/admin, command response, commands/replies, runtime readiness, or public SDK readiness.",
+    "Partial lifecycle event artifacts, single-role or two-role lifecycle proofs, diagnostic/passive complete triplets, copied-log-only reports, and status snapshots are non-evidence until the approved copied runtime principal lifecycle evidence bundle checker accepts the full session_start, session_start_rejected, and session_end triplet.",
     "No surface may be listed as promoted unless its status is promoted.",
     "post_v1_or_excluded_surfaces must exactly match surfaces whose status is post-v1 or excluded.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a non-empty public_contract.",
@@ -413,8 +418,7 @@
         "manifest": "docs/public_gameplay_events.json",
         "release_readiness_target_sets": [
           "minimal-second-source-intake",
-          "structure-observer-intake",
-          "item-return-only-policy-slice"
+          "structure-observer-intake"
         ],
         "tests": [
           "tests/sdk_consumer",
@@ -558,6 +562,39 @@
       "category": "identity",
       "status": "planning",
       "support_tier": "blocked",
+      "depends_on": [],
+      "v1_dependency_chain_position": 1,
+      "public_abi": false,
+      "adds_obelisk_api": false,
+      "public_sdk_ready": false,
+      "promotion_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "complete_sdk_counting_allowed": false,
+      "public_ready_aliases": {
+        "promoted": false,
+        "public_ready": false,
+        "public_contract_ready": false,
+        "public_abi_ready": false,
+        "public_header_allowed": false,
+        "public_sdk_ready": false,
+        "runtime_ready": false,
+        "v1_completion_evidence": false,
+        "complete_sdk_counting_allowed": false
+      },
+      "required_evidence_terms": [
+        "approved_runtime_principal_lifecycle_evidence",
+        "runtime_observer_log_source_hash",
+        "output_artifact_identity.artifact_sha256",
+        "privacy.identifier_redaction",
+        "principal_generation",
+        "principal_scope_flags",
+        "principal_invalidation_policy",
+        "append_only_pod_c_abi",
+        "owner_token_lifecycle_cleanup",
+        "sdk_consumer_tests"
+      ],
       "public_contract": [],
       "evidence": {
         "target_set": "players-identity-lifecycle-intake",
@@ -571,7 +608,8 @@
           "offline ShooterGameServer binary alone is insufficient",
           "copied core or direct core/bin planning alone is insufficient",
           "manual FName/GObjects roots alone are insufficient",
-          "private player-principal lifecycle observer wiring, marker/env-gated runtime observations, and internal lifecycle-anchor logs are promotion inputs only; they do not add public header symbols, plugin callback dispatch, player lookup, principal identifiers, permissions/admin, command/chat response, v1 SDK completion, or support-tier changes"
+          "private player-principal lifecycle observer wiring, marker/env-gated runtime observations, and internal lifecycle-anchor logs are promotion inputs only; they do not add public header symbols, plugin callback dispatch, player lookup, principal identifiers, permissions/admin, command/chat response, v1 SDK completion, or support-tier changes",
+          "approved runtime lifecycle intake for public contract review must be hash-bound through docs/player_identity_public_contract_decisions.json source_provenance_policy; passive/manual snapshots, diagnostic-only logs, request/preflight/window/receipt sidecars, scoped statements, and certificates cannot resolve runtime.lifecycle_evidence"
         ],
         "docs": [
           "docs/research/2026-05-31-player-identity-first-evidence.md",
@@ -640,6 +678,7 @@
         "must_remain_without_public_contract_until_promotion": true,
         "promotion_requires": [
           "approved runtime principal lifecycle evidence for the candidate HandleNewPlayer/OnLogout route",
+          "approved runtime evidence bound to the copied runtime-observer log source hash and output_artifact_identity.artifact_sha256",
           "accepted login/logout lifecycle ordering and principal invalidation semantics",
           "principal privacy, invalidation, and cross-instance semantics",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
@@ -693,8 +732,7 @@
         "decision_manifest": "docs/inventory_item_copied_signals_public_contract_decisions.json",
         "manifest": "docs/public_gameplay_events.json",
         "release_readiness_target_sets": [
-          "minimal-second-source-intake",
-          "item-return-only-policy-slice"
+          "minimal-second-source-intake"
         ],
         "docs": [
           "docs/research/2026-05-30-item-return-only-policy-slice.md",
@@ -871,6 +909,7 @@
         ],
         "exclusion_requires": [
           "the v1 release statement names obelisk.mission_transfer_dino_tribe.v1 as excluded",
+          "the v1 release statement states that mission excluded, transfer excluded, dino_policy excluded, tribe_policy excluded, and buff_status excluded",
           "the v1 release statement states that no Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules API, Tribe SDK, tribe MOTD, tribe-facing notices, tribe policy API, Buff/status SDK, teleport/spawn API, ownership lookup, or cross-map correlation API is included in v1",
           "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
@@ -896,7 +935,7 @@
             "mission-copied-bool-policy-slice"
           ],
           "current_blocker": "no public Mission SDK ABI, no runtime observer approval, no mission identity/state/reward authority, and no installed SDK consumer coverage",
-          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+          "allowed_v1_outcome": "explicitly excluded in a scoped non-complete statement only; promotion remains blocked until separate reviewed narrow copied C ABI evidence exists"
         },
         {
           "id": "transfer",
@@ -906,7 +945,7 @@
             "transfer-baccept-only-policy-slice"
           ],
           "current_blocker": "no public Transfer SDK ABI, no transfer identity, no cross-map correlation, no teleport/spawn authority, and no return override",
-          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+          "allowed_v1_outcome": "explicitly excluded in a scoped non-complete statement only; promotion remains blocked until separate reviewed narrow copied C ABI evidence exists"
         },
         {
           "id": "dino_policy",
@@ -915,7 +954,7 @@
             "dino-compact-intake"
           ],
           "current_blocker": "no public Dino SDK ABI, no dino identity/lookup, no mutation/cosmetics/carry-rule authority, and no runtime lifecycle/privacy contract",
-          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+          "allowed_v1_outcome": "explicitly excluded in a scoped non-complete statement only; promotion remains blocked until separate reviewed narrow copied C ABI evidence exists"
         },
         {
           "id": "tribe_policy",
@@ -924,7 +963,7 @@
             "tribe-compact-intake"
           ],
           "current_blocker": "no public Tribe SDK ABI, no tribe identity/lookup, no tribe MOTD/notices/policy authority, and no privacy/redaction contract",
-          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+          "allowed_v1_outcome": "explicitly excluded in a scoped non-complete statement only; promotion remains blocked until separate reviewed narrow copied C ABI evidence exists"
         },
         {
           "id": "buff_status",
@@ -934,7 +973,7 @@
             "buff-breadth-intake"
           ],
           "current_blocker": "no public Buff/status SDK ABI, no class/object redaction contract, no lifecycle/stacking/invalidation semantics, and no aggregate/count/proximity or mutation API",
-          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+          "allowed_v1_outcome": "explicitly excluded in a scoped non-complete statement only; promotion remains blocked until separate reviewed narrow copied C ABI evidence exists"
         }
       ],
       "buff_audit_requirements": [
@@ -961,10 +1000,44 @@
       "public_name": "Command/chat response path",
       "public_abi": false,
       "adds_obelisk_api": false,
+      "public_sdk_ready": false,
+      "promotion_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "complete_sdk_counting_allowed": false,
       "public_contract": [],
       "depends_on": [
         "obelisk.player_identity.v1",
         "obelisk.permissions_admin.v1"
+      ],
+      "v1_dependency_chain_position": 3,
+      "public_ready_aliases": {
+        "promoted": false,
+        "public_ready": false,
+        "public_contract_ready": false,
+        "public_abi_ready": false,
+        "public_header_allowed": false,
+        "public_sdk_ready": false,
+        "runtime_ready": false,
+        "v1_completion_evidence": false,
+        "complete_sdk_counting_allowed": false
+      },
+      "required_evidence_terms": [
+        "obelisk.player_identity.v1 promoted",
+        "obelisk.permissions_admin.v1 promoted",
+        "copied_response_abi",
+        "nonzero plugin_owner_token",
+        "owner_scoped_unregister",
+        "plugin_owner_cleanup",
+        "callback_lifecycle_drain",
+        "privacy_redaction",
+        "abuse_rate_limit",
+        "audit",
+        "cross_instance_routing_policy",
+        "no_public_CallProcessEvent_path",
+        "abi_layout_tests",
+        "sdk_consumer_tests"
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_for_complete_sdk",
@@ -1031,11 +1104,43 @@
       "category": "commands",
       "status": "planning",
       "support_tier": "blocked",
+      "public_abi": false,
+      "adds_obelisk_api": false,
+      "public_sdk_ready": false,
+      "promotion_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "complete_sdk_counting_allowed": false,
       "public_contract": [],
       "depends_on": [
         "obelisk.player_identity.v1",
         "obelisk.permissions_admin.v1",
         "obelisk.command_chat_response_path.v1"
+      ],
+      "v1_dependency_chain_position": 4,
+      "public_ready_aliases": {
+        "promoted": false,
+        "public_ready": false,
+        "public_contract_ready": false,
+        "public_abi_ready": false,
+        "public_header_allowed": false,
+        "public_sdk_ready": false,
+        "runtime_ready": false,
+        "v1_completion_evidence": false,
+        "complete_sdk_counting_allowed": false
+      },
+      "required_evidence_terms": [
+        "obelisk.player_identity.v1 promoted",
+        "obelisk.permissions_admin.v1 promoted",
+        "obelisk.command_chat_response_path.v1 promoted",
+        "command_lifecycle",
+        "abuse_rate_limit",
+        "moderation_boundaries",
+        "capability_gates",
+        "owner_scoped_cleanup",
+        "append_only_pod_c_abi",
+        "sdk_consumer_tests"
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_for_complete_sdk",
@@ -1095,9 +1200,44 @@
       "category": "permissions/admin",
       "status": "planning",
       "support_tier": "blocked",
+      "public_abi": false,
+      "adds_obelisk_api": false,
+      "public_sdk_ready": false,
+      "promotion_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "v1_completion_evidence": false,
+      "complete_sdk_counting_allowed": false,
       "public_contract": [],
       "depends_on": [
         "obelisk.player_identity.v1"
+      ],
+      "v1_dependency_chain_position": 2,
+      "public_ready_aliases": {
+        "promoted": false,
+        "public_ready": false,
+        "public_contract_ready": false,
+        "public_abi_ready": false,
+        "public_header_allowed": false,
+        "public_sdk_ready": false,
+        "runtime_ready": false,
+        "v1_completion_evidence": false,
+        "complete_sdk_counting_allowed": false
+      },
+      "required_evidence_terms": [
+        "obelisk.player_identity.v1 promoted certificate",
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "policy_source_id",
+        "policy_source_generation",
+        "authority_kind",
+        "authority_generation",
+        "policy_epoch",
+        "fail_closed_missing_or_stale_principal",
+        "nonzero plugin_owner_token",
+        "append_only_pod_c_abi",
+        "sdk_consumer_tests"
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_for_complete_sdk",
@@ -1124,6 +1264,56 @@
           "no permission groups, admin groups, grant/revoke API, admin actions, moderation actions, mutation authority, command router, command/chat response path, or replies/send-chat implication",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
         ],
+        "permissions_admin_query_only_planning": {
+          "status": "blocked/query-only-planning",
+          "public_contract_allowed": false,
+          "promotion_ready": false,
+          "public_sdk_ready": false,
+          "runtime_ready": false,
+          "v1_completion_evidence": false,
+          "complete_sdk_counting_allowed": false,
+          "required_policy": [
+            "permissions/admin remains query-only planning until obelisk.player_identity.v1 is promoted",
+            "the first permissions/admin public slice may only be fail-closed permission queries over copied principals",
+            "permission queries must include principal_generation and principal_scope_flags or be formally callback-local only",
+            "allow decisions require policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance"
+          ],
+          "forbidden_until_separate_promotion": [
+            "permission groups",
+            "admin groups",
+            "grant/revoke API",
+            "admin actions",
+            "admin mutation",
+            "permission cache ABI",
+            "storage/persistence",
+            "operator ingress",
+            "command router",
+            "command/chat response path",
+            "replies/send-chat",
+            "moderation authority",
+            "ban/kick API",
+            "allow without provenance",
+            "public header permission symbols"
+          ],
+          "non_counting_artifacts": [
+            "diagnostic route/gap/readiness reports",
+            "passive chat parsing or plugin-local routing artifacts",
+            "scoped non-complete-SDK release statements or exclusions",
+            "candidate-only permissions/admin query fail-closed contracts",
+            "missing, mismatched, stale, or hash-unbound promotion certificates"
+          ],
+          "required_identity_promotion_certificate": {
+            "schema": "obelisk.player-identity-promotion-certificate.v1",
+            "surface_id": "obelisk.player_identity.v1",
+            "promotion_status": "promoted",
+            "v1_dependency_chain_position": 1,
+            "required_by_surface": "obelisk.permissions_admin.v1",
+            "required_by_v1_dependency_chain_position": 2,
+            "required_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+            "reviewed_artifact_hash_policy": "must match the reviewed identity surface record hash carried by the certificate",
+            "missing_mismatched_or_stale_certificate_counts": false
+          }
+        },
         "exclusion_requires": [
           "a scoped non-complete-SDK release statement may name obelisk.permissions_admin.v1 as post-v1 or excluded",
           "the v1 release statement states that no permission groups, admin groups, grant/revoke API, admin actions, permission cache ABI, storage/persistence, operator ingress, command router, command/chat response path, replies/send-chat, moderation authority, or ban/kick API is included in v1",
@@ -1215,19 +1405,31 @@
         "docs": [
           "docs/research/2026-06-01-object-identity-resource-handle-v1-blocker.md"
         ],
-        "current_public_slice": "copied/redacted scalar callback data and category-only metadata descriptors only; copied events, resource_kind metadata, raw UObject pointers, lookup, persistence, or mutation must not imply object identity, lookup, ResourceHandle, or post-callback object correlation"
+        "current_public_slice": "copied/redacted scalar callback data and category-only metadata descriptors only; copied events, resource_kind metadata, raw UObject pointers, lookup, persistence, cross-event correlation, post-callback validity, or mutation must not imply object identity, lookup, ResourceHandle, or post-callback object correlation"
       },
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
         "promotion_requires": [
           "lifecycle and invalidation semantics for UObject-backed identities",
-          "reuse and stale-object negative evidence across isolated captures or an equivalent independent validation path",
+          "runtime object negative samples plus serial reuse/wraparound semantics across isolated captures or an equivalent independent validation path",
           "callback-scope versus post-callback validity rules, including UObject flag semantics",
           "privacy and redaction boundaries for owner, player, tribe, structure, item, dino, buff, mission, transfer, economy, mobility, and area-policy identity",
           "owner-token scoped lookup and cleanup policy if lookup is ever exposed",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, ABI layout tests, and installed-SDK consumer tests"
         ],
+        "next_evidence_contract": {
+          "status": "planning-only-not-approval",
+          "required_future_evidence": [
+            "runtime object negative samples",
+            "runtime serial reuse/wraparound semantics",
+            "post-callback lookup safety and fail-closed handle invalidation"
+          ],
+          "offline_artifacts_policy": "candidate-only",
+          "counts_toward_public_promotion": false,
+          "counts_toward_complete_sdk_claim": false,
+          "non_claim": "This contract documents the future blocker only; it does not approve lookup, mutation, cross-event identity, persistent object identity, post-callback validity, runtime work, or public SDK readiness."
+        },
         "exclusion_requires": [
           "the v1 release statement names obelisk.object_identity_resource_handle.v1 as post-v1 or excluded",
           "the v1 release statement states that no object identity, UObject identity, object lookup, ResourceHandle, post-callback object handle, structure handle, item handle, inventory handle, dino handle, tribe handle, buff/status handle, mission/transfer correlation handle, economy/mobility handle, or area-policy object handle API is included in v1",
@@ -1248,6 +1450,10 @@
         "ResourceHandle validity and reuse",
         "object lookup",
         "post-callback object correlation",
+        "post-callback validity",
+        "cross-event object identity",
+        "persistent object identity",
+        "object mutation",
         "owner-scoped handle cleanup",
         "privacy/redaction boundaries"
       ],
@@ -1257,6 +1463,10 @@
         "object lookup",
         "ResourceHandle",
         "post-callback object handles",
+        "post-callback validity",
+        "cross-event object identity",
+        "persistent object identity",
+        "object mutation",
         "structure handles",
         "item handles",
         "inventory handles",

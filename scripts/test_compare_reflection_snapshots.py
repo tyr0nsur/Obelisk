@@ -209,6 +209,34 @@ def write_target_set_root(root: Path, target_set: str) -> None:
         write_snapshot(target_dir, payload, f"{outer}.{name}.snapshot.json")
 
 
+def write_lifecycle_snapshot_root(root: Path) -> None:
+    target_dir = root / "sha" / "players_lifecycle"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for outer, name in (
+        ("ShooterGameMode", "HandleNewPlayer"),
+        ("ShooterGameMode", "OnLogout"),
+    ):
+        payload = rename_target(base_snapshot(), outer=outer, name=name)
+        write_snapshot(target_dir, payload, f"{outer}.{name}.snapshot.json")
+
+
+def write_distinct_lifecycle_fixture_root(root: Path) -> None:
+    target_dir = root / "7e7ded49e0c6" / "players_lifecycle"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    source_dir = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots" / "7e7ded49e0c6" / "players_lifecycle"
+    for name in ("ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"):
+        payload = json.loads((source_dir / f"{name}.snapshot.json").read_text(encoding="utf-8"))
+        evidence = payload["evidence"]
+        evidence["artifact_kind"] = "offline_core"
+        evidence["artifact_sha256"] = "c" * 64
+        evidence["capture_id"] = "candidate-lifecycle-core"
+        evidence["evidence_pack_id"] = "candidate-lifecycle-pack"
+        (target_dir / f"{name}.snapshot.json").write_text(
+            json.dumps(payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+
 def run_compare(base: Path, candidate: Path | None, *extra: str) -> subprocess.CompletedProcess[str]:
     command = [
         sys.executable,
@@ -229,12 +257,96 @@ def run_compare_raw(*extra: str) -> subprocess.CompletedProcess[str]:
 
 
 class CompareReflectionSnapshotsTests(unittest.TestCase):
+    def test_target_set_catalog_hygiene_blocks_readiness_and_counting_alias_names(self) -> None:
+        issues = compare.target_set_catalog_hygiene_issues(
+            target_sets={
+                "mission-readiness-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:MissionType.AddPlayerToMission",
+                ),
+                "players-identity-evidence": (
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+                ),
+                "resource-handle-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+                ),
+                "runtime-identity-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+                ),
+                "structure-mutation-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+                ),
+                "item-return-override-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+                ),
+                "stable-sdk-intake": (
+                    "obelisk.ufunction-chain.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
+                ),
+                "transfer-counts-toward-v1": (
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
+                ),
+            },
+            module_lanes={
+                "mission-readiness-intake": "mission",
+                "players-identity-evidence": "players_identity",
+                "resource-handle-intake": "resource_handle",
+                "runtime-identity-intake": "players_identity",
+                "structure-mutation-intake": "structures",
+                "item-return-override-intake": "items",
+                "stable-sdk-intake": "core_gameplay_policy",
+                "transfer-counts-toward-v1": "transfer",
+            },
+            planning_only=frozenset(),
+            release_readiness=frozenset(),
+            supported_schemas=compare.SUPPORTED_SCHEMAS,
+        )
+
+        aliases_by_target = {
+            str(issue["target_set"]): set(issue.get("aliases", []))
+            for issue in issues
+            if issue.get("reason") == "target_set_name_promotion_alias"
+        }
+        self.assertIn("readiness", aliases_by_target["mission-readiness-intake"])
+        self.assertIn("identity_evidence", aliases_by_target["players-identity-evidence"])
+        self.assertIn("resource_handle", aliases_by_target["resource-handle-intake"])
+        self.assertIn("runtime_identity", aliases_by_target["runtime-identity-intake"])
+        self.assertIn("mutation", aliases_by_target["structure-mutation-intake"])
+        self.assertIn("return_override", aliases_by_target["item-return-override-intake"])
+        self.assertIn("stable_sdk", aliases_by_target["stable-sdk-intake"])
+        self.assertIn("counts", aliases_by_target["transfer-counts-toward-v1"])
+        self.assertIn("v1", aliases_by_target["transfer-counts-toward-v1"])
+
+    def test_snapshot_claim_scan_blocks_stable_sdk_schema_alias(self) -> None:
+        payload = base_snapshot()
+        payload["schema_alias"] = "obelisk.stable-sdk-ready.v1"
+
+        _, reasons = compare.comparable_layout(payload, strict_identity_indices=False)
+
+        self.assertIn("forbidden_positive_claim_value:$.schema_alias", reasons)
+
     def test_lists_named_target_sets_without_snapshot_roots(self) -> None:
         result = run_compare_raw("--list-target-sets", "--json")
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-target-sets.v1")
+        self.assertEqual(
+            report["catalog_hygiene"],
+            {
+                "guardrail": "fail_closed_named_target_set_catalog",
+                "status": "clean",
+                "checked_target_sets": len(compare.TARGET_SETS),
+                "checked_schemas": sorted(compare.SUPPORTED_SCHEMAS),
+                "issues": [],
+            },
+        )
+        self.assertEqual(report["target_set_revision_schema"], compare.TARGET_SET_REVISION_SCHEMA)
+        self.assertEqual(report["target_set_revision_source"], compare.TARGET_SET_REVISION_SOURCE)
+        self.assertEqual(report["target_set_revision_target_schema_filter"], "all")
+        self.assertEqual(
+            report["target_set_revision_source_sha256"],
+            compare.target_set_revision_source_sha256(list(compare.TARGET_SETS), schema_filter=None),
+        )
+        self.assertRegex(report["target_set_revision_source_sha256"], r"^[0-9a-f]{64}$")
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
         classifications = {item["name"]: item["readiness_classification"] for item in report["target_sets"]}
         lanes = {item["name"]: item["module_lane"] for item in report["target_sets"]}
@@ -242,15 +354,26 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         readiness_scopes = {item["name"]: item["readiness_scope"] for item in report["target_sets"]}
         promotion_flags = {item["name"]: item["promotion_ready"] for item in report["target_sets"]}
         public_sdk_flags = {item["name"]: item["public_sdk_ready"] for item in report["target_sets"]}
+        runtime_flags = {item["name"]: item["runtime_ready"] for item in report["target_sets"]}
+        second_source_flags = {item["name"]: item["second_source_layout_evidence"] for item in report["target_sets"]}
         self.assertEqual(set(lanes), set(compare.TARGET_SETS))
         self.assertEqual(lanes["chat-message-intake"], "chat")
         self.assertEqual(lanes["command-chat-response-route-planning"], "command_chat_response")
+        self.assertEqual(lanes["inventory-custom-filter-array-boundary"], "inventory")
         self.assertEqual(lanes["mission-copied-bool-policy-slice"], "mission")
         self.assertEqual(lanes["players-lifecycle-anchor-candidates"], "players_lifecycle")
         self.assertEqual(lanes["structure-build-policy-offline-intake"], "structures")
         self.assertEqual(lanes["structure-observer-intake"], "structures")
         self.assertEqual(lanes["transfer-scriptstruct"], "transfer")
-        self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
+        self.assertEqual(report["catalog_scope"], "named_target_set_catalog_only")
+        self.assertEqual(report["evidence_scope"], "target_set_catalog_only_not_evidence")
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertTrue(report["not_second_source"])
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertIn("second_source_layout_evidence", report["does_not_satisfy_readiness"])
         self.assertIn("public_sdk", report["not_promoted_surfaces"])
         self.assertIn("runtime_hooks", report["not_promoted_surfaces"])
         self.assertTrue(
@@ -263,10 +386,15 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertFalse(any(promotion_flags.values()))
         self.assertFalse(any(public_sdk_flags.values()))
+        self.assertFalse(any(runtime_flags.values()))
+        self.assertFalse(any(second_source_flags.values()))
         self.assertIn("minimal-second-source-intake", sets)
         self.assertEqual(classifications["minimal-second-source-intake"], "release_readiness")
         self.assertIs(release_flags["minimal-second-source-intake"], True)
         self.assertEqual(readiness_scopes["minimal-second-source-intake"], "layout_only")
+        self.assertEqual(classifications["item-return-only-policy-slice"], "planning_only")
+        self.assertIs(release_flags["item-return-only-policy-slice"], False)
+        self.assertEqual(readiness_scopes["item-return-only-policy-slice"], "planning_only")
         self.assertEqual(classifications["buff-compact-intake"], "internal_layout_only")
         self.assertIs(release_flags["buff-compact-intake"], False)
         self.assertEqual(readiness_scopes["buff-compact-intake"], "internal_layout_only")
@@ -287,6 +415,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(classifications["command-chat-response-route-planning"], "planning_only")
         self.assertIs(release_flags["command-chat-response-route-planning"], False)
         self.assertEqual(readiness_scopes["command-chat-response-route-planning"], "planning_only")
+        self.assertEqual(classifications["inventory-custom-filter-array-boundary"], "planning_only")
+        self.assertIs(release_flags["inventory-custom-filter-array-boundary"], False)
+        self.assertEqual(readiness_scopes["inventory-custom-filter-array-boundary"], "planning_only")
         self.assertEqual(classifications["transfer-baccept-only-policy-slice"], "internal_layout_only")
         self.assertIs(release_flags["transfer-baccept-only-policy-slice"], False)
         self.assertEqual(readiness_scopes["transfer-baccept-only-policy-slice"], "internal_layout_only")
@@ -320,6 +451,61 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnStartNewPlayer__DelegateSignature",
             ],
         )
+        lifecycle_entry = next(
+            item for item in report["target_sets"] if item["name"] == "players-lifecycle-anchor-candidates"
+        )
+        lifecycle_policy = lifecycle_entry["lifecycle_source_policy"]
+        self.assertEqual(lifecycle_policy["policy_scope"], "source_names_only_not_runtime_evidence")
+        self.assertEqual(
+            lifecycle_policy["approved_runtime_triplet_source_names"],
+            [
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(
+            lifecycle_policy["guidance_only_non_triplet_source_names"],
+            [
+                "GameMode.K2_PostLogin",
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            ],
+        )
+        self.assertEqual(
+            lifecycle_policy["runtime_triplet_evidence_status"],
+            "approved_source_names_only_runtime_evidence_missing",
+        )
+        self.assertFalse(lifecycle_policy["approved_runtime_evidence_present"])
+        self.assertFalse(lifecycle_policy["runtime_ready"])
+        self.assertFalse(lifecycle_policy["public_sdk_ready"])
+        self.assertFalse(lifecycle_policy["promotion_ready"])
+        lifecycle_roles = {item["target"]: item for item in lifecycle_policy["source_roles"]}
+        self.assertTrue(lifecycle_roles["ShooterGameMode.HandleNewPlayer"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(lifecycle_roles["ShooterGameMode.HandleNewPlayer"]["static_lifecycle_anchor_source_name"])
+        self.assertTrue(lifecycle_roles["ShooterGameMode.OnLogout"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(lifecycle_roles["ShooterGameMode.OnLogout"]["static_lifecycle_anchor_source_name"])
+        self.assertTrue(lifecycle_roles["ShooterGameMode.CheckJoinInProgress"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(lifecycle_roles["ShooterGameMode.CheckJoinInProgress"]["rejected_start_triplet_source_name"])
+        self.assertFalse(lifecycle_roles["ShooterGameMode.CheckJoinInProgress"]["static_lifecycle_anchor_source_name"])
+        self.assertFalse(lifecycle_roles["GameMode.K2_PostLogin"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(lifecycle_roles["GameMode.K2_PostLogin"]["guidance_only_non_triplet_source_name"])
+        self.assertTrue(
+            lifecycle_roles["GameMode.K2_PostLogin"]["chronology_guidance_only_non_anchor_source_name"]
+        )
+        self.assertFalse(
+            lifecycle_roles["ShooterGameMode.OnPostLogin__DelegateSignature"][
+                "approved_runtime_triplet_source_name"
+            ]
+        )
+        self.assertTrue(
+            lifecycle_roles["ShooterGameMode.OnPostLogin__DelegateSignature"][
+                "delegate_guidance_only_non_triplet_source_name"
+            ]
+        )
+        self.assertIn("approved_runtime_evidence", lifecycle_policy["does_not_satisfy"])
+        self.assertIn("public_sdk_readiness", lifecycle_policy["does_not_satisfy"])
+        self.assertIn("promotion evidence", " ".join(lifecycle_policy["non_claims"]))
         self.assertEqual(
             sets["structure-nonpin-copied-scalar-policy-slice"],
             [
@@ -374,6 +560,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             sets["dino-compact-intake"],
         )
         self.assertIn("transfer-scriptstruct", sets)
+        self.assertEqual(
+            sets["inventory-custom-filter-array-boundary"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalInventoryComponent.InventoryCustomFilter",
+            ],
+        )
         self.assertIn("mission-compact-intake", sets)
         self.assertEqual(
             sets["mission-copied-bool-policy-slice"],
@@ -428,6 +620,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         text_result = run_compare_raw("--list-target-sets")
         self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
         self.assertIn(
+            "target_set_catalog scope=named_target_set_catalog_only "
+            "evidence_scope=target_set_catalog_only_not_evidence not_second_source=true "
+            "second_source_layout_evidence=false",
+            text_result.stdout,
+        )
+        self.assertIn(
             "minimal-second-source-intake: readiness_classification=release_readiness "
             "release_readiness=true readiness_scope=layout_only promotion_ready=false "
             "public_sdk_ready=false",
@@ -438,6 +636,135 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "release_readiness=false readiness_scope=planning_only promotion_ready=false "
             "public_sdk_ready=false",
             text_result.stdout,
+        )
+        self.assertIn(
+            "lifecycle_source_policy scope=source_names_only_not_runtime_evidence "
+            "approved_runtime_triplet_source_names=ShooterGameMode.HandleNewPlayer,ShooterGameMode.CheckJoinInProgress,ShooterGameMode.OnLogout "
+            "guidance_only_non_triplet_source_names=GameMode.K2_PostLogin,ShooterGameMode.OnPostLogin__DelegateSignature,ShooterGameMode.OnStartNewPlayer__DelegateSignature "
+            "runtime_triplet_evidence_status=approved_source_names_only_runtime_evidence_missing "
+            "approved_runtime_evidence_present=false runtime_ready=false public_sdk_ready=false promotion_ready=false",
+            text_result.stdout,
+        )
+        self.assertRegex(text_result.stdout, r"target_set_revision_source_sha256=[0-9a-f]{64}")
+
+    def test_rejects_unknown_or_duplicate_target_set_filters_before_comparison(self) -> None:
+        unknown = run_compare_raw("--target-set", "not-a-target-set", "--json")
+        duplicate = run_compare_raw(
+            "--target-set",
+            "minimal-second-source-intake",
+            "--target-set",
+            "minimal-second-source-intake",
+            "--json",
+        )
+
+        self.assertNotEqual(unknown.returncode, 0)
+        self.assertIn("invalid choice: 'not-a-target-set'", unknown.stderr)
+        self.assertNotEqual(duplicate.returncode, 0)
+        self.assertIn("duplicate target-set filter(s): minimal-second-source-intake", duplicate.stderr)
+
+    def test_target_set_catalog_guardrail_blocks_duplicate_entries(self) -> None:
+        target_sets = dict(compare.TARGET_SETS)
+        duplicated = target_sets["minimal-second-source-intake"][0]
+        target_sets["minimal-second-source-intake"] = (
+            *target_sets["minimal-second-source-intake"],
+            duplicated,
+        )
+
+        with mock.patch.object(compare, "TARGET_SETS", target_sets):
+            report = compare.target_set_catalog_hygiene_report()
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertIn(
+            {
+                "target_set": "minimal-second-source-intake",
+                "reason": "duplicate_target_set_entries",
+                "targets": [duplicated],
+                "count": 1,
+            },
+            report["issues"],
+        )
+
+        with mock.patch.object(compare, "TARGET_SETS", target_sets):
+            with self.assertRaisesRegex(SystemExit, "duplicate_target_set_entries"):
+                compare.reject_target_set_catalog_hygiene_issues()
+
+    def test_target_set_catalog_guardrail_blocks_malformed_schema_entries(self) -> None:
+        target_sets = dict(compare.TARGET_SETS)
+        target_sets["minimal-second-source-intake"] = (
+            "PrimalItem.CanUse",
+            "obelisk.unknown.snapshot.v1:PrimalItem.AllowRemoteAddToInventory",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure",
+        )
+
+        with mock.patch.object(compare, "TARGET_SETS", target_sets):
+            reasons = {
+                issue["reason"]
+                for issue in compare.target_set_catalog_hygiene_report()["issues"]
+            }
+
+        self.assertIn("target_set_entry_not_schema_qualified", reasons)
+        self.assertIn("target_set_entry_unsupported_schema", reasons)
+        self.assertIn("target_set_entry_missing_outer_dot_name", reasons)
+
+    def test_target_set_catalog_guardrail_blocks_missing_module_lane_coverage(self) -> None:
+        module_lanes = dict(compare.TARGET_SET_MODULE_LANES)
+        module_lanes.pop("transfer-scriptstruct")
+
+        with mock.patch.object(compare, "TARGET_SET_MODULE_LANES", module_lanes):
+            report = compare.target_set_catalog_hygiene_report()
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertIn(
+            {"target_set": "transfer-scriptstruct", "reason": "target_set_missing_module_lane"},
+            report["issues"],
+        )
+
+    def test_target_set_catalog_guardrail_blocks_positive_promotion_alias_names(self) -> None:
+        target_sets = dict(compare.TARGET_SETS)
+        target_sets["transfer-sdk-ready"] = (
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerUploadDino",
+        )
+        module_lanes = dict(compare.TARGET_SET_MODULE_LANES)
+        module_lanes["transfer-sdk-ready"] = "transfer"
+
+        with mock.patch.object(compare, "TARGET_SETS", target_sets), mock.patch.object(
+            compare,
+            "TARGET_SET_MODULE_LANES",
+            module_lanes,
+        ):
+            report = compare.target_set_catalog_hygiene_report()
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertIn(
+            {
+                "target_set": "transfer-sdk-ready",
+                "reason": "target_set_name_promotion_alias",
+                "aliases": ["ready", "sdk"],
+            },
+            report["issues"],
+        )
+
+    def test_target_set_catalog_guardrail_blocks_mixed_snapshot_schema_sets(self) -> None:
+        target_sets = dict(compare.TARGET_SETS)
+        target_sets["transfer-scriptstruct"] = (
+            *target_sets["transfer-scriptstruct"],
+            "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+        )
+
+        with mock.patch.object(compare, "TARGET_SETS", target_sets):
+            report = compare.target_set_catalog_hygiene_report()
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertIn(
+            {
+                "target_set": "transfer-scriptstruct",
+                "reason": "target_set_mixed_snapshot_schemas",
+                "schemas": [
+                    "obelisk.scriptstruct-chain.snapshot.v1",
+                    "obelisk.ufunction-chain.snapshot.v1",
+                ],
+            },
+            report["issues"],
         )
 
     def test_structure_build_policy_targets_stay_candidate_only_with_missing_base_gap(self) -> None:
@@ -577,6 +904,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
         self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["evidence_scope"], "offline_guidance_only_not_evidence")
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertTrue(report["not_second_source"])
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertIn("second_source_layout_evidence", report["does_not_satisfy_readiness"])
         self.assertEqual(report["target_filters"], ["PrimalStructure.IsAllowedToBuild"])
         self.assertEqual(len(report["targets"]), 1)
         guidance = report["targets"][0]
@@ -607,6 +942,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         text_result = run_compare_raw("--list-target-guidance")
         self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
         self.assertIn("target_guidance count=3 scope=offline_planning_only", text_result.stdout)
+        self.assertIn(
+            "evidence_scope=offline_guidance_only_not_evidence not_second_source=true",
+            text_result.stdout,
+        )
         self.assertIn(
             "target=obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
             text_result.stdout,
@@ -782,6 +1121,26 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 )
                 self.assertIn(f"does not promote {module} SDK", item["non_claim"])
 
+        transfer = guidance["transfer-scriptstruct"]
+        self.assertIn("scriptstruct_layout_candidate_only", transfer["why_blocked"])
+        self.assertIn("transfer_scriptstruct_payload_decode_blocked", transfer["why_blocked"])
+        self.assertIn("item_net_info_excluded", transfer["why_blocked"])
+        self.assertIn(
+            "keep ItemNetInfo explicitly excluded until a separate transfer payload decoding and ownership policy exists",
+            transfer["snapshot_prep_checks"],
+        )
+        self.assertIn("transfer payload decoding", transfer["non_claim"])
+        self.assertIn("v1 completion", transfer["non_claim"])
+
+    def test_all_internal_target_sets_have_non_promotional_guidance(self) -> None:
+        missing = sorted(
+            target_set
+            for target_set in compare.INTERNAL_LAYOUT_ONLY_TARGET_SETS
+            if compare.target_set_blocker_guidance(target_set) is None
+        )
+
+        self.assertEqual(missing, [])
+
     def test_buff_compact_guidance_names_exact_layout_readiness_gap(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",
@@ -817,7 +1176,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("return override", guidance["non_claim"])
         self.assertIn("public SDK readiness", guidance["non_claim"])
 
-    def test_item_return_target_set_guidance_keeps_release_scope_narrow(self) -> None:
+    def test_item_return_target_set_guidance_keeps_non_completion_scope_narrow(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",
             "--target-set",
@@ -833,7 +1192,11 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(len(report["target_set_guidance"]), 1)
         guidance = report["target_set_guidance"][0]
         self.assertEqual(guidance["target_set"], "item-return-only-policy-slice")
-        self.assertEqual(guidance["classification"], "release_gameplay_policy_item_return_only")
+        self.assertEqual(guidance["classification"], "internal_gameplay_policy_item_return_only_non_completion")
+        self.assertIn("internal_non_completion_side_lane", guidance["why_blocked"])
+        self.assertIn("not_release_readiness_target", guidance["why_blocked"])
+        self.assertIn("complete_sdk_accounting_blocked", guidance["why_blocked"])
+        self.assertIn("p0_dependency_chain_accounting_blocked", guidance["why_blocked"])
         self.assertIn("standalone_items_inventory_sdk_blocked", guidance["why_blocked"])
         self.assertIn("identity_lookup_resourcehandle_blocked", guidance["why_blocked"])
         self.assertIn("mutation_return_override_blocked", guidance["why_blocked"])
@@ -846,7 +1209,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "CanRepair",
             "UseItemOntoItem",
             "ReturnValue BoolProperty",
-            "GameplayPolicyEvent copied-scalar lane only",
+            "internal copied-scalar planning only",
+            "P0 dependency-chain credit",
+            "complete-SDK accounting",
             "runtime producer validation still requires a separate gated debug-window brief",
         ):
             self.assertTrue(
@@ -861,6 +1226,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "mutation",
             "return override",
             "runtime validation",
+            "release readiness",
+            "P0 dependency-chain",
+            "complete-SDK",
         ):
             self.assertIn(blocked, guidance["non_claim"])
 
@@ -871,7 +1239,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         )
         self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
         self.assertIn("target_set_guidance=1", text_result.stdout)
-        self.assertIn("release_gameplay_policy_item_return_only", text_result.stdout)
+        self.assertIn("internal_gameplay_policy_item_return_only_non_completion", text_result.stdout)
         self.assertIn("does not promote Items SDK, Inventory SDK", text_result.stdout)
 
     def test_structure_release_target_set_guidance_blocks_public_sdk_promotion(self) -> None:
@@ -972,6 +1340,1378 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("not_release_readiness_target", text_result.stdout)
         self.assertIn("does not promote Player Identity/Lifecycle SDK", text_result.stdout)
 
+    def test_player_lifecycle_anchor_candidates_guidance_keeps_all_six_planning_only(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "players-lifecycle-anchor-candidates",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_sets"], ["players-lifecycle-anchor-candidates"])
+        self.assertEqual(len(report["targets"]), 1)
+        self.assertEqual(
+            report["targets"][0]["target"],
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress",
+        )
+        self.assertIn("not_identity_anchor", report["targets"][0]["why_blocked"])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "players-lifecycle-anchor-candidates")
+        self.assertEqual(guidance["classification"], "players_lifecycle_anchor_candidates_guidance_only_candidate")
+        self.assertIn("planning_guidance_only", guidance["why_blocked"])
+        self.assertIn("not_release_readiness_target", guidance["why_blocked"])
+        self.assertIn("approved_runtime_evidence_missing", guidance["why_blocked"])
+        self.assertIn("runtime_ordering_unproven", guidance["why_blocked"])
+        self.assertIn("principal_invalidation_semantics_unproven", guidance["why_blocked"])
+        self.assertEqual(
+            guidance["approved_triplet_sources"],
+            [
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(guidance["approved_runtime_triplet_source_names"], guidance["approved_triplet_sources"])
+        self.assertEqual(guidance["policy_scope"], "source_names_only_not_runtime_evidence")
+        self.assertEqual(
+            guidance["runtime_triplet_evidence_status"],
+            "approved_source_names_only_runtime_evidence_missing",
+        )
+        self.assertFalse(guidance["approved_runtime_evidence_present"])
+        self.assertFalse(guidance["runtime_ready"])
+        self.assertFalse(guidance["public_sdk_ready"])
+        self.assertFalse(guidance["promotion_ready"])
+        self.assertEqual(
+            guidance["static_lifecycle_anchor_sources"],
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        self.assertEqual(
+            guidance["observer_rejected_start_sources"],
+            ["ShooterGameMode.CheckJoinInProgress"],
+        )
+        self.assertEqual(guidance["chronology_only_non_anchor_sources"], ["GameMode.K2_PostLogin"])
+        self.assertEqual(guidance["chronology_guidance_only_source_names"], ["GameMode.K2_PostLogin"])
+        self.assertEqual(
+            guidance["delegate_guidance_only_source_names"],
+            [
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            ],
+        )
+        self.assertEqual(
+            guidance["guidance_only_non_triplet_source_names"],
+            [
+                "GameMode.K2_PostLogin",
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            ],
+        )
+        self.assertEqual(guidance["all_six_planning_gap_evidence_status"], "non_evidence")
+        roles = {item["target"]: item for item in guidance["source_roles"]}
+        self.assertTrue(roles["ShooterGameMode.HandleNewPlayer"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(roles["ShooterGameMode.HandleNewPlayer"]["static_lifecycle_anchor_source_name"])
+        self.assertTrue(roles["ShooterGameMode.CheckJoinInProgress"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(roles["ShooterGameMode.CheckJoinInProgress"]["rejected_start_triplet_source_name"])
+        self.assertFalse(roles["GameMode.K2_PostLogin"]["approved_runtime_triplet_source_name"])
+        self.assertTrue(roles["GameMode.K2_PostLogin"]["chronology_guidance_only_non_anchor_source_name"])
+        self.assertFalse(
+            roles["ShooterGameMode.OnStartNewPlayer__DelegateSignature"]["approved_runtime_triplet_source_name"]
+        )
+        self.assertTrue(
+            roles["ShooterGameMode.OnStartNewPlayer__DelegateSignature"][
+                "delegate_guidance_only_non_triplet_source_name"
+            ]
+        )
+        self.assertIn("approved_runtime_evidence", guidance["does_not_satisfy"])
+        self.assertIn("runtime_readiness", guidance["does_not_satisfy"])
+        self.assertIn("public SDK readiness", " ".join(guidance["non_claims"]))
+        self.assertIn("distinct non-/tmp sanitized planning comparison snapshot root", guidance["next_offline_input"])
+        self.assertIn("HandleNewPlayer and ShooterGameMode.OnLogout", guidance["next_offline_input"])
+        for target in (
+            "GameMode.K2_PostLogin",
+            "ShooterGameMode.CheckJoinInProgress",
+            "ShooterGameMode.HandleNewPlayer",
+            "ShooterGameMode.OnLogout",
+            "ShooterGameMode.OnPostLogin__DelegateSignature",
+            "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+        ):
+            self.assertIn(target, guidance["snapshot_prep_checks"][0])
+        self.assertIn(
+            "require distinct artifact identity before any all-six planning-layout comparison claim",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "consume an all-six accepted comparison only through --planning-layout-intake or non-promotional readiness reporting; do not label it accepted second-source readiness",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "approved triplet sources are exactly ShooterGameMode.HandleNewPlayer, ShooterGameMode.CheckJoinInProgress, and ShooterGameMode.OnLogout",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "keep GameMode.K2_PostLogin as non-anchor chronology only; property FName mismatch diagnostics must not become triplet source, lifecycle anchor, second-source, runtime, public SDK, release, or v1 evidence",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "do not let all-six planning comparison clear approved_runtime_evidence_missing, public SDK readiness, runtime readiness, release readiness, principal validity, or principal invalidation blockers",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn(
+            "do not use this target set for release/readiness or public SDK promotion gates",
+            guidance["snapshot_prep_checks"],
+        )
+        self.assertIn("approved runtime evidence", guidance["non_claim"])
+        self.assertIn("public Player SDK", guidance["non_claim"])
+        self.assertIn("v1 completion", guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "players-lifecycle-anchor-candidates",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=1 scope=offline_planning_only target_set_guidance=1", text_result.stdout)
+        self.assertIn("target_set=players-lifecycle-anchor-candidates", text_result.stdout)
+        self.assertIn("approved_runtime_evidence_missing", text_result.stdout)
+        self.assertIn(
+            "approved_triplet_sources=ShooterGameMode.HandleNewPlayer,ShooterGameMode.CheckJoinInProgress,ShooterGameMode.OnLogout",
+            text_result.stdout,
+        )
+        self.assertIn(
+            "approved_runtime_triplet_source_names=ShooterGameMode.HandleNewPlayer,ShooterGameMode.CheckJoinInProgress,ShooterGameMode.OnLogout",
+            text_result.stdout,
+        )
+        self.assertIn(
+            "guidance_only_non_triplet_source_names=GameMode.K2_PostLogin,ShooterGameMode.OnPostLogin__DelegateSignature,ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            text_result.stdout,
+        )
+        self.assertIn("runtime_triplet_evidence_status=approved_source_names_only_runtime_evidence_missing", text_result.stdout)
+        self.assertIn("approved_runtime_evidence_present=false", text_result.stdout)
+        self.assertIn("all_six_planning_gap_evidence_status=non_evidence", text_result.stdout)
+        self.assertIn("does not promote approved runtime evidence", text_result.stdout)
+
+    def test_all_six_lifecycle_planning_gap_artifact_is_source_bound_and_non_promotional(self) -> None:
+        artifact_path = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "player-identity-planning-sources"
+            / "players-lifecycle-anchor-candidates-all-six-planning-gap.json"
+        )
+
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            artifact["schema"],
+            "obelisk.players-lifecycle-anchor-candidates-all-six-planning-gap.v1",
+        )
+        self.assertEqual(artifact["target_set"], "players-lifecycle-anchor-candidates")
+        self.assertTrue(artifact["planning_only"])
+        self.assertEqual(artifact["readiness_classification"], "planning_only")
+        self.assertEqual(len(artifact["base_fixture_targets"]), 6)
+        targets = {item["target"]: item for item in artifact["base_fixture_targets"]}
+        self.assertEqual(
+            set(targets),
+            {
+                "GameMode.K2_PostLogin",
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.OnLogout",
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            },
+        )
+        self.assertEqual(
+            targets["ShooterGameMode.HandleNewPlayer"]["base_fixture_sha256"],
+            "a9b3049dc221f128924ff0c6eb45287bf630dfaea4e4ab33bbf93647a5d3361b",
+        )
+        self.assertEqual(
+            targets["ShooterGameMode.OnLogout"]["base_fixture_sha256"],
+            "e79e416a408bbe652a31f58c710cfeb03daa0acf2e0ebef55a7ba61c83a414aa",
+        )
+        accepted_durable = sorted(
+            target
+            for target, item in targets.items()
+            if item.get("current_promoted_durable_source_bound_lifecycle_evidence") is True
+        )
+        self.assertEqual(
+            accepted_durable,
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        approved_triplet_sources = sorted(
+            target
+            for target, item in targets.items()
+            if item.get("current_approved_triplet_source") is True
+        )
+        self.assertEqual(
+            approved_triplet_sources,
+            [
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertFalse(targets["GameMode.K2_PostLogin"]["current_approved_triplet_source"])
+        self.assertTrue(targets["GameMode.K2_PostLogin"]["chronology_only_non_anchor"])
+        operational_triplet_sources = artifact["operational_consolidation"]["approved_triplet_sources"]
+        self.assertEqual(
+            operational_triplet_sources["targets"],
+            [
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(
+            operational_triplet_sources["static_lifecycle_anchor_targets"],
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        self.assertEqual(
+            operational_triplet_sources["observer_rejected_start_targets"],
+            ["ShooterGameMode.CheckJoinInProgress"],
+        )
+        self.assertEqual(
+            operational_triplet_sources["chronology_only_non_anchor_targets"],
+            ["GameMode.K2_PostLogin"],
+        )
+        self.assertTrue(operational_triplet_sources["only_these_targets_may_source_approved_triplet_roles"])
+        self.assertEqual(
+            operational_triplet_sources["k2_postlogin_status"],
+            "non_anchor_chronology_only_property_fname_mismatch_rejected",
+        )
+        self.assertEqual(operational_triplet_sources["all_six_planning_gap_evidence_status"], "non_evidence")
+        self.assertEqual(
+            operational_triplet_sources["exact_rejected_start_role_policy"],
+            {
+                "role": "session_start_rejected",
+                "status": "exact_role_only",
+                "target": "ShooterGameMode.CheckJoinInProgress",
+                "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                "required_copied_bool_values": ["1", "0"],
+                "required_event_boundary": (
+                    "post-original copied observer event accepted by analyzer/bundle/approved-checker chain"
+                ),
+                "disallowed_substitutes": [
+                    "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+                    "passive snapshots",
+                    "diagnostic-only lines",
+                ],
+            },
+        )
+        self.assertFalse(artifact["historical_scratch_comparison"]["durable"])
+        self.assertEqual(artifact["historical_scratch_comparison"]["accepted_targets"], 6)
+        self.assertFalse(artifact["durable_all_six_comparison"]["provided"])
+        self.assertFalse(artifact["durable_all_six_comparison"]["accepted"])
+        self.assertEqual(
+            artifact["durable_all_six_comparison"]["reason"],
+            "distinct_non_tmp_candidate_snapshot_root_missing",
+        )
+        self.assertIn(
+            "materialize or recreate the six vanilla candidate snapshots outside /tmp under an approved non-protected offline or repo fixture root",
+            artifact["durable_all_six_comparison"]["minimal_patch_needed"],
+        )
+        self.assertEqual(
+            artifact["durable_all_six_comparison"]["evidence_scope_when_materialized"],
+            "planning_layout_intake_only_not_second_source",
+        )
+        self.assertIn(
+            "second_source_readiness",
+            artifact["durable_all_six_comparison"]["does_not_satisfy"],
+        )
+        self.assertEqual(
+            artifact["current_durable_source_bound_lifecycle_anchor_evidence"]["accepted_targets"],
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        current_triplet_sources = artifact["current_approved_triplet_sources"]
+        self.assertEqual(
+            current_triplet_sources["accepted_targets"],
+            [
+                "ShooterGameMode.HandleNewPlayer",
+                "ShooterGameMode.CheckJoinInProgress",
+                "ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(
+            current_triplet_sources["static_lifecycle_anchor_targets"],
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        self.assertEqual(current_triplet_sources["observer_rejected_start_targets"], ["ShooterGameMode.CheckJoinInProgress"])
+        self.assertEqual(current_triplet_sources["chronology_only_non_anchor_targets"], ["GameMode.K2_PostLogin"])
+        self.assertEqual(
+            current_triplet_sources["guidance_only_non_triplet_targets"],
+            [
+                "GameMode.K2_PostLogin",
+                "ShooterGameMode.OnPostLogin__DelegateSignature",
+                "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+            ],
+        )
+        self.assertEqual(current_triplet_sources["all_six_planning_gap_evidence_status"], "non_evidence")
+        self.assertEqual(
+            current_triplet_sources["exact_rejected_start_role_policy"],
+            {
+                "role": "session_start_rejected",
+                "status": "exact_role_only",
+                "target": "ShooterGameMode.CheckJoinInProgress",
+                "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                "required_copied_bool_values": ["1", "0"],
+                "required_event_boundary": (
+                    "post-original copied observer event accepted by analyzer/bundle/approved-checker chain"
+                ),
+                "disallowed_substitutes": [
+                    "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+                    "passive snapshots",
+                    "diagnostic-only lines",
+                ],
+            },
+        )
+        self.assertEqual(
+            artifact["promotion_gate"],
+            {
+                "blockers": [
+                    "target_set_not_release_readiness",
+                    "approved_runtime_evidence_missing",
+                    "distinct_non_tmp_candidate_snapshot_root_missing",
+                ],
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "ready": False,
+                "ready_scope": "planning_only",
+                "runtime_ready": False,
+            },
+        )
+        self.assertIn("approved_runtime_evidence_missing", artifact["does_not_satisfy_blockers"])
+        self.assertIn("does not clear approved_runtime_evidence_missing", artifact["non_claims"])
+        self.assertIn(
+            "does not change approved lifecycle triplet sources beyond ShooterGameMode.HandleNewPlayer, ShooterGameMode.CheckJoinInProgress, and ShooterGameMode.OnLogout",
+            artifact["non_claims"],
+        )
+        self.assertIn(
+            "does not promote GameMode.K2_PostLogin beyond non-anchor chronology-only diagnostics",
+            artifact["non_claims"],
+        )
+
+    def test_observed_fname_chain_check_records_ragnarok_handle_new_player_mismatch(self) -> None:
+        result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-chain",
+            "28418,21314,22968,28516,17724",
+            "--observed-fname-chain-occurrences",
+            "4",
+            "--target-set",
+            "players-lifecycle-anchor-candidates",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-observed-fname-chain-check.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["evidence_scope"], "diagnostic_fname_chain_planning_only_not_second_source")
+        self.assertEqual(report["artifact_role"], "diagnostic_planning_only_not_second_source_input")
+        self.assertEqual(report["layout_evidence_status"], "not_layout_evidence")
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_candidate_snapshot_root"])
+        self.assertEqual(report["source_scope"], "sanitized_snapshot_root_only")
+        self.assertEqual(report["second_source_status"], "not_applicable")
+        self.assertIn(
+            "copied_runtime_diagnostic_line_not_distinct_sanitized_snapshot",
+            report["second_source_blockers"],
+        )
+        self.assertIn(
+            "observed_fname_indices_only_no_property_names_classes_offsets_sizes_or_bool_metadata",
+            report["second_source_blockers"],
+        )
+        self.assertTrue(report["not_second_source"])
+        self.assertEqual(report["diagnostic_observation_count"], 4)
+        self.assertEqual(
+            report["diagnostic_observation_count_scope"],
+            "repeated_runtime_mismatch_count_diagnostic_only",
+        )
+        self.assertTrue(report["diagnostic_observation_repeated"])
+        self.assertEqual(
+            report["target"],
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+        )
+        self.assertEqual(report["target_sets"], ["players-lifecycle-anchor-candidates"])
+        self.assertEqual(report["status"], "unresolved_mismatch")
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertEqual(report["readiness_classification"], "planning_only")
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["exact_property_chain_match"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(
+            report["does_not_satisfy_readiness"],
+            [
+                "second_source_layout_evidence",
+                "runtime_readiness",
+                "public_sdk_readiness",
+                "release_readiness",
+                "v1_completion",
+            ],
+        )
+        self.assertEqual(report["expected_name_indices"], [28411, 21307, 22961, 28509, 17716])
+        self.assertEqual(report["observed_name_indices"], [28418, 21314, 22968, 28516, 17724])
+        self.assertEqual(report["deltas"], [7, 7, 7, 7, 8])
+        self.assertIn("second_source_layout_evidence", report["prohibited_evidence_uses"])
+        self.assertIn("candidate_snapshot_root", report["prohibited_evidence_uses"])
+        self.assertEqual(report["observed_indices_found_count"], 0)
+        self.assertEqual(report["unmatched_observed_name_indices"], [28418, 21314, 22968, 28516, 17724])
+        self.assertIn("approved_runtime_evidence_missing", report["blockers"])
+        self.assertIn("observed_fname_chain_check_not_promotion_gate", report["blockers"])
+        self.assertIn("observed_fname_chain_unresolved", report["blockers"])
+        self.assertEqual(
+            report["promotion_gate"]["blockers"],
+            [
+                {"reason": "approved_runtime_evidence_missing", "count": 1},
+                {"reason": "observed_fname_chain_check_not_promotion_gate", "count": 1},
+                {"reason": "observed_fname_chain_unresolved", "count": 1},
+            ],
+        )
+        self.assertEqual(len(report["property_comparison"]), 5)
+        self.assertEqual(report["property_comparison"][0]["property_name"], "NewPlayer")
+        self.assertEqual(report["property_comparison"][4]["property_name"], "ReturnValue")
+        self.assertEqual(report["target_set_context"][0]["target_set"], "players-lifecycle-anchor-candidates")
+        self.assertTrue(report["target_set_context"][0]["contains_target"])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        self.assertIn("approved_runtime_evidence_missing", report["target_set_guidance"][0]["why_blocked"])
+        requirement = report["next_offline_artifact_requirement"]
+        self.assertEqual(requirement["artifact"], "distinct_sanitized_lifecycle_ufunction_snapshot_root")
+        self.assertEqual(requirement["status_needed"], "required_before_deploy_request")
+        self.assertEqual(
+            requirement["required_targets"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(requirement["comparison_mode"], "semantic_layout_without_strict_identity_indices")
+        self.assertIn("evidence.artifact_sha256", requirement["required_identity_fields"])
+        self.assertIn("BoolProperty byte/field metadata", requirement["required_shape_fields"])
+        self.assertIn("direct or symlink-resolved protected live-server paths", requirement["prohibited_inputs"])
+        self.assertIn("broad FName scans", requirement["prohibited_inputs"])
+        self.assertIn("broad GObjects scans", requirement["prohibited_inputs"])
+        self.assertIn("does not create second-source layout evidence", report["non_claims"])
+        self.assertIn("does not accept or reject runtime principal lifecycle evidence", report["non_claims"])
+
+        text_result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-chain",
+            "28418,21314,22968,28516,17724",
+            "--observed-fname-chain-occurrences",
+            "4",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("status=unresolved_mismatch", text_result.stdout)
+        self.assertIn("expected=28411,21307,22961,28509,17716", text_result.stdout)
+        self.assertIn("observed=28418,21314,22968,28516,17724", text_result.stdout)
+        self.assertIn("deltas=7,7,7,7,8", text_result.stdout)
+        self.assertIn("layout_evidence_status=not_layout_evidence", text_result.stdout)
+        self.assertIn("not_second_source=true", text_result.stdout)
+        self.assertIn("can_be_second_source=false", text_result.stdout)
+        self.assertIn("promotion_ready=false runtime_ready=false", text_result.stdout)
+        self.assertIn("diagnostic_observation_count=4 scope=diagnostic_only", text_result.stdout)
+        self.assertIn("next_offline_artifact=distinct_sanitized_lifecycle_ufunction_snapshot_root", text_result.stdout)
+
+    def test_observed_fname_chain_exact_match_still_is_not_second_source(self) -> None:
+        result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-chain",
+            "28411,21307,22961,28509,17716",
+            "--observed-fname-chain-occurrences",
+            "2",
+            "--target-set",
+            "players-lifecycle-anchor-candidates",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "matched_planning_only")
+        self.assertTrue(report["exact_property_chain_match"])
+        self.assertEqual(report["layout_evidence_status"], "not_layout_evidence")
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_candidate_snapshot_root"])
+        self.assertEqual(report["second_source_status"], "not_applicable")
+        self.assertTrue(report["not_second_source"])
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertEqual(report["readiness_classification"], "planning_only")
+        self.assertIn("second_source_layout_evidence", report["does_not_satisfy_readiness"])
+        self.assertIn("observed_fname_chain_check_not_promotion_gate", report["blockers"])
+        self.assertNotIn("observed_fname_chain_unresolved", report["blockers"])
+        self.assertEqual(
+            report["promotion_gate"]["blockers"],
+            [{"reason": "observed_fname_chain_check_not_promotion_gate", "count": 1}],
+        )
+        self.assertIn(
+            "copied_runtime_diagnostic_line_not_distinct_sanitized_snapshot",
+            report["second_source_blockers"],
+        )
+        self.assertEqual(
+            report["next_offline_artifact_requirement"]["required_targets"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+            ],
+        )
+
+    def test_observed_fname_chain_check_records_ragnarok_on_logout_mismatch(self) -> None:
+        result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-target",
+            "ShooterGameMode.OnLogout",
+            "--observed-fname-chain",
+            "28550",
+            "--observed-fname-chain-occurrences",
+            "3",
+            "--target-set",
+            "players-lifecycle-anchor-candidates",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(
+            report["target"],
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+        )
+        self.assertEqual(report["status"], "unresolved_mismatch")
+        self.assertEqual(report["diagnostic_observation_count"], 3)
+        self.assertEqual(
+            report["diagnostic_observation_count_scope"],
+            "repeated_runtime_mismatch_count_diagnostic_only",
+        )
+        self.assertTrue(report["diagnostic_observation_repeated"])
+        self.assertEqual(report["expected_name_indices"], [28543])
+        self.assertEqual(report["observed_name_indices"], [28550])
+        self.assertEqual(report["deltas"], [7])
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertTrue(report["not_second_source"])
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_second_source_layout_evidence"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertIn("observed_fname_chain_unresolved", report["blockers"])
+        self.assertIn("does not create second-source layout evidence", report["non_claims"])
+
+    def test_observed_fname_chain_rejects_non_planning_target_set_context(self) -> None:
+        result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-chain",
+            "28418,21314,22968,28516,17724",
+            "--target-set",
+            "minimal-second-source-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "--observed-fname-chain only accepts planning-only target sets: minimal-second-source-intake",
+            result.stderr,
+        )
+
+    def test_observed_fname_chain_rejects_planning_target_set_that_does_not_contain_target(self) -> None:
+        result = run_compare(
+            REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            None,
+            "--observed-fname-chain",
+            "28418,21314,22968,28516,17724",
+            "--target-set",
+            "structure-aggregate-census-planning",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "--observed-fname-chain target set(s) do not contain --observed-fname-target: structure-aggregate-census-planning",
+            result.stderr,
+        )
+
+    def test_handle_new_player_fname_mismatch_artifact_is_unresolved_and_non_promotional(self) -> None:
+        artifact_path = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "player-identity-planning-sources"
+            / "players-lifecycle-handle-new-player-fname-mismatch-ragnarok-20260604.json"
+        )
+
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            artifact["schema"],
+            "obelisk.players-lifecycle-handle-new-player-fname-mismatch.v1",
+        )
+        self.assertEqual(artifact["artifact_status"], "planning_diagnostic_unresolved")
+        self.assertTrue(artifact["planning_only"])
+        self.assertEqual(artifact["target_set"], "players-lifecycle-anchor-candidates")
+        self.assertEqual(artifact["target"], "ShooterGameMode.HandleNewPlayer")
+        self.assertEqual(artifact["evidence_scope"], "diagnostic_fname_chain_planning_only_not_second_source")
+        self.assertEqual(artifact["artifact_role"], "diagnostic_planning_only_not_second_source_input")
+        self.assertEqual(artifact["layout_evidence_status"], "not_layout_evidence")
+        self.assertFalse(artifact["second_source_layout_evidence"])
+        self.assertFalse(artifact["can_be_used_as_second_source_layout_evidence"])
+        self.assertFalse(artifact["can_be_used_as_candidate_snapshot_root"])
+        self.assertEqual(artifact["second_source_status"], "not_applicable")
+        self.assertTrue(artifact["not_second_source"])
+        self.assertEqual(artifact["readiness_effect"], "none")
+        self.assertFalse(artifact["promotion_ready"])
+        self.assertFalse(artifact["public_sdk_ready"])
+        self.assertFalse(artifact["runtime_ready"])
+        self.assertEqual(artifact["runtime_snapshot"]["map"], "Ragnarok")
+        self.assertEqual(
+            artifact["runtime_snapshot"]["snapshot_id"],
+            "passive-manual-20260604T085119Z-arkserver+arkserver2-3215640",
+        )
+        self.assertEqual(artifact["runtime_snapshot"]["captured_at_utc"], "2026-06-04T08:51:19Z")
+        self.assertFalse(artifact["runtime_snapshot"]["approved_runtime_evidence"])
+        self.assertEqual(artifact["runtime_observation_summary"]["organic_player_snapshots"], 2)
+        self.assertTrue(artifact["runtime_observation_summary"]["diagnostic_only"])
+        self.assertEqual(artifact["runtime_observation_summary"]["readiness_effect"], "none")
+        self.assertEqual(artifact["runtime_observation_summary"]["accepted_count"], 0)
+        self.assertEqual(artifact["runtime_observation_summary"]["rejected_count"], 0)
+        self.assertEqual(artifact["runtime_observation_summary"]["diagnostic_candidate_count"], 17)
+        self.assertEqual(
+            artifact["runtime_observation_summary"]["diagnostic_candidate_target_counts"],
+            {
+                "GameMode.K2_PostLogin": 3,
+                "ShooterGameMode.CheckJoinInProgress": 2,
+                "ShooterGameMode.HandleNewPlayer": 7,
+                "ShooterGameMode.OnLogout": 5,
+            },
+        )
+        self.assertEqual(
+            artifact["runtime_observation_summary"]["sibling_map_counts"]["TheIsland"],
+            {
+                "accepted_count": 0,
+                "diagnostic_candidate_count": 0,
+                "rejected_count": 0,
+            },
+        )
+        mismatch_counts = {
+            item["target"]: item for item in artifact["runtime_observation_summary"]["mismatch_counts"]
+        }
+        self.assertEqual(mismatch_counts["ShooterGameMode.HandleNewPlayer"]["observed_count"], 4)
+        self.assertEqual(mismatch_counts["ShooterGameMode.OnLogout"]["observed_count"], 3)
+        self.assertTrue(
+            all(item["not_second_source"] for item in artifact["runtime_observation_summary"]["mismatch_counts"])
+        )
+        self.assertEqual(
+            artifact["fixture_expected_name_indices"],
+            [28411, 21307, 22961, 28509, 17716],
+        )
+        self.assertEqual(
+            artifact["observed_name_indices"],
+            [28418, 21314, 22968, 28516, 17724],
+        )
+        self.assertEqual(artifact["deltas"], [7, 7, 7, 7, 8])
+        self.assertFalse(artifact["exact_property_chain_match"])
+        self.assertEqual(artifact["status"], "unresolved_mismatch")
+        self.assertEqual(artifact["observed_indices_found_in_committed_sanitized_snapshots"], [])
+        self.assertIn(
+            "copied_runtime_diagnostic_line_not_distinct_sanitized_snapshot",
+            artifact["second_source_blockers"],
+        )
+        self.assertIn(
+            "observed_fname_indices_only_no_property_names_classes_offsets_sizes_or_bool_metadata",
+            artifact["second_source_blockers"],
+        )
+        self.assertIn("second_source_layout_evidence", artifact["prohibited_evidence_uses"])
+        self.assertIn("candidate_snapshot_root", artifact["prohibited_evidence_uses"])
+        self.assertEqual(
+            artifact["does_not_satisfy_readiness"],
+            [
+                "second_source_layout_evidence",
+                "runtime_readiness",
+                "public_sdk_readiness",
+                "release_readiness",
+                "v1_completion",
+            ],
+        )
+        self.assertEqual(artifact["related_observed_fname_mismatches"][0]["target"], "ShooterGameMode.OnLogout")
+        self.assertEqual(artifact["related_observed_fname_mismatches"][0]["fixture_expected_name_indices"], [28543])
+        self.assertEqual(artifact["related_observed_fname_mismatches"][0]["observed_name_indices"], [28550])
+        self.assertEqual(artifact["related_observed_fname_mismatches"][0]["diagnostic_observation_count"], 3)
+        self.assertTrue(artifact["related_observed_fname_mismatches"][0]["not_second_source"])
+        self.assertIn(
+            "search_by_fname_matcher_alone_is_safe",
+            {item["hypothesis"] for item in artifact["rejected_hypotheses"]},
+        )
+        self.assertIn("approved_runtime_evidence_missing", artifact["blockers"])
+        self.assertIn("observed_fname_chain_check_not_promotion_gate", artifact["blockers"])
+        self.assertFalse(artifact["promotion_gate"]["ready"])
+        self.assertFalse(artifact["promotion_gate"]["runtime_ready"])
+        self.assertIn("observed_fname_chain_check_not_promotion_gate", artifact["promotion_gate"]["blockers"])
+        self.assertIn("second_source_layout_evidence_blocked", artifact["does_not_satisfy_blockers"])
+        requirement = artifact["next_offline_artifact_requirement"]
+        self.assertEqual(requirement["artifact"], "distinct_sanitized_lifecycle_ufunction_snapshot_root")
+        self.assertEqual(requirement["status_needed"], "required_before_deploy_request")
+        self.assertEqual(
+            requirement["required_targets"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(requirement["comparison_mode"], "semantic_layout_without_strict_identity_indices")
+        self.assertIn("evidence.evidence_pack_id", requirement["required_identity_fields"])
+        self.assertIn("property order", requirement["required_shape_fields"])
+        self.assertIn("direct or symlink-resolved protected live-server paths", requirement["prohibited_inputs"])
+        self.assertIn("broad FName scans", requirement["prohibited_inputs"])
+        self.assertIn("broad GObjects scans", requirement["prohibited_inputs"])
+        self.assertIn("does not create second-source layout evidence", artifact["non_claims"])
+        self.assertIn("does not mark anything accepted runtime evidence", artifact["non_claims"])
+
+    def test_lifecycle_snapshot_root_check_accepts_distinct_offline_two_target_root_only_as_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.lifecycle-ufunction-snapshot-root-requirement.v1")
+        self.assertEqual(report["artifact"], "distinct_sanitized_lifecycle_ufunction_snapshot_root")
+        self.assertEqual(
+            report["required_targets"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+            ],
+        )
+        self.assertEqual(
+            report["required_identity_fields"],
+            [
+                "evidence.ark_binary_sha256",
+                "evidence.artifact_kind=offline_core",
+                "evidence.artifact_sha256",
+                "evidence.capture_id",
+                "evidence.evidence_pack_id",
+            ],
+        )
+        self.assertEqual(report["comparison_mode"], "semantic_layout_without_strict_identity_indices")
+        self.assertTrue(report["offline_requirement"]["satisfied"])
+        self.assertEqual(report["offline_requirement"]["status"], "accepted")
+        self.assertEqual(report["comparison_counts"], {"accepted": 2, "inconclusive": 0, "rejected": 0})
+        self.assertTrue(report["base_root_artifact_identity_consistent"])
+        self.assertTrue(report["candidate_root_artifact_identity_consistent"])
+        self.assertEqual(
+            report["candidate_snapshot_scope"],
+            {
+                "exact_required_targets": True,
+                "required_targets": [
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                ],
+                "candidate_targets": [
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                ],
+                "extra_targets": [],
+                "missing_targets": [],
+                "required_snapshot_filenames": [
+                    "ShooterGameMode.HandleNewPlayer.snapshot.json",
+                    "ShooterGameMode.OnLogout.snapshot.json",
+                ],
+                "focused_candidate_root_required": False,
+            },
+        )
+        self.assertFalse(report["approved_runtime_evidence"])
+        self.assertEqual(report["approved_runtime_evidence_blocker"], "approved_runtime_evidence_missing")
+        self.assertFalse(report["layout_only_evidence_satisfies_approved_runtime_evidence"])
+        self.assertTrue(report["layout_only_evidence_rejected_for_runtime_readiness"])
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["v1_complete"])
+        self.assertEqual(
+            report["promotion_gate"]["blockers"],
+            [
+                {"reason": "approved_runtime_evidence_missing", "count": 1},
+                {"reason": "lifecycle_snapshot_root_check_not_runtime_evidence", "count": 1},
+            ],
+        )
+        for target_detail in report["target_details"]:
+            self.assertEqual(target_detail["status"], "accepted")
+            self.assertEqual(target_detail["base_identity"]["artifact_kind"], "offline_core")
+            self.assertEqual(target_detail["candidate_identity"]["artifact_kind"], "offline_core")
+            self.assertNotEqual(
+                target_detail["base_identity"]["artifact_sha256"],
+                target_detail["candidate_identity"]["artifact_sha256"],
+            )
+            self.assertEqual(target_detail["identity_reasons"], [])
+        self.assertIn("passive player-principal snapshot manifests", report["prohibited_inputs"])
+        self.assertIn("ReflectionScanner analyzer or broad scanner output", report["prohibited_inputs"])
+        self.assertIn("layout-only readiness/comparison reports", report["prohibited_inputs"])
+        self.assertIn("approved_runtime_evidence", report["does_not_satisfy_readiness"])
+        self.assertIn("does not clear approved_runtime_evidence_missing", report["non_claims"])
+        self.assertEqual(
+            report["next_offline_artifact_requirement"]["comparison_command_template"],
+            "python3 scripts/compare_reflection_snapshots.py --base-root "
+            "tests/fixtures/ufunction_snapshots --candidate-root "
+            "<distinct-sanitized-lifecycle-root> --lifecycle-snapshot-root-check --json",
+        )
+        self.assertEqual(
+            report["next_offline_action"],
+            {
+                "status": "offline_requirement_satisfied_planning_only",
+                "action": "archive_lifecycle_snapshot_root_check_as_planning_layout_evidence",
+                "next_blocker": "approved_runtime_evidence_missing",
+                "candidate_root_requirements": {
+                    "exact_required_targets_only": True,
+                    "required_targets": [
+                        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                        "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                    ],
+                    "required_snapshot_filenames": [
+                        "ShooterGameMode.HandleNewPlayer.snapshot.json",
+                        "ShooterGameMode.OnLogout.snapshot.json",
+                    ],
+                    "missing_targets": [],
+                    "extra_target_count": 0,
+                    "complete_offline_core_identity_required": True,
+                    "distinct_from_base_identity_required": True,
+                    "broad_root_or_report_input_accepted": False,
+                    "runtime_or_public_sdk_readiness_claim": False,
+                },
+                "runtime_or_public_sdk_readiness_claim": False,
+            },
+        )
+
+    def test_lifecycle_snapshot_root_check_accepts_distinct_candidate_against_committed_fixture_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_distinct_lifecycle_fixture_root(root / "candidate")
+
+            result = run_compare(
+                REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertTrue(report["offline_requirement"]["satisfied"])
+        self.assertEqual(report["comparison_counts"], {"accepted": 2, "inconclusive": 0, "rejected": 0})
+        self.assertTrue(report["candidate_snapshot_scope"]["exact_required_targets"])
+        self.assertEqual(report["candidate_snapshot_scope"]["extra_targets"], [])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertEqual(
+            report["next_offline_action"]["status"],
+            "offline_requirement_satisfied_planning_only",
+        )
+
+    def test_lifecycle_snapshot_root_check_text_output_keeps_runtime_blocker_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("lifecycle_snapshot_root_requirement status=accepted satisfied=true", result.stdout)
+        self.assertIn("approved_runtime_evidence=false", result.stdout)
+        self.assertIn("runtime_ready=false", result.stdout)
+        self.assertIn("public_sdk_ready=false", result.stdout)
+        self.assertIn("blocker=approved_runtime_evidence_missing", result.stdout)
+        self.assertIn("next_offline_action=archive_lifecycle_snapshot_root_check_as_planning_layout_evidence", result.stdout)
+        self.assertIn("runtime_or_public_sdk_readiness_claim=false", result.stdout)
+
+    def test_lifecycle_snapshot_root_check_blocks_same_root_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+
+            result = run_compare(
+                root / "base",
+                root / "base",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["offline_requirement"]["satisfied"])
+        self.assertEqual(report["offline_requirement"]["status"], "blocked")
+        self.assertEqual(report["comparison_counts"], {"accepted": 0, "inconclusive": 2, "rejected": 0})
+        self.assertIn(
+            {
+                "target": "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "reason": "same_evidence_artifact_identity",
+            },
+            report["offline_requirement"]["blockers"],
+        )
+        self.assertIn(
+            {
+                "target": "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                "reason": "same_evidence_artifact_identity",
+            },
+            report["offline_requirement"]["blockers"],
+        )
+        self.assertEqual(
+            report["next_offline_action"]["action"],
+            "create_or_recover_distinct_sanitized_lifecycle_ufunction_snapshot_root",
+        )
+        self.assertEqual(report["offline_requirement"]["blocker_count"], 3)
+        self.assertEqual(
+            report["offline_requirement"]["blocker_reason_counts"],
+            {
+                "required_lifecycle_targets_not_all_accepted": 2,
+                "same_evidence_artifact_identity": 2,
+            },
+        )
+        self.assertEqual(report["next_offline_action"]["candidate_root_requirements"]["extra_target_count"], 0)
+
+    def test_lifecycle_snapshot_root_check_blocks_candidate_extra_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+            extra_payload = rename_target(base_snapshot(), outer="PrimalItem", name="CanUse")
+            write_snapshot(
+                root / "candidate" / "sha" / "players_lifecycle",
+                extra_payload,
+                "PrimalItem.CanUse.snapshot.json",
+            )
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["offline_requirement"]["satisfied"])
+        self.assertFalse(report["candidate_snapshot_scope"]["exact_required_targets"])
+        self.assertEqual(
+            report["candidate_snapshot_scope"]["extra_targets"],
+            ["obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse"],
+        )
+        self.assertTrue(report["candidate_snapshot_scope"]["focused_candidate_root_required"])
+        self.assertEqual(
+            report["candidate_snapshot_scope"]["required_snapshot_filenames"],
+            [
+                "ShooterGameMode.HandleNewPlayer.snapshot.json",
+                "ShooterGameMode.OnLogout.snapshot.json",
+            ],
+        )
+        self.assertIn(
+            {
+                "target": "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+                "reason": "candidate_extra_snapshot_target_not_allowed",
+            },
+            report["offline_requirement"]["blockers"],
+        )
+        self.assertIn(
+            {"reason": "candidate_snapshot_root_not_exact_two_target_scope", "count": 1},
+            report["offline_requirement"]["blockers"],
+        )
+        self.assertEqual(
+            report["offline_requirement"]["blocker_reason_counts"]["candidate_snapshot_root_not_exact_two_target_scope"],
+            1,
+        )
+        self.assertEqual(
+            report["next_offline_action"]["candidate_root_requirements"]["extra_target_count"],
+            1,
+        )
+        self.assertFalse(
+            report["next_offline_action"]["candidate_root_requirements"]["broad_root_or_report_input_accepted"]
+        )
+
+    def test_lifecycle_snapshot_root_check_blocks_missing_complete_candidate_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+            candidate_snapshot = (
+                root
+                / "candidate"
+                / "sha"
+                / "players_lifecycle"
+                / "ShooterGameMode.OnLogout.snapshot.json"
+            )
+            payload = json.loads(candidate_snapshot.read_text(encoding="utf-8"))
+            payload["evidence"].pop("artifact_sha256")  # type: ignore[index]
+            payload["evidence"].pop("capture_id")  # type: ignore[index]
+            payload["evidence"].pop("evidence_pack_id")  # type: ignore[index]
+            candidate_snapshot.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["offline_requirement"]["satisfied"])
+        self.assertEqual(report["offline_requirement"]["status"], "blocked")
+        blockers = report["offline_requirement"]["blockers"]
+        self.assertIn(
+            {
+                "target": "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+                "reason": "missing_candidate_evidence_artifact_identity",
+            },
+            blockers,
+        )
+        target = {
+            item["target"]: item
+            for item in report["target_details"]
+        }["obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout"]
+        self.assertIsNone(target["candidate_identity"])
+        self.assertIn("candidate:invalid_artifact_sha256", target["identity_reasons"])
+        self.assertIn("candidate:invalid_capture_id", target["identity_reasons"])
+        self.assertIn("candidate:invalid_evidence_pack_id", target["identity_reasons"])
+        self.assertEqual(
+            report["promotion_gate"]["blockers"][0]["reason"],
+            "lifecycle_snapshot_root_requirement_blocked",
+        )
+
+    def test_lifecycle_snapshot_root_check_blocks_missing_candidate_ark_binary_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+            candidate_snapshot = (
+                root
+                / "candidate"
+                / "sha"
+                / "players_lifecycle"
+                / "ShooterGameMode.HandleNewPlayer.snapshot.json"
+            )
+            payload = json.loads(candidate_snapshot.read_text(encoding="utf-8"))
+            payload["evidence"].pop("ark_binary_sha256")  # type: ignore[index]
+            candidate_snapshot.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        target = {
+            item["target"]: item
+            for item in report["target_details"]
+        }["obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer"]
+        self.assertIsNone(target["candidate_identity"])
+        self.assertIn("candidate:missing_ark_binary_sha256", target["identity_reasons"])
+        self.assertIn(
+            {
+                "target": "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+                "reason": "candidate:missing_ark_binary_sha256",
+            },
+            report["offline_requirement"]["blockers"],
+        )
+
+    def test_lifecycle_snapshot_root_check_rejects_protected_candidate_root_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+
+            result = run_compare_raw(
+                "--base-root",
+                str(root / "base"),
+                "--candidate-root",
+                "/servidor/ark/obelisk/passive-lifecycle-snapshots",
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("--candidate-root must not read from protected live-server path", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_symlinked_json_side_input_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            candidate = root / "candidate"
+            candidate.mkdir()
+            diagnostic = root / "diagnostic-report.json"
+            diagnostic.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.reflection-snapshot-readiness.v1",
+                        "evidence_scope": "second_source_layout_evidence_only",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (candidate / "linked-report.json").symlink_to(diagnostic)
+
+            result = run_compare(
+                root / "base",
+                candidate,
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("--candidate-root must not be a symlink", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_json_side_input_symlink_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            candidate = root / "candidate"
+            candidate.mkdir()
+            side_input = candidate / "diagnostic-report.json"
+            linked_target = root / "linked-diagnostic-report.json"
+            side_input.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.reflection-snapshot-readiness.v1",
+                        "evidence_scope": "second_source_layout_evidence_only",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            linked_target.write_text(side_input.read_text(encoding="utf-8"), encoding="utf-8")
+            original_reject = compare.protected_paths.reject_symlink_component
+            swapped = False
+
+            def race_reject_symlink_component(path: Path, label: str) -> None:
+                nonlocal swapped
+                original_reject(path, label)
+                if path == side_input and not swapped:
+                    swapped = True
+                    side_input.unlink()
+                    side_input.symlink_to(linked_target)
+
+            with mock.patch.object(
+                compare.protected_paths,
+                "reject_symlink_component",
+                side_effect=race_reject_symlink_component,
+            ):
+                with self.assertRaisesRegex(SystemExit, "--candidate-root must not be a symlink"):
+                    compare.reject_forbidden_lifecycle_input_root("--candidate-root", candidate)
+
+    def test_lifecycle_snapshot_root_check_rejects_passive_manifest_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            candidate = root / "candidate"
+            candidate.mkdir()
+            (candidate / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.player-principal-passive-snapshot.v1",
+                        "approved_runtime_evidence": False,
+                        "ready": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_compare(
+                root / "base",
+                candidate,
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("passive_snapshot_manifest_not_sanitized_ufunction_snapshot", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_diagnostic_only_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            candidate = root / "candidate"
+            candidate.mkdir()
+            (candidate / "diagnostic-report.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.reflection-observed-fname-chain-check.v1",
+                        "evidence_scope": "diagnostic_fname_chain_planning_only_not_second_source",
+                        "artifact_role": "diagnostic_planning_only_not_second_source_input",
+                        "observed_chain_source": "copied_runtime_diagnostic_line",
+                        "can_be_used_as_candidate_snapshot_root": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_compare(
+                root / "base",
+                candidate,
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_reflectionscanner_output_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            candidate = root / "candidate"
+            candidate.mkdir()
+            (candidate / "reflectionscanner-report.json").write_text(
+                json.dumps(
+                    {
+                        "evidence_pack": {
+                            "status": "research-candidate",
+                            "promotion_gate": {
+                                "gate_type": "reflectionscanner_evidence_pack_v1",
+                                "ready": False,
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_compare(
+                root / "base",
+                candidate,
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("reflectionscanner_output_not_sanitized_lifecycle_snapshot_root", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_layout_only_report_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            candidate = root / "candidate"
+            candidate.mkdir()
+            (candidate / "layout-report.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.reflection-snapshot-readiness.v1",
+                        "evidence_scope": "second_source_layout_evidence_only",
+                        "promotion_gate": {"ready": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_compare(
+                root / "base",
+                candidate,
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("layout_only_report_not_sanitized_lifecycle_snapshot_root", result.stderr)
+        self.assertIn("layout_only_evidence_report_not_sanitized_lifecycle_snapshot_root", result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_non_snapshot_side_lanes(self) -> None:
+        cases = (
+            (
+                "obelisk.player-principal-lifecycle-no-users-passive-wait-recommendation.v1",
+                "no_users_passive_wait_not_sanitized_lifecycle_snapshot_root",
+            ),
+            (
+                "obelisk.player-principal-lifecycle-beta-notice-prep.v1",
+                "beta_notice_not_sanitized_lifecycle_snapshot_root",
+            ),
+            (
+                "obelisk.installed-sdk-package-shape.v1",
+                "package_shape_not_sanitized_lifecycle_snapshot_root",
+            ),
+            (
+                "obelisk.sdk-status-side-lane-summary.v1",
+                "sdk_status_side_lane_not_sanitized_lifecycle_snapshot_root",
+            ),
+            (
+                "obelisk.players-identity-first-evidence.v1",
+                "first_evidence_planning_artifact_not_sanitized_lifecycle_snapshot_root",
+            ),
+        )
+        for schema, reason in cases:
+            with self.subTest(schema=schema), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_lifecycle_snapshot_root(root / "base")
+                candidate = root / "candidate"
+                candidate.mkdir()
+                (candidate / "side-lane.json").write_text(
+                    json.dumps({"schema": schema, "ready": True}),
+                    encoding="utf-8",
+                )
+
+                result = run_compare(
+                    root / "base",
+                    candidate,
+                    "--lifecycle-snapshot-root-check",
+                    "--json",
+                )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(reason, result.stderr)
+
+    def test_lifecycle_snapshot_root_check_rejects_readiness_and_target_filters(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_lifecycle_snapshot_root(root / "base")
+            write_lifecycle_snapshot_root(root / "candidate")
+
+            readiness = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--readiness-report",
+            )
+            filtered = run_compare(
+                root / "base",
+                root / "candidate",
+                "--lifecycle-snapshot-root-check",
+                "--target",
+                "ShooterGameMode.HandleNewPlayer",
+            )
+
+        self.assertEqual(readiness.returncode, 1)
+        self.assertIn("--lifecycle-snapshot-root-check is separate from --readiness-report", readiness.stderr)
+        self.assertEqual(filtered.returncode, 1)
+        self.assertIn("compares the fixed HandleNewPlayer/OnLogout target set", filtered.stderr)
+
     def test_structure_aggregate_census_guidance_can_be_listed_without_snapshots(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",
@@ -1054,6 +2794,56 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("target_set=command-chat-response-route-planning", text_result.stdout)
         self.assertIn("command_chat_response_route_guidance_only_candidate", text_result.stdout)
         self.assertIn("does not promote command/chat response path", text_result.stdout)
+
+    def test_inventory_custom_filter_boundary_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "inventory-custom-filter-array-boundary",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_sets"], ["inventory-custom-filter-array-boundary"])
+        self.assertEqual(report["targets"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "inventory-custom-filter-array-boundary")
+        self.assertEqual(guidance["classification"], "inventory_custom_filter_array_boundary_candidate")
+        for reason in (
+            "planning_guidance_only",
+            "non_p0_side_lane",
+            "candidate_only_array_boundary_metadata",
+            "copied_array_payload_blocked",
+            "public_inventory_items_sdk_blocked",
+            "identity_lookup_resourcehandle_blocked",
+            "v1_completion_blocked",
+        ):
+            self.assertIn(reason, guidance["why_blocked"])
+        for required in (
+            "compare only PrimalInventoryComponent.InventoryCustomFilter through --target-set inventory-custom-filter-array-boundary",
+            "treat UnfilteredItemsList and FilteredItemsList as reflected TArray parameter-shell boundary metadata only",
+            "keep TArray data pointer, count, capacity, element identity, object refs, raw arrays, raw params, AdditionalData, and UE pointers redacted or absent",
+            "do not use this target set for P0, release/readiness, public SDK, runtime, or v1 completion gates",
+        ):
+            self.assertIn(required, guidance["snapshot_prep_checks"])
+        self.assertIn("Inventory SDK", guidance["non_claim"])
+        self.assertIn("copied array/list payloads", guidance["non_claim"])
+        self.assertIn("v1 completion", guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "inventory-custom-filter-array-boundary",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=1", text_result.stdout)
+        self.assertIn("target_set=inventory-custom-filter-array-boundary", text_result.stdout)
+        self.assertIn("inventory_custom_filter_array_boundary_candidate", text_result.stdout)
+        self.assertIn("does not promote P0 progress", text_result.stdout)
 
     def test_structure_aggregate_census_note_preserves_default_off_and_pin_exclusion(self) -> None:
         note = REPO_ROOT / "docs" / "research" / "2026-05-31-structure-aggregate-census-v0.md"
@@ -1184,6 +2974,62 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("--base-root must not read from protected live-server path", result.stderr)
 
+    def test_rejects_snapshot_root_symlink_even_when_resolved_path_is_not_protected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_base = root / "real-base"
+            candidate = root / "candidate"
+            real_base.mkdir()
+            candidate.mkdir()
+            linked_base = root / "linked-base"
+            linked_base.symlink_to(real_base, target_is_directory=True)
+
+            result = run_compare(linked_base, candidate, "--readiness-report")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--base-root must not be a symlink", result.stderr)
+
+    def test_rejects_direct_snapshot_file_symlink_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            real_base = root / "real-base"
+            candidate = root / "candidate"
+            real_base.mkdir()
+            candidate.mkdir()
+            real_snapshot = write_snapshot(real_base, base_snapshot(), "real.snapshot.json")
+            linked_snapshot = root / "linked.snapshot.json"
+            linked_snapshot.symlink_to(real_snapshot)
+
+            result = run_compare(linked_snapshot, candidate, "--readiness-report")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("--base-root must not be a symlink", result.stderr)
+
+    def test_rejects_direct_snapshot_file_symlink_swap_after_precheck(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshot = write_snapshot(root, base_snapshot(), "swap.snapshot.json")
+            linked_target = write_snapshot(root, base_snapshot(), "linked-target.snapshot.json")
+            original_reject = compare.reject_snapshot_input_path
+            swapped = False
+
+            def race_reject_snapshot_input_path(label: str, path: Path) -> None:
+                nonlocal swapped
+                original_reject(label, path)
+                if path == snapshot and not swapped:
+                    swapped = True
+                    snapshot.unlink()
+                    snapshot.symlink_to(linked_target)
+
+            with mock.patch.object(
+                compare,
+                "reject_snapshot_input_path",
+                side_effect=race_reject_snapshot_input_path,
+            ):
+                with self.assertRaisesRegex(SystemExit, "snapshot must not be a symlink"):
+                    compare.load_snapshot(snapshot)
+
     def test_rejects_textually_protected_snapshot_root_even_when_symlink_resolves_outside(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1213,6 +3059,21 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("snapshot must not read from protected live-server path", result.stderr)
+
+    def test_rejects_snapshot_file_symlink_even_when_resolved_path_is_not_protected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            real_snapshot = write_snapshot(base, base_snapshot(), "real.snapshot.json")
+            (base / "linked.snapshot.json").symlink_to(real_snapshot)
+
+            result = run_compare(base, candidate, "--readiness-report")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("snapshot must not be a symlink", result.stderr)
 
     def test_allows_approved_offline_workspace_snapshot_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1431,6 +3292,34 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["counts"]["inconclusive"], 1)
         self.assertTrue(any(reason.startswith("candidate:forbidden_key") for reason in report["results"][0]["reasons"]))
 
+    def test_public_runtime_resourcehandle_identity_and_mutation_claims_block_layout_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            right = deepcopy(left)
+            for payload in (left, right):
+                payload["public_sdk_ready"] = True
+                payload["runtime_status"] = "runtime-ready"
+                payload["targets"][0]["resource_handle_ready"] = "enabled"  # type: ignore[index]
+                payload["targets"][0]["property_chain"]["properties"][0]["review_note"] = (  # type: ignore[index]
+                    "ResourceHandle lookup is ready for object identity and mutation"
+                )
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertTrue(any("readiness_alias_overclaim" in reason for reason in reasons), reasons)
+        self.assertTrue(any("forbidden_positive_claim_value" in reason for reason in reasons), reasons)
+
     def test_marks_ark_sha_mismatch_inconclusive_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1477,6 +3366,39 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             report["results"][0]["reasons"],
             ["missing_base_evidence_artifact_identity", "missing_candidate_evidence_artifact_identity"],
         )
+
+    def test_readiness_report_blocks_missing_base_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base" / "sha" / "sdk_inventory"
+            base.mkdir(parents=True)
+            payload = base_snapshot()
+            evidence = payload["evidence"]  # type: ignore[index]
+            evidence.pop("artifact_kind", None)
+            evidence.pop("artifact_sha256", None)
+            evidence.pop("capture_id", None)
+            evidence.pop("evidence_pack_id", None)
+            write_snapshot(base, payload)
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target",
+                "PrimalItem.CanUse",
+                "--fail-on-base-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["totals"]["comparable"], 0)
+        self.assertEqual(report["totals"]["blocked"], 1)
+        detail = report["modules"][0]["target_details"][0]
+        self.assertIn("missing_artifact_kind", detail["block_reasons"])
+        self.assertIn("missing_artifact_sha256", detail["block_reasons"])
+        self.assertIn("missing_capture_id", detail["block_reasons"])
+        self.assertIn("missing_evidence_pack_id", detail["block_reasons"])
 
     def test_marks_same_artifact_identity_inconclusive(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1869,6 +3791,31 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("base:property[0]_array_inner_candidate_membership_status_not-in-gobjects", reasons)
         self.assertIn("candidate:property[1]_struct_type_candidate_membership_status_missing", reasons)
 
+    def test_array_and_struct_properties_require_nested_candidate_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["class_name"] = "ArrayProperty"  # type: ignore[index]
+            left["targets"][0]["property_chain"]["properties"][1]["class_name"] = "StructProperty"  # type: ignore[index]
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn("base:property[0]_array_inner_candidate_missing", reasons)
+        self.assertIn("base:property[1]_struct_type_candidate_missing", reasons)
+        self.assertIn("candidate:property[0]_array_inner_candidate_missing", reasons)
+        self.assertIn("candidate:property[1]_struct_type_candidate_missing", reasons)
+
     def test_nested_property_candidate_requires_identity_object(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1899,6 +3846,59 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         reasons = report["results"][0]["reasons"]
         self.assertIn("base:property[0]_array_inner_candidate_missing_inner_property", reasons)
         self.assertIn("candidate:property[1]_struct_type_candidate_missing_struct_type", reasons)
+
+    def test_nested_property_candidate_requires_identity_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            left = base_snapshot()
+            left["targets"][0]["property_chain"]["properties"][0]["array_inner_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "inner_property": {
+                    "name": "InventoryItems",
+                    "class_name": "ObjectProperty",
+                },
+            }
+            left["targets"][0]["property_chain"]["properties"][1]["struct_type_candidate"] = {  # type: ignore[index]
+                "status": "candidate",
+                "reject_reasons": [],
+                "membership_status": "candidate-uobject",
+                "struct_type": {
+                    "object_index": 2001,
+                    "name": "ARKTributeDino",
+                },
+            }
+            right = deepcopy(left)
+            write_snapshot(base, left)
+            write_snapshot(candidate, right)
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 2)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["inconclusive"], 1)
+        reasons = report["results"][0]["reasons"]
+        self.assertIn(
+            "base:property[0]_array_inner_candidate_inner_property_object_index_missing",
+            reasons,
+        )
+        self.assertIn(
+            "base:property[0]_array_inner_candidate_inner_property_name_index_missing",
+            reasons,
+        )
+        self.assertIn(
+            "candidate:property[1]_struct_type_candidate_struct_type_class_name_missing",
+            reasons,
+        )
+        self.assertIn(
+            "candidate:property[1]_struct_type_candidate_struct_type_name_index_missing",
+            reasons,
+        )
 
     def test_target_filter_limits_comparison_to_requested_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1966,7 +3966,23 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("unsupported target filter schema: obelisk.unknown.snapshot.v1", result.stderr)
+
+    def test_snapshot_with_unknown_schema_fails_closed_before_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = root / "base"
+            candidate = root / "candidate"
+            base.mkdir()
+            candidate.mkdir()
+            payload = base_snapshot()
+            payload["schema"] = "obelisk.unknown.snapshot.v1"
+            write_snapshot(base, payload)
+            write_snapshot(candidate, base_snapshot())
+
+            result = run_compare(base, candidate, "--json")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unsupported snapshot schema", result.stderr)
 
     def test_target_filter_rejects_empty_schema_qualified_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2216,6 +4232,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["schema"], "obelisk.reflection-snapshot-readiness.v1")
         self.assertEqual(report["second_source_status"], "missing_candidate_root")
         self.assertEqual(report["gate_mode"], "informational_gap_report")
+        self.assertIn("approved_runtime_evidence", report["does_not_satisfy_readiness"])
+        self.assertIn("public_module_sdk", report["does_not_satisfy_readiness"])
+        self.assertIn("resource_handle", report["does_not_satisfy_readiness"])
+        self.assertIn("mutation", report["does_not_satisfy_readiness"])
+        self.assertIn("return_override", report["does_not_satisfy_readiness"])
+        self.assertIn("v1_completion", report["does_not_satisfy_readiness"])
         self.assertEqual(report["totals"]["targets"], 1)
         self.assertEqual(report["totals"]["comparable"], 1)
         self.assertEqual(report["totals"]["second_source_missing"], 1)
@@ -2361,6 +4383,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["targets"], 4)
         self.assertEqual(report["totals"]["comparable"], 1)
         self.assertEqual(report["totals"]["blocked"], 3)
+        self.assertEqual(report["target_set_coverage"]["status"], "complete")
+        self.assertTrue(report["target_set_coverage"]["complete"])
+        self.assertEqual(report["target_set_coverage"]["missing_targets"], [])
+        self.assertEqual(report["target_set_coverage"]["unexpected_targets"], [])
         self.assertIn({"reason": "blocked_base_targets", "count": 3}, report["promotion_gate"]["blockers"])
         self.assertIn({"reason": "missing_second_source", "count": 1}, report["promotion_gate"]["blockers"])
         missing_module = next(module for module in report["modules"] if module["module"] == "<missing>")
@@ -2448,6 +4474,18 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             any("Inventory SDK, Items SDK" in claim for claim in report["non_claims"]),
             report["non_claims"],
         )
+        coverage = report["target_set_coverage"]
+        self.assertEqual(coverage["schema"], compare.READINESS_TARGET_SET_COVERAGE_SCHEMA)
+        self.assertEqual(coverage["target_sets"], ["minimal-second-source-intake"])
+        self.assertEqual(coverage["status"], "complete")
+        self.assertTrue(coverage["complete"])
+        self.assertEqual(coverage["target_set_revision_schema"], "obelisk.reflection-target-set-revision.v1")
+        self.assertEqual(coverage["target_set_revision_source"], "scripts/reflection_target_sets.py")
+        self.assertRegex(coverage["target_set_revision_source_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(coverage["expected_targets"], sorted(compare.TARGET_SETS["minimal-second-source-intake"]))
+        self.assertEqual(coverage["observed_targets"], sorted(compare.TARGET_SETS["minimal-second-source-intake"]))
+        self.assertEqual(coverage["missing_targets"], [])
+        self.assertEqual(coverage["unexpected_targets"], [])
 
     def test_planning_layout_intake_requires_readiness_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2553,6 +4591,61 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn(
             {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
             report["promotion_gate"]["blockers"],
+        )
+
+    def test_planning_layout_intake_without_candidate_root_stays_not_second_source(self) -> None:
+        target_set = "structure-aggregate-census-planning"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["second_source_status"], "not_applicable_planning_layout_intake")
+        self.assertEqual(report["planning_layout_comparison_status"], "missing_candidate_root")
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["second_source_readiness_satisfied"])
+        self.assertTrue(report["not_second_source"])
+        self.assertEqual(
+            report["totals_scope"],
+            "planning_layout_comparison_counts_not_second_source_readiness",
+        )
+        self.assertEqual(
+            report["planning_layout_gate"]["blockers"],
+            [{"reason": "missing_second_source", "count": len(compare.TARGET_SETS[target_set])}],
+        )
+        self.assertEqual(
+            report["planning_layout_comparison_totals"],
+            {
+                "accepted": 0,
+                "rejected": 0,
+                "inconclusive": 0,
+                "missing": len(compare.TARGET_SETS[target_set]),
+            },
+        )
+        target_details = [
+            detail
+            for module in report["modules"]
+            for detail in module["target_details"]
+        ]
+        self.assertEqual(
+            {detail["planning_layout_comparison_status"] for detail in target_details},
+            {"missing"},
+        )
+        self.assertEqual(
+            {detail["second_source_status"] for detail in target_details},
+            {"not_applicable_planning_layout_intake"},
         )
 
     def test_command_chat_response_planning_intake_emits_redaction_guidance(self) -> None:
@@ -2711,12 +4804,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             roots = {
                 "minimal": root / "minimal",
                 "structure": root / "structure",
-                "item_return": root / "item_return",
                 "chat": root / "chat",
             }
             write_target_set_root(roots["minimal"], "minimal-second-source-intake")
             write_target_set_root(roots["structure"], "structure-observer-intake")
-            write_target_set_root(roots["item_return"], "item-return-only-policy-slice")
             write_target_set_root(roots["chat"], "chat-message-intake")
             chat_snapshot = (
                 roots["chat"]
@@ -2737,8 +4828,6 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                     str(roots["minimal"]),
                     "--structure-root",
                     str(roots["structure"]),
-                    "--item-return-root",
-                    str(roots["item_return"]),
                     "--chat-root",
                     str(roots["chat"]),
                     "--output-root",
@@ -2835,7 +4924,111 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
-        self.assertEqual(report["target_set_guidance"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        self.assertEqual(
+            report["target_set_guidance"][0]["target_set"],
+            "players-lifecycle-anchor-candidates",
+        )
+        self.assertIn("approved_runtime_evidence_missing", report["target_set_guidance"][0]["why_blocked"])
+
+    def test_lifecycle_anchor_candidate_planning_intake_stays_non_promotional(self) -> None:
+        target_set = "players-lifecycle-anchor-candidates"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+            text_result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["evidence_scope"], "planning_layout_intake_only_not_second_source")
+        self.assertEqual(report["readiness_effect"], "none")
+        self.assertEqual(report["second_source_status"], "not_applicable_planning_layout_intake")
+        self.assertFalse(report["second_source_layout_evidence"])
+        self.assertFalse(report["can_be_used_as_second_source_layout_evidence"])
+        self.assertTrue(report["not_second_source"])
+        self.assertFalse(report["second_source_readiness_satisfied"])
+        self.assertTrue(report["planning_only"])
+        self.assertEqual(report["readiness_classification"], "planning_only")
+        self.assertIn("second_source_layout_evidence", report["does_not_satisfy_readiness"])
+        self.assertEqual(
+            report["totals_scope"],
+            "planning_layout_comparison_counts_not_second_source_readiness",
+        )
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], 6)
+        self.assertEqual(report["totals"]["second_source_accepted"], 6)
+        self.assertEqual(
+            report["planning_layout_comparison_totals"],
+            {"accepted": 6, "rejected": 0, "inconclusive": 0, "missing": 0},
+        )
+        self.assertEqual(
+            report["planning_layout_gate"],
+            {
+                "ready": True,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            },
+        )
+        self.assertFalse(report["promotion_gate"]["ready"])
+        self.assertFalse(report["promotion_gate"]["promotion_ready"])
+        self.assertFalse(report["promotion_gate"]["public_sdk_ready"])
+        self.assertFalse(report["promotion_gate"]["runtime_ready"])
+        self.assertIn(
+            {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
+            report["promotion_gate"]["blockers"],
+        )
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        self.assertIn("approved_runtime_evidence_missing", report["target_set_guidance"][0]["why_blocked"])
+        self.assertEqual(
+            {module["second_source_status"] for module in report["modules"]},
+            {"not_applicable_planning_layout_intake"},
+        )
+        self.assertEqual(
+            sum(module["planning_layout_comparison"]["accepted"] for module in report["modules"]),
+            6,
+        )
+        target_details = [
+            detail
+            for module in report["modules"]
+            for detail in module["target_details"]
+        ]
+        self.assertEqual(
+            {detail["second_source_status"] for detail in target_details},
+            {"not_applicable_planning_layout_intake"},
+        )
+        self.assertEqual(
+            {detail["planning_layout_comparison_status"] for detail in target_details},
+            {"accepted"},
+        )
+        self.assertIn(
+            "second_source_status=not_applicable_planning_layout_intake planning_layout=accepted:6",
+            text_result.stdout,
+        )
+        self.assertNotIn("second_source=accepted:6", text_result.stdout)
 
     def test_planning_layout_intake_accepts_planning_only_layout_without_promotion(self) -> None:
         target_set = "players-identity-lifecycle-intake"
@@ -2935,8 +5128,48 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             },
         )
 
-    def test_release_target_set_promotion_blocks_explicit_targets_outside_named_set(self) -> None:
+    def test_readiness_report_blocks_item_return_only_policy_slice_p0_completion_gate(self) -> None:
         target_set = "item-return-only-policy-slice"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], 3)
+        self.assertEqual(report["totals"]["second_source_accepted"], 3)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["classification"], "internal_gameplay_policy_item_return_only_non_completion")
+        self.assertIn("complete_sdk_accounting_blocked", guidance["why_blocked"])
+        self.assertIn("p0_dependency_chain_accounting_blocked", guidance["why_blocked"])
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+            },
+        )
+
+    def test_release_target_set_promotion_blocks_explicit_targets_outside_named_set(self) -> None:
+        target_set = "minimal-second-source-intake"
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             write_target_set_root(root / "base", target_set)
@@ -2965,13 +5198,22 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(len(report["target_set_guidance"]), 1)
         guidance = report["target_set_guidance"][0]
         self.assertEqual(guidance["target_set"], target_set)
-        self.assertEqual(guidance["classification"], "release_gameplay_policy_item_return_only")
-        self.assertIn("standalone_items_inventory_sdk_blocked", guidance["why_blocked"])
-        self.assertIn("GameplayPolicyEvent copied-scalar lane only", " ".join(guidance["snapshot_prep_checks"]))
-        self.assertIn("Items SDK", guidance["non_claim"])
+        self.assertEqual(guidance["classification"], "release_compact_inventory_structure_layout_evidence")
+        self.assertIn("compact_layout_evidence_only", guidance["why_blocked"])
+        self.assertIn("public_inventory_items_structure_sdks_blocked", guidance["why_blocked"])
+        self.assertIn("narrower policy target sets", guidance["next_offline_input"])
         self.assertIn("Inventory SDK", guidance["non_claim"])
+        self.assertIn("Items SDK", guidance["non_claim"])
         self.assertIn("runtime validation", guidance["non_claim"])
-        self.assertEqual(report["totals"]["second_source_accepted"], 4)
+        self.assertEqual(report["totals"]["second_source_accepted"], 5)
+        coverage = report["target_set_coverage"]
+        self.assertEqual(coverage["status"], "incomplete")
+        self.assertFalse(coverage["complete"])
+        self.assertEqual(coverage["missing_targets"], [])
+        self.assertEqual(
+            coverage["unexpected_targets"],
+            ["obelisk.ufunction-chain.snapshot.v1:PrimalItem.CraftBlueprint"],
+        )
         self.assertEqual(
             report["promotion_gate"],
             {
@@ -3286,24 +5528,22 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(report["totals"]["second_source_missing"], 6)
 
     def test_all_named_target_sets_match_committed_base_fixtures(self) -> None:
-        target_sets = {
-            "chat-message-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 1),
-            "minimal-second-source-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
-            "structure-observer-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 6),
-            "structure-nonpin-copied-scalar-policy-slice": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
-            "buff-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
-            "buff-breadth-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 3),
-            "dino-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),
-            "item-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
-            "inventory-action-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 2),
-            "mission-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 4),
-            "tribe-compact-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 5),
-            "transfer-ufunction-intake": (REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots", 7),
-            "transfer-scriptstruct": (REPO_ROOT / "tests" / "fixtures" / "scriptstruct_snapshots", 2),
+        fixture_roots = {
+            "obelisk.ufunction-chain.snapshot.v1": REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
+            "obelisk.scriptstruct-chain.snapshot.v1": REPO_ROOT / "tests" / "fixtures" / "scriptstruct_snapshots",
         }
+        known_missing_base_fixture_target_sets = {
+            "structure-build-policy-offline-intake",
+        }
+        self.assertLessEqual(known_missing_base_fixture_target_sets, set(compare.TARGET_SETS))
 
-        for target_set, (base_root, expected_targets) in target_sets.items():
+        for target_set in sorted(set(compare.TARGET_SETS) - known_missing_base_fixture_target_sets):
             with self.subTest(target_set=target_set):
+                targets = compare.TARGET_SETS[target_set]
+                schemas = {target.partition(":")[0] for target in targets}
+                self.assertEqual(1, len(schemas))
+                schema = next(iter(schemas))
+                base_root = fixture_roots[schema]
                 result = run_compare_raw(
                     "--base-root",
                     str(base_root),
@@ -3317,6 +5557,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
                 report = json.loads(result.stdout)
                 self.assertEqual(report["gate_mode"], "base_fixture_readiness")
+                expected_targets = len(targets)
                 self.assertEqual(report["totals"]["targets"], expected_targets)
                 self.assertEqual(report["totals"]["comparable"], expected_targets)
                 self.assertEqual(report["totals"]["blocked"], 0)

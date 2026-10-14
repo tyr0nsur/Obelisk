@@ -32,6 +32,11 @@ recovery APIs. Object identity/ResourceHandle is tracked separately so copied ca
 metadata cannot be mistaken for lookup handles, persistent handles, or post-callback
 object correlation. Gameplay/server tick callbacks are also tracked as a separate v1
 completion blocker so process-local timers are not mistaken for UE gameplay tick hooks.
+The next ResourceHandle evidence contract is planning-only: future promotion would need
+runtime object negative samples plus runtime serial reuse/wraparound semantics. Offline
+serial artifacts, package-shape metadata, scoped release-statement bookkeeping, and
+copied resource-kind descriptors do not approve lookup, mutation, cross-event identity,
+persistent object identity, or post-callback validity.
 The P0 chain must be promoted before `v1_completion_required` can become true; non-chain
 blockers must be promoted or deliberately excluded/post-v1 in the release statement before
 they stop blocking scoped support-statement accounting.
@@ -45,6 +50,33 @@ Plugin Hub remains post-SDK-complete planning: no seed/package publication, inta
 prioritization, production module availability, or support-tier activation may be
 inferred from v0.1 RC surfaces, installed SDK package shape, foundation examples, or
 promoted-experimental copied-data seeds.
+Current compatibility non-claim: no current-turn exact live-op scope, no current-turn
+exact approval for operations, Discord send, Plugin Hub publication, public SDK
+readiness, or stable v1 claim exists in this document. Historical
+TheIsland/Ragnarok/Genesis2 notes, the latest release-readiness pass, request packs,
+release-readiness passes, request packs, status reports, `progress_normalization_trace`,
+source_overclaim diagnostics, `source_overclaim_total_flag_count=0`, the latest
+validation pass, six-agent closure notes, Codex cache cleanup, passive observation,
+passive player evidence, passive player summaries, passive summaries, passive snapshots,
+passive triplets, passive monitor ticks, passive monitor output, passive monitors, public
+reachability, beta tester notices, beta notices, future beta notices, Discord notice
+drafts, package-shape installs, package installs, explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+install/package success, package-shape install success, install/package-shape checks,
+support-tier labels, package shape, package-shape/public package readiness, Plugin Hub
+planning, scoped non-complete release statements, side-lane candidates/accounting, prior
+approvals, historical live approvals/map names, historical approvals/map names, closure
+requests, local tests, and diagnostic material are not live authorization, runtime evidence, SDK evidence, SDK/P0 progress,
+live-op authorization, Discord authorization, public SDK readiness, publication authority,
+runtime readiness, stable SDK readiness, Plugin Hub readiness, support-tier activation,
+stable SDK claims, stable claims, or approved in-game evidence. They may be cited only as chronology/request
+context; they remain non-authorizing/non-evidence unless a claim names both the
+current-turn exact approval for the scoped action and the accepted checker evidence for
+the evidence result. The current route remains SDK `0/12`, P0 `0/4`,
+`stable_claim_allowed=false`, and blocked on `approved_runtime_evidence_missing`.
+Deferred C++ observer patch notes and diagnostic/passive lifecycle material are planning
+context only; they do not satisfy approved runtime principal lifecycle evidence and do
+not advance SDK/P0 progress, public SDK readiness, or stable SDK claims.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
 `GameplayPolicyEvent` and `ChatMessageEvent`, separately or together, must not be
 described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on
@@ -112,6 +144,10 @@ That file set is package-shape evidence only, not a `v1.0` completion marker, an
 not imply private runtime headers, vendored runtime dependencies, release package
 readiness, public package availability, Plugin Hub package publication, or any blocked
 gameplay module surface.
+The explicit non-`EXACT` numeric version plus `COMPONENTS SDK` request above is part of
+that package-shape contract only. It is not evidence for stable SDK readiness, public
+package readiness, Plugin Hub readiness/publication, support-tier activation, runtime
+readiness, or v1 completion.
 The installed CMake package exports explicit non-claim metadata with package-shape status
 and false runtime-readiness, live-op approval, Plugin Hub readiness/publication,
 support-tier activation, v1 completion, public module SDK coverage, and production stable
@@ -385,7 +421,7 @@ approval and must not be cited as evidence that a surface is included in v1.
 | `obelisk.commands_replies.v1` | `promoted` | promoted player identity, permissions/admin, and command/chat response path | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no command SDK/router wording. |
 | `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |
 | `obelisk.structure_census.v1` | `promoted` or `excluded` | copied structure evidence, privacy/redaction, identity policy if exposed | Name StructureEvents SDK, structure census, structure identity, lookup, build placement policy, no-collision policy, and ownership lookup. |
-| `obelisk.object_identity_resource_handle.v1` | `promoted`, `excluded`, or `post-v1` | lifecycle/reuse semantics, privacy/redaction, paired runtime ResourceHandle evidence | Name ResourceHandle, object identity, object lookup, post-callback handles, persistent handles, serial reuse/wraparound, mutation, and return override. |
+| `obelisk.object_identity_resource_handle.v1` | `promoted`, `excluded`, or `post-v1` | runtime object negative samples, serial reuse/wraparound semantics, lifecycle/reuse semantics, privacy/redaction, paired runtime ResourceHandle evidence | Name ResourceHandle, object identity, object lookup, post-callback handles/validity, cross-event identity, persistent object identity/handles, serial reuse/wraparound, mutation, and return override. |
 | `obelisk.mission_transfer_dino_tribe.v1` | `promoted` or `excluded` | each module promoted as a narrow copied ABI or explicitly left out | Name Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules, Tribe SDK, tribe MOTD/notices/policy, Buff/status SDK, teleport/spawn, ownership lookup, and cross-map correlation. |
 | `obelisk.player_services_economy_mobility.v1` | `promoted`, `excluded`, or `post-v1` | identity, permissions/admin, storage/persistence, audit/rollback/abuse controls | Name economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy, timed notices, and cross-instance persistence. |
 | `obelisk.operator_ingress_storage.v1` | `promoted`, `excluded`, or `post-v1` | secret-safe ingress, storage schema/migration, queue drain, audit, encoding, lifecycle policy | Name RCON, operator reload command API, Unicode/operator text encoding, webhooks, database/storage, secret manager, external ingress, and cross-instance storage. |

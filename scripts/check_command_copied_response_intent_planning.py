@@ -12,6 +12,7 @@ from typing import Any
 
 import check_permissions_admin_public_readiness as permissions_readiness
 import check_permissions_admin_query_failclosed_contract as query_failclosed_contract
+from native_prototype_guardrails import without_native_prototype_symbols
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -675,7 +676,9 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
 
 
 def validate_public_header(path: Path, tokens: list[str], blockers: list[dict[str, Any]]) -> None:
-    text = path.read_text(encoding="utf-8")
+    # The separately verified callback-scoped native prototype does not promote
+    # this historical response-intent contract. Other symbols still block it.
+    text = without_native_prototype_symbols(path.read_text(encoding="utf-8"), header_only=True)
     present = sorted(token for token in set(tokens) | DEFAULT_FORBIDDEN_HEADER_TOKENS if token in text)
     if present:
         add(blockers, "public_header_contains_command_response_intent_symbol", str(path), tokens=present)

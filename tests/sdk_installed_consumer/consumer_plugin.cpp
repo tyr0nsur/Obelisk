@@ -49,7 +49,6 @@ namespace
     ObeliskApi g_Api{};
     bool g_HasApi = false;
     uint64_t g_OwnerToken = 0;
-    uint64_t g_ProcessEventHandle = 0;
     uint64_t g_GameplayPolicyEventHandle = 0;
     uint64_t g_ChatMessageEventHandle = 0;
     uint64_t g_ScheduledHandle = 0;
@@ -118,17 +117,26 @@ namespace
         return path && stat(path, &st) == 0;
     }
 
+    bool HasApiMetadataPrefix(const ObeliskApi* api)
+    {
+        if (!api ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+        {
+            return false;
+        }
+
+        if (api->abi_version != OBELISK_API_ABI_VERSION)
+            return false;
+
+        return true;
+    }
+
     void CopyApiPrefix(const ObeliskApi* api)
     {
         g_Api = {};
         if (!api)
             return;
         std::memcpy(&g_Api, api, api->struct_size < sizeof(g_Api) ? api->struct_size : sizeof(g_Api));
-    }
-
-    bool OnProcessEvent(void*, void*, void*)
-    {
-        return true;
     }
 
     void OnGameplayPolicyEvent(const ObeliskGameplayPolicyEvent* event, void* userData)
@@ -219,22 +227,12 @@ namespace
             g_ScheduledSeen = true;
     }
 
-    bool HasProcessEventHandleApi(const ObeliskApi* api)
-    {
-        return api &&
-            (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0 &&
-            (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
-            (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0 &&
-            api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-                sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
-            api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
-            api->UnregisterProcessEventCallbackWithOwnerToken;
-    }
-
     bool HasGameplayPolicyEventApi(const ObeliskApi* api)
     {
-        return api &&
+        return HasApiMetadataPrefix(api) &&
             (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) +
+                sizeof(api->RegisterGameplayPolicyEventWithOwnerTokenHandle) &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
                 sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
             api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
@@ -247,7 +245,7 @@ namespace
                                         uint64_t fieldMask,
                                         const char* stableName)
     {
-        if (!api ||
+        if (!HasApiMetadataPrefix(api) ||
             (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
             api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) + sizeof(api->DescribeResourceKind) ||
             !api->DescribeResourceKind)
@@ -280,7 +278,7 @@ namespace
                                                uint64_t requiredFlag,
                                                const char* stableName)
     {
-        if (!api ||
+        if (!HasApiMetadataPrefix(api) ||
             (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
             api->struct_size < offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
                 sizeof(api->DescribeGameplayPolicyEventKind) ||
@@ -307,8 +305,10 @@ namespace
 
     bool HasChatMessageEventApi(const ObeliskApi* api)
     {
-        return api &&
+        return HasApiMetadataPrefix(api) &&
             (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle) +
+                sizeof(api->RegisterChatMessageEventWithOwnerTokenHandle) &&
             api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
                 sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
             api->RegisterChatMessageEventWithOwnerTokenHandle &&
@@ -317,8 +317,10 @@ namespace
 
     bool HasScheduledApi(const ObeliskApi* api)
     {
-        return api &&
+        return HasApiMetadataPrefix(api) &&
             (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+            api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) +
+                sizeof(api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) &&
             api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
                 sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
             api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
@@ -330,7 +332,6 @@ namespace
         g_Api = {};
         g_HasApi = false;
         g_OwnerToken = 0;
-        g_ProcessEventHandle = 0;
         g_GameplayPolicyEventHandle = 0;
         g_ChatMessageEventHandle = 0;
         g_ScheduledHandle = 0;
@@ -346,11 +347,6 @@ namespace
         {
             g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken)(g_OwnerToken, g_ScheduledHandle);
             g_ScheduledHandle = 0;
-        }
-        if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-        {
-            g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
-            g_ProcessEventHandle = 0;
         }
         if (g_HasApi && g_GameplayPolicyEventHandle != 0 && g_Api.UnregisterGameplayPolicyEventWithOwnerToken)
         {
@@ -396,8 +392,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         if (!api || !context)
             return false;
 
-        if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
+        if (!HasApiMetadataPrefix(api) ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
         {
@@ -419,19 +414,6 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         {
             ResetState();
             return false;
-        }
-
-        if (HasProcessEventHandleApi(api))
-        {
-            g_ProcessEventHandle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-                g_OwnerToken,
-                42,
-                OnProcessEvent);
-            if (g_ProcessEventHandle == 0)
-            {
-                ResetState();
-                return false;
-            }
         }
 
         if (HasChatMessageEventApi(api))

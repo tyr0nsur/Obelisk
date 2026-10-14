@@ -19,6 +19,7 @@
 #include "runtime/RuntimeMarkers.h"
 #include "hooks/HookManager.h"
 #include "hooks/ProcessEventHook.h"
+#include "hooks/NativeChatHook.h"
 #include "core/PluginManager.h"
 #include "ue/ReflectionScanner.h"
 
@@ -247,10 +248,15 @@ void Obelisk_Init()
     OBELISK_INFO("Starting runtime bootstrap...");
 
     ConfigureDebugPtrace();
-    StartDebugControlThread();
     
     // Initialize hooking engine
     Obelisk::Hooks::HookManager::Init();
+
+        // Native code patches are startup-only. Install before our own workers.
+        if (Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_NATIVE_COMMANDS",
+                                                           "enable-native-commands"))
+            Obelisk::Hooks::NativeChatHook::Install();
+        StartDebugControlThread();
 
         if (Obelisk::Runtime::IsEnvAndInstanceMarkerEnabled("OBELISK_ENABLE_REFLECTION_SCANNER", "enable-reflection-scanner"))
         {

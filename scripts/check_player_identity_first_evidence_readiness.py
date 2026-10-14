@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -20,6 +21,7 @@ import check_player_identity_runtime_principal_lifecycle_approved_evidence as ap
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence
 import check_player_principal_lifecycle_window_request as player_principal_lifecycle_window_request
 import validate_offline_artifact_gate as offline_artifact_gate
+from reflection_target_sets import schema_target_list
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -30,10 +32,15 @@ FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 REFLECTION_INVENTORY_PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 RADARE2_STATIC_ORIENTATION_SCHEMA = "obelisk.radare2-static-orientation-windows.v1"
+LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA = "obelisk.lifecycle-ufunction-snapshot-root-requirement.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
-PLAYER_IDENTITY_TARGET_COUNT = 12
+EXPECTED_PLAYER_IDENTITY_TARGETS = tuple(
+    schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
+)
+PLAYER_IDENTITY_TARGET_COUNT = len(EXPECTED_PLAYER_IDENTITY_TARGETS)
+LIFECYCLE_SNAPSHOT_ROOT_REQUIRED_TARGET_COUNT = 2
 EXPECTED_SHOOTERGAME_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 PLAYER_IDENTITY_RAW_RUN_PREFIX = "player-identity-offline-"
 REQUIRED_ADMIN_TARGETS = [
@@ -75,6 +82,203 @@ APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK = (
     / "player-identity-planning-sources"
     / "players-identity-principal-invalidation-policy.json"
 )
+APPROVED_RUNTIME_REQUIRED_OBSERVED_CASES = (
+    "observer_enable",
+    "session_start_anchor",
+    "session_start_rejected_anchor",
+    "session_end_anchor",
+)
+STRICT_REJECTED_START_TARGET = "ShooterGameMode.CheckJoinInProgress"
+STRICT_REJECTED_START_COPIED_BOOL_FIELDS = ("bIsFromLogin", "ReturnValue")
+STRICT_REJECTED_START_COPIED_BOOL_VALUES = ("1", "0")
+STRICT_REJECTED_START_SHAPE = "ShooterGameMode.CheckJoinInProgress(1,0)"
+SUPERSEDED_HANDLE_NEW_PLAYER_REJECTED_START_VALUES = (
+    ("0", "1"),
+    ("1", "0"),
+    ("0", "0"),
+)
+APPROVED_RUNTIME_FORBIDDEN_REPORT_TRUE_KEYS = (
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_sdk",
+    "counts_toward_v1_completion",
+    "promotion_ready",
+    "public_or_runtime_accounting_allowed",
+    "public_header_allowed",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "v1_completion_ready",
+    "runtime_ready",
+    "stable_claim_allowed",
+    "complete_sdk_allowed",
+    "complete_sdk_ready",
+    "observerEventTripletReady",
+    "runtimeEvidenceAcceptedAsPublicContract",
+    "approvedRuntimeEvidenceReadyForSdk",
+    "completeSdkAllowed",
+    "completeSdkReady",
+    "stableClaimAllowed",
+    "stableReleaseContractClaimAllowed",
+    "stableV1SdkClaimAllowed",
+    "publicHeaderAllowed",
+    "publicAbiReady",
+    "publicSdkReady",
+    "runtimeReady",
+    "v1CompletionReady",
+    "completeSdkClaimAllowed",
+    "completeSdkClaimReady",
+    "sdkCompletionReady",
+    "countsTowardCompleteSdkClaim",
+    "countsTowardCompleteSdk",
+    "countsTowardPublicSdk",
+    "countsTowardRuntime",
+    "countsTowardSdk",
+    "countsTowardV1Completion",
+    "publicOrRuntimeAccountingAllowed",
+)
+APPROVED_RUNTIME_FORBIDDEN_REPORT_NONZERO_KEYS = (
+    "credit",
+    "credits",
+    "sdk_credit",
+    "sdk_credits",
+    "sdkCredit",
+    "sdkCredits",
+    "sdk_completion_credit",
+    "sdk_completion_credits",
+    "sdkCompletionCredit",
+    "sdkCompletionCredits",
+    "complete_sdk_credit",
+    "complete_sdk_credits",
+    "completeSdkCredit",
+    "completeSdkCredits",
+    "complete_sdk_claim_credit",
+    "complete_sdk_claim_credits",
+    "completeSdkClaimCredit",
+    "completeSdkClaimCredits",
+    "p0_credit",
+    "p0_credits",
+    "p0Credit",
+    "p0Credits",
+    "p0_dependency_chain_credit",
+    "p0_dependency_chain_credits",
+    "p0DependencyChainCredit",
+    "p0DependencyChainCredits",
+    "v1_completion_credit",
+    "v1_completion_credits",
+    "v1CompletionCredit",
+    "v1CompletionCredits",
+)
+LIFECYCLE_SNAPSHOT_ROOT_FORBIDDEN_TRUE_KEYS = (
+    "approved_runtime_evidence",
+    "layout_only_evidence_satisfies_approved_runtime_evidence",
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "v1_complete",
+)
+NON_FIRST_EVIDENCE_SCHEMA_REASONS = {
+    "obelisk.installed-sdk-package-shape.v1": "package_shape_not_first_evidence",
+    "obelisk.player-principal-lifecycle-beta-notice-authority-boundary.v1": (
+        "beta_notice_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-beta-notice-prep.v1": "beta_notice_not_first_evidence",
+    "obelisk.player-principal-lifecycle-evidence-closure-request.v1": (
+        "runtime_window_side_lane_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-guarded-beta-notice-action.v1": (
+        "beta_notice_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-no-users-passive-wait-recommendation.v1": (
+        "no_users_passive_wait_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-evidence-status.v1": (
+        "runtime_evidence_status_report_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-execution.v1": (
+        "runtime_window_side_lane_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-plan.v1": (
+        "runtime_window_side_lane_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-post-window-state.v1": (
+        "runtime_window_side_lane_not_first_evidence"
+    ),
+    "obelisk.player-principal-lifecycle-window-request-check.v1": "window_request_not_first_evidence",
+    "obelisk.player-principal-lifecycle-window-request.v1": "window_request_not_first_evidence",
+    "obelisk.player-principal-passive-actionability.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-activity-triage.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-extended-monitor-triage.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-monitor-only-summary.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-observer-event-triage.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-snapshot-diff.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-snapshot-latest.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-snapshot.v1": "passive_snapshot_not_first_evidence",
+    "obelisk.player-principal-passive-target-triplet-candidate-summary.v1": (
+        "passive_snapshot_not_first_evidence"
+    ),
+    "obelisk.players-identity-first-evidence.v1": "first_evidence_planning_artifact_not_runtime_evidence",
+    "obelisk.players-identity-lifecycle-anchor-candidates.v1": (
+        "lifecycle_anchor_side_lane_not_first_evidence"
+    ),
+    "obelisk.players-identity-principal-invalidation-policy.v1": (
+        "principal_policy_side_lane_not_first_evidence"
+    ),
+    "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1": (
+        "runtime_shape_fixture_not_first_evidence"
+    ),
+    "obelisk.public-sdk-v1-completion-check.v1": "sdk_status_side_lane_not_first_evidence",
+    "obelisk.public-sdk-v1-completion-summary.v1": "sdk_status_side_lane_not_first_evidence",
+    "obelisk.sdk-status-report.v1": "sdk_status_side_lane_not_first_evidence",
+    "obelisk.sdk-status-side-lane-summary.v1": "sdk_status_side_lane_not_first_evidence",
+}
+
+
+def report_progress_value_is_nonzero(value: Any) -> bool:
+    if value is True:
+        return True
+    if value in (False, None):
+        return False
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, list):
+        return any(report_progress_value_is_nonzero(item) for item in value)
+    if isinstance(value, dict):
+        return any(report_progress_value_is_nonzero(item) for item in value.values())
+    if not isinstance(value, str):
+        return False
+
+    normalized = value.strip().casefold()
+    if normalized in {"", "0", "0.0", "0%", "false", "none", "no"}:
+        return False
+    if re.fullmatch(r"0+(?:\.0+)?\s*%", normalized):
+        return False
+    if re.fullmatch(r"0+(?:\.0+)?\s*/\s*[1-9]\d*(?:\.0+)?", normalized):
+        return False
+    return True
+
+
+def non_first_evidence_boundary(schema: Any) -> dict[str, Any]:
+    blocker = NON_FIRST_EVIDENCE_SCHEMA_REASONS.get(schema) if isinstance(schema, str) else None
+    return {
+        "schema": schema if isinstance(schema, str) else None,
+        "side_lane_artifact": blocker is not None,
+        "side_lane_blocker": blocker,
+        "counts_as_first_evidence": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "non_claim": (
+            "schema classification only; side-lane, passive, no-users, beta-notice, "
+            "package-shape, and planning artifacts do not count as first evidence"
+        ),
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,6 +304,15 @@ def parse_args() -> argparse.Namespace:
         "--candidate-root",
         type=Path,
         help="Optional distinct sanitized second-source snapshot root for layout comparison.",
+    )
+    parser.add_argument(
+        "--lifecycle-snapshot-candidate-root",
+        type=Path,
+        help=(
+            "Optional distinct sanitized two-target lifecycle snapshot root for the "
+            "HandleNewPlayer/OnLogout pre-runtime drift check. This is planning-only and "
+            "does not satisfy approved runtime evidence."
+        ),
     )
     parser.add_argument(
         "--lifecycle-anchor-candidates-manifest",
@@ -177,6 +390,15 @@ def parse_args() -> argparse.Namespace:
         help="Sanitized identifier-redaction evidence consumed as contract-review input only.",
     )
     parser.add_argument(
+        "--identity-public-contract-decision-record",
+        type=Path,
+        default=REPO_ROOT / public_contract_gap_report.DEFAULT_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD,
+        help=(
+            "Reviewed identity public-contract decision record consumed as post-runtime "
+            "contract-review input only."
+        ),
+    )
+    parser.add_argument(
         "--public-header",
         type=Path,
         default=REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h",
@@ -209,6 +431,131 @@ def run_json_command(args: list[str], *, check: bool = False) -> tuple[subproces
     if check and result.returncode != 0:
         raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
     return result, payload
+
+
+def lifecycle_snapshot_root_check_contract_blockers(
+    result: subprocess.CompletedProcess[str] | None,
+    payload: dict[str, Any] | None,
+) -> list[str]:
+    blockers: list[str] = []
+    if result is None:
+        blockers.append("lifecycle_snapshot_root_check_not_run")
+    elif result.returncode != 0:
+        blockers.append("lifecycle_snapshot_root_check_returncode_nonzero")
+
+    if not isinstance(payload, dict):
+        blockers.append("lifecycle_snapshot_root_check_output_missing_or_malformed")
+        return sorted(set(blockers))
+
+    if payload.get("schema") != LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA:
+        blockers.append("lifecycle_snapshot_root_check_schema_mismatch")
+
+    offline_requirement = payload.get("offline_requirement")
+    if not isinstance(offline_requirement, dict):
+        blockers.append("lifecycle_snapshot_root_check_offline_requirement_missing")
+    else:
+        if offline_requirement.get("satisfied") is not True:
+            blockers.append("lifecycle_snapshot_root_check_offline_requirement_not_satisfied")
+        if offline_requirement.get("status") != "accepted":
+            blockers.append("lifecycle_snapshot_root_check_offline_requirement_status_not_accepted")
+        if offline_requirement.get("blocker_count") not in (0, None):
+            blockers.append("lifecycle_snapshot_root_check_offline_requirement_blockers_present")
+
+    comparison_counts = payload.get("comparison_counts")
+    if not isinstance(comparison_counts, dict):
+        blockers.append("lifecycle_snapshot_root_check_comparison_counts_missing")
+    else:
+        if comparison_counts.get("accepted") != LIFECYCLE_SNAPSHOT_ROOT_REQUIRED_TARGET_COUNT:
+            blockers.append("lifecycle_snapshot_root_check_accepted_count_mismatch")
+        if comparison_counts.get("rejected") != 0:
+            blockers.append("lifecycle_snapshot_root_check_rejected_count_nonzero")
+        if comparison_counts.get("inconclusive") != 0:
+            blockers.append("lifecycle_snapshot_root_check_inconclusive_count_nonzero")
+
+    candidate_scope = payload.get("candidate_snapshot_scope")
+    if not isinstance(candidate_scope, dict):
+        blockers.append("lifecycle_snapshot_root_check_candidate_scope_missing")
+    else:
+        if candidate_scope.get("exact_required_targets") is not True:
+            blockers.append("lifecycle_snapshot_root_check_candidate_scope_not_exact")
+        if candidate_scope.get("extra_targets") not in ([], None):
+            blockers.append("lifecycle_snapshot_root_check_candidate_extra_targets_present")
+        if candidate_scope.get("missing_targets") not in ([], None):
+            blockers.append("lifecycle_snapshot_root_check_candidate_missing_targets_present")
+
+    for key in LIFECYCLE_SNAPSHOT_ROOT_FORBIDDEN_TRUE_KEYS:
+        if key in payload and payload.get(key) is not False:
+            blockers.append(f"lifecycle_snapshot_root_check_{key}_not_false")
+
+    if "readiness_effect" in payload and payload.get("readiness_effect") != "none":
+        blockers.append("lifecycle_snapshot_root_check_readiness_effect_not_none")
+    if (
+        "approved_runtime_evidence_blocker" in payload
+        and payload.get("approved_runtime_evidence_blocker") != "approved_runtime_evidence_missing"
+    ):
+        blockers.append("lifecycle_snapshot_root_check_runtime_blocker_mismatch")
+
+    promotion_gate = payload.get("promotion_gate")
+    if isinstance(promotion_gate, dict):
+        for key in ("ready", "promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if promotion_gate.get(key) is not False:
+                blockers.append(f"lifecycle_snapshot_root_check_promotion_gate_{key}_not_false")
+        if promotion_gate.get("ready_scope") not in (None, "planning_only"):
+            blockers.append("lifecycle_snapshot_root_check_promotion_gate_ready_scope_mismatch")
+
+    return sorted(set(blockers))
+
+
+def lifecycle_snapshot_root_check_summary(
+    result: subprocess.CompletedProcess[str] | None,
+    payload: dict[str, Any] | None,
+    candidate_root: Path | None,
+) -> dict[str, Any]:
+    if candidate_root is None:
+        return {
+            "provided": False,
+            "ready": False,
+            "status": "not_provided",
+            "approved_runtime_evidence": False,
+            "runtime_ready": False,
+            "public_sdk_ready": False,
+            "summary_blockers": [],
+        }
+    offline_requirement = payload.get("offline_requirement") if isinstance(payload, dict) else None
+    summary_blockers = lifecycle_snapshot_root_check_contract_blockers(result, payload)
+    offline_satisfied = not summary_blockers
+    comparison_counts = payload.get("comparison_counts") if isinstance(payload, dict) else None
+    candidate_scope = payload.get("candidate_snapshot_scope") if isinstance(payload, dict) else None
+    return {
+        "provided": True,
+        "candidate_root": str(candidate_root),
+        "returncode": result.returncode if result is not None else None,
+        "source_schema": payload.get("schema") if isinstance(payload, dict) else None,
+        "ready": offline_satisfied,
+        "status": "satisfied_planning_only" if offline_satisfied else "blocked",
+        "comparison_counts": comparison_counts if isinstance(comparison_counts, dict) else {},
+        "candidate_snapshot_scope": candidate_scope if isinstance(candidate_scope, dict) else {},
+        "summary_blockers": summary_blockers,
+        "blocker_count": (
+            offline_requirement.get("blocker_count")
+            if isinstance(offline_requirement, dict)
+            else None
+        ),
+        "blocker_reason_counts": (
+            offline_requirement.get("blocker_reason_counts")
+            if isinstance(offline_requirement, dict)
+            else {}
+        ),
+        "next_blocker": "approved_runtime_evidence_missing",
+        "approved_runtime_evidence": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "v1_complete": False,
+        "non_claims": [
+            "lifecycle snapshot root check is planning-layout evidence only",
+            "it does not satisfy approved runtime evidence, runtime readiness, public identity, public SDK readiness, or v1 completion",
+        ],
+    }
 
 
 def parse_missing_required_targets(stderr: str) -> list[str]:
@@ -278,9 +625,21 @@ def rejected_artifact_root_inventory_payload(root: Path, detail: str) -> dict[st
     }
 
 
+def unavailable_artifact_root_inventory_payload(root: Path, detail: str) -> dict[str, Any]:
+    return {
+        "ready": False,
+        "accepted_pack": None,
+        "manifests_scanned": 0,
+        "candidate_packs": [],
+        "reasons": [{"reason": "artifact_root_unavailable", "path": str(root), "detail": detail}],
+    }
+
+
 def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, Any]:
     try:
         resolved = reject_player_identity_artifact_root(root, "--artifact-root")
+        root_exists = resolved.exists()
+        root_is_directory = resolved.is_dir() if root_exists else False
     except SystemExit as exc:
         return {
             "status": "artifact_root_rejected",
@@ -291,7 +650,17 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
             "core_like_candidates": [],
             "ready_to_build_core_evidence_pack": False,
         }
-    if not resolved.exists():
+    except OSError as exc:
+        return {
+            "status": "artifact_root_unavailable",
+            "artifact_root_only": True,
+            "error": str(exc),
+            "server_root_excluded": "/servidor/ark",
+            "shooter_game_server_candidates": [],
+            "core_like_candidates": [],
+            "ready_to_build_core_evidence_pack": False,
+        }
+    if not root_exists:
         return {
             "status": "artifact_root_missing",
             "artifact_root_only": True,
@@ -301,7 +670,7 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
             "core_like_candidates": [],
             "ready_to_build_core_evidence_pack": False,
         }
-    if not resolved.is_dir():
+    if not root_is_directory:
         return {
             "status": "artifact_root_not_directory",
             "artifact_root_only": True,
@@ -508,7 +877,9 @@ def artifact_root_diagnosis(inventory_payload: dict[str, Any] | None) -> dict[st
         )
 
     accepted_pack = inventory_payload.get("accepted_pack")
-    if isinstance(accepted_pack, dict):
+    if "artifact_root_unavailable" in reason_counts:
+        status = "artifact_root_unavailable"
+    elif isinstance(accepted_pack, dict):
         status = "accepted_reflection_inventory_pack"
     elif not inventory_payload.get("manifests_scanned"):
         status = "no_manifest_files_found"
@@ -557,6 +928,16 @@ def scan_reflection_inventory_root(root: Path) -> tuple[subprocess.CompletedProc
                 str(exc),
             ),
             rejected_artifact_root_inventory_payload(root, str(exc)),
+            str(exc),
+        )
+    except OSError as exc:
+        # Inaccessible historical/operator artifacts are unavailable evidence,
+        # not a reason to escalate permissions or abort the SDK status report.
+        return (
+            subprocess.CompletedProcess(
+                ["check_reflection_inventory_pack_readiness.py", "--root", str(root)], 1, "", str(exc)
+            ),
+            unavailable_artifact_root_inventory_payload(root, str(exc)),
             str(exc),
         )
     result, payload = run_json_command(
@@ -837,7 +1218,9 @@ def reflection_inventory_chain_diagnosis(inventory_payload: dict[str, Any] | Non
         blockers.append("accepted_reflection_inventory_direct_core_mode_not_allowed")
 
     target_sets = string_list(inputs.get("target_sets"))
-    if target_sets and target_sets != [PLAYER_IDENTITY_TARGET_SET]:
+    if not target_sets:
+        blockers.append("accepted_reflection_inventory_input_target_set_missing")
+    elif target_sets != [PLAYER_IDENTITY_TARGET_SET]:
         blockers.append("accepted_reflection_inventory_input_target_set_mismatch")
 
     coverage = accepted_pack.get("target_set_coverage")
@@ -871,10 +1254,21 @@ def reflection_inventory_chain_diagnosis(inventory_payload: dict[str, Any] | Non
         if coverage_entry.get("complete") is False:
             blockers.append("accepted_reflection_inventory_target_set_coverage_incomplete")
 
-    if len(expected_targets) != PLAYER_IDENTITY_TARGET_COUNT:
+    expected_target_set = set(EXPECTED_PLAYER_IDENTITY_TARGETS)
+    if (
+        len(expected_targets) != PLAYER_IDENTITY_TARGET_COUNT
+        or len(set(expected_targets)) != PLAYER_IDENTITY_TARGET_COUNT
+    ):
         blockers.append("accepted_reflection_inventory_not_full_player_identity_target_set")
-    if len(set(covered_targets)) != PLAYER_IDENTITY_TARGET_COUNT:
+    if (
+        len(covered_targets) != PLAYER_IDENTITY_TARGET_COUNT
+        or len(set(covered_targets)) != PLAYER_IDENTITY_TARGET_COUNT
+    ):
         blockers.append("accepted_reflection_inventory_covered_targets_incomplete")
+    if set(expected_targets) != expected_target_set:
+        blockers.append("accepted_reflection_inventory_expected_targets_mismatch")
+    if set(covered_targets) != expected_target_set:
+        blockers.append("accepted_reflection_inventory_covered_targets_mismatch")
     for target in REQUIRED_ADMIN_TARGETS:
         if target not in covered_targets:
             blockers.append(f"accepted_reflection_inventory_missing_required_target:{target}")
@@ -1333,8 +1727,10 @@ def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -
         "public_abi_ready": False,
         "v1_completion_ready": False,
         "runtime_ready": False,
+        "counts_as_first_evidence": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
+        "first_evidence_boundary": non_first_evidence_boundary(None),
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
         "non_claims": [
@@ -1350,6 +1746,7 @@ def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -
     validation = runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode="consume")
     report = runtime_principal_lifecycle_evidence.build_report(payload, validation, check_mode="consume")
     blockers = [blocker["reason"] for blocker in validation.blockers]
+    first_evidence_boundary = non_first_evidence_boundary(payload.get("schema"))
     return {
         **base,
         "ready": not blockers,
@@ -1361,7 +1758,35 @@ def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "counts_as_first_evidence": False,
+        "first_evidence_boundary": first_evidence_boundary,
     }
+
+
+def approved_runtime_lifecycle_module(payload: dict[str, Any]) -> dict[str, Any]:
+    source_summary = payload.get("source_summary")
+    if not isinstance(source_summary, dict):
+        return {}
+    modules = source_summary.get("modules")
+    if not isinstance(modules, dict):
+        return {}
+    module = modules.get("player_principal_lifecycle")
+    return module if isinstance(module, dict) else {}
+
+
+def approved_runtime_complete_lifecycle_triplet_candidate_present(payload: dict[str, Any]) -> bool:
+    return approved_runtime_lifecycle_module(payload).get(
+        "complete_lifecycle_event_triplet_candidate_present"
+    ) is True
+
+
+def approved_runtime_report_observed_cases_complete(report: dict[str, Any]) -> bool:
+    observed_cases = report.get("observed_runtime_cases")
+    if not isinstance(observed_cases, list):
+        return False
+    return set(APPROVED_RUNTIME_REQUIRED_OBSERVED_CASES).issubset(
+        {case for case in observed_cases if isinstance(case, str)}
+    )
 
 
 def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
@@ -1374,6 +1799,10 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "ready_scope": None,
         "next_blocker": "approved_runtime_evidence_missing",
         "ready": False,
+        "source_checker_approved": False,
+        "required_observed_runtime_cases": list(APPROVED_RUNTIME_REQUIRED_OBSERVED_CASES),
+        "complete_lifecycle_event_triplet_candidate_present": False,
+        "complete_lifecycle_event_triplet_observed_by_checker_report": False,
         "approved_runtime_evidence_present": False,
         "runtime_evidence_ready": False,
         "promotion_ready": False,
@@ -1384,6 +1813,7 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "runtime_ready": False,
         "counts_toward_complete_sdk": False,
         "counts_toward_complete_sdk_claim": False,
+        "counts_as_first_evidence": False,
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_sdk": False,
@@ -1391,6 +1821,7 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
+        "first_evidence_boundary": non_first_evidence_boundary(None),
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
         "non_claims": [
@@ -1406,6 +1837,11 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode="consume")
     report = approved_runtime_principal_lifecycle_evidence.build_report(payload, validation, check_mode="consume")
     blockers = [blocker["reason"] for blocker in validation.blockers]
+    first_evidence_boundary = non_first_evidence_boundary(payload.get("schema"))
+    if first_evidence_boundary["side_lane_blocker"] is not None:
+        blockers.append(first_evidence_boundary["side_lane_blocker"])
+    complete_lifecycle_triplet = approved_runtime_complete_lifecycle_triplet_candidate_present(payload)
+    complete_lifecycle_report_cases = approved_runtime_report_observed_cases_complete(report)
     if not validation.blockers:
         if report.get("schema") != approved_runtime_principal_lifecycle_evidence.REPORT_SCHEMA:
             blockers.append("approved_runtime_report_schema_mismatch")
@@ -1423,23 +1859,16 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
             blockers.append("approved_runtime_report_remaining_blockers_not_empty")
         if report.get("blockers") != []:
             blockers.append("approved_runtime_report_blockers_not_empty")
-        for key in (
-            "counts_toward_complete_sdk",
-            "counts_toward_complete_sdk_claim",
-            "counts_toward_public_sdk",
-            "counts_toward_runtime",
-            "counts_toward_sdk",
-            "counts_toward_v1_completion",
-            "promotion_ready",
-            "public_or_runtime_accounting_allowed",
-            "public_header_allowed",
-            "public_sdk_ready",
-            "public_abi_ready",
-            "v1_completion_ready",
-            "runtime_ready",
-        ):
+        if not complete_lifecycle_triplet:
+            blockers.append("approved_runtime_manifest_complete_lifecycle_event_triplet_candidate_missing")
+        if not complete_lifecycle_report_cases:
+            blockers.append("approved_runtime_report_complete_lifecycle_event_triplet_cases_incomplete")
+        for key in APPROVED_RUNTIME_FORBIDDEN_REPORT_TRUE_KEYS:
             if report.get(key, False) is not False:
                 blockers.append(f"approved_runtime_report_{key}_not_false")
+        for key in APPROVED_RUNTIME_FORBIDDEN_REPORT_NONZERO_KEYS:
+            if report_progress_value_is_nonzero(report.get(key)):
+                blockers.append(f"approved_runtime_report_{key}_not_zero")
         for key in ("public_capability_bits_now", "public_callback_abi_now"):
             if report.get(key, []) != []:
                 blockers.append(f"approved_runtime_report_{key}_not_empty")
@@ -1454,6 +1883,10 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "ready_scope": report.get("ready_scope"),
         "next_blocker": report.get("next_blocker") if ready else "approved_runtime_evidence_missing",
         "ready": ready,
+        "source_checker_approved": ready,
+        "required_observed_runtime_cases": list(APPROVED_RUNTIME_REQUIRED_OBSERVED_CASES),
+        "complete_lifecycle_event_triplet_candidate_present": complete_lifecycle_triplet,
+        "complete_lifecycle_event_triplet_observed_by_checker_report": complete_lifecycle_report_cases,
         "approved_runtime_evidence_present": ready,
         "runtime_evidence_ready": ready,
         "promotion_ready": False,
@@ -1464,6 +1897,7 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "runtime_ready": False,
         "counts_toward_complete_sdk": False,
         "counts_toward_complete_sdk_claim": False,
+        "counts_as_first_evidence": False,
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_sdk": False,
@@ -1471,6 +1905,7 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
+        "first_evidence_boundary": first_evidence_boundary,
         "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],
         "blockers": blockers,
         "observed_runtime_cases": report["observed_runtime_cases"],
@@ -1493,9 +1928,13 @@ def player_principal_lifecycle_window_request_diagnosis(
         "operator_current_turn_runtime_window_approval_required": False,
         "approved_runtime_evidence_present": False,
         "runtime_evidence_ready": False,
+        "counts_as_first_evidence": False,
+        "no_users_policy_counts_as_evidence": False,
+        "passive_wait_counts_as_evidence": False,
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "first_evidence_boundary": non_first_evidence_boundary(None),
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
         "next_required_runtime_artifacts": [],
@@ -1546,12 +1985,19 @@ def player_principal_lifecycle_window_request_diagnosis(
     )
     blockers = [blocker["reason"] for blocker in validation.blockers]
     ready = not blockers and report.get("request_pack_ready") is True and operator_request_verified
+    user_policy = payload.get("user_policy") if isinstance(payload.get("user_policy"), str) else None
     return {
         **base,
         "ready": ready,
         "request_pack_ready": ready,
         "bundle_inputs_ready": False,
         "operator_current_turn_runtime_window_approval_required": ready,
+        "user_policy": user_policy,
+        "no_users_policy_only": user_policy == "no_regular_users",
+        "counts_as_first_evidence": False,
+        "no_users_policy_counts_as_evidence": False,
+        "passive_wait_counts_as_evidence": False,
+        "first_evidence_boundary": non_first_evidence_boundary(payload.get("schema")),
         "blockers": blockers,
         "operator_request_path": str(operator_request_path),
         "operator_request_verified": operator_request_verified,
@@ -1601,12 +2047,50 @@ def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
             },
             {
                 "case": "session_start_rejected_anchor",
-                "target": "ShooterGameMode.HandleNewPlayer",
+                "target": STRICT_REJECTED_START_TARGET,
                 "required_signal": "copied_principal_lifecycle_state_not_created_for_rejected_start",
                 "required_role": "session_start_rejected",
-                "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
-                "required_copied_bool_values": ["0", "1"],
-                "required_copied_fields": ["bIsFromLogin", "ReturnValue"],
+                "required_copied_bool_fields": list(STRICT_REJECTED_START_COPIED_BOOL_FIELDS),
+                "required_copied_bool_values": list(STRICT_REJECTED_START_COPIED_BOOL_VALUES),
+                "required_copied_fields": list(STRICT_REJECTED_START_COPIED_BOOL_FIELDS),
+                "required_redacted_fields": ["NewPlayer"],
+                "strict_shape": STRICT_REJECTED_START_SHAPE,
+                "accepted_alternatives": [
+                    {
+                        "target": STRICT_REJECTED_START_TARGET,
+                        "copied_bool_fields": list(STRICT_REJECTED_START_COPIED_BOOL_FIELDS),
+                        "copied_bool_values": list(STRICT_REJECTED_START_COPIED_BOOL_VALUES),
+                    },
+                ],
+                "superseded_non_evidence_alternatives": [
+                    {
+                        "target": "ShooterGameMode.HandleNewPlayer",
+                        "copied_bool_fields": list(STRICT_REJECTED_START_COPIED_BOOL_FIELDS),
+                        "copied_bool_values": list(values),
+                        "status": "superseded_non_evidence",
+                        "reason": (
+                            "historical HandleNewPlayer rejected-start tuple is ambiguous "
+                            "and no longer satisfies approved runtime evidence"
+                        ),
+                    }
+                    for values in SUPERSEDED_HANDLE_NEW_PLAYER_REJECTED_START_VALUES
+                ],
+                "non_evidence_sources": [
+                    "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+                    "passive snapshots",
+                    "diagnostic-only lines",
+                ],
+                "diagnostic_candidate_boundary": {
+                    "diagnostic_shape": "CheckJoinInProgress",
+                    "diagnostic_exact_shape": STRICT_REJECTED_START_SHAPE,
+                    "diagnostic_lines_can_satisfy": False,
+                    "required_observer_event": True,
+                    "reason": (
+                        "diagnostic CheckJoinInProgress candidates may identify the "
+                        "right tuple, but approved runtime evidence requires the exact "
+                        "observer event with role=session_start_rejected"
+                    ),
+                },
                 "required_order": 2,
             },
             {
@@ -1650,6 +2134,27 @@ def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
             "copied opaque principal state only",
             "no Steam/EOS ids, player names, IP-like values, tribe ids, raw UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
         ],
+        "diagnostic_candidate_guardrails": [
+            {
+                "code": "diagnostic_check_join_in_progress_non_evidence",
+                "strict_shape": STRICT_REJECTED_START_SHAPE,
+                "can_satisfy_session_start_rejected_anchor": False,
+                "required_runtime_observer_event": {
+                    "role": "session_start_rejected",
+                    "target": STRICT_REJECTED_START_TARGET,
+                    "copied_bool_fields": list(STRICT_REJECTED_START_COPIED_BOOL_FIELDS),
+                    "copied_bool_values": list(STRICT_REJECTED_START_COPIED_BOOL_VALUES),
+                },
+            },
+            {
+                "code": "diagnostic_rejected_drift_non_evidence",
+                "can_satisfy_approved_runtime_evidence": False,
+                "required_next_step": (
+                    "compare distinct sanitized lifecycle snapshot roots before another "
+                    "approved runtime-evidence attempt"
+                ),
+            },
+        ],
         "approval_boundary": {
             "approved_runtime_evidence_present": False,
             "runtime_work_authorized_by_this_report": False,
@@ -1683,6 +2188,7 @@ def player_identity_public_contract_gap_diagnosis(
     surfaces: Path,
     private_candidate_contract: Path,
     identifier_redaction_evidence: Path,
+    identity_public_contract_decision_record: Path,
     principal_invalidation_policy_manifest: Path | None,
     approved_runtime_evidence_manifest: Path | None,
     public_header: Path,
@@ -1738,6 +2244,10 @@ def player_identity_public_contract_gap_diagnosis(
         report_blockers,
         public_abi_preflight_report,
     )
+    identity_contract_decision_report = public_contract_gap_report.validate_identity_public_contract_decision_record(
+        identity_public_contract_decision_record,
+        report_blockers,
+    )
     planning_source_verification = public_contract_gap_report.validate_planning_source_verification(
         public_contract_gap_report.planning_source_manifests.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
         public_contract_gap_report.DEFAULT_PLANNING_SOURCES_DIR,
@@ -1757,6 +2267,7 @@ def player_identity_public_contract_gap_diagnosis(
         private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_abi_preflight_candidate=public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         owner_token_sdk_consumer_contract=public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
+        identity_public_contract_decision_record=identity_public_contract_decision_record,
         approved_runtime_evidence=approved_runtime_evidence_manifest,
         public_header=public_header,
     )
@@ -1774,6 +2285,7 @@ def player_identity_public_contract_gap_diagnosis(
         private_pod_layout_report,
         public_abi_preflight_report,
         owner_token_sdk_consumer_report,
+        identity_contract_decision_report,
     )
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:
@@ -1815,10 +2327,15 @@ def player_identity_public_contract_gap_diagnosis(
         "identifier_redaction_evidence": report.get("identifier_redaction_evidence", {}),
         "principal_invalidation_policy": report.get("principal_invalidation_policy", {}),
         "approved_runtime_evidence": report.get("approved_runtime_evidence", {}),
+        "identity_public_contract_decision_record": report.get(
+            "identity_public_contract_decision_record",
+            {},
+        ),
         "source_bound_planning_manifest_verification": report.get(
             "source_bound_planning_manifest_verification",
             {},
         ),
+        "inputs": report.get("inputs", {}),
         "runtime_evidence_missing": report.get("runtime_evidence_missing"),
         "accepted_for_contract_review": False,
         "promotion_ready": False,
@@ -1870,7 +2387,13 @@ def next_actionable_blocker(
     core_manifest_pattern: Path,
     reflection_inventory_pattern: Path,
     next_operator_recipe: dict[str, Any],
+    lifecycle_snapshot_root_check: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    lifecycle_snapshot_root_check = lifecycle_snapshot_root_check or lifecycle_snapshot_root_check_summary(
+        None,
+        None,
+        None,
+    )
     base: dict[str, Any] = {
         "promotion_ready": False,
         "public_sdk_ready": False,
@@ -2012,7 +2535,10 @@ def next_actionable_blocker(
             "blocked_until": "reviewed_fail_closed_principal_invalidation_policy",
             "why": "lifecycle anchor layout evidence is present, but public identity still lacks reviewed principal invalidation semantics",
         }
-    if "identity_public_contract_gap_report_invalid" in downstream_blockers:
+    if (
+        "identity_public_contract_gap_report_invalid" in downstream_blockers
+        and "approved_runtime_evidence_missing" not in downstream_blockers
+    ):
         return {
             **base,
             "code": "identity_public_contract_gap_report_invalid",
@@ -2020,12 +2546,46 @@ def next_actionable_blocker(
             "why": "the offline public-contract gap guardrail must keep player identity blocked, private, and non-promotional before runtime evidence can route to contract review",
         }
     if "approved_runtime_evidence_missing" in downstream_blockers:
+        lifecycle_check_ready = lifecycle_snapshot_root_check.get("ready") is True
+        lifecycle_check_status = (
+            "satisfied_planning_only"
+            if lifecycle_check_ready
+            else lifecycle_snapshot_root_check.get("status", "not_provided")
+        )
         return {
             **base,
             "code": "approved_runtime_evidence_missing",
             "blocked_until": "approved_runtime_principal_lifecycle_evidence",
             "why": "principal invalidation policy is consumable for planning, but public identity still lacks approved runtime evidence",
             "next_required_evidence": runtime_principal_lifecycle_evidence_requirements(),
+            "pre_runtime_offline_requirement": {
+                "code": "distinct_lifecycle_snapshot_root_check_required",
+                "status": lifecycle_check_status,
+                "satisfied": lifecycle_check_ready,
+                "why": (
+                    "current passive diagnostics show FName drift on the accepted lifecycle "
+                    "anchors; before another runtime window, compare a distinct sanitized "
+                    "lifecycle snapshot root for HandleNewPlayer and OnLogout"
+                ),
+                "provided_candidate_root": lifecycle_snapshot_root_check.get("candidate_root"),
+                "comparison_counts": lifecycle_snapshot_root_check.get("comparison_counts", {}),
+                "candidate_snapshot_scope": lifecycle_snapshot_root_check.get("candidate_snapshot_scope", {}),
+                "next_blocker_after_satisfied": "approved_runtime_evidence_missing",
+                "required_targets": [
+                    "ShooterGameMode.HandleNewPlayer",
+                    "ShooterGameMode.OnLogout",
+                ],
+                "required_command": (
+                    "PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py "
+                    "--base-root tests/fixtures/ufunction_snapshots "
+                    "--candidate-root <distinct-sanitized-lifecycle-root> "
+                    "--lifecycle-snapshot-root-check --json"
+                ),
+                "non_claims": [
+                    "offline lifecycle snapshot comparison is planning-layout evidence only",
+                    "it does not authorize runtime work, marker/env changes, restarts, public identity, or SDK readiness",
+                ],
+            },
         }
     if "identity_public_contract_gate_missing" in downstream_blockers:
         return {
@@ -2096,6 +2656,7 @@ def build_operator_next_commands(
         if offline_status in (
             "offline_binary_and_core_like_inputs_missing",
             "artifact_root_rejected",
+            "artifact_root_unavailable",
             "artifact_root_missing",
             "artifact_root_not_directory",
         ):
@@ -2412,9 +2973,59 @@ def build_progress_signal(
     }
 
 
+def build_first_evidence_boundary(
+    *,
+    layout_accepted: bool,
+    lifecycle_ready: bool,
+    principal_invalidation_ready: bool,
+    approved_runtime_evidence_ready: bool,
+    window_request_diagnosis: dict[str, Any],
+    runtime_evidence_manifest_diagnosis: dict[str, Any],
+    approved_runtime_evidence_manifest_diagnosis: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "counts_as_first_evidence": False,
+        "accepted_planning_authorizes_runtime": False,
+        "accepted_planning_counts_toward_p0_dependency_chain": False,
+        "accepted_planning_counts_toward_public_sdk": False,
+        "accepted_planning_counts_toward_v1_completion": False,
+        "no_users_policy_counts_as_evidence": False,
+        "passive_snapshots_count_as_evidence": False,
+        "beta_notices_count_as_evidence": False,
+        "package_shape_counts_as_evidence": False,
+        "side_lanes_count_as_evidence": False,
+        "approved_runtime_evidence_missing": not approved_runtime_evidence_ready,
+        "post_runtime_fast_path_inputs": {
+            "layout_accepted_for_planning": layout_accepted,
+            "lifecycle_anchor_planning_ready": lifecycle_ready,
+            "principal_invalidation_policy_ready": principal_invalidation_ready,
+        },
+        "observed_non_counting_inputs": {
+            "window_request_pack_ready": window_request_diagnosis.get("request_pack_ready") is True,
+            "window_request_user_policy": window_request_diagnosis.get("user_policy"),
+            "window_request_no_users_policy_only": window_request_diagnosis.get("no_users_policy_only") is True,
+            "runtime_shape_fixture_ready": runtime_evidence_manifest_diagnosis.get("ready") is True,
+            "runtime_shape_fixture_counts_as_first_evidence": False,
+            "approved_runtime_manifest_counts_as_first_evidence": False,
+            "approved_runtime_manifest_side_lane_blocker": approved_runtime_evidence_manifest_diagnosis.get(
+                "first_evidence_boundary",
+                {},
+            ).get("side_lane_blocker"),
+        },
+        "required_authorizing_input": "approved_runtime_principal_lifecycle_evidence",
+        "next_public_gate_after_runtime": "identity_public_contract_gate_missing",
+        "non_claims": [
+            "accepted planning is useful routing for the post-runtime path only",
+            "no-users policy, passive snapshots, beta notices, package-shape reports, and side-lane reports are non-counting first-evidence inputs",
+            "this preflight does not authorize server operations, runtime capture, public SDK readiness, P0 dependency-chain credit, or v1 completion",
+        ],
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     input_fallbacks = approved_workspace_input_fallbacks(args)
     effective_candidate_root = input_fallbacks["candidate_root"]
+    lifecycle_snapshot_candidate_root = getattr(args, "lifecycle_snapshot_candidate_root", None)
     effective_lifecycle_anchor_candidates_manifest = input_fallbacks["lifecycle_anchor_candidates_manifest"]
     effective_principal_invalidation_policy_manifest = input_fallbacks["principal_invalidation_policy_manifest"]
     requested_artifact_root = args.artifact_root
@@ -2470,6 +3081,25 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     if effective_candidate_root:
         coverage_command.extend(["--candidate-root", str(effective_candidate_root)])
     coverage_result, coverage_payload = run_json_command(coverage_command)
+    lifecycle_snapshot_result: subprocess.CompletedProcess[str] | None = None
+    lifecycle_snapshot_payload: dict[str, Any] | None = None
+    if lifecycle_snapshot_candidate_root is not None:
+        lifecycle_snapshot_result, lifecycle_snapshot_payload = run_json_command(
+            [
+                str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
+                "--base-root",
+                str(args.snapshot_root),
+                "--candidate-root",
+                str(lifecycle_snapshot_candidate_root),
+                "--lifecycle-snapshot-root-check",
+                "--json",
+            ]
+        )
+    lifecycle_snapshot_check = lifecycle_snapshot_root_check_summary(
+        lifecycle_snapshot_result,
+        lifecycle_snapshot_payload,
+        lifecycle_snapshot_candidate_root,
+    )
     first_evidence_result, first_evidence_payload = run_json_command(
         [
             str(SCRIPT_DIR / "build_redacted_ufunction_signatures.py"),
@@ -2553,6 +3183,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             args,
             "player_identity_identifier_redaction_evidence",
             REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
+        ),
+        identity_public_contract_decision_record=getattr(
+            args,
+            "identity_public_contract_decision_record",
+            REPO_ROOT / public_contract_gap_report.DEFAULT_IDENTITY_PUBLIC_CONTRACT_DECISION_RECORD,
         ),
         principal_invalidation_policy_manifest=effective_principal_invalidation_policy_manifest,
         approved_runtime_evidence_manifest=approved_runtime_evidence_for_contract_gap,
@@ -2733,6 +3368,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         core_manifest_pattern=core_manifest_pattern,
         reflection_inventory_pattern=reflection_inventory_pattern,
         next_operator_recipe=next_operator_recipe,
+        lifecycle_snapshot_root_check=lifecycle_snapshot_check,
     )
     operator_next_commands = build_operator_next_commands(
         inventory_ready=inventory_ready,
@@ -2762,13 +3398,28 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         operator_next_commands=operator_next_commands,
         layout_lifecycle_state=layout_lifecycle_state,
     )
+    first_evidence_boundary = build_first_evidence_boundary(
+        layout_accepted=layout_accepted,
+        lifecycle_ready=lifecycle_ready,
+        principal_invalidation_ready=principal_invalidation_ready,
+        approved_runtime_evidence_ready=approved_runtime_evidence_ready,
+        window_request_diagnosis=window_request_diagnosis,
+        runtime_evidence_manifest_diagnosis=runtime_evidence_manifest_diagnosis,
+        approved_runtime_evidence_manifest_diagnosis=approved_runtime_evidence_manifest_diagnosis,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
         "status": status,
         "ready": ready,
         "accepted_for_internal_planning": ready,
+        "first_evidence_boundary": first_evidence_boundary,
         "not_artifact_gate": True,
+        "counts_as_first_evidence": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
         "promotion_ready": False,
         "artifact_root": str(requested_artifact_root),
         "effective_artifact_root": str(effective_artifact_root),
@@ -2779,6 +3430,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         },
         "snapshot_root": str(args.snapshot_root),
         "candidate_root": str(effective_candidate_root) if effective_candidate_root else None,
+        "lifecycle_snapshot_candidate_root": (
+            str(lifecycle_snapshot_candidate_root) if lifecycle_snapshot_candidate_root else None
+        ),
+        "lifecycle_snapshot_root_check": lifecycle_snapshot_check,
         "lifecycle_anchor_candidates_manifest": (
             str(effective_lifecycle_anchor_candidates_manifest)
             if effective_lifecycle_anchor_candidates_manifest

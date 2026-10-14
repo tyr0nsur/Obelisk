@@ -4,16 +4,23 @@
 from __future__ import annotations
 
 import json
+import sys
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = REPO_ROOT / "scripts"
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import check_player_identity_public_contract_readiness as public_contract_readiness  # noqa: E402
+
 DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
-REQUIRED_IDS = {
+REQUIRED_PRE_HEADER_ID_ORDER = [
     "evidence.complete_non_protected_pack",
     "evidence.accepted_session_start_anchor",
     "evidence.accepted_session_end_anchor",
@@ -29,7 +36,15 @@ REQUIRED_IDS = {
     "abi.owner_token_registration",
     "abi.append_only_layout_tests",
     "separation.no_commands_permissions_persistence",
-}
+]
+REQUIRED_POST_RUNTIME_REVIEW_KEYS = [
+    "identity_public_contract.reviewed_copied_opaque_principal_pod_abi",
+    "identity_public_contract.reviewed_owner_token_lifecycle",
+    "identity_public_contract.reviewed_process_local_non_persistent_handles",
+    "identity_public_contract.reviewed_no_lookup_persistence_permissions_commands_mutation_return_override",
+]
+REQUIRED_POST_RUNTIME_DECISION_ORDER = REQUIRED_PRE_HEADER_ID_ORDER + REQUIRED_POST_RUNTIME_REVIEW_KEYS
+REQUIRED_IDS = set(REQUIRED_PRE_HEADER_ID_ORDER)
 
 FORBIDDEN_HEADER_TOKENS = {
     "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
@@ -163,6 +178,45 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         payload = self.load_decisions()
         aliases = payload["alias_guardrails"]
 
+        required_aliases = {
+            "publicApiReady",
+            "publicAbiReady",
+            "publicHeaderAllowed",
+            "publicHeaderReadiness",
+            "publicContractReady",
+            "publicReadiness",
+            "publicSdkReady",
+            "sdkConsumerReady",
+            "runtimeReady",
+            "runtimeReadiness",
+            "lookupAllowed",
+            "playerLookupReady",
+            "permissionsAdminUnlocked",
+            "commandResponseUnlocked",
+            "commandsRepliesUnlocked",
+            "promotionReady",
+            "stableClaimAllowed",
+            "v1CompletionReady",
+            "v1CompletionEvidence",
+            "publicSdkV1CompletionReady",
+            "publicCallbackAbiReady",
+            "acceptedForHeaderGateReview",
+            "acceptedForPublicHeaderGateReview",
+            "publicHeaderGateReady",
+            "publicHeaderGateUnlocked",
+            "publicApiGateReady",
+            "publicApiGateUnlocked",
+            "publicAbiGateReady",
+            "publicAbiGateUnlocked",
+            "resourceHandleReady",
+            "resourceHandleSupported",
+            "resourceHandleAllowed",
+            "completeSdkReady",
+            "completeSdkCountingAllowed",
+            "p0ProgressReady",
+            "sdkP0ProgressReady",
+        }
+        self.assertTrue(required_aliases.issubset(set(aliases)))
         for key in (
             "contractReviewed",
             "identityContractReady",
@@ -172,11 +226,26 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             "identityHeaderAllowed",
             "identityHeaderReady",
             "principalLookupReady",
+            "identityLookupReady",
+            "publicLookupReady",
+            "runtimePrincipalReady",
             "realIdentityReady",
             "redactionEvidencePromotesIdentity",
+            "permissionsAdminReady",
+            "permissionsAdminPublicReady",
+            "commandResponseReady",
+            "commandChatResponseReady",
+            "commandsRepliesReady",
+            "chatRepliesReady",
+            "sendChatReady",
         ):
             with self.subTest(key=key):
                 self.assertFalse(aliases[key])
+        for key, value in aliases.items():
+            if key == "non_claim":
+                continue
+            with self.subTest(key=key):
+                self.assertFalse(value)
         self.assertIn("false-only", aliases["non_claim"])
 
     def test_proposed_public_pod_abi_candidate_is_candidate_only(self) -> None:
@@ -310,13 +379,154 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             },
         )
 
-    def test_surface_manifest_still_has_no_public_identity_contract(self) -> None:
+    def test_surface_manifest_dependency_chain_rows_stay_non_promoted(self) -> None:
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
         by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
-        identity = by_id["obelisk.player_identity.v1"]
-        self.assertEqual(identity["status"], "planning")
-        self.assertEqual(identity["public_contract"], [])
-        self.assertIn("obelisk.player_identity.v1", surfaces["v1_sdk_completion_blockers"])
+
+        dependency_chain = [
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        ]
+        self.assertEqual(surfaces["v1_required_dependency_chain"], dependency_chain)
+        self.assertEqual(surfaces["v1_dependency_sequence"], dependency_chain)
+
+        expected = {
+            "obelisk.player_identity.v1": {
+                "depends_on": [],
+                "position": 1,
+                "terms": {
+                    "approved_runtime_principal_lifecycle_evidence",
+                    "runtime_observer_log_source_hash",
+                    "output_artifact_identity.artifact_sha256",
+                    "privacy.identifier_redaction",
+                    "principal_generation",
+                    "principal_scope_flags",
+                    "principal_invalidation_policy",
+                    "append_only_pod_c_abi",
+                    "owner_token_lifecycle_cleanup",
+                    "sdk_consumer_tests",
+                },
+            },
+            "obelisk.permissions_admin.v1": {
+                "depends_on": ["obelisk.player_identity.v1"],
+                "position": 2,
+                "terms": {
+                    "obelisk.player_identity.v1 promoted certificate",
+                    "principal_handle",
+                    "principal_generation",
+                    "principal_scope_flags",
+                    "policy_source_id",
+                    "policy_source_generation",
+                    "authority_kind",
+                    "authority_generation",
+                    "policy_epoch",
+                    "fail_closed_missing_or_stale_principal",
+                    "nonzero plugin_owner_token",
+                    "append_only_pod_c_abi",
+                    "sdk_consumer_tests",
+                },
+            },
+            "obelisk.command_chat_response_path.v1": {
+                "depends_on": [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                ],
+                "position": 3,
+                "terms": {
+                    "obelisk.player_identity.v1 promoted",
+                    "obelisk.permissions_admin.v1 promoted",
+                    "copied_response_abi",
+                    "nonzero plugin_owner_token",
+                    "owner_scoped_unregister",
+                    "plugin_owner_cleanup",
+                    "callback_lifecycle_drain",
+                    "privacy_redaction",
+                    "abuse_rate_limit",
+                    "audit",
+                    "cross_instance_routing_policy",
+                    "no_public_CallProcessEvent_path",
+                    "abi_layout_tests",
+                    "sdk_consumer_tests",
+                },
+            },
+            "obelisk.commands_replies.v1": {
+                "depends_on": [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                    "obelisk.command_chat_response_path.v1",
+                ],
+                "position": 4,
+                "terms": {
+                    "obelisk.player_identity.v1 promoted",
+                    "obelisk.permissions_admin.v1 promoted",
+                    "obelisk.command_chat_response_path.v1 promoted",
+                    "command_lifecycle",
+                    "abuse_rate_limit",
+                    "moderation_boundaries",
+                    "capability_gates",
+                    "owner_scoped_cleanup",
+                    "append_only_pod_c_abi",
+                    "sdk_consumer_tests",
+                },
+            },
+        }
+
+        false_row_flags = (
+            "public_abi",
+            "adds_obelisk_api",
+            "public_sdk_ready",
+            "promotion_ready",
+            "runtime_ready",
+            "public_header_allowed",
+            "v1_completion_evidence",
+            "complete_sdk_counting_allowed",
+        )
+        false_aliases = {
+            "promoted",
+            "public_ready",
+            "public_contract_ready",
+            "public_abi_ready",
+            "public_header_allowed",
+            "public_sdk_ready",
+            "runtime_ready",
+            "v1_completion_evidence",
+            "complete_sdk_counting_allowed",
+        }
+
+        for surface_id, surface_expected in expected.items():
+            with self.subTest(surface=surface_id):
+                surface = by_id[surface_id]
+                self.assertEqual(surface["status"], "planning")
+                self.assertEqual(surface["support_tier"], "blocked")
+                self.assertEqual(surface["public_contract"], [])
+                self.assertEqual(surface["depends_on"], surface_expected["depends_on"])
+                self.assertEqual(
+                    surface["v1_dependency_chain_position"],
+                    surface_expected["position"],
+                )
+                self.assertNotIn(surface_id, surfaces["promoted_surfaces"])
+                self.assertIn(surface_id, surfaces["v1_sdk_completion_blockers"])
+                self.assertEqual(
+                    surface["v1_decision_contract"]["current_decision"],
+                    "blocked_until_promoted_for_complete_sdk",
+                )
+                self.assertTrue(
+                    surface["v1_decision_contract"][
+                        "must_remain_without_public_contract_until_promotion"
+                    ]
+                )
+                for key in false_row_flags:
+                    self.assertFalse(surface[key])
+                self.assertEqual(set(surface["public_ready_aliases"]), false_aliases)
+                for alias, value in surface["public_ready_aliases"].items():
+                    with self.subTest(surface=surface_id, alias=alias):
+                        self.assertFalse(value)
+                self.assertEqual(
+                    set(surface["required_evidence_terms"]),
+                    surface_expected["terms"],
+                )
 
     def test_approved_runtime_evidence_intake_is_machine_readable_but_not_promoting(self) -> None:
         payload = self.load_decisions()
@@ -325,14 +535,145 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(intake["id"], "approved_runtime_principal_lifecycle_evidence")
         self.assertEqual(intake["status"], "external_manifest_required")
         self.assertEqual(intake["resolved_input"], "runtime.lifecycle_evidence")
-        self.assertFalse(intake["promotion_ready"])
-        self.assertFalse(intake["public_sdk_ready"])
-        self.assertFalse(intake["runtime_ready"])
-        self.assertFalse(intake["public_header_allowed"])
+        for key in (
+            "promotion_ready",
+            "public_contract_allowed",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_api_ready",
+            "public_abi_ready",
+            "public_header_allowed",
+            "lookup_ready",
+            "permissions_ready",
+            "commands_ready",
+            "v1_completion_evidence",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(intake[key])
         self.assertEqual(
             intake["required_checker"],
             "scripts/check_player_identity_public_contract_readiness.py",
         )
+        policy = intake["source_provenance_policy"]
+        self.assertEqual(policy["accepted_source_kind"], "runtime-observer-log")
+        self.assertEqual(policy["resolved_source_path"], "$.source_summary.evidence.sources[0].path")
+        self.assertEqual(policy["copied_log_path"], "$.operational_window.copied_log.path")
+        self.assertEqual(policy["required_output_artifact_hash"], "$.output_artifact_identity.artifact_sha256")
+        for forbidden in (
+            "diagnostic-only sources",
+            "passive monitor or snapshot sources",
+            "post-reboot passive monitor context",
+            "confirmed beta notice JSON",
+            "next-action/status reports",
+            "copied-log-only artifacts",
+            "installed runtime, broadcast, or RCON status checks",
+            "source-overclaim zero diagnostics",
+            "request packs",
+            "preflight or window manifests",
+            "operator receipts",
+            "live-ops sidecars",
+            "scoped or non-complete release statements",
+            "promotion or completion certificates",
+            "simulation, mock, or fixture artifacts",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertIn(forbidden, policy["forbidden_source_classes"])
+        self.assertIn("cannot open the public identity contract gate", policy["non_claim"])
+        self.assertIn("post-reboot passive monitor context", policy["non_claim"])
+        self.assertIn("confirmed beta notice JSON", policy["non_claim"])
+        self.assertIn("next-action/status reports", policy["non_claim"])
+        self.assertIn("copied-log-only artifacts", policy["non_claim"])
+        self.assertIn("installed runtime, broadcast, RCON", policy["non_claim"])
+        self.assertIn("source-overclaim zero diagnostics", policy["non_claim"])
+
+    def test_approved_runtime_evidence_is_not_private_logout_correlation_proof(self) -> None:
+        payload = self.load_decisions()
+        not_sufficient = payload["approved_runtime_evidence_not_sufficient"]
+
+        self.assertIn(
+            "runtime evidence can show logout observations; it does not prove the private logout correlation contract required before public identity promotion",
+            not_sufficient["why"],
+        )
+        self.assertIn(
+            "private logout correlation contract resolved",
+            not_sufficient["minimum_additional_gates"],
+        )
+        self.assertIn(
+            "private logout correlation must be resolved before public identity promotion",
+            payload["required_before_public_header"]
+            [REQUIRED_PRE_HEADER_ID_ORDER.index("lifetime.reconnect_duplicate_stale_policy")]
+            ["required_policy"],
+        )
+
+    def test_post_runtime_evidence_gate_names_next_auditable_blocker(self) -> None:
+        payload = self.load_decisions()
+        gate = payload["post_approved_runtime_evidence_gate"]
+
+        self.assertEqual(
+            gate["id"],
+            "identity_public_contract_gate.reviewed_identity_public_contract",
+        )
+        self.assertEqual(gate["status"], "blocked/review-required")
+        self.assertEqual(gate["active_after_resolved_input"], "runtime.lifecycle_evidence")
+        self.assertEqual(gate["reported_current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(gate["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(gate["required_unresolved_decision_keys"], REQUIRED_POST_RUNTIME_DECISION_ORDER)
+        self.assertEqual(
+            set(gate["auditable_inputs"]),
+            {
+                "approved_runtime_evidence_intake",
+                "approved_runtime_evidence_not_sufficient",
+                "contract_gate_inputs",
+                "proposed_public_pod_abi_candidate",
+                "required_before_public_header",
+                "required_tests_before_public_header",
+            },
+        )
+        self.assertEqual(
+            gate["next_required_artifact"],
+            public_contract_readiness.REQUIRED_POST_APPROVED_RUNTIME_EVIDENCE_NEXT_REQUIRED_ARTIFACT,
+        )
+        alias_policy = gate["next_required_artifact"]["non_counting_candidate_alias_policy"]
+        for alias_class in (
+            "copied-log candidate aliases",
+            "preflight aliases",
+            "review-status aliases",
+            "live-ops sidecar candidate aliases",
+            "beta or confirmed-beta notice candidate aliases",
+            "passive or post-reboot passive monitor candidate aliases",
+            "diagnostic-only candidate aliases",
+        ):
+            with self.subTest(alias_class=alias_class):
+                self.assertIn(alias_class, alias_policy["alias_classes"])
+        for key in (
+            "can_count_candidate_aliases",
+            "can_count_preflight_aliases",
+            "can_count_review_aliases",
+            "can_unlock_identity_public_contract_gate_missing",
+            "can_unlock_public_identity_contract_readiness",
+            "can_replace_reviewed_identity_public_contract_decision_record",
+            "accepted_for_public_header_gate_review",
+        ):
+            with self.subTest(alias_policy_key=key):
+                self.assertFalse(alias_policy[key])
+        self.assertEqual(alias_policy["p0_progress_contribution"], 0)
+        self.assertIn("Candidate, preflight, review-status", alias_policy["non_claim"])
+        self.assertIn("identity_public_contract_gate_missing", alias_policy["non_claim"])
+        for key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_header_allowed",
+            "public_abi_ready",
+            "v1_completion_evidence",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(gate[key])
+        self.assertIn("cannot open public identity", gate["non_claim"])
+        self.assertIn("lookup", gate["non_claim"])
+        self.assertIn("public API/ABI/header", gate["non_claim"])
+        self.assertIn("identity_public_contract_gate_missing", gate["non_claim"])
+        self.assertIn("SDK readiness", gate["non_claim"])
 
     def test_identifier_redaction_evidence_intake_is_machine_readable_but_not_promoting(self) -> None:
         payload = self.load_decisions()

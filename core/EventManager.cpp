@@ -3,6 +3,7 @@
 #endif
 
 #include "EventManager.h"
+#include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
 #include "runtime/RuntimeMarkers.h"
 #include <algorithm>
@@ -360,6 +361,8 @@ namespace Obelisk::Core
 
                 try
                 {
+                    GameplayCallbackScope callbackScope(GameplayCallbackFamily::ProcessEvent,
+                                                         GameplayCallbackScope::TrackingMode::CurrentOnly);
                     if (!snapshot.callback(caller, function, parms))
                     {
                         if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
@@ -440,6 +443,8 @@ namespace Obelisk::Core
 
                 try
                 {
+                    GameplayCallbackScope callbackScope(GameplayCallbackFamily::ProcessEvent,
+                                                         GameplayCallbackScope::TrackingMode::CurrentOnly);
                     if (!snapshot.callback(caller, function, parms))
                     {
                         if (snapshot.allowProcessEventBlocking && IsProcessEventBlockingAllowed())
@@ -515,6 +520,8 @@ namespace Obelisk::Core
 
                 try
                 {
+                    GameplayCallbackScope callbackScope(GameplayCallbackFamily::ProcessEvent,
+                                                         GameplayCallbackScope::TrackingMode::CurrentOnly);
                     snapshot.callback(caller, function, parms);
                 }
                 catch (const std::exception& e)
@@ -585,6 +592,8 @@ namespace Obelisk::Core
 
                 try
                 {
+                    GameplayCallbackScope callbackScope(GameplayCallbackFamily::ProcessEvent,
+                                                         GameplayCallbackScope::TrackingMode::CurrentOnly);
                     snapshot.callback(caller, function, parms);
                 }
                 catch (const std::exception& e)

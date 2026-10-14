@@ -1,0 +1,354 @@
+{
+  "schema": "obelisk.players-lifecycle-handle-new-player-fname-mismatch.v1",
+  "artifact_status": "planning_diagnostic_unresolved",
+  "planning_only": true,
+  "evidence_scope": "diagnostic_fname_chain_planning_only_not_second_source",
+  "artifact_role": "diagnostic_planning_only_not_second_source_input",
+  "layout_evidence_status": "not_layout_evidence",
+  "readiness_classification": "planning_only",
+  "readiness_effect": "none",
+  "second_source_layout_evidence": false,
+  "can_be_used_as_second_source_layout_evidence": false,
+  "can_be_used_as_candidate_snapshot_root": false,
+  "second_source_status": "not_applicable",
+  "not_second_source": true,
+  "promotion_ready": false,
+  "public_sdk_ready": false,
+  "runtime_ready": false,
+  "target_set": "players-lifecycle-anchor-candidates",
+  "target": "ShooterGameMode.HandleNewPlayer",
+  "operational_consolidation": {
+    "accepted_drift_anchor_scope": [
+      {
+        "role": "session_start",
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "accepted_shape": "post-original copied bIsFromLogin=1,ReturnValue=1 with candidate_created/session_start_created",
+        "drift_acceptance": "known Ragnarok drift chain accepted only after the full copied observer and checker gates pass"
+      },
+      {
+        "role": "session_end",
+        "target": "ShooterGameMode.OnLogout",
+        "accepted_shape": "post-original copied Exiting redacted with session_end_invalidated and correlation_status=matched",
+        "drift_acceptance": "known Ragnarok drift chain accepted only after the full copied observer and correlation gates pass"
+      }
+    ],
+    "strict_rejected_start_boundary": {
+      "role": "session_start_rejected",
+      "target": "ShooterGameMode.CheckJoinInProgress",
+      "accepted_shape": "post-original copied bIsFromLogin=1,ReturnValue=0 with session_start_rejected_noop",
+      "superseded_non_evidence": [
+        {
+          "target": "ShooterGameMode.HandleNewPlayer",
+          "copied_bool_values": [
+            "0,1",
+            "1,0",
+            "0,0"
+          ],
+          "reason": "historical HandleNewPlayer rejected-start tuples are ambiguous and no longer satisfy approved runtime evidence"
+        },
+        {
+          "source": "passive snapshots",
+          "reason": "passive snapshots are context only until an approved copied sibling-set bundle passes consume-mode validation"
+        },
+        {
+          "source": "diagnostic-only lines",
+          "reason": "diagnostic candidates are logged with evidence_claim=none and cannot substitute for the copied observer event"
+        }
+      ]
+    },
+    "rejected_non_anchor_drift": [
+      {
+        "target": "GameMode.K2_PostLogin",
+        "observed_diagnostic_count": 3,
+        "reason": "chronology-only diagnostic with no approved copied bool tuple, principal_action, apply_status, or correlation semantics for any required lifecycle role",
+        "readiness_effect": "none"
+      }
+    ],
+    "passive_artifact_boundary": "passive copied diagnostics, passive complete triplets, and observed FName indices remain planning context only and cannot clear approved_runtime_evidence_missing"
+  },
+  "artifact_identity": {
+    "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+    "base_fixture_path": "tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.HandleNewPlayer.snapshot.json",
+    "base_fixture_sha256": "a9b3049dc221f128924ff0c6eb45287bf630dfaea4e4ab33bbf93647a5d3361b",
+    "base_fixture_root": "tests/fixtures/ufunction_snapshots",
+    "build_type": "repo_fixture_runtime_diagnostic_planning_check",
+    "target_set_revision": "reflection_target_sets.py:players-lifecycle-anchor-candidates"
+  },
+  "runtime_snapshot": {
+    "approved_runtime_evidence": false,
+    "captured_at_utc": "2026-06-04T08:51:19Z",
+    "diagnostic_kind": "lifecycle_property_FName_mismatch",
+    "map": "Ragnarok",
+    "manifest_path": "/tmp/obelisk-passive-evidence-snapshots/passive-manual-20260604T085119Z-arkserver+arkserver2-3215640/manifest.json",
+    "source": "passive_snapshot_copied_log_analysis",
+    "snapshot_id": "passive-manual-20260604T085119Z-arkserver+arkserver2-3215640"
+  },
+  "runtime_observation_summary": {
+    "accepted_count": 0,
+    "approved_runtime_evidence": false,
+    "diagnostic_candidate_count": 17,
+    "diagnostic_candidate_read_status_counts": {
+      "implausible": 7
+    },
+    "diagnostic_candidate_target_counts": {
+      "GameMode.K2_PostLogin": 3,
+      "ShooterGameMode.CheckJoinInProgress": 2,
+      "ShooterGameMode.HandleNewPlayer": 7,
+      "ShooterGameMode.OnLogout": 5
+    },
+    "diagnostic_only": true,
+    "organic_player_snapshots": 2,
+    "readiness_effect": "none",
+    "rejected_count": 0,
+    "source_scope": "copied_passive_snapshot_log_analysis",
+    "mismatch_counts": [
+      {
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "reason": "lifecycle_property_FName_mismatch_expected_28411_observed_28418_21314_22968_28516_17724",
+        "observed_count": 4,
+        "not_second_source": true,
+        "readiness_effect": "none"
+      },
+      {
+        "target": "ShooterGameMode.OnLogout",
+        "reason": "lifecycle_property_FName_mismatch_expected_28543_observed_28550",
+        "observed_count": 3,
+        "not_second_source": true,
+        "readiness_effect": "none"
+      }
+    ],
+    "current_recognizer_freshness": {
+      "status": "superseded_by_current_observer_recognizer",
+      "recognized_drift_targets": [
+        "ShooterGameMode.HandleNewPlayer",
+        "ShooterGameMode.OnLogout"
+      ],
+      "recognized_when": "only when the copied observer line satisfies the current target, outer, field-order, offset, size, bool-metadata, redaction, post-original, apply-status, and correlation gates",
+      "passive_artifact_effect": "this historical passive Ragnarok artifact remains planning context only and cannot clear approved runtime evidence, second-source layout evidence, public SDK readiness, or runtime readiness"
+    },
+    "sibling_map_counts": {
+      "TheIsland": {
+        "accepted_count": 0,
+        "diagnostic_candidate_count": 0,
+        "rejected_count": 0
+      }
+    }
+  },
+  "fixture_property_order": [
+    "NewPlayer",
+    "PlayerData",
+    "PlayerCharacter",
+    "bIsFromLogin",
+    "ReturnValue"
+  ],
+  "fixture_expected_name_indices": [
+    28411,
+    21307,
+    22961,
+    28509,
+    17716
+  ],
+  "observed_name_indices": [
+    28418,
+    21314,
+    22968,
+    28516,
+    17724
+  ],
+  "deltas": [
+    7,
+    7,
+    7,
+    7,
+    8
+  ],
+  "exact_property_chain_match": false,
+  "observed_indices_found_in_committed_sanitized_snapshots": [],
+  "latest_unbound_passive_diagnostic_context": {
+    "status": "unverified_passive_diagnostic_non_evidence",
+    "source": "worker_prompt_redacted_monitor_context",
+    "captured_or_reported_at_utc": "2026-06-07",
+    "readiness_effect": "none",
+    "approved_runtime_evidence": false,
+    "can_update_fixture_expectations": false,
+    "counts_as_second_source_layout_evidence": false,
+    "runtime_ready": false,
+    "public_sdk_ready": false,
+    "summary": "Later redacted passive monitor context reported a larger first-property drift on the same accepted lifecycle anchors. The complete property chain, copied observer event, and distinct sanitized snapshot root were not provided in this repo artifact.",
+    "observations": [
+      {
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "property": "NewPlayer",
+        "property_position": 0,
+        "expected_name_index": 28411,
+        "observed_name_index": 28422,
+        "delta": 11,
+        "complete_property_chain_available": false,
+        "source_bound_to_repo_artifact": false,
+        "evidence_classification": "passive_diagnostic_non_evidence"
+      },
+      {
+        "target": "ShooterGameMode.OnLogout",
+        "property": "Exiting",
+        "property_position": 0,
+        "expected_name_index": 28543,
+        "observed_name_index": 28554,
+        "delta": 11,
+        "complete_property_chain_available": false,
+        "source_bound_to_repo_artifact": false,
+        "evidence_classification": "passive_diagnostic_non_evidence"
+      }
+    ],
+    "required_resolution": "bind any future drift update to a distinct sanitized lifecycle snapshot root or an approved copied observer event bundle; passive FName deltas alone remain non-evidence"
+  },
+  "second_source_blockers": [
+    "copied_runtime_diagnostic_line_not_distinct_sanitized_snapshot",
+    "observed_fname_indices_only_no_property_names_classes_offsets_sizes_or_bool_metadata",
+    "missing_distinct_lifecycle_artifact_identity",
+    "approved_runtime_evidence_missing"
+  ],
+  "prohibited_evidence_uses": [
+    "second_source_layout_evidence",
+    "candidate_snapshot_root",
+    "approved_runtime_principal_lifecycle_evidence",
+    "runtime_readiness",
+    "public_sdk_readiness",
+    "release_readiness",
+    "v1_completion"
+  ],
+  "related_observed_fname_mismatches": [
+    {
+      "target": "ShooterGameMode.OnLogout",
+      "fixture_property_order": [
+        "Exiting"
+      ],
+      "fixture_expected_name_indices": [
+        28543
+      ],
+      "observed_name_indices": [
+        28550
+      ],
+      "deltas": [
+        7
+      ],
+      "diagnostic_observation_count": 3,
+      "exact_property_chain_match": false,
+      "current_recognizer_drift_chain_accepted": true,
+      "current_recognizer_drift_chain_accepted_meaning": "recognizer_alternative_only_not_runtime_evidence",
+      "status": "recognized_drift_chain_planning_only",
+      "planning_only": true,
+      "not_second_source": true,
+      "readiness_effect": "none",
+      "second_source_status": "not_applicable"
+    }
+  ],
+  "status": "unresolved_mismatch",
+  "current_recognizer_drift_chain_accepted": true,
+  "current_recognizer_drift_chain_accepted_meaning": "recognizer_alternative_only_not_runtime_evidence",
+  "interpretation": "Current-recognizer freshness note: current observer recognition accepts the known Ragnarok HandleNewPlayer and OnLogout FName drift chains as explicit drift alternatives when the full copied lifecycle shape and observer acceptance gates match. This artifact itself remains unresolved passive planning context only; it is not approved runtime evidence, not second-source layout evidence, and cannot clear readiness.",
+  "offline_core_resolution": {
+    "status": "observed_indices_resolve_to_unrelated_names",
+    "interpretation": "The existing offline core name resolution does not explain the Ragnarok observed FName indices and is not second-source evidence for the lifecycle layouts. That offline-name result is no longer a reason to reject the current recognizer's explicit drift-chain acceptance."
+  },
+  "rejected_hypotheses": [
+    {
+      "hypothesis": "search_by_fname_matcher_alone_is_safe",
+      "reason": "FName matching alone remains unsafe: the current recognizer accepts only explicit HandleNewPlayer and OnLogout drift chains after the full function, outer, positional property shape, copied bool, redaction, post-original, apply-status, and correlation gates match.",
+      "replacement_gate": "Require exact positional property-chain shape or an explicit current-recognizer drift-chain alternative: target, outer, class, property order, property class, offsets, sizes, ParmsSize, bool metadata, copied observer semantics, and distinct artifact identity before any second-source or runtime-readiness claim."
+    },
+    {
+      "hypothesis": "K2_PostLogin_FName_drift_is_lifecycle_anchor_evidence",
+      "reason": "K2_PostLogin diagnostics do not carry the accepted player-principal lifecycle role semantics. They lack the copied bool/apply/correlation contract required for session_start, session_start_rejected, or session_end.",
+      "replacement_gate": "Keep K2_PostLogin as chronology guidance only; require HandleNewPlayer or OnLogout accepted-role lines, or the exact CheckJoinInProgress observer-only rejected-start alternative, through the full analyzer/bundle/checker chain."
+    }
+  ],
+  "blockers": [
+    "approved_runtime_evidence_missing",
+    "observed_fname_chain_check_not_promotion_gate",
+    "observed_fname_chain_requires_current_recognizer_gate",
+    "second_source_layout_evidence_blocked",
+    "public_player_sdk_blocked",
+    "runtime_ordering_unproven",
+    "principal_invalidation_semantics_unproven",
+    "runtime_observation_requires_separate_approval"
+  ],
+  "does_not_satisfy_blockers": [
+    "approved_runtime_evidence_missing",
+    "observed_fname_chain_requires_current_recognizer_gate",
+    "second_source_layout_evidence_blocked",
+    "public_player_sdk_blocked",
+    "runtime_ordering_unproven",
+    "principal_invalidation_semantics_unproven",
+    "runtime_observation_requires_separate_approval"
+  ],
+  "does_not_satisfy_readiness": [
+    "second_source_layout_evidence",
+    "runtime_readiness",
+    "public_sdk_readiness",
+    "release_readiness",
+    "v1_completion"
+  ],
+  "promotion_gate": {
+    "ready": false,
+    "ready_scope": "planning_only",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "blockers": [
+      "approved_runtime_evidence_missing",
+      "observed_fname_chain_check_not_promotion_gate",
+      "observed_fname_chain_requires_current_recognizer_gate"
+    ]
+  },
+  "next_offline_artifact_requirement": {
+    "artifact": "distinct_sanitized_lifecycle_ufunction_snapshot_root",
+    "status_needed": "required_before_deploy_request",
+    "purpose": "prove lifecycle property shape without treating copied passive FName indices alone as layout evidence",
+    "required_targets": [
+      "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+      "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout"
+    ],
+    "required_identity_fields": [
+      "evidence.ark_binary_sha256",
+      "evidence.artifact_kind=offline_core",
+      "evidence.artifact_sha256",
+      "evidence.capture_id",
+      "evidence.evidence_pack_id"
+    ],
+    "required_shape_fields": [
+      "target outer/name/class",
+      "NumParms",
+      "ParmsSize",
+      "ReturnValueOffset",
+      "property order",
+      "property class",
+      "offset_internal",
+      "element_size",
+      "array_dim",
+      "property_flags",
+      "BoolProperty byte/field metadata",
+      "candidate-uobject membership for target/class/outer/properties"
+    ],
+    "comparison_mode": "semantic_layout_without_strict_identity_indices",
+    "comparison_command_template": "python3 scripts/compare_reflection_snapshots.py --base-root tests/fixtures/ufunction_snapshots --candidate-root <distinct-sanitized-lifecycle-root> --target ShooterGameMode.HandleNewPlayer --target ShooterGameMode.OnLogout --readiness-report --json",
+    "accepted_result_scope": "property_shape_planning_evidence_only_not_runtime_or_public_sdk_readiness",
+    "prohibited_inputs": [
+      "copied passive diagnostic FName-chain lines by themselves",
+      "passive snapshot manifests",
+      "direct or symlink-resolved protected live-server paths",
+      "broad FName scans",
+      "broad GObjects scans",
+      "ReflectionScanner output from an unapproved runtime run"
+    ]
+  },
+  "non_claims": [
+    "planning-only comparison against sanitized UFunction snapshots",
+    "does not create second-source layout evidence",
+    "does not mark anything accepted runtime evidence",
+    "does not reject current HandleNewPlayer or OnLogout drift-chain recognition when the full observer gates pass",
+    "does not clear approved_runtime_evidence_missing",
+    "does not promote public Player SDK, public player identity, runtime readiness, release readiness, or v1 completion",
+    "does not expose UE pointers, raw params, GObjects indices, lookup, ResourceHandle, mutation, or return override",
+    "does not authorize server writes, marker changes, restarts, scanner, native probes, ptrace, gcore, Frida, rr, GitHub, Discord, commits, pushes, or tags"
+  ]
+}

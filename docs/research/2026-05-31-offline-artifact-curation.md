@@ -30,6 +30,8 @@ planning-only target sets are `command-chat-response-route-planning`,
 `structure-build-policy-offline-intake`; their packs, container manifests, and child
 evidence must not be cited as release-readiness roots, public SDK promotion evidence, or
 `v1.0` completion signals. The
+`inventory-custom-filter-array-boundary` target set is also planning-only and does not
+promote Inventory SDK, mutation, public ABI, release readiness, or `v1.0` completion. The
 `players-lifecycle-anchor-candidates` target set is layout-planning only and carries no
 runtime lifecycle ordering claim. The `structure-build-policy-offline-intake` target set
 has accepted planning-layout second-source accounting through the pinned offline intake
@@ -117,6 +119,31 @@ Known caution: some child manifests record provenance paths under
 artifact provenance, but this curation note is about the local
 `/home/flowcommunity-ark/obelisk-artifacts` root. Do not dereference protected server
 paths during read-only artifact audits.
+
+2026-06-06 gate hardening: a valid sidecar does not allow a generic JSON artifact with an
+unknown schema through the consume gate. Sidecars and embedded provenance are checked for
+protected-root strings and relative paths that resolve into the protected root. Candidate
+ResourceHandle, GObjects, and weak-helper artifacts remain consume-valid only while they
+avoid positive public/runtime aliases such as lookup availability, public identity,
+mutation support, or return-override support. Named target-set coverage must match the
+current `scripts/reflection_target_sets.py` revision hash, and duplicate or mismatched
+manifest/direct target-set declarations are blockers rather than silently deduplicated.
+Nested arrays/maps are part of that claim scan: unsupported child schemas and redacted
+UFunction signature reports now emit explicit wording blockers for positive
+`ResourceHandle`, lookup, public SDK, runtime hook, mutation, or return-override text.
+Named redacted UFunction signature artifacts also inherit
+`scripts/reflection_target_sets.py` catalog hygiene blockers, so duplicate catalog entries
+or mixed UFunction/ScriptStruct target-set definitions cannot be hidden by deduped
+coverage helpers. The artifact sidecar gate now scans provenance for positive
+public/runtime/ResourceHandle/object-identity aliases, including underscore/camel-case
+forms, while preserving blocked or planning-only ResourceHandle research wording.
+
+2026-06-06 supervised offline alias follow-up: the shared target-set catalog alias guard
+now also rejects `mutation`, `return_override`, and `stable_sdk` promotion surfaces,
+including compact/camel-case spellings such as `ResourceHandle`, `ObjectLookup`,
+`ReturnOverride`, and `StableSDK`. Redacted UFunction signature validation now scans
+schema/provenance/catalog fields for those non-promoted aliases without treating ordinary
+`v1` schema syntax or accepted planning target sets as promotion claims.
 
 ## Player Identity Status
 

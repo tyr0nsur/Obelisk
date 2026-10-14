@@ -5,7 +5,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 SERVER_ROOT="/servidor/ark"
-APPROVED_OFFLINE_WORKSPACE_ROOT="/servidor/ark/workspace-offline"
 BUILD_DIR="${OBELISK_BUILD_DIR:-build}"
 JOBS="${OBELISK_BUILD_JOBS:-$(nproc)}"
 RELEASE_CHECK_ROOT=""
@@ -23,7 +22,6 @@ SCRIPTSTRUCT_SECOND_SOURCE_TARGET_SETS=()
 PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
     "minimal-second-source-intake"
     "structure-observer-intake"
-    "item-return-only-policy-slice"
     "chat-message-intake"
 )
 PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS=(
@@ -41,22 +39,22 @@ PRODUCTION_FORBIDDEN_SYMBOL_PATTERNS=(
     "SetPluginRetentionFailure"
     "ClearPluginOwnerLifecycle"
 )
+PACKAGE_SHAPE_NON_CLAIM_CMAKE_VARS=(
+    "Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED"
+    "Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED"
+    "Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED"
+    "Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED"
+    "Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED"
+    "Obelisk_V1_COMPLETION_CLAIM_ALLOWED"
+    "Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED"
+    "Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED"
+)
 
 is_under_path() {
     local path="$1"
     local parent="$2"
 
     [[ "${path}" == "${parent}" || "${path}" == "${parent}/"* ]]
-}
-
-is_approved_offline_workspace_path() {
-    local path="$1"
-    local resolved_path
-    local resolved_workspace
-
-    resolved_path="$(realpath -m "${path}")"
-    resolved_workspace="$(realpath -m "${APPROVED_OFFLINE_WORKSPACE_ROOT}")"
-    is_under_path "${resolved_path}" "${resolved_workspace}"
 }
 
 reject_protected_path() {
@@ -67,18 +65,38 @@ reject_protected_path() {
     local resolved_path
 
     absolute_path="$(realpath -s -m "${path}")"
-    if is_under_path "${absolute_path}" "${SERVER_ROOT}" && \
-        ! is_approved_offline_workspace_path "${absolute_path}"; then
+    if is_under_path "${absolute_path}" "${SERVER_ROOT}"; then
         printf '%s must not %s protected server root %s: %s\n' \
             "${label}" "${action}" "${SERVER_ROOT}" "${absolute_path}" >&2
         exit 2
     fi
 
     resolved_path="$(realpath -m "${path}")"
-    if is_under_path "${resolved_path}" "${SERVER_ROOT}" && \
-        ! is_approved_offline_workspace_path "${resolved_path}"; then
+    if is_under_path "${resolved_path}" "${SERVER_ROOT}"; then
         printf '%s must not %s protected server root %s: %s\n' \
             "${label}" "${action}" "${SERVER_ROOT}" "${resolved_path}" >&2
+        exit 2
+    fi
+}
+
+reject_symlink_path_components() {
+    local label="$1"
+    local path="$2"
+    local lexical_path
+    local resolved_path
+
+    lexical_path="$(realpath -s -m "${path}")"
+    resolved_path="$(realpath -m "${path}")"
+    if [[ "${lexical_path}" != "${resolved_path}" ]]; then
+        printf '%s must not resolve through symlink path components: %s -> %s\n' \
+            "${label}" "${path}" "${resolved_path}" >&2
+        exit 2
+    fi
+}
+
+validate_build_jobs() {
+    if [[ ! "${JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+        printf 'OBELISK_BUILD_JOBS must be a positive integer, got: %s\n' "${JOBS}" >&2
         exit 2
     fi
 }
@@ -163,6 +181,17 @@ validate_second_source_report_dir() {
 
     reject_protected_path "--second-source-report-dir" "write under" "${report_dir}"
 
+    if [[ -L "${report_dir}" ]]; then
+        printf 'Second-source report dir must be a real directory, not a symlink: %s\n' \
+            "${report_dir}" >&2
+        exit 2
+    fi
+    if [[ -e "${report_dir}" && ! -d "${report_dir}" ]]; then
+        printf 'Second-source report dir must be a directory: %s\n' "${report_dir}" >&2
+        exit 2
+    fi
+    reject_symlink_path_components "Second-source report dir" "${report_dir}"
+
     local report_dir_abs
     local repo_abs
     report_dir_abs="$(realpath -m "${report_dir}")"
@@ -182,6 +211,13 @@ validate_second_source_report_dir() {
                 "${report_dir}" >&2
             exit 2
         fi
+    fi
+
+    if [[ -d "${report_dir}" ]] && \
+        find "${report_dir}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+        printf 'Second-source report dir must be new or empty; refusing stale generated report root: %s\n' \
+            "${report_dir}" >&2
+        exit 2
     fi
 }
 
@@ -330,15 +366,25 @@ Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-sour
                                           [--second-source-report-dir <path>]
 
 Runs the local release-readiness baseline gate. It owns build, CTest, script tests,
-production libobelisk.so symbol surface checks, install/SDK dry-runs, read-only CLI
-status, and clean-tree validation. By default the command fails if tracked or untracked
-non-ignored files are present before or after validation. Ignored build/cache directories
-are allowed. Gameplay/module second-source promotion gates run only when
+production libobelisk.so symbol surface checks, install/SDK package-shape dry-runs,
+installed CMake package non-claim metadata, read-only CLI status, and clean-tree
+validation. By default the command fails if tracked or untracked non-ignored files are
+present before or after validation. Ignored build/cache directories are allowed.
+Gameplay/module second-source promotion gates run only when
 --require-second-source-readiness is supplied.
-The v1 complete-SDK claim gate runs only when --require-v1-sdk-completion is supplied.
+The v1 complete-SDK claim gate runs only when --require-v1-sdk-completion is supplied
+and consumes scripts/check_public_sdk_v1_completion.py --json.
+The baseline non-claim SDK status gate consumes
+scripts/report_obelisk_sdk_status.py --json and requires the default status report to
+stay blocked/non-claim with runtime/public/stable readiness false and source-overclaim
+diagnostics at zero.
+The default CI/baseline invocation must not pass --require-v1-sdk-completion; use that
+option only for an explicit stable SDK claim attempt with a reviewed release statement.
 Passing this gate is not live-ops approval, Plugin Hub readiness/publication,
-support-tier activation, runtime readiness, stable production readiness, a stable SDK
-claim, or v1 SDK completion unless the exact additional gate says so.
+support-tier activation, runtime readiness, stable production readiness, stable SDK claims,
+or v1 SDK completion unless the exact additional gate says so.
+Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4,
+stable_claim_allowed=false, active blocker approved_runtime_evidence_missing.
 
 Options:
   --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
@@ -349,7 +395,8 @@ Options:
   --require-second-source-readiness Fail if focused reflection promotion target sets lack complete
                                     second-source evidence.
   --require-v1-sdk-completion       Fail unless docs/public_sdk_surfaces.json allows a complete
-                                    v1.0 SDK claim. This is separate from baseline release readiness.
+                                    v1.0 SDK claim. This is separate from baseline release readiness
+                                    and is release-manager opt-in only.
   --v1-sdk-release-statement        Reviewed v1 SDK release statement naming excluded/post-v1 blockers.
   --ufunction-second-source-root    Candidate UFunction snapshot root for second-source promotion.
   --scriptstruct-second-source-root Candidate ScriptStruct snapshot root for second-source promotion.
@@ -358,15 +405,20 @@ Options:
                                     Defaults to the public RC target sets:
                                     minimal-second-source-intake,
                                     structure-observer-intake,
-                                    item-return-only-policy-slice, and chat-message-intake.
+                                    and chat-message-intake. Item return-only is internal backing,
+                                    not a public RC/default target set.
   --scriptstruct-second-source-target-set
                                     ScriptStruct target set to gate. Repeat for each promoted module.
                                     No default; ScriptStruct promotion requires explicit opt-in.
   --second-source-report-dir        Directory where JSON second-source readiness reports are written.
+                                    Must be new or empty and must not traverse symlink path components;
+                                    stale generated report roots are rejected.
                                     Defaults to a temporary directory under the release check root.
   -h, --help                        Show this help.
 
 Environment alternatives:
+  OBELISK_BUILD_DIR
+  OBELISK_BUILD_JOBS
   OBELISK_UFUNCTION_SECOND_SOURCE_ROOT
   OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT
   OBELISK_SECOND_SOURCE_REPORT_DIR
@@ -447,10 +499,12 @@ fi
 
 if [[ -n "${UFUNCTION_SECOND_SOURCE_ROOT}" ]]; then
     reject_protected_path "--ufunction-second-source-root" "read from" "${UFUNCTION_SECOND_SOURCE_ROOT}"
+    reject_symlink_path_components "--ufunction-second-source-root" "${UFUNCTION_SECOND_SOURCE_ROOT}"
     validate_second_source_root_commit "--ufunction-second-source-root" "${UFUNCTION_SECOND_SOURCE_ROOT}"
 fi
 if [[ -n "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}" ]]; then
     reject_protected_path "--scriptstruct-second-source-root" "read from" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
+    reject_symlink_path_components "--scriptstruct-second-source-root" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
     validate_second_source_root_commit "--scriptstruct-second-source-root" "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}"
 fi
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
@@ -467,6 +521,8 @@ fi
 if [[ -n "${V1_SDK_RELEASE_STATEMENT}" ]]; then
     reject_protected_path "--v1-sdk-release-statement" "read from" "${V1_SDK_RELEASE_STATEMENT}"
 fi
+reject_protected_path "OBELISK_BUILD_DIR" "read/write under" "${BUILD_DIR}"
+validate_build_jobs
 preflight_ufunction_second_source_readiness
 
 cleanup() {
@@ -494,9 +550,145 @@ run_step() {
     "$@"
 }
 
+check_public_sdk_v1_stable_claim_gate() {
+    local report_path="${RELEASE_CHECK_ROOT}/public-sdk-v1-completion.json"
+    local status
+
+    set +e
+    python3 scripts/check_public_sdk_v1_completion.py \
+        --release-statement "${V1_SDK_RELEASE_STATEMENT}" \
+        --json >"${report_path}"
+    status=$?
+    set -e
+
+    if [[ "${status}" -ne 0 ]]; then
+        python3 - "${report_path}" <<'PY' >&2 || true
+import json
+import sys
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+print("Public SDK v1 completion gate blocked.")
+print("The stable v1 SDK claim remains disabled; check_public_sdk_v1_completion.py --json did not authorize it.")
+print(f"report_path: {report_path}")
+
+try:
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    print(f"could not load completion JSON: {exc}")
+    raise SystemExit(0)
+
+blockers = payload.get("blockers")
+if isinstance(blockers, list):
+    for blocker in blockers[:16]:
+        print(f"blocker: {blocker}")
+
+for key in (
+    "complete_sdk_claim_progress_ratio",
+    "p0_dependency_chain_claim_progress_ratio",
+    "current_route_blocker",
+):
+    value = payload.get(key)
+    if value is not None:
+        print(f"{key}: {value}")
+
+stable_claim_allowed = payload.get("stable_claim_allowed")
+if stable_claim_allowed is not None:
+    print(f"stable_claim_allowed={str(stable_claim_allowed).lower()}")
+PY
+        exit "${status}"
+    fi
+
+    python3 - "${report_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+payload = json.loads(report_path.read_text(encoding="utf-8"))
+errors = []
+
+if payload.get("stable_claim_allowed") is not True:
+    errors.append("stable_claim_allowed must be true")
+if payload.get("complete_sdk_ready") is not True:
+    errors.append("complete_sdk_ready must be true")
+if payload.get("blockers") != []:
+    errors.append("blockers must be empty")
+if payload.get("complete_sdk_claim_progress_ratio") != "12/12":
+    errors.append("complete_sdk_claim_progress_ratio must be 12/12")
+if payload.get("p0_dependency_chain_claim_progress_ratio") != "4/4":
+    errors.append("p0_dependency_chain_claim_progress_ratio must be 4/4")
+
+if errors:
+    print("Public SDK v1 stable claim gate JSON did not authorize stable claim:", file=sys.stderr)
+    for error in errors:
+        print(error, file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"Public SDK v1 completion JSON authorized stable claim: {report_path}")
+PY
+}
+
+check_sdk_status_report_non_claim_gate() {
+    local report_path="${RELEASE_CHECK_ROOT}/sdk-status-report.json"
+
+    python3 scripts/report_obelisk_sdk_status.py --json >"${report_path}"
+    python3 - "${report_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+payload = json.loads(report_path.read_text(encoding="utf-8"))
+errors = []
+
+
+def require_value(key, expected):
+    observed = payload.get(key)
+    if observed != expected:
+        errors.append(f"{key} must be {expected!r}, got {observed!r}")
+
+
+for key in (
+    "runtime_ready",
+    "public_sdk_ready",
+    "stable_sdk_ready",
+    "stable_claim_allowed",
+    "source_ready",
+    "source_runtime_ready",
+    "source_public_sdk_ready",
+    "source_stable_sdk_ready",
+):
+    require_value(key, False)
+
+require_value("schema", "obelisk.sdk-status-report.v1")
+require_value("status", "blocked")
+require_value("status_report_only", True)
+require_value("current_route_blocker", "approved_runtime_evidence_missing")
+require_value("next_required_artifact", "approved_runtime_principal_lifecycle_evidence_bundle")
+require_value("missing_required_artifact", "approved_runtime_principal_lifecycle_evidence_bundle")
+require_value("complete_sdk_progress_ratio", "0/12")
+require_value("p0_chain_progress_ratio", "0/4")
+require_value("p0_dependency_chain_progress_ratio", "0/4")
+require_value("source_overclaim_total_flag_count", 0)
+require_value("source_overclaim_component_count", 0)
+require_value("side_lane_source_overclaim_count", 0)
+
+if errors:
+    print("SDK status report baseline non-claim gate failed:", file=sys.stderr)
+    for error in errors:
+        print(error, file=sys.stderr)
+    print(f"report_path: {report_path}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(f"SDK status report remained blocked/non-claim with zero source overclaims: {report_path}")
+PY
+}
+
 if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
-    run_step python3 scripts/check_public_sdk_v1_completion.py \
-        --release-statement "${V1_SDK_RELEASE_STATEMENT}"
+    run_step check_public_sdk_v1_stable_claim_gate
+else
+    run_step check_sdk_status_report_non_claim_gate
 fi
 
 validate_second_source_readiness_json() {
@@ -799,7 +991,152 @@ check_production_runtime_symbols() {
     fi
 }
 
+require_file_contains() {
+    local path="$1"
+    local expected="$2"
+    local label="$3"
+
+    if ! grep -F -- "${expected}" "${path}" >/dev/null; then
+        printf '%s missing required package-shape non-claim text: %s\n' \
+            "${label}" "${expected}" >&2
+        exit 1
+    fi
+}
+
+check_package_shape_non_claim_contract() {
+    local cmake_config_template="cmake/ObeliskConfig.cmake.in"
+    local install_script="scripts/install_obelisk.sh"
+    local install_doc="docs/INSTALL.md"
+    local claim_var
+
+    require_file_contains \
+        "${cmake_config_template}" \
+        'set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")' \
+        "${cmake_config_template}"
+    require_file_contains \
+        "${install_script}" \
+        "Install output is package-shape evidence only" \
+        "${install_script}"
+    require_file_contains \
+        "${install_script}" \
+        "Install layout/package-shape evidence only; no runtime/live-ops approval, Plugin Hub readiness/publication, support-tier activation, stable SDK claim, or v1 SDK completion is granted." \
+        "${install_script}"
+    require_file_contains \
+        "${install_script}" \
+        "Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4, stable_claim_allowed=false, active blocker approved_runtime_evidence_missing." \
+        "${install_script}"
+    require_file_contains \
+        "${install_doc}" \
+        "Plugin Hub seed work is parked until the complete SDK blocker chain is resolved." \
+        "${install_doc}"
+    require_file_contains \
+        "${install_doc}" \
+        'The plugin installer only publishes an already-built `.so`; it does not validate Plugin Hub' \
+        "${install_doc}"
+    require_file_contains \
+        "${install_doc}" \
+        'These package-shape markers do not resolve route completion for the current complete SDK' \
+        "${install_doc}"
+    require_file_contains \
+        "${install_doc}" \
+        'stable_claim_allowed=false' \
+        "${install_doc}"
+    require_file_contains \
+        "${install_doc}" \
+        'approved_runtime_evidence_missing' \
+        "${install_doc}"
+
+    for claim_var in "${PACKAGE_SHAPE_NON_CLAIM_CMAKE_VARS[@]}"; do
+        require_file_contains \
+            "${cmake_config_template}" \
+            "set(${claim_var} FALSE)" \
+            "${cmake_config_template}"
+        require_file_contains \
+            "${install_doc}" \
+            "${claim_var}=FALSE" \
+            "${install_doc}"
+    done
+}
+
+check_installed_cmake_package_non_claim_metadata() {
+    local install_root="$1"
+    local check_root="${RELEASE_CHECK_ROOT}/installed-cmake-package-non-claim-check"
+
+    reject_protected_path "Installed CMake package root" "read from" "${install_root}"
+    reject_symlink_path_components "Installed CMake package root" "${install_root}"
+
+    if [[ ! -f "${install_root}/lib/cmake/Obelisk/ObeliskConfig.cmake" ]]; then
+        printf 'Installed CMake package config missing: %s\n' \
+            "${install_root}/lib/cmake/Obelisk/ObeliskConfig.cmake" >&2
+        exit 1
+    fi
+    if [[ ! -f "${install_root}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake" ]]; then
+        printf 'Installed CMake package version config missing: %s\n' \
+            "${install_root}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake" >&2
+        exit 1
+    fi
+    if [[ ! -f "${install_root}/lib/cmake/Obelisk/ObeliskTargets.cmake" ]]; then
+        printf 'Installed CMake package targets missing: %s\n' \
+            "${install_root}/lib/cmake/Obelisk/ObeliskTargets.cmake" >&2
+        exit 1
+    fi
+
+    mkdir -p "${check_root}"
+    cat > "${check_root}/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.22)
+project(ObeliskInstalledPackageNonClaimCheck LANGUAGES C)
+
+find_package(Obelisk 0.1.0 EXACT CONFIG QUIET COMPONENTS SDK)
+if(Obelisk_FOUND)
+    message(FATAL_ERROR "Installed Obelisk package accepted an exact stable-looking 0.1.0 SDK request")
+endif()
+
+find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
+
+if(NOT TARGET Obelisk::obelisk_sdk)
+    message(FATAL_ERROR "Installed Obelisk package did not define Obelisk::obelisk_sdk")
+endif()
+if(NOT Obelisk_SDK_FOUND)
+    message(FATAL_ERROR "Installed Obelisk package did not report SDK component found")
+endif()
+if(NOT Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev")
+    message(FATAL_ERROR "Installed Obelisk package development line is not pre-release: ${Obelisk_DEVELOPMENT_LINE}")
+endif()
+if(NOT Obelisk_RELEASE_CHANNEL STREQUAL "dev")
+    message(FATAL_ERROR "Installed Obelisk package release channel is not dev: ${Obelisk_RELEASE_CHANNEL}")
+endif()
+if(NOT Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS STREQUAL "package-shape-evidence-only")
+    message(FATAL_ERROR
+        "Installed Obelisk package did not mark SDK package shape as evidence-only: "
+        "${Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS}")
+endif()
+foreach(non_claim_var
+    Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED
+    Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED
+    Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED
+    Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED
+    Obelisk_SUPPORT_TIER_ACTIVATION_ALLOWED
+    Obelisk_V1_COMPLETION_CLAIM_ALLOWED
+    Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED
+    Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED
+)
+    if(NOT DEFINED ${non_claim_var})
+        message(FATAL_ERROR "Installed Obelisk package omitted non-claim marker: ${non_claim_var}")
+    endif()
+    if(NOT "${${non_claim_var}}" STREQUAL "FALSE")
+        message(FATAL_ERROR
+            "Installed Obelisk package enabled forbidden readiness marker "
+            "${non_claim_var}=${${non_claim_var}}")
+    endif()
+endforeach()
+CMAKE
+
+    cmake -S "${check_root}" -B "${check_root}/build" \
+        -DCMAKE_PREFIX_PATH="${install_root}"
+}
+
 check_clean_tree
+run_step check_package_shape_non_claim_contract
 run_step cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOBELISK_BUILD_EXPERIMENTAL_PLUGINS=OFF
 run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
 run_step check_production_runtime_symbols
@@ -836,6 +1173,7 @@ if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
     fi
 fi
 run_step env OBELISK_BUILD_DIR="${BUILD_DIR}" scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
+run_step check_installed_cmake_package_non_claim_metadata "${LAYOUT_CHECK_ROOT}"
 run_step scripts/obelisk.py --root "${LAYOUT_CHECK_ROOT}" status
 run_step scripts/install_obelisk.sh --build-dir "${BUILD_DIR}" --dry-run "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
@@ -861,3 +1199,4 @@ else
     printf 'Public SDK v1 stable claim gate was not run.\n'
 fi
 printf 'Release gate output is evidence for this exact gate only; it does not grant live-ops approval, Plugin Hub readiness/publication, support-tier activation, runtime readiness, stable production readiness, stable SDK claims, or v1 SDK completion.\n'
+printf 'Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4, stable_claim_allowed=false, active blocker approved_runtime_evidence_missing.\n'

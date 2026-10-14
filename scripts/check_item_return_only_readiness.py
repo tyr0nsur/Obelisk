@@ -27,6 +27,7 @@ OUTPUT_TARGET_SET = "item-return-only-policy-slice"
 PUBLIC_GAMEPLAY_EVENTS = REPO_ROOT / "docs" / "public_gameplay_events.json"
 PUBLIC_GAMEPLAY_EVENTS_SCHEMA = "obelisk.public-gameplay-events.v1"
 GAMEPLAY_POLICY_EVENT_ID = "obelisk.gameplay_policy.v1"
+ITEM_RETURN_BACKING_REPORT = "docs/research/2026-05-30-item-return-only-policy-slice.md"
 INVENTORY_ITEM_RESOURCE_KIND = "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
 RETURN_VALUE_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
 REQUESTED_BY_PLAYER_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER"
@@ -375,6 +376,29 @@ PUBLIC_GAMEPLAY_EVENTS_STATUS_CLAIM_KEY_RE = re.compile(
     r"resource_handle|return_override).*(?:status|readiness|ready|promotion)$",
     re.IGNORECASE,
 )
+POSITIVE_POLICY_CLAIM_SUBJECT_RE = re.compile(
+    r"(?:"
+    r"Inventory\s+SDK|Items\s+SDK|item\s+SDK|public\s+(?:SDK|API|ABI|contract|module)|"
+    r"runtime(?:\s+hook)?|approved\s+runtime\s+evidence|complete\s+SDK|stable\s+SDK|"
+    r"v1\s+(?:completion|SDK|release)|P0|dependency\s+chain|package\s+shape|plugin\s+hub|"
+    r"item\s+identity|inventory\s+identity|object\s+identity|class\s+identity|identity|lookup|"
+    r"mutation|return\s+overrides?|ResourceHandle|resource\s+handle"
+    r")",
+    re.IGNORECASE,
+)
+POSITIVE_POLICY_CLAIM_CONTEXT_RE = re.compile(
+    r"(?:"
+    r"ready|readiness|available|enabled|promoted|promotion|complete|"
+    r"completion|supported|validated|claim|counts|allowed|unblocked|unlocked|"
+    r"clears?|resolves?|replaces?|satisfies|stable|accepted|approved"
+    r")",
+    re.IGNORECASE,
+)
+NEGATIVE_POLICY_CLAIM_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|must\s+not|not\s+promote|not\s+expose|not\s+copy|no\s+|excluded)\b",
+    re.IGNORECASE,
+)
+POLICY_CLAIM_CLAUSE_SPLIT_RE = re.compile(r"(?:[.;\n]|\bbut\b|\bhowever\b)", re.IGNORECASE)
 
 
 def parse_args() -> argparse.Namespace:
@@ -565,6 +589,30 @@ def scan_public_gameplay_event_readiness_claims(
     elif isinstance(value, list):
         for index, child in enumerate(value):
             scan_public_gameplay_event_readiness_claims(child, blockers, f"{path}[{index}]")
+
+
+def reject_positive_policy_claim_values(value: Any, blockers: list[dict[str, Any]], *, path: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            reject_positive_policy_claim_values(child, blockers, path=f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_positive_policy_claim_values(child, blockers, path=f"{path}[{index}]")
+        return
+    if not isinstance(value, str):
+        return
+    for clause in POLICY_CLAIM_CLAUSE_SPLIT_RE.split(value):
+        if NEGATIVE_POLICY_CLAIM_RE.search(clause):
+            continue
+        if POSITIVE_POLICY_CLAIM_SUBJECT_RE.search(clause) is None:
+            continue
+        if POSITIVE_POLICY_CLAIM_CONTEXT_RE.search(clause) is None:
+            continue
+        break
+    else:
+        return
+    append_blocker(blockers, "forbidden_positive_policy_claim_value", path=path, value=value)
 
 
 def validate_generated_from(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
@@ -799,31 +847,37 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
     )
     if not target_sets:
         append_blocker(blockers, "public_target_sets_missing_or_invalid")
-    if OUTPUT_TARGET_SET not in target_sets:
-        append_blocker(blockers, "public_item_return_target_set_not_listed", expected=OUTPUT_TARGET_SET)
+    if OUTPUT_TARGET_SET in target_sets:
+        append_blocker(
+            blockers,
+            "public_item_return_target_set_listed_as_public_scope",
+            value=OUTPUT_TARGET_SET,
+        )
 
     evidence = event.get("target_set_evidence")
     if not isinstance(evidence, list):
         append_blocker(blockers, "public_target_set_evidence_missing")
     else:
-        evidence_matches = [
+        item_return_evidence_matches = [
             entry
             for entry in evidence
             if isinstance(entry, dict) and entry.get("target_set") == OUTPUT_TARGET_SET
         ]
-        if len(evidence_matches) != 1:
+        if item_return_evidence_matches:
             append_blocker(
                 blockers,
-                "public_item_return_evidence_count_mismatch",
-                expected=1,
-                value=len(evidence_matches),
+                "public_item_return_target_set_evidence_misclassified_as_public_scope",
+                value=len(item_return_evidence_matches),
             )
-        elif "copied ReturnValue-only item backing" not in str(evidence_matches[0].get("scope", "")):
-            append_blocker(
-                blockers,
-                "public_item_return_evidence_scope_not_return_value_only",
-                value=evidence_matches[0].get("scope"),
-            )
+
+    second_source_reports = event.get("second_source_reports")
+    if not isinstance(second_source_reports, list) or ITEM_RETURN_BACKING_REPORT not in second_source_reports:
+        append_blocker(
+            blockers,
+            "public_item_return_second_source_report_missing",
+            expected=ITEM_RETURN_BACKING_REPORT,
+            value=second_source_reports,
+        )
 
     require_not_promoted_claim(
         blockers,
@@ -1319,6 +1373,7 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     for token in REQUIRED_NON_CLAIM_TOKENS:
         if token not in non_claims_text:
             append_blocker(blockers, "required_non_claim_missing", token=token)
+    reject_positive_policy_claim_values(policy, blockers)
 
     return {
         "input_targets": sorted(input_targets),

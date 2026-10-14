@@ -17,11 +17,114 @@ import build_redacted_ufunction_signatures
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_checker
 import check_player_identity_principal_invalidation_policy as principal_checker
 import protected_paths
+from reflection_target_sets import (
+    PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS,
+    PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS,
+    PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS,
+    PLAYER_LIFECYCLE_REJECTED_START_SOURCE_TARGETS,
+    PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS,
+    schema_target_list,
+    target_set_module_lane,
+    target_set_readiness_classification,
+)
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 REPORT_SCHEMA = "obelisk.player-identity-planning-source-manifests-build-report.v1"
 FIRST_EVIDENCE_OUTPUT_NAME = "players-identity-first-evidence.json"
 REPORT_OUTPUT_NAME = "player-identity-planning-source-manifests-report.json"
+ALL_SIX_PLANNING_GAP_OUTPUT_NAME = "players-lifecycle-anchor-candidates-all-six-planning-gap.json"
+FNAME_MISMATCH_OUTPUT_NAME = "players-lifecycle-handle-new-player-fname-mismatch-ragnarok-20260604.json"
+ALL_SIX_PLANNING_GAP_SCHEMA = "obelisk.players-lifecycle-anchor-candidates-all-six-planning-gap.v1"
+FNAME_MISMATCH_SCHEMA = "obelisk.players-lifecycle-handle-new-player-fname-mismatch.v1"
+ALL_SIX_PLANNING_GAP_TARGET_SET = "players-lifecycle-anchor-candidates"
+FNAME_MISMATCH_PRIMARY_TARGET = "ShooterGameMode.HandleNewPlayer"
+FNAME_MISMATCH_RELATED_TARGETS = ("ShooterGameMode.OnLogout",)
+FNAME_MISMATCH_ALLOWED_TARGETS = (FNAME_MISMATCH_PRIMARY_TARGET, *FNAME_MISMATCH_RELATED_TARGETS)
+ALL_SIX_REQUIRED_TARGETS = (
+    "GameMode.K2_PostLogin",
+    "ShooterGameMode.CheckJoinInProgress",
+    "ShooterGameMode.HandleNewPlayer",
+    "ShooterGameMode.OnLogout",
+    "ShooterGameMode.OnPostLogin__DelegateSignature",
+    "ShooterGameMode.OnStartNewPlayer__DelegateSignature",
+)
+ALL_SIX_CURRENT_DURABLE_ANCHOR_TARGETS = [
+    *PLAYER_LIFECYCLE_STATIC_ANCHOR_TARGETS,
+]
+ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS = [
+    *PLAYER_LIFECYCLE_APPROVED_TRIPLET_SOURCE_TARGETS,
+]
+ALL_SIX_REJECTED_START_SOURCE_TARGETS = [
+    *PLAYER_LIFECYCLE_REJECTED_START_SOURCE_TARGETS,
+]
+ALL_SIX_CHRONOLOGY_ONLY_TARGETS = [
+    *PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS,
+]
+ALL_SIX_GUIDANCE_ONLY_TARGETS = [
+    *PLAYER_LIFECYCLE_CHRONOLOGY_ONLY_TARGETS,
+    *PLAYER_LIFECYCLE_DELEGATE_GUIDANCE_ONLY_TARGETS,
+]
+ALL_SIX_REQUIRED_BLOCKER = "approved_runtime_evidence_missing"
+ALL_SIX_TRIPLET_SOURCE_TARGETS_MEANING = (
+    "source-name labels for the required runtime triplet only; not lifecycle anchor "
+    "bindings, approved runtime evidence, or public SDK progress"
+)
+ALL_SIX_DURABLE_ANCHOR_TARGETS_MEANING = (
+    "source-bound static lifecycle anchor bindings only; excludes CheckJoinInProgress "
+    "and does not replace approved runtime triplet evidence"
+)
+ALL_SIX_HISTORICAL_ACCEPTED_TARGETS_MEANING = (
+    "scratch comparison target count only; not durable second-source evidence, "
+    "lifecycle anchor binding, approved runtime evidence, or public SDK progress"
+)
+ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY = {
+    "role": "session_start_rejected",
+    "target": "ShooterGameMode.CheckJoinInProgress",
+    "required_copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+    "required_copied_bool_values": ["1", "0"],
+    "required_event_boundary": "post-original copied observer event accepted by analyzer/bundle/approved-checker chain",
+    "disallowed_substitutes": [
+        "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+        "passive snapshots",
+        "diagnostic-only lines",
+    ],
+    "status": "exact_role_only",
+}
+ALL_SIX_FORBIDDEN_TRUE_FIELDS = frozenset(
+    (
+        "accepted_for_lifecycle_anchor_binding",
+        "accepted_for_runtime_evidence",
+        "accepted_for_second_source",
+        "approved_runtime_evidence",
+        "approved_runtime_evidence_present",
+        "can_update_fixture_expectations",
+        "counts_as_second_source_layout_evidence",
+        "promotion_ready",
+        "public_sdk_ready",
+        "ready",
+        "runtime_evidence_ready",
+        "runtime_ready",
+        "server_operations_authorized",
+    )
+)
+FNAME_MISMATCH_FORBIDDEN_TRUE_FIELDS = frozenset(
+    (
+        "accepted_for_runtime_evidence",
+        "accepted_for_second_source",
+        "approved_runtime_evidence",
+        "can_be_used_as_candidate_snapshot_root",
+        "can_be_used_as_second_source_layout_evidence",
+        "counts_as_approved_runtime_evidence",
+        "counts_as_runtime_evidence",
+        "layout_evidence_accepted",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "second_source_layout_evidence",
+        "server_operations_authorized",
+    )
+)
 DEFAULT_LIFECYCLE_STATIC_REPORT = (
     Path(__file__).resolve().parents[1]
     / "docs"
@@ -85,6 +188,38 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def duplicate_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
+
+
+def reject_duplicate_source_artifact_ids(source_ids: Any, *, label: str) -> None:
+    if not isinstance(source_ids, list):
+        return
+    string_source_ids = [source_id for source_id in source_ids if isinstance(source_id, str)]
+    duplicate_entries = duplicate_strings(string_source_ids)
+    if duplicate_entries:
+        raise SystemExit(f"{label} source_artifact_ids duplicate: " + ", ".join(duplicate_entries))
+
+    values_by_kind: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
+    for source_id in string_source_ids:
+        key, separator, value = source_id.partition(":")
+        if separator and key in values_by_kind:
+            values_by_kind[key].append(value)
+    for key, values in values_by_kind.items():
+        duplicates = duplicate_strings(values)
+        if duplicates:
+            raise SystemExit(
+                f"{label} source_artifact_ids duplicate {key}: "
+                + ", ".join(duplicates)
+            )
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -215,6 +350,7 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
     )
     if source_id_blockers:
         raise SystemExit("lifecycle-static-report source_artifact_ids invalid")
+    reject_duplicate_source_artifact_ids(source_ids, label="lifecycle-static-report")
     static_orientation = payload.get("static_orientation")
     if not isinstance(static_orientation, dict):
         raise SystemExit("lifecycle-static-report static_orientation missing")
@@ -258,6 +394,7 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
     missing = [target for _, target in LIFECYCLE_TARGETS if target not in targets_by_name]
     if missing:
         raise SystemExit("lifecycle-static-report missing accepted lifecycle targets: " + ", ".join(missing))
+    accepted_target_snapshot_shas: list[str] = []
     for role, target in LIFECYCLE_TARGETS:
         row = targets_by_name[target]
         expected = lifecycle_checker.LIFECYCLE_LAYOUT_CANDIDATE_TARGETS[target]
@@ -269,12 +406,19 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
             row["source_snapshot_sha256"]
         ) is None:
             raise SystemExit(f"lifecycle-static-report source snapshot SHA invalid for {target}")
+        accepted_target_snapshot_shas.append(row["source_snapshot_sha256"])
         if row.get("num_parms") != expected["num_parms"]:
             raise SystemExit(f"lifecycle-static-report num_parms mismatch for {target}")
         if row.get("parms_size") != expected["parms_size"]:
             raise SystemExit(f"lifecycle-static-report parms_size mismatch for {target}")
         if row.get("property_order") != [field[0] for field in expected["fields"]]:
             raise SystemExit(f"lifecycle-static-report property_order mismatch for {target}")
+    duplicate_snapshot_shas = duplicate_strings(accepted_target_snapshot_shas)
+    if duplicate_snapshot_shas:
+        raise SystemExit(
+            "lifecycle-static-report source snapshot SHA duplicate: "
+            + ", ".join(duplicate_snapshot_shas)
+        )
     return payload, lifecycle_static_report_hash(path)
 
 
@@ -743,6 +887,1242 @@ def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:
     return [str(blocker.get("reason")) for blocker in blockers]
 
 
+def add_all_six_blocker(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
+    blocker = {"reason": reason, "label": label}
+    blocker.update(extra)
+    blockers.append(blocker)
+
+
+def validate_all_six_exact_rejected_start_role_policy(
+    policy: Any,
+    blockers: list[dict[str, Any]],
+    label: str,
+) -> None:
+    if policy != ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_exact_rejected_start_role_policy_mismatch",
+            label,
+            expected=ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY,
+            actual=policy,
+        )
+
+
+def repo_relative_path(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def snapshot_target_summary(path: Path, target: str) -> dict[str, Any]:
+    payload, target_payload = snapshot_target_payload(path, target)
+    property_chain = target_payload.get("property_chain")
+    properties = property_chain.get("properties") if isinstance(property_chain, dict) else None
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target}: property_chain.properties missing")
+    evidence = payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    return {
+        "ark_binary_sha256": evidence.get("ark_binary_sha256"),
+        "base_fixture_path": repo_relative_path(path),
+        "base_fixture_sha256": sha256_file(path),
+        "num_parms": target_payload.get("num_parms"),
+        "parms_size": target_payload.get("parms_size"),
+        "property_order": [prop.get("name") for prop in properties if isinstance(prop, dict)],
+        "property_name_indices": [prop.get("name_index") for prop in properties if isinstance(prop, dict)],
+    }
+
+
+def validate_all_six_catalog_binding(blockers: list[dict[str, Any]]) -> None:
+    try:
+        catalog_targets = schema_target_list(ALL_SIX_PLANNING_GAP_TARGET_SET, lifecycle_checker.SNAPSHOT_SCHEMA)
+    except KeyError:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_catalog_target_set_missing",
+            "$.target_set",
+            target_set=ALL_SIX_PLANNING_GAP_TARGET_SET,
+        )
+        return
+
+    if catalog_targets != list(ALL_SIX_REQUIRED_TARGETS):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_catalog_targets_mismatch",
+            "reflection_target_sets.py:players-lifecycle-anchor-candidates",
+            expected=list(ALL_SIX_REQUIRED_TARGETS),
+            actual=catalog_targets,
+        )
+    try:
+        module_lane = target_set_module_lane(ALL_SIX_PLANNING_GAP_TARGET_SET)
+    except KeyError:
+        module_lane = None
+    if module_lane != "players_lifecycle":
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_catalog_module_lane_mismatch",
+            "reflection_target_sets.py:TARGET_SET_MODULE_LANES",
+            actual=module_lane,
+        )
+    try:
+        readiness_classification = target_set_readiness_classification(ALL_SIX_PLANNING_GAP_TARGET_SET)
+    except KeyError:
+        readiness_classification = None
+    if readiness_classification != "planning_only":
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_catalog_readiness_classification_mismatch",
+            "reflection_target_sets.py:PLANNING_ONLY_TARGET_SETS",
+            actual=readiness_classification,
+        )
+
+
+def validate_all_six_base_fixture_binding(
+    artifact: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    snapshot_root: Path,
+) -> None:
+    paths = manifest_target_paths(snapshot_root)
+    manifest = load_json(snapshot_root / "manifest.json", "snapshot manifest")
+    identity = artifact.get("artifact_identity") if isinstance(artifact.get("artifact_identity"), dict) else {}
+    manifest_binary_sha = manifest.get("ark_binary_sha256")
+    if identity.get("ark_binary_sha256") != manifest_binary_sha:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_manifest_binary_sha_mismatch",
+            "$.artifact_identity.ark_binary_sha256",
+            expected=manifest_binary_sha,
+            actual=identity.get("ark_binary_sha256"),
+        )
+
+    targets = artifact.get("base_fixture_targets")
+    if not isinstance(targets, list):
+        return
+
+    entries_by_target: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(targets):
+        if not isinstance(entry, dict):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_target_entry_invalid",
+                f"$.base_fixture_targets[{index}]",
+            )
+            continue
+        target = entry.get("target")
+        if not isinstance(target, str) or not target:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_target_name_missing",
+                f"$.base_fixture_targets[{index}].target",
+            )
+            continue
+        if target in entries_by_target:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_target_duplicate",
+                f"$.base_fixture_targets[{index}].target",
+                target=target,
+            )
+            continue
+        entries_by_target[target] = entry
+
+    for target in ALL_SIX_REQUIRED_TARGETS:
+        entry = entries_by_target.get(target)
+        if entry is None:
+            continue
+        path = paths.get(target)
+        if path is None:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_snapshot_missing",
+                f"$.base_fixture_targets[{target}]",
+                target=target,
+            )
+            continue
+        summary = snapshot_target_summary(path, target)
+        for key in ("base_fixture_path", "base_fixture_sha256", "num_parms", "parms_size", "property_order"):
+            if entry.get(key) != summary[key]:
+                add_all_six_blocker(
+                    blockers,
+                    f"all_six_planning_gap_{key}_mismatch",
+                    f"$.base_fixture_targets[{target}].{key}",
+                    target=target,
+                    expected=summary[key],
+                    actual=entry.get(key),
+                )
+        if summary["ark_binary_sha256"] != identity.get("ark_binary_sha256"):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_binary_sha_mismatch",
+                f"$.base_fixture_targets[{target}]",
+                target=target,
+                expected=identity.get("ark_binary_sha256"),
+                actual=summary["ark_binary_sha256"],
+            )
+
+
+def all_six_planning_gap_artifact_blockers(
+    artifact: dict[str, Any],
+    *,
+    snapshot_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    validate_all_six_catalog_binding(blockers)
+
+    if artifact.get("schema") != ALL_SIX_PLANNING_GAP_SCHEMA:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_schema_mismatch",
+            "$.schema",
+            actual=artifact.get("schema"),
+        )
+    if artifact.get("artifact_status") != "planning_gap":
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_artifact_status_mismatch",
+            "$.artifact_status",
+            actual=artifact.get("artifact_status"),
+        )
+    if artifact.get("planning_only") is not True:
+        add_all_six_blocker(blockers, "all_six_planning_gap_planning_only_not_true", "$.planning_only")
+    if artifact.get("target_set") != ALL_SIX_PLANNING_GAP_TARGET_SET:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_target_set_mismatch",
+            "$.target_set",
+            actual=artifact.get("target_set"),
+        )
+    if artifact.get("readiness_classification") != "planning_only":
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_readiness_classification_mismatch",
+            "$.readiness_classification",
+            actual=artifact.get("readiness_classification"),
+        )
+
+    operational = artifact.get("operational_consolidation")
+    if not isinstance(operational, dict):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_operational_consolidation_missing",
+            "$.operational_consolidation",
+        )
+    else:
+        triplet_policy = operational.get("approved_triplet_sources")
+        if not isinstance(triplet_policy, dict):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_approved_triplet_sources_missing",
+                "$.operational_consolidation.approved_triplet_sources",
+            )
+        else:
+            expected_triplet_policy_fields = {
+                "targets": ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS,
+                "targets_meaning": ALL_SIX_TRIPLET_SOURCE_TARGETS_MEANING,
+                "static_lifecycle_anchor_targets": ALL_SIX_CURRENT_DURABLE_ANCHOR_TARGETS,
+                "observer_rejected_start_targets": ALL_SIX_REJECTED_START_SOURCE_TARGETS,
+                "chronology_only_non_anchor_targets": ALL_SIX_CHRONOLOGY_ONLY_TARGETS,
+            }
+            for key, expected in expected_triplet_policy_fields.items():
+                if triplet_policy.get(key) != expected:
+                    add_all_six_blocker(
+                        blockers,
+                        f"all_six_planning_gap_{key}_mismatch",
+                        f"$.operational_consolidation.approved_triplet_sources.{key}",
+                        expected=expected,
+                        actual=triplet_policy.get(key),
+                    )
+            validate_all_six_exact_rejected_start_role_policy(
+                triplet_policy.get("exact_rejected_start_role_policy"),
+                blockers,
+                "$.operational_consolidation.approved_triplet_sources.exact_rejected_start_role_policy",
+            )
+            if triplet_policy.get("only_these_targets_may_source_approved_triplet_roles") is not True:
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_triplet_source_exclusivity_missing",
+                    "$.operational_consolidation.approved_triplet_sources.only_these_targets_may_source_approved_triplet_roles",
+                )
+            if triplet_policy.get("k2_postlogin_status") != "non_anchor_chronology_only_property_fname_mismatch_rejected":
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_k2_postlogin_status_mismatch",
+                    "$.operational_consolidation.approved_triplet_sources.k2_postlogin_status",
+                    actual=triplet_policy.get("k2_postlogin_status"),
+                )
+            if triplet_policy.get("all_six_planning_gap_evidence_status") != "non_evidence":
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_evidence_status_mismatch",
+                    "$.operational_consolidation.approved_triplet_sources.all_six_planning_gap_evidence_status",
+                    actual=triplet_policy.get("all_six_planning_gap_evidence_status"),
+                )
+        durable_roles = operational.get("durable_lifecycle_anchor_roles")
+        if not isinstance(durable_roles, list):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_durable_lifecycle_anchor_roles_missing",
+                "$.operational_consolidation.durable_lifecycle_anchor_roles",
+            )
+        else:
+            roles_by_target = {
+                entry.get("target"): entry
+                for entry in durable_roles
+                if isinstance(entry, dict) and isinstance(entry.get("target"), str)
+            }
+            handle_new_player_role = roles_by_target.get("ShooterGameMode.HandleNewPlayer")
+            if not isinstance(handle_new_player_role, dict):
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_handle_new_player_lifecycle_role_missing",
+                    "$.operational_consolidation.durable_lifecycle_anchor_roles",
+                )
+            elif handle_new_player_role.get("can_source_session_start_rejected") is not False:
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_handle_new_player_rejected_start_role_not_disallowed",
+                    "$.operational_consolidation.durable_lifecycle_anchor_roles[ShooterGameMode.HandleNewPlayer].can_source_session_start_rejected",
+                    actual=handle_new_player_role.get("can_source_session_start_rejected"),
+                )
+            for index, entry in enumerate(durable_roles):
+                if (
+                    isinstance(entry, dict)
+                    and entry.get("target") == "ShooterGameMode.HandleNewPlayer"
+                    and entry.get("role") == "session_start_rejected"
+                ):
+                    add_all_six_blocker(
+                        blockers,
+                        "all_six_planning_gap_handle_new_player_rejected_start_role_not_allowed",
+                        f"$.operational_consolidation.durable_lifecycle_anchor_roles[{index}]",
+                    )
+
+        observer = operational.get("observer_only_alternative")
+        if not isinstance(observer, dict):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_observer_only_alternative_missing",
+                "$.operational_consolidation.observer_only_alternative",
+            )
+        else:
+            observer_fields = {
+                "role": ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["role"],
+                "target": ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["target"],
+                "required_copied_bool_fields": ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["required_copied_bool_fields"],
+                "required_copied_bool_values": ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["required_copied_bool_values"],
+                "disallowed_substitutes": ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["disallowed_substitutes"],
+            }
+            for key, expected in observer_fields.items():
+                if observer.get(key) != expected:
+                    add_all_six_blocker(
+                        blockers,
+                        f"all_six_planning_gap_observer_only_{key}_mismatch",
+                        f"$.operational_consolidation.observer_only_alternative.{key}",
+                        expected=expected,
+                        actual=observer.get(key),
+                    )
+
+    identity = artifact.get("artifact_identity")
+    if not isinstance(identity, dict):
+        add_all_six_blocker(blockers, "all_six_planning_gap_artifact_identity_missing", "$.artifact_identity")
+    else:
+        if identity.get("build_type") != "repo_fixture_planning_gap":
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_build_type_mismatch",
+                "$.artifact_identity.build_type",
+                actual=identity.get("build_type"),
+            )
+        if identity.get("target_set_revision") != STATIC_REPORT_TARGET_SET_REVISION:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_target_set_revision_mismatch",
+                "$.artifact_identity.target_set_revision",
+                actual=identity.get("target_set_revision"),
+            )
+        if identity.get("path_redacted") is not True:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_path_redacted_not_true",
+                "$.artifact_identity.path_redacted",
+            )
+        source_id_blockers: list[dict[str, Any]] = []
+        lifecycle_checker.validate_source_artifact_ids(
+            identity.get("base_source_artifact_ids"),
+            source_id_blockers,
+            "$.artifact_identity.base_source_artifact_ids",
+        )
+        if source_id_blockers:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_source_artifact_ids_invalid",
+                "$.artifact_identity.base_source_artifact_ids",
+                details=source_id_blockers,
+            )
+
+    targets = artifact.get("base_fixture_targets")
+    if not isinstance(targets, list):
+        add_all_six_blocker(blockers, "all_six_planning_gap_base_fixture_targets_invalid", "$.base_fixture_targets")
+    else:
+        for index, entry in enumerate(targets):
+            if not isinstance(entry, dict):
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_base_fixture_target_entry_invalid",
+                    f"$.base_fixture_targets[{index}]",
+                )
+        target_names = [entry.get("target") for entry in targets if isinstance(entry, dict)]
+        if target_names != list(ALL_SIX_REQUIRED_TARGETS):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_base_fixture_targets_mismatch",
+                "$.base_fixture_targets",
+                actual=target_names,
+            )
+        promoted = [
+            entry.get("target")
+            for entry in targets
+            if isinstance(entry, dict) and entry.get("current_promoted_durable_source_bound_lifecycle_evidence") is True
+        ]
+        if promoted != ALL_SIX_CURRENT_DURABLE_ANCHOR_TARGETS:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_promoted_anchor_subset_mismatch",
+                "$.base_fixture_targets",
+                actual=promoted,
+            )
+        triplet_source_targets = sorted(
+            entry.get("target")
+            for entry in targets
+            if (
+                isinstance(entry, dict)
+                and isinstance(entry.get("target"), str)
+                and entry.get("current_approved_triplet_source") is True
+            )
+        )
+        if triplet_source_targets != sorted(ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_triplet_source_target_flags_mismatch",
+                "$.base_fixture_targets",
+                expected=ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS,
+                actual=triplet_source_targets,
+            )
+        entries_by_target = {
+            entry.get("target"): entry
+            for entry in targets
+            if isinstance(entry, dict) and isinstance(entry.get("target"), str)
+        }
+        for target, entry in entries_by_target.items():
+            expected_flag = target in ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS
+            if entry.get("current_approved_triplet_source") is not expected_flag:
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_triplet_source_flag_mismatch",
+                    f"$.base_fixture_targets[{target}].current_approved_triplet_source",
+                    target=target,
+                    expected=expected_flag,
+                    actual=entry.get("current_approved_triplet_source"),
+                )
+        k2_entry = entries_by_target.get("GameMode.K2_PostLogin")
+        if not isinstance(k2_entry, dict):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_k2_postlogin_entry_missing",
+                "$.base_fixture_targets",
+            )
+        else:
+            if k2_entry.get("current_approved_triplet_source") is not False:
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_k2_postlogin_triplet_source_not_false",
+                    "$.base_fixture_targets[GameMode.K2_PostLogin].current_approved_triplet_source",
+                    actual=k2_entry.get("current_approved_triplet_source"),
+                )
+            if k2_entry.get("chronology_only_non_anchor") is not True:
+                add_all_six_blocker(
+                    blockers,
+                    "all_six_planning_gap_k2_postlogin_not_chronology_only",
+                    "$.base_fixture_targets[GameMode.K2_PostLogin].chronology_only_non_anchor",
+                    actual=k2_entry.get("chronology_only_non_anchor"),
+                )
+        handle_new_player_entry = entries_by_target.get("ShooterGameMode.HandleNewPlayer")
+        if (
+            isinstance(handle_new_player_entry, dict)
+            and handle_new_player_entry.get("current_rejected_start_observer_alternative") is True
+        ):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_handle_new_player_rejected_start_observer_not_allowed",
+                "$.base_fixture_targets[ShooterGameMode.HandleNewPlayer].current_rejected_start_observer_alternative",
+            )
+        check_join_entry = entries_by_target.get("ShooterGameMode.CheckJoinInProgress")
+        if not isinstance(check_join_entry, dict):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_checkjoin_entry_missing",
+                "$.base_fixture_targets",
+            )
+        elif check_join_entry.get("current_rejected_start_observer_alternative") is not True:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_checkjoin_rejected_start_observer_missing",
+                "$.base_fixture_targets[ShooterGameMode.CheckJoinInProgress].current_rejected_start_observer_alternative",
+                actual=check_join_entry.get("current_rejected_start_observer_alternative"),
+            )
+
+    historical = artifact.get("historical_scratch_comparison")
+    if not isinstance(historical, dict):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_historical_scratch_comparison_missing",
+            "$.historical_scratch_comparison",
+        )
+    else:
+        if historical.get("durable") is not False:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_historical_scratch_comparison_must_not_be_durable",
+                "$.historical_scratch_comparison.durable",
+            )
+        if historical.get("status") != "scratch_triage_only":
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_historical_scratch_comparison_status_mismatch",
+                "$.historical_scratch_comparison.status",
+                actual=historical.get("status"),
+            )
+        if historical.get("accepted_targets") != len(ALL_SIX_REQUIRED_TARGETS):
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_historical_scratch_accepted_targets_count_mismatch",
+                "$.historical_scratch_comparison.accepted_targets",
+                expected=len(ALL_SIX_REQUIRED_TARGETS),
+                actual=historical.get("accepted_targets"),
+            )
+        if historical.get("accepted_targets_meaning") != ALL_SIX_HISTORICAL_ACCEPTED_TARGETS_MEANING:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_historical_scratch_accepted_targets_meaning_mismatch",
+                "$.historical_scratch_comparison.accepted_targets_meaning",
+                expected=ALL_SIX_HISTORICAL_ACCEPTED_TARGETS_MEANING,
+                actual=historical.get("accepted_targets_meaning"),
+            )
+
+    durable = artifact.get("durable_all_six_comparison")
+    if not isinstance(durable, dict):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_durable_all_six_comparison_missing",
+            "$.durable_all_six_comparison",
+        )
+    else:
+        if durable.get("provided") is not False:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_durable_all_six_comparison_must_not_be_provided",
+                "$.durable_all_six_comparison.provided",
+            )
+        if durable.get("accepted") is not False:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_durable_all_six_comparison_must_not_be_accepted",
+                "$.durable_all_six_comparison.accepted",
+            )
+        if durable.get("reason") != "distinct_non_tmp_candidate_snapshot_root_missing":
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_durable_all_six_comparison_reason_mismatch",
+                "$.durable_all_six_comparison.reason",
+                actual=durable.get("reason"),
+            )
+
+    current = artifact.get("current_durable_source_bound_lifecycle_anchor_evidence")
+    if not isinstance(current, dict):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_current_durable_anchor_evidence_missing",
+            "$.current_durable_source_bound_lifecycle_anchor_evidence",
+        )
+    elif current.get("accepted_targets") != ALL_SIX_CURRENT_DURABLE_ANCHOR_TARGETS:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_current_durable_anchor_targets_mismatch",
+            "$.current_durable_source_bound_lifecycle_anchor_evidence.accepted_targets",
+            actual=current.get("accepted_targets"),
+        )
+    else:
+        if current.get("accepted_targets_meaning") != ALL_SIX_DURABLE_ANCHOR_TARGETS_MEANING:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_current_durable_anchor_accepted_targets_meaning_mismatch",
+                "$.current_durable_source_bound_lifecycle_anchor_evidence.accepted_targets_meaning",
+                expected=ALL_SIX_DURABLE_ANCHOR_TARGETS_MEANING,
+                actual=current.get("accepted_targets_meaning"),
+            )
+        observer_alternatives = current.get("observer_only_rejected_start_alternatives")
+        observer_targets = [
+            entry.get("target")
+            for entry in observer_alternatives
+            if isinstance(entry, dict)
+        ] if isinstance(observer_alternatives, list) else []
+        if observer_targets != ALL_SIX_REJECTED_START_SOURCE_TARGETS:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_current_observer_rejected_start_sources_mismatch",
+                "$.current_durable_source_bound_lifecycle_anchor_evidence.observer_only_rejected_start_alternatives",
+                expected=ALL_SIX_REJECTED_START_SOURCE_TARGETS,
+                actual=observer_targets,
+            )
+        if len(observer_targets) == 1 and observer_targets[0] == ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY["target"]:
+            observer_entry = observer_alternatives[0] if isinstance(observer_alternatives, list) else None
+            if isinstance(observer_entry, dict):
+                for key in (
+                    "required_copied_bool_fields",
+                    "required_copied_bool_values",
+                    "disallowed_substitutes",
+                ):
+                    expected = ALL_SIX_EXACT_REJECTED_START_ROLE_POLICY[key]
+                    if observer_entry.get(key) != expected:
+                        add_all_six_blocker(
+                            blockers,
+                            f"all_six_planning_gap_current_observer_rejected_start_{key}_mismatch",
+                            f"$.current_durable_source_bound_lifecycle_anchor_evidence.observer_only_rejected_start_alternatives[0].{key}",
+                            expected=expected,
+                            actual=observer_entry.get(key),
+                        )
+
+    current_triplet = artifact.get("current_approved_triplet_sources")
+    if not isinstance(current_triplet, dict):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_current_triplet_sources_missing",
+            "$.current_approved_triplet_sources",
+        )
+    else:
+        current_triplet_fields = {
+            "accepted_targets": ALL_SIX_APPROVED_TRIPLET_SOURCE_TARGETS,
+            "accepted_targets_meaning": ALL_SIX_TRIPLET_SOURCE_TARGETS_MEANING,
+            "static_lifecycle_anchor_targets": ALL_SIX_CURRENT_DURABLE_ANCHOR_TARGETS,
+            "observer_rejected_start_targets": ALL_SIX_REJECTED_START_SOURCE_TARGETS,
+            "chronology_only_non_anchor_targets": ALL_SIX_CHRONOLOGY_ONLY_TARGETS,
+            "guidance_only_non_triplet_targets": ALL_SIX_GUIDANCE_ONLY_TARGETS,
+        }
+        for key, expected in current_triplet_fields.items():
+            if current_triplet.get(key) != expected:
+                add_all_six_blocker(
+                    blockers,
+                    f"all_six_planning_gap_current_triplet_{key}_mismatch",
+                    f"$.current_approved_triplet_sources.{key}",
+                    expected=expected,
+                    actual=current_triplet.get(key),
+                )
+        validate_all_six_exact_rejected_start_role_policy(
+            current_triplet.get("exact_rejected_start_role_policy"),
+            blockers,
+            "$.current_approved_triplet_sources.exact_rejected_start_role_policy",
+        )
+        if current_triplet.get("all_six_planning_gap_evidence_status") != "non_evidence":
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_current_triplet_all_six_status_mismatch",
+                "$.current_approved_triplet_sources.all_six_planning_gap_evidence_status",
+                actual=current_triplet.get("all_six_planning_gap_evidence_status"),
+            )
+
+    promotion_gate = artifact.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        add_all_six_blocker(blockers, "all_six_planning_gap_promotion_gate_missing", "$.promotion_gate")
+    else:
+        for key in ("ready", "promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if promotion_gate.get(key) is not False:
+                add_all_six_blocker(
+                    blockers,
+                    f"all_six_planning_gap_{key}_must_be_false",
+                    f"$.promotion_gate.{key}",
+                    actual=promotion_gate.get(key),
+                )
+        if promotion_gate.get("ready_scope") != "planning_only":
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_ready_scope_mismatch",
+                "$.promotion_gate.ready_scope",
+                actual=promotion_gate.get("ready_scope"),
+            )
+        gate_blockers = promotion_gate.get("blockers")
+        if not isinstance(gate_blockers, list) or ALL_SIX_REQUIRED_BLOCKER not in gate_blockers:
+            add_all_six_blocker(
+                blockers,
+                "all_six_planning_gap_approved_runtime_evidence_missing_not_preserved",
+                "$.promotion_gate.blockers",
+                actual=gate_blockers,
+            )
+
+    does_not_satisfy = artifact.get("does_not_satisfy_blockers")
+    if not isinstance(does_not_satisfy, list) or ALL_SIX_REQUIRED_BLOCKER not in does_not_satisfy:
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_does_not_satisfy_runtime_blocker_missing",
+            "$.does_not_satisfy_blockers",
+            actual=does_not_satisfy,
+        )
+
+    non_claims = artifact.get("non_claims")
+    required_non_claims = {
+        "does not promote the all-six comparison as durable second-source evidence",
+        "does not change approved lifecycle triplet sources beyond ShooterGameMode.HandleNewPlayer, ShooterGameMode.CheckJoinInProgress, and ShooterGameMode.OnLogout",
+        "does not promote GameMode.K2_PostLogin beyond non-anchor chronology-only diagnostics",
+        "does not clear approved_runtime_evidence_missing",
+        "accepted_targets fields in this planning-gap artifact describe scoped source lists or scratch counts only; they are not approved runtime evidence",
+    }
+    if not isinstance(non_claims, list) or not required_non_claims.issubset(set(non_claims)):
+        add_all_six_blocker(
+            blockers,
+            "all_six_planning_gap_non_claims_missing",
+            "$.non_claims",
+            required=sorted(required_non_claims),
+        )
+
+    def reject_promotional_true_fields(value: Any, trail: str = "$") -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_trail = f"{trail}.{key}"
+                if key in ALL_SIX_FORBIDDEN_TRUE_FIELDS and child is True:
+                    add_all_six_blocker(
+                        blockers,
+                        "all_six_planning_gap_promotional_true_field",
+                        child_trail,
+                        field=key,
+                    )
+                reject_promotional_true_fields(child, child_trail)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                reject_promotional_true_fields(child, f"{trail}[{index}]")
+
+    reject_promotional_true_fields(artifact)
+    if snapshot_root is not None:
+        validate_all_six_base_fixture_binding(artifact, blockers, snapshot_root)
+    return blockers
+
+
+def add_fname_mismatch_blocker(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
+    blocker = {"reason": reason, "label": label}
+    blocker.update(extra)
+    blockers.append(blocker)
+
+
+def integer_list(value: Any) -> list[int] | None:
+    if not isinstance(value, list):
+        return None
+    result: list[int] = []
+    for item in value:
+        if not isinstance(item, int) or isinstance(item, bool):
+            return None
+        result.append(item)
+    return result
+
+
+def validate_fname_mismatch_chain(
+    *,
+    entry: dict[str, Any],
+    summary: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    label: str,
+    target: str,
+) -> None:
+    expected_order = summary["property_order"]
+    expected_indices = summary["property_name_indices"]
+    if entry.get("fixture_property_order") != expected_order:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_fixture_property_order_mismatch",
+            f"{label}.fixture_property_order",
+            target=target,
+            expected=expected_order,
+            actual=entry.get("fixture_property_order"),
+        )
+
+    recorded_expected = integer_list(entry.get("fixture_expected_name_indices"))
+    if recorded_expected != expected_indices:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_fixture_expected_name_indices_mismatch",
+            f"{label}.fixture_expected_name_indices",
+            target=target,
+            expected=expected_indices,
+            actual=entry.get("fixture_expected_name_indices"),
+        )
+    observed = integer_list(entry.get("observed_name_indices"))
+    if observed is None:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_observed_name_indices_invalid",
+            f"{label}.observed_name_indices",
+            target=target,
+        )
+        return
+    if recorded_expected is None or len(observed) != len(expected_indices):
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_observed_name_indices_shape_mismatch",
+            f"{label}.observed_name_indices",
+            target=target,
+            expected_count=len(expected_indices),
+            actual_count=len(observed),
+        )
+        return
+
+    expected_deltas = [observed_index - expected_index for expected_index, observed_index in zip(expected_indices, observed)]
+    if entry.get("deltas") != expected_deltas:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_deltas_mismatch",
+            f"{label}.deltas",
+            target=target,
+            expected=expected_deltas,
+            actual=entry.get("deltas"),
+        )
+    exact_match = observed == expected_indices
+    if entry.get("exact_property_chain_match") is not exact_match:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_exact_property_chain_match_mismatch",
+            f"{label}.exact_property_chain_match",
+            target=target,
+            expected=exact_match,
+            actual=entry.get("exact_property_chain_match"),
+        )
+
+
+def reject_fname_mismatch_promotional_true_fields(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    trail: str = "$",
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if key in FNAME_MISMATCH_FORBIDDEN_TRUE_FIELDS and child is True:
+                add_fname_mismatch_blocker(
+                    blockers,
+                    "fname_mismatch_promotional_true_field",
+                    child_trail,
+                    field=key,
+                )
+            reject_fname_mismatch_promotional_true_fields(child, blockers, child_trail)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_fname_mismatch_promotional_true_fields(child, blockers, f"{trail}[{index}]")
+
+
+def validate_latest_unbound_passive_context(
+    context: Any,
+    blockers: list[dict[str, Any]],
+    summaries: dict[str, dict[str, Any]],
+) -> None:
+    label = "$.latest_unbound_passive_diagnostic_context"
+    if not isinstance(context, dict):
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_latest_unbound_passive_context_missing",
+            label,
+        )
+        return
+    expected_fields = {
+        "status": "unverified_passive_diagnostic_non_evidence",
+        "source": "worker_prompt_redacted_monitor_context",
+        "readiness_effect": "none",
+    }
+    for key, expected in expected_fields.items():
+        if context.get(key) != expected:
+            add_fname_mismatch_blocker(
+                blockers,
+                f"fname_mismatch_latest_unbound_context_{key}_mismatch",
+                f"{label}.{key}",
+                expected=expected,
+                actual=context.get(key),
+            )
+    for key in (
+        "approved_runtime_evidence",
+        "can_update_fixture_expectations",
+        "counts_as_second_source_layout_evidence",
+        "runtime_ready",
+        "public_sdk_ready",
+    ):
+        if context.get(key) is not False:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_context_promotional_claim",
+                f"{label}.{key}",
+                field=key,
+                actual=context.get(key),
+            )
+
+    observations = context.get("observations")
+    if not isinstance(observations, list) or not observations:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_latest_unbound_context_observations_invalid",
+            f"{label}.observations",
+        )
+        return
+    for index, observation in enumerate(observations):
+        obs_label = f"{label}.observations[{index}]"
+        if not isinstance(observation, dict):
+            add_fname_mismatch_blocker(blockers, "fname_mismatch_latest_unbound_observation_invalid", obs_label)
+            continue
+        target = observation.get("target")
+        if target not in FNAME_MISMATCH_ALLOWED_TARGETS:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_target_mismatch",
+                f"{obs_label}.target",
+                actual=target,
+            )
+            continue
+        summary = summaries.get(str(target))
+        position = observation.get("property_position")
+        if not isinstance(position, int) or isinstance(position, bool):
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_position_invalid",
+                f"{obs_label}.property_position",
+                target=target,
+            )
+            continue
+        if summary is None or position < 0 or position >= len(summary["property_name_indices"]):
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_position_out_of_range",
+                f"{obs_label}.property_position",
+                target=target,
+                actual=position,
+            )
+            continue
+        expected_name_index = observation.get("expected_name_index")
+        observed_name_index = observation.get("observed_name_index")
+        delta = observation.get("delta")
+        expected_from_fixture = summary["property_name_indices"][position]
+        if expected_name_index != expected_from_fixture:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_expected_index_mismatch",
+                f"{obs_label}.expected_name_index",
+                target=target,
+                expected=expected_from_fixture,
+                actual=expected_name_index,
+            )
+        if (
+            not isinstance(observed_name_index, int)
+            or isinstance(observed_name_index, bool)
+            or delta != observed_name_index - expected_from_fixture
+        ):
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_delta_mismatch",
+                f"{obs_label}.delta",
+                target=target,
+                expected=(
+                    observed_name_index - expected_from_fixture
+                    if isinstance(observed_name_index, int) and not isinstance(observed_name_index, bool)
+                    else None
+                ),
+                actual=delta,
+            )
+        if observation.get("complete_property_chain_available") is not False:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_complete_chain_overclaim",
+                f"{obs_label}.complete_property_chain_available",
+                target=target,
+                actual=observation.get("complete_property_chain_available"),
+            )
+        if observation.get("source_bound_to_repo_artifact") is not False:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_latest_unbound_observation_source_bound_overclaim",
+                f"{obs_label}.source_bound_to_repo_artifact",
+                target=target,
+                actual=observation.get("source_bound_to_repo_artifact"),
+            )
+
+
+def fname_mismatch_artifact_blockers(
+    artifact: dict[str, Any],
+    *,
+    snapshot_root: Path,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if artifact.get("schema") != FNAME_MISMATCH_SCHEMA:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_schema_mismatch",
+            "$.schema",
+            actual=artifact.get("schema"),
+        )
+    expected_top_level = {
+        "artifact_status": "planning_diagnostic_unresolved",
+        "planning_only": True,
+        "evidence_scope": "diagnostic_fname_chain_planning_only_not_second_source",
+        "artifact_role": "diagnostic_planning_only_not_second_source_input",
+        "layout_evidence_status": "not_layout_evidence",
+        "readiness_classification": "planning_only",
+        "readiness_effect": "none",
+        "second_source_layout_evidence": False,
+        "can_be_used_as_second_source_layout_evidence": False,
+        "can_be_used_as_candidate_snapshot_root": False,
+        "second_source_status": "not_applicable",
+        "not_second_source": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "target_set": ALL_SIX_PLANNING_GAP_TARGET_SET,
+        "target": FNAME_MISMATCH_PRIMARY_TARGET,
+    }
+    for key, expected in expected_top_level.items():
+        if artifact.get(key) != expected:
+            add_fname_mismatch_blocker(
+                blockers,
+                f"fname_mismatch_{key}_mismatch",
+                f"$.{key}",
+                expected=expected,
+                actual=artifact.get(key),
+            )
+
+    paths = manifest_target_paths(snapshot_root)
+    manifest = load_json(snapshot_root / "manifest.json", "snapshot manifest")
+    summaries: dict[str, dict[str, Any]] = {}
+    for target in FNAME_MISMATCH_ALLOWED_TARGETS:
+        path = paths.get(target)
+        if path is None:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_snapshot_target_missing",
+                "snapshot-root",
+                target=target,
+            )
+            continue
+        summaries[target] = snapshot_target_summary(path, target)
+
+    identity = artifact.get("artifact_identity")
+    if not isinstance(identity, dict):
+        add_fname_mismatch_blocker(blockers, "fname_mismatch_artifact_identity_missing", "$.artifact_identity")
+    else:
+        primary_summary = summaries.get(FNAME_MISMATCH_PRIMARY_TARGET)
+        identity_expected = {
+            "ark_binary_sha256": manifest.get("ark_binary_sha256"),
+            "base_fixture_root": repo_relative_path(snapshot_root),
+            "build_type": "repo_fixture_runtime_diagnostic_planning_check",
+            "target_set_revision": STATIC_REPORT_TARGET_SET_REVISION,
+        }
+        for key, expected in identity_expected.items():
+            if identity.get(key) != expected:
+                add_fname_mismatch_blocker(
+                    blockers,
+                    f"fname_mismatch_artifact_identity_{key}_mismatch",
+                    f"$.artifact_identity.{key}",
+                    expected=expected,
+                    actual=identity.get(key),
+                )
+        if primary_summary is not None:
+            for key in ("base_fixture_path", "base_fixture_sha256"):
+                if identity.get(key) != primary_summary[key]:
+                    add_fname_mismatch_blocker(
+                        blockers,
+                        f"fname_mismatch_{key}_mismatch",
+                        f"$.artifact_identity.{key}",
+                        expected=primary_summary[key],
+                        actual=identity.get(key),
+                    )
+
+    primary_summary = summaries.get(FNAME_MISMATCH_PRIMARY_TARGET)
+    if primary_summary is not None:
+        validate_fname_mismatch_chain(
+            entry=artifact,
+            summary=primary_summary,
+            blockers=blockers,
+            label="$",
+            target=FNAME_MISMATCH_PRIMARY_TARGET,
+        )
+
+    related = artifact.get("related_observed_fname_mismatches")
+    if not isinstance(related, list):
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_related_observed_fname_mismatches_invalid",
+            "$.related_observed_fname_mismatches",
+        )
+    else:
+        related_targets = []
+        for index, entry in enumerate(related):
+            label = f"$.related_observed_fname_mismatches[{index}]"
+            if not isinstance(entry, dict):
+                add_fname_mismatch_blocker(blockers, "fname_mismatch_related_entry_invalid", label)
+                continue
+            target = entry.get("target")
+            related_targets.append(target)
+            if target not in FNAME_MISMATCH_RELATED_TARGETS:
+                add_fname_mismatch_blocker(
+                    blockers,
+                    "fname_mismatch_related_target_mismatch",
+                    f"{label}.target",
+                    expected=list(FNAME_MISMATCH_RELATED_TARGETS),
+                    actual=target,
+                )
+                continue
+            summary = summaries.get(str(target))
+            if summary is not None:
+                validate_fname_mismatch_chain(
+                    entry=entry,
+                    summary=summary,
+                    blockers=blockers,
+                    label=label,
+                    target=str(target),
+                )
+            expected_related_fields = {
+                "current_recognizer_drift_chain_accepted_meaning": "recognizer_alternative_only_not_runtime_evidence",
+                "status": "recognized_drift_chain_planning_only",
+                "planning_only": True,
+                "not_second_source": True,
+                "readiness_effect": "none",
+                "second_source_status": "not_applicable",
+            }
+            for key, expected in expected_related_fields.items():
+                if entry.get(key) != expected:
+                    add_fname_mismatch_blocker(
+                        blockers,
+                        f"fname_mismatch_related_{key}_mismatch",
+                        f"{label}.{key}",
+                        target=target,
+                        expected=expected,
+                        actual=entry.get(key),
+                    )
+        if related_targets != list(FNAME_MISMATCH_RELATED_TARGETS):
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_related_targets_mismatch",
+                "$.related_observed_fname_mismatches",
+                expected=list(FNAME_MISMATCH_RELATED_TARGETS),
+                actual=related_targets,
+            )
+
+    runtime_snapshot = artifact.get("runtime_snapshot")
+    if not isinstance(runtime_snapshot, dict):
+        add_fname_mismatch_blocker(blockers, "fname_mismatch_runtime_snapshot_missing", "$.runtime_snapshot")
+    else:
+        if runtime_snapshot.get("approved_runtime_evidence") is not False:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_runtime_snapshot_approved_runtime_evidence_not_false",
+                "$.runtime_snapshot.approved_runtime_evidence",
+                actual=runtime_snapshot.get("approved_runtime_evidence"),
+            )
+        if runtime_snapshot.get("source") != "passive_snapshot_copied_log_analysis":
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_runtime_snapshot_source_mismatch",
+                "$.runtime_snapshot.source",
+                actual=runtime_snapshot.get("source"),
+            )
+
+    runtime_summary = artifact.get("runtime_observation_summary")
+    if not isinstance(runtime_summary, dict):
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_runtime_observation_summary_missing",
+            "$.runtime_observation_summary",
+        )
+    else:
+        for key, expected in (
+            ("accepted_count", 0),
+            ("approved_runtime_evidence", False),
+            ("diagnostic_only", True),
+            ("readiness_effect", "none"),
+            ("rejected_count", 0),
+            ("source_scope", "copied_passive_snapshot_log_analysis"),
+        ):
+            if runtime_summary.get(key) != expected:
+                add_fname_mismatch_blocker(
+                    blockers,
+                    f"fname_mismatch_runtime_summary_{key}_mismatch",
+                    f"$.runtime_observation_summary.{key}",
+                    expected=expected,
+                    actual=runtime_summary.get(key),
+                )
+        mismatch_counts = runtime_summary.get("mismatch_counts")
+        if not isinstance(mismatch_counts, list) or not mismatch_counts:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_runtime_summary_mismatch_counts_invalid",
+                "$.runtime_observation_summary.mismatch_counts",
+            )
+        else:
+            for index, entry in enumerate(mismatch_counts):
+                label = f"$.runtime_observation_summary.mismatch_counts[{index}]"
+                if not isinstance(entry, dict):
+                    add_fname_mismatch_blocker(blockers, "fname_mismatch_runtime_summary_mismatch_count_invalid", label)
+                    continue
+                if entry.get("target") not in FNAME_MISMATCH_ALLOWED_TARGETS:
+                    add_fname_mismatch_blocker(
+                        blockers,
+                        "fname_mismatch_runtime_summary_mismatch_count_target_invalid",
+                        f"{label}.target",
+                        actual=entry.get("target"),
+                    )
+                if entry.get("not_second_source") is not True or entry.get("readiness_effect") != "none":
+                    add_fname_mismatch_blocker(
+                        blockers,
+                        "fname_mismatch_runtime_summary_mismatch_count_boundary_mismatch",
+                        label,
+                        actual=entry,
+                    )
+
+    if artifact.get("current_recognizer_drift_chain_accepted_meaning") != "recognizer_alternative_only_not_runtime_evidence":
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_recognizer_acceptance_meaning_mismatch",
+            "$.current_recognizer_drift_chain_accepted_meaning",
+            actual=artifact.get("current_recognizer_drift_chain_accepted_meaning"),
+        )
+
+    promotion_gate = artifact.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        add_fname_mismatch_blocker(blockers, "fname_mismatch_promotion_gate_missing", "$.promotion_gate")
+    else:
+        for key in ("ready", "promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if promotion_gate.get(key) is not False:
+                add_fname_mismatch_blocker(
+                    blockers,
+                    f"fname_mismatch_promotion_gate_{key}_not_false",
+                    f"$.promotion_gate.{key}",
+                    actual=promotion_gate.get(key),
+                )
+        gate_blockers = promotion_gate.get("blockers")
+        if not isinstance(gate_blockers, list) or ALL_SIX_REQUIRED_BLOCKER not in gate_blockers:
+            add_fname_mismatch_blocker(
+                blockers,
+                "fname_mismatch_approved_runtime_evidence_missing_not_preserved",
+                "$.promotion_gate.blockers",
+                actual=gate_blockers,
+            )
+
+    does_not_satisfy = artifact.get("does_not_satisfy_blockers")
+    if not isinstance(does_not_satisfy, list) or ALL_SIX_REQUIRED_BLOCKER not in does_not_satisfy:
+        add_fname_mismatch_blocker(
+            blockers,
+            "fname_mismatch_does_not_satisfy_runtime_blocker_missing",
+            "$.does_not_satisfy_blockers",
+            actual=does_not_satisfy,
+        )
+
+    validate_latest_unbound_passive_context(
+        artifact.get("latest_unbound_passive_diagnostic_context"),
+        blockers,
+        summaries,
+    )
+    reject_fname_mismatch_promotional_true_fields(artifact, blockers)
+    return blockers
+
+
 def source_artifact_id_rows(source_artifact_ids: Any) -> list[dict[str, str]]:
     if not isinstance(source_artifact_ids, list):
         return []
@@ -1058,6 +2438,7 @@ def verify_existing_dir(
 
         blockers: list[dict[str, Any]] = []
         checked_outputs: dict[str, dict[str, Any]] = {}
+        checked_optional_outputs: dict[str, dict[str, Any]] = {}
         for name in (
             FIRST_EVIDENCE_OUTPUT_NAME,
             binder.LIFECYCLE_OUTPUT_NAME,
@@ -1120,6 +2501,58 @@ def verify_existing_dir(
                         }
                     )
 
+        all_six_path = existing_dir / ALL_SIX_PLANNING_GAP_OUTPUT_NAME
+        if all_six_path.exists():
+            if not all_six_path.is_file():
+                blockers.append({"reason": "all_six_planning_gap_artifact_not_file", "path": str(all_six_path)})
+            else:
+                all_six_artifact = load_json(all_six_path, "existing all-six planning-gap artifact")
+                all_six_blockers = all_six_planning_gap_artifact_blockers(
+                    all_six_artifact,
+                    snapshot_root=snapshot_root,
+                )
+                checked_optional_outputs[ALL_SIX_PLANNING_GAP_OUTPUT_NAME] = {
+                    "path": str(all_six_path),
+                    "sha256": sha256_file(all_six_path),
+                    "schema": all_six_artifact.get("schema"),
+                    "valid": not all_six_blockers,
+                }
+                for blocker in all_six_blockers:
+                    blockers.append(
+                        {
+                            "reason": "all_six_planning_gap_artifact_invalid",
+                            "path": str(all_six_path),
+                            "detail": blocker.get("reason"),
+                            "label": blocker.get("label"),
+                        }
+                    )
+
+        fname_mismatch_path = existing_dir / FNAME_MISMATCH_OUTPUT_NAME
+        if fname_mismatch_path.exists():
+            if not fname_mismatch_path.is_file():
+                blockers.append({"reason": "fname_mismatch_artifact_not_file", "path": str(fname_mismatch_path)})
+            else:
+                fname_mismatch_artifact = load_json(fname_mismatch_path, "existing FName mismatch artifact")
+                fname_mismatch_blockers = fname_mismatch_artifact_blockers(
+                    fname_mismatch_artifact,
+                    snapshot_root=snapshot_root,
+                )
+                checked_optional_outputs[FNAME_MISMATCH_OUTPUT_NAME] = {
+                    "path": str(fname_mismatch_path),
+                    "sha256": sha256_file(fname_mismatch_path),
+                    "schema": fname_mismatch_artifact.get("schema"),
+                    "valid": not fname_mismatch_blockers,
+                }
+                for blocker in fname_mismatch_blockers:
+                    blockers.append(
+                        {
+                            "reason": "fname_mismatch_artifact_invalid",
+                            "path": str(fname_mismatch_path),
+                            "detail": blocker.get("reason"),
+                            "label": blocker.get("label"),
+                        }
+                    )
+
         valid = not blockers and generated_report.get("valid") is True
         return {
             "schema": REPORT_SCHEMA,
@@ -1138,6 +2571,7 @@ def verify_existing_dir(
             "verify_existing_dir": str(existing_dir),
             "blockers": blockers,
             "checked_outputs": checked_outputs,
+            "checked_optional_outputs": checked_optional_outputs,
             "generated_report_valid": generated_report.get("valid") is True,
             "non_claims": NON_CLAIMS,
         }

@@ -58,6 +58,8 @@ namespace Obelisk::Core
         size_t UnregisterCallbacksForOwner(void* owner);
 #ifdef OBELISK_MISSION_COPIED_BOOL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
         void SetNextRegistrationIdForTesting(uint64_t nextRegistrationId);
+        void FailNextDeferredDestroyFailureRecordForTesting();
+        void FailNextFailedOwnerDestroyRetrySetupForTesting();
 #endif
 
         size_t Dispatch(const MissionCopiedBoolEventView& event);
@@ -76,6 +78,7 @@ namespace Obelisk::Core
         {
             MissionCopiedBoolEventSubscription Subscription;
             uint64_t CleanupBatchId = 0;
+            void* Owner = nullptr;
         };
 
         struct DeferredDestroyFailure
@@ -89,6 +92,7 @@ namespace Obelisk::Core
         {
             void* Owner = nullptr;
             MissionCopiedBoolEventSubscription Subscription;
+            std::exception_ptr UnreportedFailure;
         };
 
         uint64_t AllocateRegistrationId();
@@ -97,15 +101,29 @@ namespace Obelisk::Core
         bool QueueOrDestroyRemovedSubscriptions(
             std::vector<MissionCopiedBoolEventSubscription>& removed,
             std::unique_lock<std::mutex>& lock,
-            uint64_t cleanupBatchId = 0);
+            uint64_t cleanupBatchId = 0,
+            void* owner = nullptr);
         bool IsDispatchCleanupComplete() const;
-        std::vector<MissionCopiedBoolEventSubscription> TakeFailedOwnerDestroySubscriptions(void* owner);
+        std::vector<MissionCopiedBoolEventSubscription> TakeFailedOwnerDestroySubscriptions(
+            void* owner,
+            std::exception_ptr& firstFailure);
         void RetainFailedOwnerDestroySubscriptions(
             void* owner,
-            const std::vector<MissionCopiedBoolEventSubscription>& subscriptions);
+            const std::vector<MissionCopiedBoolEventSubscription>& subscriptions,
+            std::exception_ptr unreportedFailure = nullptr);
+        void RetainFailedOwnerDestroySubscriptionNoThrow(
+            void* owner,
+            const MissionCopiedBoolEventSubscription& subscription,
+            std::exception_ptr unreportedFailure = nullptr);
         std::vector<MissionCopiedBoolEventSubscription> TakeDeferredDestroyFailures(
             uint64_t cleanupBatchId,
             std::exception_ptr& firstFailure);
+        void ReserveDeferredDestroyFailureSlots(size_t count);
+        void ReleaseDeferredDestroyFailureSlots(size_t count);
+        void RecordDeferredDestroyFailure(
+            uint64_t cleanupBatchId,
+            const MissionCopiedBoolEventSubscription& subscription,
+            std::exception_ptr failure);
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -118,7 +136,16 @@ namespace Obelisk::Core
         std::atomic<size_t> m_SubscriptionCount{0};
         std::vector<PendingDestroy> m_PendingDestroy;
         std::vector<DeferredDestroyFailure> m_DeferredDestroyFailures;
+        bool m_HasFallbackDeferredDestroyFailure = false;
+        DeferredDestroyFailure m_FallbackDeferredDestroyFailure;
         std::vector<FailedOwnerDestroy> m_FailedOwnerDestroy;
+        bool m_HasFallbackFailedOwnerDestroy = false;
+        FailedOwnerDestroy m_FallbackFailedOwnerDestroy;
         size_t m_PendingDestroyInProgress = 0;
+        size_t m_ReservedDeferredDestroyFailureSlots = 0;
+#ifdef OBELISK_MISSION_COPIED_BOOL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+        bool m_FailNextDeferredDestroyFailureRecordForTesting = false;
+        bool m_FailNextFailedOwnerDestroyRetrySetupForTesting = false;
+#endif
     };
 }

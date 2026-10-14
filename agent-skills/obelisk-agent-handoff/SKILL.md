@@ -48,6 +48,35 @@ Classify each transferred item:
 - `owner`: files or subsystem the agent was responsible for.
 
 Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
+Authorization and evidence status are separate facts. In delegated summaries, request
+packs, status reports, `progress_normalization_trace`, source_overclaim diagnostics, the
+latest release-readiness pass, release-readiness passes, `source_overclaim_total_flag_count=0`,
+the latest validation pass, closed sub-agent/all-six-agents-closed notes, `.codex`
+cleanup, passive observation, passive player evidence, passive player summaries, passive
+summaries/snapshots/triplets, passive monitor ticks/output, passive monitors, public
+reachability, beta tester notices, beta notices, future beta notices, Discord notice
+drafts, package-shape installs, package installs, exact-version
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+install/package success, package-shape install success, install/package-shape checks,
+support-tier or package-shape labels, Plugin Hub planning, scoped non-complete release
+statements, side-lane candidates/accounting, prior approvals, historical live
+approvals/map names, historical approvals/map names, and historical server names such as
+TheIsland, Ragnarok, and Genesis2 are
+non-authorizing/non-evidence unless the specific claim names both the current-turn exact
+approval for the scoped action and the accepted checker evidence for the evidence result.
+Do not compress that rule into current-turn exact approval or accepted checker evidence;
+both sides must match the scoped claim. They cannot imply public readiness by handoff.
+Do not collapse a durable standing launch authorization recorded in both
+`CURRENT.md` and `COMPACT_CONTEXT.md` into vague prior approval: for the named
+live/log/process/posture/marker/env/start/stop/restart/beta-notice/evidence/debug
+operations and safety limits it records, that standing authorization remains transferable
+until revoked. It still supplies no runtime evidence, SDK/P0 progress, publication, or
+SDK/stable/public-readiness claim.
+They cannot become current-turn live-op scope, runtime evidence, SDK evidence, approved
+in-game evidence, SDK/P0 progress, live-op authorization, Discord authorization,
+publication authority, runtime readiness, public SDK readiness, package-shape/public
+package readiness, stable SDK readiness, Plugin Hub readiness, support-tier activation,
+stable SDK claims, or stable claims by handoff.
 
 ## Before Starting
 
@@ -55,6 +84,10 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
    `docs/agent-handoff/CURRENT.md` and `docs/agent-handoff/COMPACT_CONTEXT.md`.
    For a narrow same-turn continuation, `CURRENT.md` is sufficient unless the task needs
    stable resume context.
+   Treat memory loss, reboot, or context compaction as a recovery event, not as
+   revocation of any standing authority recorded in both files. Reconfirm current
+   SDK/evidence status before acting, and never translate that authority into evidence,
+   readiness, publication permission, or broad Discord permission.
 2. Check `git status --short --ignored` unless the current instruction explicitly
    prohibits Git.
 3. Identify your owned files and avoid editing outside that scope.
@@ -62,6 +95,14 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
 5. Note any stale or conflicting handoff state before changing files.
 6. When delegating, distill only the relevant facts, risks, allowed paths, required skills,
    and expected decision for that agent's scope.
+7. Do not run the full `scripts.test_check_public_sdk_v1_completion` suite concurrently
+   with workers touching `tests/core` or `tests/sdk_consumer`; it uses repo-local temp
+   dirs under those roots, so coordinate a serial lead-run after those workers close.
+8. Do not run
+   `scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle` and
+   `scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+   concurrently. They share fixture cleanup surfaces; run them serially to avoid false
+   integration failures.
 
 ## Before Finishing
 
@@ -77,14 +118,16 @@ For sub-agents:
 For the lead:
 
 1. Review and integrate sub-agent findings.
-2. Update `docs/agent-handoff/CURRENT.md` with what changed.
-3. Add or update research notes and skills when the evidence changes future behavior.
-4. Commit locally only when the accumulated documentation/code is a useful stable
+2. Record each delegated agent's scope, result, validation, remaining risk, and closure
+   status; close completed or obsolete standby agents before starting another round.
+3. Update `docs/agent-handoff/CURRENT.md` with what changed.
+4. Add or update research notes and skills when the evidence changes future behavior.
+5. Commit locally only when the accumulated documentation/code is a useful stable
    checkpoint for contributors, release behavior, or integration. Push/GitHub publication
    is a separate lead-owned step and requires current direction that allows publication;
    release tags also require current release-manager/lead authorization and a fresh gate
    on the intended ref.
-5. Report uncommitted files, skipped validation, and remaining risks.
+6. Report uncommitted files, skipped validation, and remaining risks.
 
 ## CURRENT.md Rules
 

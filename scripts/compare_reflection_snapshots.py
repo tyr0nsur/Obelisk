@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,12 +17,19 @@ from artifact_identity import ARTIFACT_IDENTITY_KEYS, is_safe_artifact_id, is_sh
 import protected_paths
 from reflection_target_sets import (
     INTERNAL_LAYOUT_ONLY_TARGET_SETS,
+    NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
     PLANNING_ONLY_TARGET_SETS,
     RELEASE_READINESS_TARGET_SETS,
     TARGET_SETS,
+    TARGET_SET_MODULE_LANES,
+    TARGET_SET_REVISION_SCHEMA,
+    TARGET_SET_REVISION_SOURCE,
+    player_lifecycle_anchor_source_policy,
+    target_set_catalog_hygiene_issues,
     target_set_module_lane,
     target_set_target_overlaps,
     target_set_readiness_classification,
+    target_set_revision_source_sha256,
 )
 
 
@@ -48,8 +58,24 @@ ALLOWED_ARTIFACT_KINDS = {"offline_core"}
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 READINESS_EVIDENCE_SCOPE = "second_source_layout_evidence_only"
+READINESS_TARGET_SET_COVERAGE_SCHEMA = "obelisk.reflection-snapshot-readiness-target-set-coverage.v1"
+TARGET_SET_CATALOG_GUARDRAIL = "fail_closed_named_target_set_catalog"
+TARGET_SET_CATALOG_EVIDENCE_SCOPE = "target_set_catalog_only_not_evidence"
+TARGET_GUIDANCE_EVIDENCE_SCOPE = "offline_guidance_only_not_evidence"
+PLANNING_LAYOUT_INTAKE_EVIDENCE_SCOPE = "planning_layout_intake_only_not_second_source"
+PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS = "not_applicable_planning_layout_intake"
+PLANNING_LAYOUT_DOES_NOT_SATISFY = [
+    "second_source_layout_evidence",
+    *NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
+    "release_readiness",
+]
+READINESS_DOES_NOT_SATISFY = [
+    "release_readiness",
+    *NON_AUTHORIZING_READY_DOES_NOT_SATISFY,
+]
 READINESS_NOT_PROMOTED_SURFACES = {
     "class_identity",
+    "complete_sdk",
     "cross_binary_portability",
     "inventory_identity",
     "inventory_sdk",
@@ -59,10 +85,30 @@ READINESS_NOT_PROMOTED_SURFACES = {
     "mutation",
     "object_identity",
     "public_sdk",
+    "p0_dependency_chain",
     "raw_params",
     "resource_handle",
     "return_override",
     "runtime_hooks",
+    "v1_completion",
+}
+READINESS_FALSE_FLAGS = {
+    "complete_sdk_ready": False,
+    "counts_toward_complete_sdk_claim": False,
+    "counts_toward_p0_dependency_chain_claim": False,
+    "counts_toward_public_sdk": False,
+    "counts_toward_runtime": False,
+    "counts_toward_v1_completion": False,
+    "p0_dependency_chain_ready": False,
+    "promotion_ready": False,
+    "public_sdk_ready": False,
+    "runtime_ready": False,
+    "v1_completion_ready": False,
+}
+READINESS_ZERO_FIELDS = {
+    "complete_sdk_claim_progress_contribution": 0,
+    "p0_dependency_chain_claim_progress_contribution": 0,
+    "v1_completion_progress_contribution": 0,
 }
 READINESS_NON_CLAIMS = [
     "accepted second-source readiness is layout evidence only",
@@ -73,9 +119,248 @@ READINESS_NON_CLAIMS = [
     (
         "does not promote public SDK, Mission SDK, Transfer SDK, Structure SDK, "
         "StructureEvents, Inventory SDK, Items SDK, object identity, lookup, mutation, "
-        "return override, ResourceHandle, or runtime hooks"
+        "return override, ResourceHandle, runtime hooks, P0 dependency-chain credit, "
+        "complete-SDK accounting, or v1 completion"
     ),
 ]
+POSITIVE_STATUS_VALUES = frozenset(
+    (
+        "accepted",
+        "active",
+        "available",
+        "enabled",
+        "promoted",
+        "public",
+        "public-ready",
+        "ready",
+        "release-ready",
+        "release-supported",
+        "runtime",
+        "runtime-ready",
+        "sdk-ready",
+        "stable",
+        "stable-ready",
+        "supported",
+        "true",
+        "validated",
+        "v1-ready",
+    )
+)
+FORBIDDEN_CLAIM_KEY_RE = re.compile(
+    r"(?:"
+    r"^ready$|readiness|"
+    r"public_?(?:sdk|api|abi|contract|ready)|"
+    r"runtime_?(?:ready|validated|validation|hook|wiring|contract)|"
+    r"complete_?sdk|stable_?sdk|p0|v1_?(?:completion|ready)|promotion_?ready|"
+    r"(?:route|progress)_?(?:ready|readiness|claim|contribution)|"
+    r"resource_?handle|"
+    r"(?:object|player|item|inventory|class)?_?identity_?(?:ready|lookup|contract)?|"
+    r"lookup_?ready|mutation|return_?override|"
+    r"counts_?(?:toward|for)|contributes?_?to"
+    r")",
+    re.IGNORECASE,
+)
+CLAIM_SUBJECT_RE = re.compile(
+    r"(?:"
+    r"public[_\s-]+(?:sdk|api|abi|contract)|"
+    r"runtime(?:[_\s-]+(?:hook|validation|wiring|ready|readiness))?|"
+    r"complete[_\s-]+sdk|stable[_\s-]+sdk|p0|v1[_\s-]+completion|"
+    r"ResourceHandle|resource[_\s-]+handle|"
+    r"route[_\s-]+(?:ready|readiness|progress|claim)|progress[_\s-]+(?:claim|contribution)|"
+    r"(?:object|player|item|inventory|class)?[_\s-]*identity|lookup|"
+    r"mutation|return[_\s-]+override"
+    r")",
+    re.IGNORECASE,
+)
+AFFIRMATIVE_CONTEXT_RE = re.compile(
+    r"(?:ready|readiness|available|enabled|promoted|promotion|public|runtime|complete|"
+    r"completion|supported|validated|claim|counts|contributes)",
+    re.IGNORECASE,
+)
+NEGATED_OR_BLOCKED_RE = re.compile(
+    r"\b(?:"
+    r"blocked|candidate-only|candidate_only|does\s+not|do\s+not|excluded|must\s+not|"
+    r"no|not|non-promoting|redacted|remain|remains|without"
+    r")\b",
+    re.IGNORECASE,
+)
+CLAIM_SCAN_EXEMPT_PATHS = frozenset(
+    (
+        "$.evidence.artifact_kind",
+        "$.evidence.source",
+        "$.evidence.status",
+    )
+)
+DEFAULT_OBSERVED_FNAME_TARGET = "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer"
+OBSERVED_FNAME_CHAIN_EVIDENCE_SCOPE = "diagnostic_fname_chain_planning_only_not_second_source"
+OBSERVED_FNAME_CHAIN_LAYOUT_EVIDENCE_STATUS = "not_layout_evidence"
+OBSERVED_FNAME_CHAIN_ARTIFACT_ROLE = "diagnostic_planning_only_not_second_source_input"
+OBSERVED_FNAME_CHAIN_NON_CLAIMS = [
+    "planning-only comparison against sanitized UFunction snapshots",
+    "does not create second-source layout evidence",
+    "does not accept or reject runtime principal lifecycle evidence",
+    "does not promote public Player SDK, public player identity, lookup, ResourceHandle, mutation, return override, runtime hooks, release readiness, or v1 completion",
+    "does not expose UE pointers, raw params, GObjects indices, player/controller/character identity, or copied gameplay payloads",
+]
+OBSERVED_FNAME_CHAIN_SECOND_SOURCE_BLOCKERS = [
+    "copied_runtime_diagnostic_line_not_distinct_sanitized_snapshot",
+    "observed_fname_indices_only_no_property_names_classes_offsets_sizes_or_bool_metadata",
+    "missing_distinct_lifecycle_artifact_identity",
+    "approved_runtime_evidence_missing",
+]
+OBSERVED_FNAME_CHAIN_PROHIBITED_EVIDENCE_USES = [
+    "second_source_layout_evidence",
+    "candidate_snapshot_root",
+    "approved_runtime_principal_lifecycle_evidence",
+    "runtime_readiness",
+    "public_sdk_readiness",
+    "release_readiness",
+    "v1_completion",
+]
+DIAGNOSTIC_ONLY_LIFECYCLE_SCHEMAS = {
+    "obelisk.reflection-observed-fname-chain-check.v1",
+    "obelisk.players-lifecycle-handle-new-player-fname-mismatch.v1",
+}
+NON_SNAPSHOT_LIFECYCLE_SIDECAR_SCHEMA_REASONS = {
+    "obelisk.installed-sdk-package-shape.v1": "package_shape_not_sanitized_lifecycle_snapshot_root",
+    "obelisk.player-principal-lifecycle-beta-notice-authority-boundary.v1": (
+        "beta_notice_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-beta-notice-prep.v1": (
+        "beta_notice_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-evidence-closure-request.v1": (
+        "runtime_window_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-guarded-beta-notice-action.v1": (
+        "beta_notice_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-no-users-passive-wait-recommendation.v1": (
+        "no_users_passive_wait_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-evidence-status.v1": (
+        "runtime_window_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-execution.v1": (
+        "runtime_window_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-plan.v1": (
+        "runtime_window_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-runtime-window-post-window-state.v1": (
+        "runtime_window_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-window-request-check.v1": (
+        "window_request_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.player-principal-lifecycle-window-request.v1": (
+        "window_request_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.players-identity-first-evidence.v1": (
+        "first_evidence_planning_artifact_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.players-identity-lifecycle-anchor-candidates.v1": (
+        "lifecycle_anchor_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.players-identity-principal-invalidation-policy.v1": (
+        "principal_policy_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.public-sdk-v1-completion-check.v1": (
+        "sdk_status_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.public-sdk-v1-completion-summary.v1": (
+        "sdk_status_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+    "obelisk.sdk-status-report.v1": "sdk_status_side_lane_not_sanitized_lifecycle_snapshot_root",
+    "obelisk.sdk-status-side-lane-summary.v1": (
+        "sdk_status_side_lane_not_sanitized_lifecycle_snapshot_root"
+    ),
+}
+LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS = [
+    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+]
+LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_FILENAMES = [
+    "ShooterGameMode.HandleNewPlayer.snapshot.json",
+    "ShooterGameMode.OnLogout.snapshot.json",
+]
+LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA = "obelisk.lifecycle-ufunction-snapshot-root-requirement.v1"
+LIFECYCLE_SNAPSHOT_ROOT_CHECK_EVIDENCE_SCOPE = (
+    "lifecycle_property_shape_planning_evidence_only_not_runtime_or_public_sdk_readiness"
+)
+LIFECYCLE_SNAPSHOT_ROOT_REQUIRED_IDENTITY_FIELDS = [
+    "evidence.ark_binary_sha256",
+    "evidence.artifact_kind=offline_core",
+    "evidence.artifact_sha256",
+    "evidence.capture_id",
+    "evidence.evidence_pack_id",
+]
+LIFECYCLE_SNAPSHOT_ROOT_NON_CLAIMS = [
+    "offline sanitized UFunction snapshot-root requirement only",
+    "accepted lifecycle snapshot-root checks are property-shape planning evidence only",
+    "does not clear approved_runtime_evidence_missing",
+    "does not prove runtime login/logout ordering, principal validity, principal invalidation, or lifecycle cleanup",
+    "does not promote public Player SDK, public player identity, lookup, ResourceHandle, mutation, return override, runtime hooks, release readiness, public SDK readiness, or v1 completion",
+    "does not expose UE pointers, raw params, GObjects indices, player/controller/character identity, or copied gameplay payloads",
+]
+LIFECYCLE_SNAPSHOT_ROOT_PROHIBITED_INPUTS = [
+    "direct or symlink-resolved protected live-server paths",
+    "passive player-principal snapshot manifests",
+    "ReflectionScanner analyzer or broad scanner output",
+    "layout-only readiness/comparison reports",
+    "copied runtime diagnostic FName-chain lines",
+    "broad FName scans",
+    "broad GObjects scans",
+]
+LIFECYCLE_SNAPSHOT_ROOT_DOES_NOT_SATISFY = [
+    "approved_runtime_evidence",
+    "runtime_readiness",
+    "public_sdk_readiness",
+    "release_readiness",
+    "v1_completion",
+]
+LIFECYCLE_FNAME_DRIFT_NEXT_OFFLINE_ARTIFACT_REQUIREMENT = {
+    "artifact": "distinct_sanitized_lifecycle_ufunction_snapshot_root",
+    "status_needed": "required_before_deploy_request",
+    "purpose": "prove lifecycle property shape without treating observed FName indices as layout evidence",
+    "required_targets": LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS,
+    "required_identity_fields": [
+        "evidence.ark_binary_sha256",
+        "evidence.artifact_kind=offline_core",
+        "evidence.artifact_sha256",
+        "evidence.capture_id",
+        "evidence.evidence_pack_id",
+    ],
+    "required_shape_fields": [
+        "target outer/name/class",
+        "NumParms",
+        "ParmsSize",
+        "ReturnValueOffset",
+        "property order",
+        "property class",
+        "offset_internal",
+        "element_size",
+        "array_dim",
+        "property_flags",
+        "BoolProperty byte/field metadata",
+        "candidate-uobject membership for target/class/outer/properties",
+    ],
+    "comparison_mode": "semantic_layout_without_strict_identity_indices",
+    "comparison_command_template": (
+        "python3 scripts/compare_reflection_snapshots.py --base-root "
+        "tests/fixtures/ufunction_snapshots --candidate-root "
+        "<distinct-sanitized-lifecycle-root> --lifecycle-snapshot-root-check --json"
+    ),
+    "accepted_result_scope": "property_shape_planning_evidence_only_not_runtime_or_public_sdk_readiness",
+    "prohibited_inputs": [
+        "copied runtime diagnostic FName-chain lines",
+        "passive snapshot manifests",
+        "direct or symlink-resolved protected live-server paths",
+        "broad FName scans",
+        "broad GObjects scans",
+        "ReflectionScanner output from an unapproved runtime run",
+    ],
+}
 MISSION_COPIED_BOOL_FIXTURE_ROOT = "tests/fixtures/ufunction_snapshots"
 MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
     "f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945"
@@ -245,8 +530,12 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         ),
     },
     "item-return-only-policy-slice": {
-        "classification": "release_gameplay_policy_item_return_only",
+        "classification": "internal_gameplay_policy_item_return_only_non_completion",
         "why_blocked": [
+            "internal_non_completion_side_lane",
+            "not_release_readiness_target",
+            "complete_sdk_accounting_blocked",
+            "p0_dependency_chain_accounting_blocked",
             "standalone_items_inventory_sdk_blocked",
             "identity_lookup_resourcehandle_blocked",
             "mutation_return_override_blocked",
@@ -262,12 +551,13 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "copy only the ReturnValue BoolProperty field for each target",
             "keep CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, AdditionalData, object refs, raw params, and UE pointers excluded",
             "keep item identity, inventory identity, lookup, ResourceHandle, mutation, and return override blocked",
-            "treat release readiness as the narrow GameplayPolicyEvent copied-scalar lane only, not an Items SDK or Inventory SDK",
+            "treat accepted layout as internal copied-scalar planning only, not release readiness, P0 dependency-chain credit, or complete-SDK accounting",
             "runtime producer validation still requires a separate gated debug-window brief",
         ],
         "non_claim": (
             "does not promote Items SDK, Inventory SDK, identity, lookup, ResourceHandle, "
-            "mutation, return override, runtime validation, or target-set expansion"
+            "mutation, return override, runtime validation, release readiness, P0 dependency-chain "
+            "credit, complete-SDK accounting, or target-set expansion"
         ),
     },
     "players-identity-lifecycle-intake": {
@@ -294,6 +584,47 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "non_claim": (
             "does not promote Player Identity/Lifecycle SDK, public player identity, lookup, "
             "ResourceHandle, mutation, return override, runtime hooks, or release readiness"
+        ),
+    },
+    "players-lifecycle-anchor-candidates": {
+        "classification": "players_lifecycle_anchor_candidates_guidance_only_candidate",
+        **player_lifecycle_anchor_source_policy(),
+        "why_blocked": [
+            "planning_guidance_only",
+            "not_release_readiness_target",
+            "approved_runtime_evidence_missing",
+            "public_player_sdk_blocked",
+            "runtime_ordering_unproven",
+            "principal_invalidation_semantics_unproven",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "materialize a distinct non-/tmp sanitized planning comparison snapshot root "
+            "for all six players-lifecycle-anchor-candidates targets, with complete "
+            "artifact identity; repo fixtures currently bind the all-six base layouts "
+            "only, and durable promoted source-bound lifecycle evidence remains limited "
+            "to static anchors ShooterGameMode.HandleNewPlayer and ShooterGameMode.OnLogout, "
+            "with ShooterGameMode.CheckJoinInProgress preserved only as the rejected-start "
+            "triplet source"
+        ),
+        "snapshot_prep_checks": [
+            "compare exactly GameMode.K2_PostLogin, ShooterGameMode.CheckJoinInProgress, ShooterGameMode.HandleNewPlayer, ShooterGameMode.OnLogout, ShooterGameMode.OnPostLogin__DelegateSignature, and ShooterGameMode.OnStartNewPlayer__DelegateSignature through --target-set players-lifecycle-anchor-candidates",
+            "approved triplet sources are exactly ShooterGameMode.HandleNewPlayer, ShooterGameMode.CheckJoinInProgress, and ShooterGameMode.OnLogout",
+            "keep ShooterGameMode.CheckJoinInProgress as the approved rejected-start triplet source and observer alternative, not a static session-start/session-end anchor",
+            "keep GameMode.K2_PostLogin as non-anchor chronology only; property FName mismatch diagnostics must not become triplet source, lifecycle anchor, second-source, runtime, public SDK, release, or v1 evidence",
+            "keep OnPostLogin__DelegateSignature and OnStartNewPlayer__DelegateSignature as delegate guidance only",
+            "require distinct artifact identity before any all-six planning-layout comparison claim",
+            "consume an all-six accepted comparison only through --planning-layout-intake or non-promotional readiness reporting; do not label it accepted second-source readiness",
+            "keep current accepted durable lifecycle anchors limited to ShooterGameMode.HandleNewPlayer and ShooterGameMode.OnLogout",
+            "do not let all-six planning comparison clear approved_runtime_evidence_missing, public SDK readiness, runtime readiness, release readiness, principal validity, or principal invalidation blockers",
+            "keep player/controller/character object refs, UE pointers, raw params, FName/GObjects indices, lookup, ResourceHandle, mutation, and return override blocked",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote approved runtime evidence, public Player SDK, public player "
+            "identity, runtime login/logout ordering, principal validity, principal "
+            "invalidation, lookup, ResourceHandle, mutation, return override, runtime hooks, "
+            "release readiness, or v1 completion"
         ),
     },
     "command-chat-response-route-planning": {
@@ -329,6 +660,40 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "return override, runtime hooks, or release readiness"
         ),
     },
+    "inventory-custom-filter-array-boundary": {
+        "classification": "inventory_custom_filter_array_boundary_candidate",
+        "why_blocked": [
+            "planning_guidance_only",
+            "non_p0_side_lane",
+            "candidate_only_array_boundary_metadata",
+            "copied_array_payload_blocked",
+            "public_inventory_items_sdk_blocked",
+            "identity_lookup_resourcehandle_blocked",
+            "mutation_return_override_blocked",
+            "v1_completion_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "use only the committed InventoryCustomFilter sanitized snapshot or a distinct "
+            "non-protected offline sanitized snapshot for PrimalInventoryComponent."
+            "InventoryCustomFilter; validate with scripts/check_inventory_custom_filter_array_boundary.py"
+        ),
+        "snapshot_prep_checks": [
+            "compare only PrimalInventoryComponent.InventoryCustomFilter through --target-set inventory-custom-filter-array-boundary",
+            "treat UnfilteredItemsList and FilteredItemsList as reflected TArray parameter-shell boundary metadata only",
+            "keep TArray data pointer, count, capacity, element identity, object refs, raw arrays, raw params, AdditionalData, and UE pointers redacted or absent",
+            "keep copied array/list payloads, copied scalars, Inventory SDK, Items SDK, public API, public ABI, and public payload contracts blocked",
+            "keep item identity, inventory identity, lookup, ResourceHandle, mutation, and return override blocked",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for P0, release/readiness, public SDK, runtime, or v1 completion gates",
+        ],
+        "non_claim": (
+            "does not promote P0 progress, Inventory SDK, Items SDK, public API, copied "
+            "array/list payloads, item or inventory identity, lookup, ResourceHandle, "
+            "mutation, return override, runtime hooks, release readiness, public SDK "
+            "readiness, or v1 completion"
+        ),
+    },
     "structure-aggregate-census-planning": {
         "classification": "structure_aggregate_census_guidance_only_candidate",
         "why_blocked": [
@@ -356,6 +721,39 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "does not promote Structure aggregate/census SDK, public StructureEvents, "
             "structure handles, identity, lookup, ResourceHandle, mutation, return override, "
             "runtime hooks, or release readiness"
+        ),
+    },
+    "structure-build-policy-offline-intake": {
+        "classification": "structure_build_policy_offline_intake_candidate",
+        "why_blocked": [
+            "planning_guidance_only",
+            "not_release_readiness_target",
+            "missing_committed_sanitized_snapshot_coverage",
+            "missing_distinct_second_source_layout",
+            "placement_struct_redaction_policy_unproven",
+            "copied_payload_policy_unproven",
+            "public_structureevents_sdk_blocked",
+            "build_denial_return_override_policy_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "approved non-protected copied/offline core or complete core evidence-pack "
+            "manifest for exactly IsAllowedToBuild, BPIsAllowedToBuild, and "
+            "BPIsAllowedToBuildEx; regenerate sanitized snapshots only after reflected "
+            "owners are proven"
+        ),
+        "snapshot_prep_checks": [
+            "compare exactly PrimalStructure.IsAllowedToBuild, PrimalStructure.BPIsAllowedToBuild, and PrimalStructure.BPIsAllowedToBuildEx through --target-set structure-build-policy-offline-intake",
+            "treat APrimalStructure seeds as dictionary clues only until sanitized snapshots prove the reflected owner",
+            "keep placement structs, location vectors, player/controller context, object refs, arrays, raw params, and UE pointers redacted or recognition-only",
+            "keep StructureEvents, build-policy SDK, enforcement, mutation, return override, structure identity, lookup, and ResourceHandle blocked",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote StructureEvents, build-policy SDK, enforcement, identity, "
+            "lookup, ResourceHandle, mutation, return override, runtime hooks, release "
+            "readiness, or public SDK readiness"
         ),
     },
     "mission-copied-bool-policy-slice": {
@@ -416,6 +814,41 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "non_claim": (
             "does not promote public StructureEvents, Structure SDK, pincode/player identity exposure, "
             "identity, lookup, ResourceHandle, mutation, return override, runtime validation, or target-set expansion"
+        ),
+    },
+    "transfer-scriptstruct": {
+        "classification": "internal_transfer_scriptstruct_layout_only_candidate",
+        "why_blocked": [
+            "internal_layout_evidence_only",
+            "not_release_readiness_target",
+            "scriptstruct_layout_candidate_only",
+            "transfer_scriptstruct_payload_decode_blocked",
+            "item_net_info_excluded",
+            "copied_data_policy_unproven",
+            "lifecycle_privacy_policy_unproven",
+            "promotion_gate_blocked",
+            "public_transfer_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "sanitized ARKTributeDino and ArkTributePlayerData ScriptStruct snapshots "
+            "from a distinct non-protected offline artifact with complete artifact identity"
+        ),
+        "snapshot_prep_checks": [
+            "compare only PrimalLocalProfile.ARKTributeDino and PrimalLocalProfile.ArkTributePlayerData through --target-set transfer-scriptstruct",
+            "keep ItemNetInfo explicitly excluded until a separate transfer payload decoding and ownership policy exists",
+            "treat bool-tail metadata as redacted transfer payload layout only, not copied scalar evidence",
+            "keep transferred player/dino payloads, inventory data, cross-map state, object refs, strings, arrays, raw params, and UE pointers redacted or recognition-only",
+            "keep public Transfer SDK, ScriptStruct SDK, transfer payload decoding, ResourceHandle, object identity, mutation, and return override blocked",
+            "keep evidence internal until copied-data, lifecycle, privacy, and promotion gates pass",
+            "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote Transfer SDK, public ScriptStruct SDK, transfer payload "
+            "decoding, ItemNetInfo, identity, lookup, ResourceHandle, mutation, return "
+            "override, runtime hooks, release readiness, public SDK readiness, or v1 completion"
         ),
     },
     "transfer-baccept-only-policy-slice": {
@@ -581,6 +1014,38 @@ def parse_args() -> argparse.Namespace:
             "Use --target to filter."
         ),
     )
+    parser.add_argument(
+        "--observed-fname-chain",
+        help=(
+            "Comma-separated observed property FName indices from a copied diagnostic line. "
+            "Compares one target against --base-root as planning-only, non-promotional evidence."
+        ),
+    )
+    parser.add_argument(
+        "--observed-fname-chain-occurrences",
+        type=int,
+        help=(
+            "Number of copied diagnostic lines that repeated the same --observed-fname-chain. "
+            "This count is diagnostic-only and does not make the report second-source evidence."
+        ),
+    )
+    parser.add_argument(
+        "--observed-fname-target",
+        default=DEFAULT_OBSERVED_FNAME_TARGET,
+        help=(
+            "Target to use with --observed-fname-chain. Accepts Outer.Name or schema:Outer.Name. "
+            f"Default: {DEFAULT_OBSERVED_FNAME_TARGET}."
+        ),
+    )
+    parser.add_argument(
+        "--lifecycle-snapshot-root-check",
+        action="store_true",
+        help=(
+            "Validate the distinct sanitized offline UFunction snapshot-root requirement for "
+            "ShooterGameMode.HandleNewPlayer and ShooterGameMode.OnLogout. This is not runtime "
+            "or public SDK readiness evidence."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
@@ -625,30 +1090,149 @@ def reject_protected_input_path(label: str, path: Path) -> None:
     )
 
 
+def reject_snapshot_input_path(label: str, path: Path) -> None:
+    reject_protected_input_path(label, path)
+    protected_paths.reject_symlink_component(path, label)
+
+
+class SymlinkInputPathError(OSError):
+    def __init__(self, component: Path) -> None:
+        super().__init__(errno.ELOOP, f"path must not be a symlink: {component}")
+        self.component = component
+
+
+def open_regular_file_no_symlink(path: Path):
+    symlink_component = protected_paths.first_symlink_component(path)
+    if symlink_component is not None:
+        raise SymlinkInputPathError(symlink_component)
+
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    if not candidate.name:
+        raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+
+    common_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = common_flags | getattr(os, "O_DIRECTORY", 0)
+    file_flags = common_flags
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+        file_flags |= os.O_NOFOLLOW
+
+    parent_fd: int | None = None
+    try:
+        parent_fd = os.open(candidate.anchor, directory_flags)
+        for part in candidate.parts[1:-1]:
+            next_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = next_fd
+        fd = os.open(candidate.name, file_flags, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise SymlinkInputPathError(candidate) from exc
+        raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+    try:
+        status = os.fstat(fd)
+        if not stat.S_ISREG(status.st_mode):
+            raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+        return os.fdopen(fd, "rb")
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def read_json_input_no_symlink(path: Path, *, label: str) -> Any:
+    try:
+        with open_regular_file_no_symlink(path) as handle:
+            return json.loads(handle.read().decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path}: invalid JSON: {exc}") from exc
+    except SymlinkInputPathError as exc:
+        raise SystemExit(f"{label} must not be a symlink: {exc.component}") from exc
+    except OSError as exc:
+        raise SystemExit(f"{path}: unreadable JSON: {exc}") from exc
+
+
+def target_set_listing_entry(name: str, targets: tuple[str, ...]) -> dict[str, Any]:
+    entry = {
+        "name": name,
+        "module_lane": target_set_module_lane(name),
+        "readiness_classification": target_set_readiness_classification(name),
+        "release_readiness": name in RELEASE_READINESS_TARGET_SETS,
+        "readiness_scope": (
+            "layout_only"
+            if name in RELEASE_READINESS_TARGET_SETS
+            else target_set_readiness_classification(name)
+        ),
+        "second_source_layout_evidence": False,
+        **READINESS_FALSE_FLAGS,
+        **READINESS_ZERO_FIELDS,
+        "targets": list(targets),
+    }
+    if name == "players-lifecycle-anchor-candidates":
+        entry["lifecycle_source_policy"] = player_lifecycle_anchor_source_policy()
+    return entry
+
+
 def target_set_report() -> dict[str, Any]:
     return {
         "schema": "obelisk.reflection-snapshot-target-sets.v1",
-        "evidence_scope": READINESS_EVIDENCE_SCOPE,
+        "catalog_scope": "named_target_set_catalog_only",
+        "evidence_scope": TARGET_SET_CATALOG_EVIDENCE_SCOPE,
+        "target_set_revision_schema": TARGET_SET_REVISION_SCHEMA,
+        "target_set_revision_source": TARGET_SET_REVISION_SOURCE,
+        "target_set_revision_target_schema_filter": "all",
+        "target_set_revision_source_sha256": target_set_revision_source_sha256(
+            list(TARGET_SETS),
+            schema_filter=None,
+        ),
+        "readiness_effect": "none",
+        "second_source_layout_evidence": False,
+        "not_second_source": True,
+        **READINESS_FALSE_FLAGS,
+        **READINESS_ZERO_FIELDS,
+        "does_not_satisfy_readiness": list(PLANNING_LAYOUT_DOES_NOT_SATISFY),
+        "catalog_hygiene": target_set_catalog_hygiene_report(),
         "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
         "non_claims": list(READINESS_NON_CLAIMS),
-        "target_sets": [
-            {
-                "name": name,
-                "module_lane": target_set_module_lane(name),
-                "readiness_classification": target_set_readiness_classification(name),
-                "release_readiness": name in RELEASE_READINESS_TARGET_SETS,
-                "readiness_scope": (
-                    "layout_only"
-                    if name in RELEASE_READINESS_TARGET_SETS
-                    else target_set_readiness_classification(name)
-                ),
-                "promotion_ready": False,
-                "public_sdk_ready": False,
-                "targets": list(targets),
-            }
-            for name, targets in sorted(TARGET_SETS.items())
-        ],
+        "target_sets": [target_set_listing_entry(name, targets) for name, targets in sorted(TARGET_SETS.items())],
     }
+
+
+def target_set_catalog_guardrail_issues() -> list[dict[str, object]]:
+    return target_set_catalog_hygiene_issues(
+        target_sets=TARGET_SETS,
+        module_lanes=TARGET_SET_MODULE_LANES,
+        planning_only=PLANNING_ONLY_TARGET_SETS,
+        release_readiness=RELEASE_READINESS_TARGET_SETS,
+        supported_schemas=SUPPORTED_SCHEMAS,
+    )
+
+
+def target_set_catalog_hygiene_report() -> dict[str, Any]:
+    issues = target_set_catalog_guardrail_issues()
+    return {
+        "guardrail": TARGET_SET_CATALOG_GUARDRAIL,
+        "status": "blocked" if issues else "clean",
+        "checked_target_sets": len(TARGET_SETS),
+        "checked_schemas": sorted(SUPPORTED_SCHEMAS),
+        "issues": issues,
+    }
+
+
+def reject_target_set_catalog_hygiene_issues() -> None:
+    issues = target_set_catalog_guardrail_issues()
+    if not issues:
+        return
+    reasons = sorted({str(issue.get("reason", "unknown")) for issue in issues})
+    raise SystemExit(
+        "target-set catalog hygiene failed: "
+        + ", ".join(reasons)
+        + "; fix scripts/reflection_target_sets.py before comparing snapshots or claiming target-set coverage"
+    )
 
 
 def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
@@ -659,6 +1243,14 @@ def target_guidance_report(target_filters: set[str]) -> dict[str, Any]:
     return {
         "schema": "obelisk.reflection-target-guidance.v1",
         "guidance_scope": "offline_planning_only",
+        "evidence_scope": TARGET_GUIDANCE_EVIDENCE_SCOPE,
+        "readiness_effect": "none",
+        "second_source_layout_evidence": False,
+        "not_second_source": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "does_not_satisfy_readiness": list(PLANNING_LAYOUT_DOES_NOT_SATISFY),
         "target_filters": sorted(target_filters),
         "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
         "non_claims": list(READINESS_NON_CLAIMS),
@@ -735,6 +1327,15 @@ def reject_duplicate_target_set_guidance_filters(target_sets: list[str]) -> None
         raise SystemExit("duplicate target-set guidance filter(s): " + ", ".join(duplicates))
 
 
+def reject_invalid_target_set_filters(target_sets: list[str]) -> None:
+    duplicates = duplicate_values(target_sets)
+    if duplicates:
+        raise SystemExit("duplicate target-set filter(s): " + ", ".join(duplicates))
+    unknown = sorted(target_set for target_set in target_sets if target_set not in TARGET_SETS)
+    if unknown:
+        raise SystemExit("unknown target-set filter(s): " + ", ".join(unknown))
+
+
 def reject_duplicate_target_guidance_filters(targets: list[str]) -> None:
     duplicates = duplicate_values(targets)
     if duplicates:
@@ -763,27 +1364,24 @@ def target_blocker_guidance(target: str) -> dict[str, Any] | None:
 
 
 def snapshot_paths(root: Path) -> list[Path]:
-    reject_protected_input_path("snapshot root", root)
-    if root.is_symlink():
-        reject_protected_input_path("snapshot", root)
+    reject_snapshot_input_path("snapshot root", root)
     if root.is_file():
         return [root]
     if not root.exists():
         raise SystemExit(f"snapshot root does not exist: {root}")
     paths = []
     for path in root.rglob("*.snapshot.json"):
-        reject_protected_input_path("snapshot", path)
+        reject_snapshot_input_path("snapshot", path)
         if path.is_file():
             paths.append(path)
     return sorted(paths)
 
 
 def load_snapshot(path: Path) -> dict[str, Any]:
-    reject_protected_input_path("snapshot", path)
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"{path}: invalid JSON: {exc}") from exc
+    reject_snapshot_input_path("snapshot", path)
+    payload = read_json_input_no_symlink(path, label="snapshot")
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{path}: expected JSON object snapshot")
     if payload.get("schema") not in SUPPORTED_SCHEMAS:
         raise SystemExit(f"{path}: unsupported snapshot schema: {payload.get('schema')!r}")
     targets = payload.get("targets")
@@ -829,6 +1427,59 @@ def module_from_path(path: str) -> str:
     if len(parts) >= 2:
         return parts[-2]
     return "<unknown>"
+
+
+def normalize_claim_key(key: str) -> str:
+    camel_spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", key)
+    camel_spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", camel_spaced)
+    return re.sub(r"[^a-z0-9]+", "_", camel_spaced.lower()).strip("_")
+
+
+def is_negative_or_blocker_text(value: str) -> bool:
+    return bool(NEGATED_OR_BLOCKED_RE.search(value))
+
+
+def is_positive_status_alias(value: str) -> bool:
+    normalized = re.sub(r"[\s_]+", "-", value.strip().lower())
+    return (
+        normalized in POSITIVE_STATUS_VALUES
+        or normalized.endswith("-ready")
+    )
+
+
+def is_positive_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        if is_negative_or_blocker_text(value):
+            return False
+        return is_positive_status_alias(value) or (
+            CLAIM_SUBJECT_RE.search(value) is not None
+            and AFFIRMATIVE_CONTEXT_RE.search(value) is not None
+        )
+    return False
+
+
+def claim_sanitization_reasons(value: Any, *, path: str = "$") -> list[str]:
+    reasons: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            key_text = str(key)
+            normalized_key = normalize_claim_key(key_text)
+            if child_path in CLAIM_SCAN_EXEMPT_PATHS:
+                continue
+            if normalized_key == "status" and isinstance(child, str) and is_positive_status_alias(child):
+                reasons.append(f"positive_status_alias:{child_path}")
+            if FORBIDDEN_CLAIM_KEY_RE.search(normalized_key) and is_positive_claim_value(child):
+                reasons.append(f"readiness_alias_overclaim:{child_path}")
+            reasons.extend(claim_sanitization_reasons(child, path=child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            reasons.extend(claim_sanitization_reasons(child, path=f"{path}[{index}]"))
+    elif isinstance(value, str) and is_positive_claim_value(value):
+        reasons.append(f"forbidden_positive_claim_value:{path}")
+    return reasons
 
 
 def raw_sanitization_reasons(value: Any, *, key: str | None = None, path: str = "") -> list[str]:
@@ -938,6 +1589,13 @@ def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
         membership = prop.get(membership_key)
         if membership != "candidate-uobject":
             reasons.append(f"{prefix}_{membership_key}_{membership if membership is not None else 'missing'}")
+    required_nested_candidates = {
+        "ArrayProperty": "array_inner_candidate",
+        "StructProperty": "struct_type_candidate",
+    }
+    required_nested_key = required_nested_candidates.get(prop.get("class_name"))
+    if required_nested_key is not None and not isinstance(prop.get(required_nested_key), dict):
+        reasons.append(f"{prefix}_{required_nested_key}_missing")
     for nested_key in ("array_inner_candidate", "struct_type_candidate"):
         nested = prop.get(nested_key)
         if not isinstance(nested, dict):
@@ -951,8 +1609,17 @@ def property_block_reasons(prop: dict[str, Any], *, index: int) -> list[str]:
         membership = nested.get("membership_status")
         if membership != "candidate-uobject":
             reasons.append(f"{nested_prefix}_membership_status_{membership if membership is not None else 'missing'}")
-        if not isinstance(nested.get(nested_identity_key), dict):
+        nested_identity = nested.get(nested_identity_key)
+        if not isinstance(nested_identity, dict):
             reasons.append(f"{nested_prefix}_missing_{nested_identity_key}")
+        else:
+            for field in ("object_index", "name_index"):
+                if type(nested_identity.get(field)) is not int:
+                    reasons.append(f"{nested_prefix}_{nested_identity_key}_{field}_missing")
+            for field in ("name", "class_name"):
+                value = nested_identity.get(field)
+                if not isinstance(value, str) or not value:
+                    reasons.append(f"{nested_prefix}_{nested_identity_key}_{field}_missing")
     return reasons
 
 
@@ -967,17 +1634,21 @@ def evidence_reasons(payload: dict[str, Any]) -> list[str]:
     elif not is_sha256(ark_binary_sha256):
         reasons.append("invalid_ark_binary_sha256")
     artifact_kind = evidence.get("artifact_kind")
-    if artifact_kind is not None and artifact_kind not in ALLOWED_ARTIFACT_KINDS:
+    if artifact_kind is None:
+        reasons.append("missing_artifact_kind")
+    elif artifact_kind not in ALLOWED_ARTIFACT_KINDS:
         reasons.append(f"invalid_artifact_kind_{artifact_kind}")
     artifact_sha256 = evidence.get("artifact_sha256")
-    if artifact_sha256 is not None:
-        if not is_sha256(artifact_sha256):
-            reasons.append("invalid_artifact_sha256")
+    if artifact_sha256 is None:
+        reasons.append("missing_artifact_sha256")
+    elif not is_sha256(artifact_sha256):
+        reasons.append("invalid_artifact_sha256")
     for field in ("capture_id", "evidence_pack_id"):
         value = evidence.get(field)
-        if value is not None:
-            if not is_safe_artifact_id(value):
-                reasons.append(f"invalid_{field}")
+        if value is None:
+            reasons.append(f"missing_{field}")
+        elif not is_safe_artifact_id(value):
+            reasons.append(f"invalid_{field}")
     if evidence.get("source") != "offline_core":
         reasons.append(f"evidence_source_{evidence.get('source')}")
     if evidence.get("status") != "candidate-only":
@@ -990,8 +1661,9 @@ def evidence_reasons(payload: dict[str, Any]) -> list[str]:
 
 def comparable_layout(payload: dict[str, Any], *, strict_identity_indices: bool) -> tuple[dict[str, Any] | None, list[str]]:
     raw_reasons = raw_sanitization_reasons(payload)
-    if raw_reasons:
-        return None, raw_reasons
+    claim_reasons = claim_sanitization_reasons(payload)
+    if raw_reasons or claim_reasons:
+        return None, raw_reasons + claim_reasons
     invalid_evidence = evidence_reasons(payload)
     if invalid_evidence:
         return None, invalid_evidence
@@ -1235,6 +1907,627 @@ def compare_sets(
     }
 
 
+def payload_has_reflectionscanner_gate(value: Any) -> bool:
+    if isinstance(value, dict):
+        if value.get("gate_type") == "reflectionscanner_evidence_pack_v1":
+            return True
+        return any(payload_has_reflectionscanner_gate(child) for child in value.values())
+    if isinstance(value, list):
+        return any(payload_has_reflectionscanner_gate(child) for child in value)
+    return False
+
+
+def forbidden_lifecycle_input_reasons(payload: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    schema = payload.get("schema")
+    if schema in DIAGNOSTIC_ONLY_LIFECYCLE_SCHEMAS:
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    sidecar_reason = NON_SNAPSHOT_LIFECYCLE_SIDECAR_SCHEMA_REASONS.get(schema)
+    if sidecar_reason is not None:
+        reasons.append(sidecar_reason)
+    if schema == "obelisk.player-principal-passive-snapshot.v1":
+        reasons.append("passive_snapshot_manifest_not_sanitized_ufunction_snapshot")
+    if schema in {
+        "obelisk.reflection-snapshot-readiness.v1",
+        "obelisk.reflection-snapshot-comparison.v1",
+    }:
+        reasons.append("layout_only_report_not_sanitized_lifecycle_snapshot_root")
+    evidence_scope = payload.get("evidence_scope")
+    if isinstance(evidence_scope, str) and evidence_scope in {
+        READINESS_EVIDENCE_SCOPE,
+        PLANNING_LAYOUT_INTAKE_EVIDENCE_SCOPE,
+    }:
+        reasons.append("layout_only_evidence_report_not_sanitized_lifecycle_snapshot_root")
+    if evidence_scope == OBSERVED_FNAME_CHAIN_EVIDENCE_SCOPE:
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    if payload.get("artifact_role") == OBSERVED_FNAME_CHAIN_ARTIFACT_ROLE:
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    if payload.get("artifact_status") == "planning_diagnostic_unresolved":
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    if payload.get("observed_chain_source") == "copied_runtime_diagnostic_line":
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    runtime_summary = payload.get("runtime_observation_summary")
+    if isinstance(runtime_summary, dict) and runtime_summary.get("diagnostic_only") is True:
+        reasons.append("diagnostic_only_root_not_sanitized_lifecycle_snapshot_root")
+    if payload_has_reflectionscanner_gate(payload):
+        reasons.append("reflectionscanner_output_not_sanitized_lifecycle_snapshot_root")
+    return reasons
+
+
+def reject_forbidden_lifecycle_input_root(label: str, root: Path) -> None:
+    reject_protected_input_path(label, root)
+    if root.is_file():
+        paths = [root]
+    elif root.exists():
+        paths = sorted(path for path in root.rglob("*.json") if path.is_file())
+    else:
+        paths = []
+    for path in paths:
+        protected_paths.reject_symlink_component(path, label)
+        reject_protected_input_path(label, path)
+        payload = read_json_input_no_symlink(path, label=label)
+        if not isinstance(payload, dict):
+            continue
+        reasons = forbidden_lifecycle_input_reasons(payload)
+        if reasons:
+            raise SystemExit(
+                f"{label} contains forbidden lifecycle input {path}: "
+                + ", ".join(sorted(set(reasons)))
+            )
+
+
+def lifecycle_complete_identity(
+    payload: dict[str, Any],
+    *,
+    label: str,
+) -> tuple[dict[str, str] | None, list[str]]:
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        return None, [f"{label}:missing_evidence"]
+
+    reasons: list[str] = []
+    ark_binary_sha256 = evidence.get("ark_binary_sha256")
+    if not isinstance(ark_binary_sha256, str):
+        reasons.append(f"{label}:missing_ark_binary_sha256")
+    elif not is_sha256(ark_binary_sha256):
+        reasons.append(f"{label}:invalid_ark_binary_sha256")
+
+    artifact_kind = evidence.get("artifact_kind")
+    if artifact_kind != "offline_core":
+        reasons.append(f"{label}:artifact_kind_not_offline_core")
+
+    artifact_sha256 = evidence.get("artifact_sha256")
+    if not is_sha256(artifact_sha256):
+        reasons.append(f"{label}:invalid_artifact_sha256")
+
+    capture_id = evidence.get("capture_id")
+    if not is_safe_artifact_id(capture_id):
+        reasons.append(f"{label}:invalid_capture_id")
+
+    evidence_pack_id = evidence.get("evidence_pack_id")
+    if not is_safe_artifact_id(evidence_pack_id):
+        reasons.append(f"{label}:invalid_evidence_pack_id")
+
+    if reasons:
+        return None, reasons
+    return (
+        {
+            "ark_binary_sha256": str(ark_binary_sha256),
+            "artifact_kind": str(artifact_kind),
+            "artifact_sha256": str(artifact_sha256),
+            "capture_id": str(capture_id),
+            "evidence_pack_id": str(evidence_pack_id),
+        },
+        [],
+    )
+
+
+def lifecycle_snapshot_identity_record(
+    snapshots: dict[str, dict[str, Any]],
+    key: str,
+    *,
+    label: str,
+) -> tuple[dict[str, str] | None, list[str]]:
+    entry = snapshots.get(key)
+    if entry is None:
+        return None, [f"{label}:missing_snapshot"]
+    return lifecycle_complete_identity(entry["payload"], label=label)
+
+
+def lifecycle_artifact_identity_tuple(identity: dict[str, str]) -> tuple[str, ...]:
+    return tuple(identity[key] for key in EVIDENCE_ARTIFACT_IDENTITY_KEYS)
+
+
+def lifecycle_unique_artifact_identities(identities: list[dict[str, str]]) -> list[tuple[str, ...]]:
+    return sorted({lifecycle_artifact_identity_tuple(identity) for identity in identities})
+
+
+def offline_blocker_reason_counts(blockers: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for blocker in blockers:
+        reason = blocker.get("reason")
+        if not isinstance(reason, str) or not reason:
+            reason = "unknown"
+        raw_count = blocker.get("count", 1)
+        count = raw_count if isinstance(raw_count, int) and raw_count > 0 else 1
+        counts[reason] = counts.get(reason, 0) + count
+    return dict(sorted(counts.items()))
+
+
+def lifecycle_snapshot_next_offline_action(
+    offline_satisfied: bool,
+    *,
+    candidate_extra_targets: list[str] | None = None,
+    candidate_missing_targets: list[str] | None = None,
+) -> dict[str, Any]:
+    candidate_extra_targets = candidate_extra_targets or []
+    candidate_missing_targets = candidate_missing_targets or []
+    candidate_root_requirements = {
+        "exact_required_targets_only": True,
+        "required_targets": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS),
+        "required_snapshot_filenames": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_FILENAMES),
+        "missing_targets": list(candidate_missing_targets),
+        "extra_target_count": len(candidate_extra_targets),
+        "complete_offline_core_identity_required": True,
+        "distinct_from_base_identity_required": True,
+        "broad_root_or_report_input_accepted": False,
+        "runtime_or_public_sdk_readiness_claim": False,
+    }
+    if offline_satisfied:
+        return {
+            "status": "offline_requirement_satisfied_planning_only",
+            "action": "archive_lifecycle_snapshot_root_check_as_planning_layout_evidence",
+            "next_blocker": "approved_runtime_evidence_missing",
+            "candidate_root_requirements": candidate_root_requirements,
+            "runtime_or_public_sdk_readiness_claim": False,
+        }
+    return {
+        "status": "offline_requirement_blocked",
+        "action": "create_or_recover_distinct_sanitized_lifecycle_ufunction_snapshot_root",
+        "required_targets": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS),
+        "candidate_root_requirements": candidate_root_requirements,
+        "runtime_or_public_sdk_readiness_claim": False,
+    }
+
+
+def lifecycle_snapshot_root_requirement_report(
+    base: dict[str, dict[str, Any]],
+    candidate: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    target_filters = set(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS)
+    comparison = compare_sets(
+        base,
+        candidate,
+        strict_identity_indices=False,
+        allow_ark_sha_mismatch=False,
+        target_filters=target_filters,
+    )
+    results_by_target = {result["target"]: result for result in comparison["results"]}
+    target_details: list[dict[str, Any]] = []
+    offline_blockers: list[dict[str, Any]] = []
+    base_identities: list[dict[str, str]] = []
+    candidate_identities: list[dict[str, str]] = []
+    for key in LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS:
+        result = results_by_target.get(
+            key,
+            {"target": key, "status": "inconclusive", "reasons": ["missing_comparison_result"]},
+        )
+        base_identity, base_identity_reasons = lifecycle_snapshot_identity_record(base, key, label="base")
+        candidate_identity, candidate_identity_reasons = lifecycle_snapshot_identity_record(
+            candidate,
+            key,
+            label="candidate",
+        )
+        if base_identity is not None:
+            base_identities.append(base_identity)
+        if candidate_identity is not None:
+            candidate_identities.append(candidate_identity)
+        detail: dict[str, Any] = {
+            "target": key,
+            "status": result["status"],
+            "base_path": base.get(key, {}).get("path"),
+            "candidate_path": candidate.get(key, {}).get("path"),
+            "base_identity": base_identity,
+            "candidate_identity": candidate_identity,
+            "identity_reasons": base_identity_reasons + candidate_identity_reasons,
+        }
+        if result["status"] == "inconclusive":
+            detail["reasons"] = result.get("reasons", [])
+        elif result["status"] == "rejected":
+            diffs = result.get("diffs", [])
+            detail["diff_count"] = len(diffs)
+            detail["first_diff"] = diffs[0].get("path") if diffs else None
+
+        for reason in detail.get("identity_reasons", []):
+            offline_blockers.append({"target": key, "reason": reason})
+        if result["status"] == "inconclusive":
+            for reason in result.get("reasons", []):
+                offline_blockers.append({"target": key, "reason": reason})
+        elif result["status"] == "rejected":
+            offline_blockers.append({"target": key, "reason": "lifecycle_layout_mismatch"})
+        target_details.append(detail)
+
+    base_unique_identities = lifecycle_unique_artifact_identities(base_identities)
+    candidate_unique_identities = lifecycle_unique_artifact_identities(candidate_identities)
+    if len(base_unique_identities) > 1:
+        offline_blockers.append(
+            {
+                "reason": "base_lifecycle_root_artifact_identity_inconsistent",
+                "count": len(base_unique_identities),
+            }
+        )
+    if len(candidate_unique_identities) > 1:
+        offline_blockers.append(
+            {
+                "reason": "candidate_lifecycle_root_artifact_identity_inconsistent",
+                "count": len(candidate_unique_identities),
+            }
+        )
+
+    counts = comparison["counts"]
+    if counts["accepted"] != len(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS):
+        offline_blockers.append(
+            {
+                "reason": "required_lifecycle_targets_not_all_accepted",
+                "count": len(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS) - counts["accepted"],
+            }
+        )
+
+    candidate_targets = set(candidate)
+    candidate_extra_targets = sorted(candidate_targets - target_filters)
+    candidate_missing_targets = sorted(target_filters - candidate_targets)
+    if candidate_extra_targets:
+        for target in candidate_extra_targets:
+            offline_blockers.append({"target": target, "reason": "candidate_extra_snapshot_target_not_allowed"})
+    if candidate_extra_targets or candidate_missing_targets:
+        offline_blockers.append(
+            {
+                "reason": "candidate_snapshot_root_not_exact_two_target_scope",
+                "count": len(candidate_extra_targets) + len(candidate_missing_targets),
+            }
+        )
+
+    offline_satisfied = not offline_blockers
+    blocker_reason_counts = offline_blocker_reason_counts(offline_blockers)
+    return {
+        "schema": LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA,
+        "guidance_scope": "offline_lifecycle_snapshot_requirement",
+        "source_scope": "sanitized_ufunction_snapshot_roots_only",
+        "artifact": "distinct_sanitized_lifecycle_ufunction_snapshot_root",
+        "required_targets": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS),
+        "required_identity_fields": list(LIFECYCLE_SNAPSHOT_ROOT_REQUIRED_IDENTITY_FIELDS),
+        "required_shape_fields": list(
+            LIFECYCLE_FNAME_DRIFT_NEXT_OFFLINE_ARTIFACT_REQUIREMENT["required_shape_fields"]
+        ),
+        "comparison_mode": "semantic_layout_without_strict_identity_indices",
+        "strict_identity_indices": False,
+        "allow_ark_sha_mismatch": False,
+        "evidence_scope": LIFECYCLE_SNAPSHOT_ROOT_CHECK_EVIDENCE_SCOPE,
+        "offline_requirement": {
+            "satisfied": offline_satisfied,
+            "status": "accepted" if offline_satisfied else "blocked",
+            "blocker_count": len(offline_blockers),
+            "blocker_reason_counts": blocker_reason_counts,
+            "blockers": offline_blockers,
+        },
+        "comparison_counts": dict(counts),
+        "target_details": target_details,
+        "base_root_artifact_identity_consistent": len(base_unique_identities) <= 1,
+        "candidate_root_artifact_identity_consistent": len(candidate_unique_identities) <= 1,
+        "candidate_snapshot_scope": {
+            "exact_required_targets": not candidate_extra_targets and not candidate_missing_targets,
+            "required_targets": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_TARGETS),
+            "candidate_targets": sorted(candidate_targets),
+            "extra_targets": candidate_extra_targets,
+            "missing_targets": candidate_missing_targets,
+            "required_snapshot_filenames": list(LIFECYCLE_FNAME_DRIFT_REQUIRED_SNAPSHOT_FILENAMES),
+            "focused_candidate_root_required": bool(candidate_extra_targets or candidate_missing_targets),
+        },
+        "prohibited_inputs": list(LIFECYCLE_SNAPSHOT_ROOT_PROHIBITED_INPUTS),
+        "next_offline_artifact_requirement": dict(LIFECYCLE_FNAME_DRIFT_NEXT_OFFLINE_ARTIFACT_REQUIREMENT),
+        "next_offline_action": lifecycle_snapshot_next_offline_action(
+            offline_satisfied,
+            candidate_extra_targets=candidate_extra_targets,
+            candidate_missing_targets=candidate_missing_targets,
+        ),
+        "approved_runtime_evidence": False,
+        "approved_runtime_evidence_blocker": "approved_runtime_evidence_missing",
+        "layout_only_evidence_satisfies_approved_runtime_evidence": False,
+        "layout_only_evidence_rejected_for_runtime_readiness": True,
+        "does_not_satisfy_readiness": list(LIFECYCLE_SNAPSHOT_ROOT_DOES_NOT_SATISFY),
+        "readiness_effect": "none",
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "v1_complete": False,
+        "promotion_gate": {
+            "ready": False,
+            "ready_scope": "planning_only" if offline_satisfied else "not_ready",
+            "layout_ready": offline_satisfied,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": (
+                [
+                    {"reason": "approved_runtime_evidence_missing", "count": 1},
+                    {"reason": "lifecycle_snapshot_root_check_not_runtime_evidence", "count": 1},
+                ]
+                if offline_satisfied
+                else [
+                    {"reason": "lifecycle_snapshot_root_requirement_blocked", "count": len(offline_blockers)},
+                    {"reason": "approved_runtime_evidence_missing", "count": 1},
+                ]
+            ),
+        },
+        "non_claims": list(LIFECYCLE_SNAPSHOT_ROOT_NON_CLAIMS),
+    }
+
+
+def parse_observed_fname_chain(value: str) -> list[int]:
+    parts = [part.strip() for part in value.split(",")]
+    if not parts or any(not part for part in parts):
+        raise SystemExit("--observed-fname-chain must be a comma-separated list of decimal indices")
+    observed = []
+    for part in parts:
+        if not part.isdecimal():
+            raise SystemExit("--observed-fname-chain accepts decimal FName indices only")
+        observed.append(int(part))
+    return observed
+
+
+def validate_observed_fname_target_sets(observed_target: str, target_sets: list[str]) -> None:
+    if not target_sets:
+        return
+    validate_target_filters({observed_target})
+    non_planning = sorted(set(target_sets) - PLANNING_ONLY_TARGET_SETS)
+    if non_planning:
+        raise SystemExit(
+            "--observed-fname-chain only accepts planning-only target sets: "
+            + ", ".join(non_planning)
+        )
+    mismatched = [
+        target_set
+        for target_set in sorted(set(target_sets))
+        if not any(matches_target_filter(target, {observed_target}) for target in TARGET_SETS[target_set])
+    ]
+    if mismatched:
+        raise SystemExit(
+            "--observed-fname-chain target set(s) do not contain --observed-fname-target: "
+            + ", ".join(mismatched)
+        )
+
+
+def observed_index_occurrences(
+    snapshots: dict[str, dict[str, Any]],
+    observed_name_indices: list[int],
+) -> list[dict[str, Any]]:
+    wanted = set(observed_name_indices)
+    occurrences: list[dict[str, Any]] = []
+    for key, entry in sorted(snapshots.items()):
+        target = entry["payload"]["targets"][0]
+        chain = target.get("property_chain")
+        if not isinstance(chain, dict):
+            continue
+        properties = chain.get("properties")
+        if not isinstance(properties, list):
+            continue
+        for index, prop in enumerate(properties):
+            if not isinstance(prop, dict):
+                continue
+            name_index = prop.get("name_index")
+            if name_index not in wanted:
+                continue
+            occurrences.append(
+                {
+                    "target": key,
+                    "path": entry["path"],
+                    "property_index": index,
+                    "property_name": prop.get("name"),
+                    "class_name": prop.get("class_name"),
+                    "offset_internal": prop.get("offset_internal"),
+                    "name_index": name_index,
+                }
+            )
+    return occurrences
+
+
+def assert_observed_fname_chain_report_contract(report: dict[str, Any]) -> None:
+    expected_values = {
+        "guidance_scope": "offline_planning_only",
+        "evidence_scope": OBSERVED_FNAME_CHAIN_EVIDENCE_SCOPE,
+        "artifact_role": OBSERVED_FNAME_CHAIN_ARTIFACT_ROLE,
+        "layout_evidence_status": OBSERVED_FNAME_CHAIN_LAYOUT_EVIDENCE_STATUS,
+        "second_source_layout_evidence": False,
+        "can_be_used_as_second_source_layout_evidence": False,
+        "can_be_used_as_candidate_snapshot_root": False,
+        "second_source_status": "not_applicable",
+        "not_second_source": True,
+        "readiness_effect": "none",
+        "readiness_classification": "planning_only",
+        "planning_only": True,
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+    }
+    violations = [
+        f"{field}={report.get(field)!r}"
+        for field, expected in expected_values.items()
+        if report.get(field) != expected
+    ]
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        violations.append("promotion_gate missing")
+    else:
+        for field in ("ready", "promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if promotion_gate.get(field) is not False:
+                violations.append(f"promotion_gate.{field}={promotion_gate.get(field)!r}")
+    prohibited_uses = set(report.get("prohibited_evidence_uses", []))
+    required_prohibited_uses = set(OBSERVED_FNAME_CHAIN_PROHIBITED_EVIDENCE_USES)
+    if not required_prohibited_uses.issubset(prohibited_uses):
+        missing = sorted(required_prohibited_uses - prohibited_uses)
+        violations.append("missing_prohibited_evidence_uses=" + ",".join(missing))
+    if violations:
+        raise AssertionError("observed FName-chain diagnostic contract violated: " + "; ".join(violations))
+
+
+def observed_fname_chain_report(
+    snapshots: dict[str, dict[str, Any]],
+    *,
+    observed_target: str,
+    observed_name_indices: list[int],
+    observed_chain_occurrences: int,
+    target_sets: list[str],
+) -> dict[str, Any]:
+    validate_target_filters({observed_target})
+    keys = [
+        key
+        for key in filtered_keys(snapshots, {}, target_filters={observed_target})
+        if key in snapshots and matches_target_filter(key, {observed_target})
+    ]
+    if len(keys) != 1:
+        raise SystemExit(
+            "--observed-fname-target must match exactly one snapshot target; matched "
+            + str(len(keys))
+        )
+
+    key = keys[0]
+    entry = snapshots[key]
+    layout, reasons = comparable_layout(entry["payload"], strict_identity_indices=True)
+    if layout is None or reasons:
+        raise SystemExit(
+            "--observed-fname-target snapshot is not comparable: " + ", ".join(reasons)
+        )
+
+    properties = layout["property_chain"]["properties"]
+    expected_name_indices = [prop.get("name_index") for prop in properties]
+    property_comparison = []
+    for index, prop in enumerate(properties):
+        expected = prop.get("name_index")
+        observed = observed_name_indices[index] if index < len(observed_name_indices) else None
+        delta = observed - expected if isinstance(observed, int) and isinstance(expected, int) else None
+        property_comparison.append(
+            {
+                "position": index,
+                "property_name": prop.get("name"),
+                "class_name": prop.get("class_name"),
+                "offset_internal": prop.get("offset_internal"),
+                "element_size": prop.get("element_size"),
+                "array_dim": prop.get("array_dim"),
+                "expected_name_index": expected,
+                "observed_name_index": observed,
+                "delta": delta,
+                "exact_name_index_match": observed == expected,
+            }
+        )
+
+    exact_chain_match = expected_name_indices == observed_name_indices
+    occurrences = observed_index_occurrences(snapshots, observed_name_indices)
+    matched_observed_indices = sorted(
+        {
+            occurrence["name_index"]
+            for occurrence in occurrences
+            if isinstance(occurrence.get("name_index"), int)
+        }
+    )
+    unmatched_observed_indices = [
+        index for index in observed_name_indices if index not in matched_observed_indices
+    ]
+    target_set_context = [
+        {
+            "target_set": target_set,
+            "contains_target": key in TARGET_SETS[target_set],
+            "readiness_classification": target_set_readiness_classification(target_set),
+        }
+        for target_set in sorted(target_sets)
+    ]
+
+    report = {
+        "schema": "obelisk.reflection-observed-fname-chain-check.v1",
+        "guidance_scope": "offline_planning_only",
+        "evidence_scope": OBSERVED_FNAME_CHAIN_EVIDENCE_SCOPE,
+        "artifact_role": OBSERVED_FNAME_CHAIN_ARTIFACT_ROLE,
+        "layout_evidence_status": OBSERVED_FNAME_CHAIN_LAYOUT_EVIDENCE_STATUS,
+        "second_source_layout_evidence": False,
+        "can_be_used_as_second_source_layout_evidence": False,
+        "can_be_used_as_candidate_snapshot_root": False,
+        "target": key,
+        "target_sets": sorted(target_sets),
+        "target_set_context": target_set_context,
+        "target_set_guidance": target_set_guidance_report(target_sets),
+        "source_scope": "sanitized_snapshot_root_only",
+        "observed_chain_source": "copied_runtime_diagnostic_line",
+        "diagnostic_observation_count": observed_chain_occurrences,
+        "diagnostic_observation_count_scope": "repeated_runtime_mismatch_count_diagnostic_only",
+        "diagnostic_observation_repeated": observed_chain_occurrences > 1,
+        "second_source_status": "not_applicable",
+        "second_source_blockers": list(OBSERVED_FNAME_CHAIN_SECOND_SOURCE_BLOCKERS),
+        "not_second_source": True,
+        "status": "matched_planning_only" if exact_chain_match else "unresolved_mismatch",
+        "readiness_effect": "none",
+        "readiness_classification": "planning_only",
+        "planning_only": True,
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "does_not_satisfy_readiness": [
+            "second_source_layout_evidence",
+            "runtime_readiness",
+            "public_sdk_readiness",
+            "release_readiness",
+            "v1_completion",
+        ],
+        "prohibited_evidence_uses": list(OBSERVED_FNAME_CHAIN_PROHIBITED_EVIDENCE_USES),
+        "exact_property_chain_match": exact_chain_match,
+        "expected_name_indices": expected_name_indices,
+        "observed_name_indices": observed_name_indices,
+        "deltas": [item["delta"] for item in property_comparison],
+        "observed_count": len(observed_name_indices),
+        "expected_count": len(expected_name_indices),
+        "extra_observed_name_indices": observed_name_indices[len(expected_name_indices) :],
+        "property_comparison": property_comparison,
+        "observed_indices_found_in_snapshot_root": occurrences,
+        "observed_indices_found_count": len(occurrences),
+        "unmatched_observed_name_indices": unmatched_observed_indices,
+        "interpretation": (
+            "observed chain does not resolve to the committed sanitized snapshot indices"
+            if not exact_chain_match
+            else "observed chain matches the sanitized snapshot indices, but this remains planning-only"
+        ),
+        "blockers": [
+            "approved_runtime_evidence_missing",
+            "observed_fname_chain_check_not_promotion_gate",
+            "observed_fname_chain_unresolved",
+            "runtime_observation_requires_separate_approval",
+        ]
+        if not exact_chain_match
+        else [
+            "approved_runtime_evidence_missing",
+            "observed_fname_chain_check_not_promotion_gate",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "promotion_gate": {
+            "ready": False,
+            "ready_scope": "planning_only",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": [
+                {"reason": "approved_runtime_evidence_missing", "count": 1},
+                {"reason": "observed_fname_chain_check_not_promotion_gate", "count": 1},
+                {"reason": "observed_fname_chain_unresolved", "count": 1},
+            ]
+            if not exact_chain_match
+            else [{"reason": "observed_fname_chain_check_not_promotion_gate", "count": 1}],
+        },
+        "next_offline_artifact_requirement": dict(
+            LIFECYCLE_FNAME_DRIFT_NEXT_OFFLINE_ARTIFACT_REQUIREMENT
+        ),
+        "non_claims": list(OBSERVED_FNAME_CHAIN_NON_CLAIMS),
+    }
+    assert_observed_fname_chain_report_contract(report)
+    return report
+
+
 def readiness_report(
     snapshots: dict[str, dict[str, Any]],
     *,
@@ -1385,8 +2678,11 @@ def readiness_report(
         "target_filters": sorted(target_filters),
         "second_source_status": "compared" if candidate is not None else "missing_candidate_root",
         "evidence_scope": READINESS_EVIDENCE_SCOPE,
+        "does_not_satisfy_readiness": list(READINESS_DOES_NOT_SATISFY),
         "not_promoted_surfaces": sorted(READINESS_NOT_PROMOTED_SURFACES),
         "non_claims": list(READINESS_NON_CLAIMS),
+        **READINESS_FALSE_FLAGS,
+        **READINESS_ZERO_FIELDS,
         "totals": totals,
         "promotion_gate": promotion_gate_summary(),
         "modules": [modules[key] for key in sorted(modules)],
@@ -1395,29 +2691,74 @@ def readiness_report(
 
 def print_text(report: dict[str, Any]) -> None:
     if report["schema"] == "obelisk.reflection-snapshot-target-sets.v1":
+        print(
+            "target_set_catalog scope={scope} evidence_scope={evidence_scope} "
+            "not_second_source={not_second_source} second_source_layout_evidence={second_source} "
+            "target_set_revision_source_sha256={source_sha256}".format(
+                scope=report.get("catalog_scope", "unknown"),
+                evidence_scope=report.get("evidence_scope", "unknown"),
+                not_second_source=str(report.get("not_second_source", False)).lower(),
+                second_source=str(report.get("second_source_layout_evidence", False)).lower(),
+                source_sha256=report.get("target_set_revision_source_sha256", "unknown"),
+            )
+        )
         for item in report["target_sets"]:
             print(
                 "{name}: readiness_classification={classification} "
                 "release_readiness={release_readiness} readiness_scope={readiness_scope} "
-                "promotion_ready={promotion_ready} public_sdk_ready={public_sdk_ready}".format(
+                "promotion_ready={promotion_ready} public_sdk_ready={public_sdk_ready} "
+                "runtime_ready={runtime_ready} second_source_layout_evidence={second_source}".format(
                     name=item["name"],
                     classification=item["readiness_classification"],
                     release_readiness=str(item["release_readiness"]).lower(),
                     readiness_scope=item["readiness_scope"],
                     promotion_ready=str(item["promotion_ready"]).lower(),
                     public_sdk_ready=str(item["public_sdk_ready"]).lower(),
+                    runtime_ready=str(item.get("runtime_ready", False)).lower(),
+                    second_source=str(item.get("second_source_layout_evidence", False)).lower(),
                 )
             )
+            lifecycle_source_policy = item.get("lifecycle_source_policy")
+            if isinstance(lifecycle_source_policy, dict):
+                approved_names = lifecycle_source_policy.get("approved_runtime_triplet_source_names", [])
+                guidance_names = lifecycle_source_policy.get("guidance_only_non_triplet_source_names", [])
+                print(
+                    "  lifecycle_source_policy scope={scope} "
+                    "approved_runtime_triplet_source_names={approved} "
+                    "guidance_only_non_triplet_source_names={guidance} "
+                    "runtime_triplet_evidence_status={status} "
+                    "approved_runtime_evidence_present={runtime_evidence} "
+                    "runtime_ready={runtime_ready} public_sdk_ready={public_sdk_ready} "
+                    "promotion_ready={promotion_ready}".format(
+                        scope=lifecycle_source_policy.get("policy_scope", "unknown"),
+                        approved=",".join(str(target) for target in approved_names)
+                        if isinstance(approved_names, list)
+                        else "",
+                        guidance=",".join(str(target) for target in guidance_names)
+                        if isinstance(guidance_names, list)
+                        else "",
+                        status=lifecycle_source_policy.get("runtime_triplet_evidence_status", "unknown"),
+                        runtime_evidence=str(
+                            lifecycle_source_policy.get("approved_runtime_evidence_present", False)
+                        ).lower(),
+                        runtime_ready=str(lifecycle_source_policy.get("runtime_ready", False)).lower(),
+                        public_sdk_ready=str(lifecycle_source_policy.get("public_sdk_ready", False)).lower(),
+                        promotion_ready=str(lifecycle_source_policy.get("promotion_ready", False)).lower(),
+                    )
+                )
             for target in item["targets"]:
                 print(f"  {target}")
         return
 
     if report["schema"] == "obelisk.reflection-target-guidance.v1":
         print(
-            "target_guidance count={count} scope={scope} target_set_guidance={set_count}".format(
+            "target_guidance count={count} scope={scope} target_set_guidance={set_count} "
+            "evidence_scope={evidence_scope} not_second_source={not_second_source}".format(
                 count=len(report["targets"]),
                 scope=report["guidance_scope"],
                 set_count=len(report.get("target_set_guidance", [])),
+                evidence_scope=report.get("evidence_scope", "unknown"),
+                not_second_source=str(report.get("not_second_source", False)).lower(),
             )
         )
         for item in report.get("target_set_guidance", []):
@@ -1428,6 +2769,38 @@ def print_text(report: dict[str, Any]) -> None:
             why_blocked = item.get("why_blocked")
             if isinstance(why_blocked, list) and why_blocked:
                 parts.append(f"why_blocked={','.join(str(reason) for reason in why_blocked)}")
+            approved_triplet_sources = item.get("approved_triplet_sources")
+            if isinstance(approved_triplet_sources, list) and approved_triplet_sources:
+                parts.append(
+                    "approved_triplet_sources="
+                    + ",".join(str(target) for target in approved_triplet_sources)
+                )
+            approved_runtime_triplet_source_names = item.get("approved_runtime_triplet_source_names")
+            if (
+                isinstance(approved_runtime_triplet_source_names, list)
+                and approved_runtime_triplet_source_names
+            ):
+                parts.append(
+                    "approved_runtime_triplet_source_names="
+                    + ",".join(str(target) for target in approved_runtime_triplet_source_names)
+                )
+            guidance_only_source_names = item.get("guidance_only_non_triplet_source_names")
+            if isinstance(guidance_only_source_names, list) and guidance_only_source_names:
+                parts.append(
+                    "guidance_only_non_triplet_source_names="
+                    + ",".join(str(target) for target in guidance_only_source_names)
+                )
+            runtime_triplet_status = item.get("runtime_triplet_evidence_status")
+            if isinstance(runtime_triplet_status, str) and runtime_triplet_status:
+                parts.append(f"runtime_triplet_evidence_status={runtime_triplet_status}")
+            if "approved_runtime_evidence_present" in item:
+                parts.append(
+                    "approved_runtime_evidence_present="
+                    + str(item.get("approved_runtime_evidence_present", False)).lower()
+                )
+            all_six_status = item.get("all_six_planning_gap_evidence_status")
+            if isinstance(all_six_status, str) and all_six_status:
+                parts.append(f"all_six_planning_gap_evidence_status={all_six_status}")
             next_offline_input = item.get("next_offline_input")
             if isinstance(next_offline_input, str) and next_offline_input:
                 parts.append(f"next_offline_input={next_offline_input}")
@@ -1456,6 +2829,116 @@ def print_text(report: dict[str, Any]) -> None:
             if isinstance(non_claim, str) and non_claim:
                 parts.append(f"non_claim={non_claim}")
             print("  " + " ".join(parts))
+        return
+
+    if report["schema"] == LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA:
+        offline = report["offline_requirement"]
+        counts = report["comparison_counts"]
+        print(
+            "lifecycle_snapshot_root_requirement status={status} satisfied={satisfied} "
+            "accepted={accepted} rejected={rejected} inconclusive={inconclusive} "
+            "approved_runtime_evidence={runtime_evidence} runtime_ready={runtime_ready} "
+            "public_sdk_ready={public_sdk_ready} blocker={blocker}".format(
+                status=offline["status"],
+                satisfied=str(offline["satisfied"]).lower(),
+                accepted=counts["accepted"],
+                rejected=counts["rejected"],
+                inconclusive=counts["inconclusive"],
+                runtime_evidence=str(report["approved_runtime_evidence"]).lower(),
+                runtime_ready=str(report["runtime_ready"]).lower(),
+                public_sdk_ready=str(report["public_sdk_ready"]).lower(),
+                blocker=report["approved_runtime_evidence_blocker"],
+            )
+        )
+        print(
+            "  evidence_scope={scope} comparison_mode={mode} readiness_effect={effect}".format(
+                scope=report["evidence_scope"],
+                mode=report["comparison_mode"],
+                effect=report["readiness_effect"],
+            )
+        )
+        for blocker in offline.get("blockers", []):
+            if not isinstance(blocker, dict):
+                continue
+            target = blocker.get("target")
+            prefix = f" target={target}" if target else ""
+            print(f"  blocker{prefix} reason={blocker.get('reason')} count={blocker.get('count', 1)}")
+        for detail in report.get("target_details", []):
+            print(
+                "  target={target} status={status} base_identity={base_identity} "
+                "candidate_identity={candidate_identity}".format(
+                    target=detail.get("target"),
+                    status=detail.get("status"),
+                    base_identity=str(detail.get("base_identity") is not None).lower(),
+                    candidate_identity=str(detail.get("candidate_identity") is not None).lower(),
+                )
+            )
+        next_action = report.get("next_offline_action")
+        if isinstance(next_action, dict):
+            print(
+                "  next_offline_action={action} status={status} runtime_or_public_sdk_readiness_claim={claim}".format(
+                    action=next_action.get("action"),
+                    status=next_action.get("status"),
+                    claim=str(next_action.get("runtime_or_public_sdk_readiness_claim")).lower(),
+                )
+            )
+        return
+
+    if report["schema"] == "obelisk.reflection-observed-fname-chain-check.v1":
+        print(
+            "observed_fname_chain target={target} status={status} exact_match={exact} "
+            "expected={expected} observed={observed} deltas={deltas} readiness_effect={effect} "
+            "layout_evidence_status={layout_status} not_second_source={not_second_source} "
+            "can_be_second_source={can_be_second_source} promotion_ready={promotion_ready} "
+            "runtime_ready={runtime_ready}".format(
+                target=report["target"],
+                status=report["status"],
+                exact=str(report["exact_property_chain_match"]).lower(),
+                expected=",".join(str(index) for index in report["expected_name_indices"]),
+                observed=",".join(str(index) for index in report["observed_name_indices"]),
+                deltas=",".join(str(delta) for delta in report["deltas"]),
+                effect=report["readiness_effect"],
+                layout_status=report["layout_evidence_status"],
+                not_second_source=str(report["not_second_source"]).lower(),
+                can_be_second_source=str(report["can_be_used_as_second_source_layout_evidence"]).lower(),
+                promotion_ready=str(report["promotion_ready"]).lower(),
+                runtime_ready=str(report["runtime_ready"]).lower(),
+            )
+        )
+        unmatched = report.get("unmatched_observed_name_indices", [])
+        if isinstance(unmatched, list) and unmatched:
+            print("  unmatched_observed_name_indices=" + ",".join(str(index) for index in unmatched))
+        observation_count = report.get("diagnostic_observation_count")
+        if isinstance(observation_count, int) and observation_count > 1:
+            print(f"  diagnostic_observation_count={observation_count} scope=diagnostic_only")
+        blockers = report.get("blockers", [])
+        if isinstance(blockers, list) and blockers:
+            print("  blockers=" + ",".join(str(blocker) for blocker in blockers))
+        next_requirement = report.get("next_offline_artifact_requirement")
+        if isinstance(next_requirement, dict):
+            required_targets = next_requirement.get("required_targets", [])
+            if isinstance(required_targets, list):
+                print(
+                    "  next_offline_artifact={artifact} targets={targets} comparison_mode={mode}".format(
+                        artifact=next_requirement.get("artifact"),
+                        targets=",".join(str(target) for target in required_targets),
+                        mode=next_requirement.get("comparison_mode"),
+                    )
+                )
+        for item in report.get("property_comparison", []):
+            print(
+                "  property position={position} name={name} class={class_name} offset={offset} "
+                "expected={expected} observed={observed} delta={delta} exact={exact}".format(
+                    position=item.get("position"),
+                    name=item.get("property_name"),
+                    class_name=item.get("class_name"),
+                    offset=item.get("offset_internal"),
+                    expected=item.get("expected_name_index"),
+                    observed=item.get("observed_name_index"),
+                    delta=item.get("delta"),
+                    exact=str(item.get("exact_name_index_match")).lower(),
+                )
+            )
         return
 
     if report["schema"] == "obelisk.reflection-snapshot-readiness.v1":
@@ -1490,24 +2973,50 @@ def print_text(report: dict[str, Any]) -> None:
         )
         for module in report["modules"]:
             second_source = module["second_source"]
-            print(
-                "{schema}:{module_name} targets={targets} comparable={comparable} "
-                "blocked={blocked} second_source=accepted:{accepted},rejected:{rejected},"
-                "inconclusive:{inconclusive},missing:{missing}".format(
-                    schema=module["schema"],
-                    module_name=module["module"],
-                    targets=module["targets"],
-                    comparable=module["comparable"],
-                    blocked=module["blocked"],
-                    accepted=second_source["accepted"],
-                    rejected=second_source["rejected"],
-                    inconclusive=second_source["inconclusive"],
-                    missing=second_source["missing"],
+            planning_layout_comparison = module.get("planning_layout_comparison")
+            if isinstance(planning_layout_comparison, dict):
+                print(
+                    "{schema}:{module_name} targets={targets} comparable={comparable} "
+                    "blocked={blocked} second_source_status={status} "
+                    "planning_layout=accepted:{accepted},rejected:{rejected},"
+                    "inconclusive:{inconclusive},missing:{missing}".format(
+                        schema=module["schema"],
+                        module_name=module["module"],
+                        targets=module["targets"],
+                        comparable=module["comparable"],
+                        blocked=module["blocked"],
+                        status=module.get("second_source_status", PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS),
+                        accepted=planning_layout_comparison["accepted"],
+                        rejected=planning_layout_comparison["rejected"],
+                        inconclusive=planning_layout_comparison["inconclusive"],
+                        missing=planning_layout_comparison["missing"],
+                    )
                 )
-            )
+            else:
+                print(
+                    "{schema}:{module_name} targets={targets} comparable={comparable} "
+                    "blocked={blocked} second_source=accepted:{accepted},rejected:{rejected},"
+                    "inconclusive:{inconclusive},missing:{missing}".format(
+                        schema=module["schema"],
+                        module_name=module["module"],
+                        targets=module["targets"],
+                        comparable=module["comparable"],
+                        blocked=module["blocked"],
+                        accepted=second_source["accepted"],
+                        rejected=second_source["rejected"],
+                        inconclusive=second_source["inconclusive"],
+                        missing=second_source["missing"],
+                    )
+                )
             for detail in module["target_details"]:
                 second_source_status = detail["second_source_status"]
                 if detail["comparable"] and second_source_status == "accepted":
+                    continue
+                if (
+                    detail["comparable"]
+                    and second_source_status == PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS
+                    and detail.get("planning_layout_comparison_status") == "accepted"
+                ):
                     continue
 
                 parts = [
@@ -1583,6 +3092,7 @@ def apply_planning_layout_intake_gate(report: dict[str, Any], target_sets: list[
     if report.get("gate_mode") != "planning_layout_intake":
         return
 
+    original_second_source_status = report.get("second_source_status", "unknown")
     totals = report.get("totals", {})
     blockers: list[dict[str, Any]] = []
     if totals.get("targets") == 0:
@@ -1610,6 +3120,24 @@ def apply_planning_layout_intake_gate(report: dict[str, Any], target_sets: list[
         "runtime_ready": False,
         "blockers": blockers,
     }
+    report["evidence_scope"] = PLANNING_LAYOUT_INTAKE_EVIDENCE_SCOPE
+    report["readiness_effect"] = "none"
+    report["second_source_readiness_satisfied"] = False
+    report["second_source_status"] = PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS
+    report["second_source_layout_evidence"] = False
+    report["can_be_used_as_second_source_layout_evidence"] = False
+    report["not_second_source"] = True
+    report["planning_only"] = True
+    report["readiness_classification"] = "planning_only"
+    report["does_not_satisfy_readiness"] = list(PLANNING_LAYOUT_DOES_NOT_SATISFY)
+    report["totals_scope"] = "planning_layout_comparison_counts_not_second_source_readiness"
+    report["planning_layout_comparison_status"] = original_second_source_status
+    report["planning_layout_comparison_totals"] = {
+        "accepted": totals.get("second_source_accepted", 0),
+        "rejected": totals.get("second_source_rejected", 0),
+        "inconclusive": totals.get("second_source_inconclusive", 0),
+        "missing": totals.get("second_source_missing", 0),
+    }
 
     promotion_gate = report.get("promotion_gate")
     if isinstance(promotion_gate, dict):
@@ -1621,6 +3149,22 @@ def apply_planning_layout_intake_gate(report: dict[str, Any], target_sets: list[
         promotion_blockers = promotion_gate.setdefault("blockers", [])
         if isinstance(promotion_blockers, list):
             promotion_blockers.append({"reason": "planning_layout_intake_not_promotion_gate", "count": 1})
+
+    for module in report.get("modules", []):
+        if not isinstance(module, dict):
+            continue
+        second_source = module.get("second_source")
+        if isinstance(second_source, dict):
+            module["planning_layout_comparison"] = dict(second_source)
+        module["second_source_status"] = PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS
+        module["second_source_readiness_satisfied"] = False
+        for detail in module.get("target_details", []):
+            if not isinstance(detail, dict):
+                continue
+            status = detail.get("second_source_status")
+            if status in {"accepted", "rejected", "inconclusive", "missing"}:
+                detail["planning_layout_comparison_status"] = status
+                detail["second_source_status"] = PLANNING_LAYOUT_NOT_SECOND_SOURCE_STATUS
 
 
 def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
@@ -1726,8 +3270,70 @@ def block_ambiguous_target_set_coverage(report: dict[str, Any], target_sets: lis
     report["target_set_coverage_ambiguity"] = overlaps
 
 
+def readiness_report_target_set_coverage(
+    *,
+    target_sets: list[str],
+    observed_targets: set[str],
+) -> dict[str, Any] | None:
+    if not target_sets:
+        return None
+
+    from reflection_target_sets import (
+        TARGET_SET_REVISION_SCHEMA,
+        TARGET_SET_REVISION_SOURCE,
+        target_set_revision_source_sha256,
+    )
+
+    expected_targets: list[str] = []
+    expected_seen: set[str] = set()
+    declared_target_sets = []
+    for target_set in sorted(target_sets):
+        target_set_targets = list(TARGET_SETS[target_set])
+        for target in target_set_targets:
+            if target not in expected_seen:
+                expected_targets.append(target)
+                expected_seen.add(target)
+        covered_targets = sorted(set(target_set_targets) & observed_targets)
+        missing_targets = sorted(set(target_set_targets) - observed_targets)
+        declared_target_sets.append(
+            {
+                "name": target_set,
+                "source": "readiness_report",
+                "module_lane": target_set_module_lane(target_set),
+                "readiness_classification": target_set_readiness_classification(target_set),
+                "expected_targets": sorted(target_set_targets),
+                "covered_targets": covered_targets,
+                "missing_targets": missing_targets,
+                "complete": not missing_targets,
+            }
+        )
+
+    schema_observed_targets = {target for target in observed_targets if ":" in target}
+    expected_set = set(expected_targets)
+    covered_targets = sorted(expected_set & schema_observed_targets)
+    missing_targets = sorted(expected_set - schema_observed_targets)
+    unexpected_targets = sorted(schema_observed_targets - expected_set)
+    complete = not missing_targets and not unexpected_targets
+    return {
+        "schema": READINESS_TARGET_SET_COVERAGE_SCHEMA,
+        "status": "complete" if complete else "incomplete",
+        "complete": complete,
+        "target_sets": sorted(target_sets),
+        "target_set_revision_schema": TARGET_SET_REVISION_SCHEMA,
+        "target_set_revision_source": TARGET_SET_REVISION_SOURCE,
+        "target_set_revision_source_sha256": target_set_revision_source_sha256(sorted(target_sets)),
+        "declared_target_sets": declared_target_sets,
+        "expected_targets": sorted(expected_targets),
+        "observed_targets": sorted(schema_observed_targets),
+        "covered_targets": covered_targets,
+        "missing_targets": missing_targets,
+        "unexpected_targets": unexpected_targets,
+    }
+
+
 def main() -> int:
     args = parse_args()
+    reject_target_set_catalog_hygiene_issues()
     if args.list_target_sets:
         report = target_set_report()
         if args.json:
@@ -1735,8 +3341,8 @@ def main() -> int:
         else:
             print_text(report)
         return 0
-    target_filters = expand_target_filters(args.target, args.target_set)
     if args.list_target_guidance:
+        target_filters = expand_target_filters(args.target, args.target_set)
         reject_duplicate_target_set_guidance_filters(args.target_set)
         reject_duplicate_target_guidance_filters(args.target)
         unmatched_guidance = unmatched_target_guidance_filters(args.target)
@@ -1754,6 +3360,8 @@ def main() -> int:
             print_text(report)
         return 0
 
+    reject_invalid_target_set_filters(args.target_set)
+    target_filters = expand_target_filters(args.target, args.target_set)
     if args.base_root is None:
         raise SystemExit("--base-root is required unless --list-target-sets or --list-target-guidance is used")
     if args.fail_on_readiness_gaps and args.allow_ark_sha_mismatch:
@@ -1771,11 +3379,54 @@ def main() -> int:
                 "--planning-layout-intake only accepts planning-only target sets: "
                 + ", ".join(non_planning)
             )
-    reject_protected_input_path("--base-root", args.base_root)
+    if args.lifecycle_snapshot_root_check:
+        if args.readiness_report:
+            raise SystemExit("--lifecycle-snapshot-root-check is separate from --readiness-report")
+        if args.observed_fname_chain:
+            raise SystemExit("--lifecycle-snapshot-root-check is separate from --observed-fname-chain")
+        if args.fail_on_readiness_gaps or args.fail_on_base_readiness_gaps or args.planning_layout_intake:
+            raise SystemExit("--lifecycle-snapshot-root-check is not a promotion or readiness gate")
+        if args.target or args.target_set:
+            raise SystemExit("--lifecycle-snapshot-root-check compares the fixed HandleNewPlayer/OnLogout target set")
+        if args.strict_identity_indices:
+            raise SystemExit("--lifecycle-snapshot-root-check uses semantic layout comparison without strict identity indices")
+        if args.allow_ark_sha_mismatch:
+            raise SystemExit("--allow-ark-sha-mismatch is incompatible with --lifecycle-snapshot-root-check")
+        if args.candidate_root is None:
+            raise SystemExit("--candidate-root is required with --lifecycle-snapshot-root-check")
+    if args.observed_fname_chain:
+        if args.candidate_root:
+            raise SystemExit("--observed-fname-chain does not accept --candidate-root")
+        if args.readiness_report:
+            raise SystemExit("--observed-fname-chain is separate from --readiness-report")
+        if args.fail_on_readiness_gaps or args.fail_on_base_readiness_gaps or args.planning_layout_intake:
+            raise SystemExit("--observed-fname-chain is not a promotion, readiness, or planning-layout gate")
+        if args.observed_fname_chain_occurrences is not None and args.observed_fname_chain_occurrences < 1:
+            raise SystemExit("--observed-fname-chain-occurrences must be a positive integer")
+        validate_observed_fname_target_sets(args.observed_fname_target, args.target_set)
+    elif args.observed_fname_chain_occurrences is not None:
+        raise SystemExit("--observed-fname-chain-occurrences requires --observed-fname-chain")
+    reject_snapshot_input_path("--base-root", args.base_root)
     if args.candidate_root:
-        reject_protected_input_path("--candidate-root", args.candidate_root)
+        reject_snapshot_input_path("--candidate-root", args.candidate_root)
+    if args.lifecycle_snapshot_root_check:
+        reject_forbidden_lifecycle_input_root("--base-root", args.base_root)
+        reject_forbidden_lifecycle_input_root("--candidate-root", args.candidate_root)
     base = load_snapshot_set(args.base_root)
-    candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
+    if args.observed_fname_chain:
+        observed_name_indices = parse_observed_fname_chain(args.observed_fname_chain)
+        report = observed_fname_chain_report(
+            base,
+            observed_target=args.observed_fname_target,
+            observed_name_indices=observed_name_indices,
+            observed_chain_occurrences=args.observed_fname_chain_occurrences or 1,
+            target_sets=args.target_set,
+        )
+    elif args.lifecycle_snapshot_root_check:
+        candidate = load_snapshot_set(args.candidate_root)
+        report = lifecycle_snapshot_root_requirement_report(base, candidate)
+    else:
+        candidate = load_snapshot_set(args.candidate_root) if args.candidate_root else None
     if args.readiness_report:
         report = readiness_report(
             base,
@@ -1799,7 +3450,19 @@ def main() -> int:
         block_explicit_targets_outside_named_target_sets(report, args.target, args.target_set)
         block_ambiguous_target_set_coverage(report, args.target_set)
         block_non_release_target_set_promotion(report, args.target_set)
-    else:
+        coverage = readiness_report_target_set_coverage(
+            target_sets=args.target_set,
+            observed_targets={
+                detail["target"]
+                for module in report.get("modules", [])
+                if isinstance(module, dict)
+                for detail in module.get("target_details", [])
+                if isinstance(detail, dict) and isinstance(detail.get("target"), str)
+            },
+        )
+        if coverage is not None:
+            report["target_set_coverage"] = coverage
+    elif not args.observed_fname_chain and not args.lifecycle_snapshot_root_check:
         if candidate is None:
             raise SystemExit("--candidate-root is required unless --readiness-report is used")
         report = compare_sets(
@@ -1832,6 +3495,15 @@ def main() -> int:
         if args.planning_layout_intake:
             if not report.get("planning_layout_gate", {}).get("ready"):
                 return 1
+        return 0
+    if report["schema"] == LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA:
+        if report.get("offline_requirement", {}).get("satisfied"):
+            return 0
+        counts = report.get("comparison_counts", {})
+        if counts.get("rejected"):
+            return 1
+        return 2
+    if report["schema"] == "obelisk.reflection-observed-fname-chain-check.v1":
         return 0
     if report["counts"]["rejected"]:
         return 1

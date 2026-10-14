@@ -99,9 +99,12 @@ STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES = (
     "$.safety_summary.explicitly_excluded",
 )
 STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
+    "approved_runtime_samples_ready",
     "build_placement_policy_ready",
     "build_policy_ready",
     "collision_policy_ready",
+    "complete_sdk_ready",
+    "complete_sdk_readiness",
     "counts_toward_complete_sdk",
     "enforcement_allowed",
     "enforcement_ready",
@@ -114,8 +117,13 @@ STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
     "placement_policy_ready",
     "release_supported",
     "public_structure_sdk_ready",
+    "route_acceptance_ready",
+    "route_accepted",
     "return_override_allowed",
     "return_override_ready",
+    "runtime_samples_approved",
+    "sdk_progress",
+    "sdk_progress_ready",
     "runtime_hook_ready",
     "runtime_hooks_ready",
     "stable",
@@ -135,14 +143,23 @@ STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS = {
     "collision",
     "event",
     "events",
+    "identity",
+    "lookup",
+    "mutation",
+    "progress",
     "promotion",
     "promote",
     "promoted",
     "public",
     "release",
+    "route",
+    "routes",
+    "sample",
+    "samples",
     "pin",
     "pincode",
     "placement",
+    "runtime",
     "sdk",
     "stable",
     "structure",
@@ -152,10 +169,12 @@ STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS = {
 }
 STRUCTURE_CENSUS_READY_TERMS = {
     "accepted",
+    "approved",
     "complete",
     "completion",
     "counts",
     "done",
+    "progress",
     "promoted",
     "promotion",
     "readiness",
@@ -215,18 +234,29 @@ STRUCTURE_CENSUS_FORBIDDEN_STRING_DOMAINS = {
     "structureevents sdk": "public_structureevents_sdk",
     "public abi": "public_abi",
     "public sdk gate": "public_structure_sdk",
+    "approved runtime samples": "runtime_samples",
+    "complete sdk readiness": "v1_completion",
+    "mutation readiness": "mutation",
+    "public lookup": "public_lookup",
     "promotion gate": "promotion_gate",
+    "route accepted": "route_acceptance",
+    "route acceptance": "route_acceptance",
+    "runtime sample": "runtime_samples",
+    "runtime samples": "runtime_samples",
+    "sdk progress": "sdk_progress",
 }
 STRUCTURE_CENSUS_POSITIVE_STRING_RE = re.compile(
-    r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"(?:\baccepted\b|\bapproved\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
     r"\brelease[-_\s]+supported\b|\bstable\b|\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
-    r"\bpublic[-_\s]+ready\b|\bready\b)",
+    r"\bpublic[-_\s]+ready\b|\bprogress\b|\bready\b)",
     re.IGNORECASE,
 )
 STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE = re.compile(
-    r"(?:\bready\b|\breadiness\b|\ballowed\b|\benabled\b|\bpromoted\b|"
+    r"(?:\bready\b|\breadiness\b|\ballowed\b|\benabled\b|\bpromoted\b|\bapproved\b|"
     r"\bpublic\s+sdk\b|\brelease[-_\s]+supported\b|\bstable\b|"
+    r"\broute[-_\s]+accept(?:ance|ed)\b|\bsdk[-_\s]+progress\b|"
     r"\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
+    r"\bcomplete[-_\s]+sdk[-_\s]+readiness\b|"
     r"\bv1\s+(?:complete|completion|done|ready)\b|"
     r"\bruntime\s+hooks?\s+ready\b)",
     re.IGNORECASE,
@@ -1048,6 +1078,11 @@ def build_candidate_only_accounting(
         "promotion_ready": False,
         "missing_public_gates": CANDIDATE_ONLY_MISSING_PUBLIC_GATES,
         "reason": reason,
+        "route_acceptance_ready": False,
+        "approved_runtime_samples_ready": False,
+        "public_lookup_ready": False,
+        "sdk_progress_ready": False,
+        "complete_sdk_ready": False,
     }
 
 
@@ -1174,6 +1209,11 @@ def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: P
             "return_override": "not_claimed",
             "enforcement": "not_claimed",
             "runtime": "not_claimed",
+            "route_acceptance": "not_claimed",
+            "approved_runtime_samples": "not_claimed",
+            "public_lookup": "not_claimed",
+            "sdk_progress": "not_claimed",
+            "complete_sdk_readiness": "not_claimed",
         },
         "non_claims": REPORT_NON_CLAIMS,
     }

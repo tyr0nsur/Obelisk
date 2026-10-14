@@ -25,7 +25,7 @@ CHANNELS = {
     "beta-test": {
         "env": "OBELISK_BETA_TEST_WEBHOOK_URL",
         "color": 0x3498DB,
-        "purpose": "operator-approved in-game test windows only",
+        "purpose": "deprecated beta webhook path; use discord_beta_bridge.py bot notices",
     },
 }
 
@@ -44,8 +44,20 @@ FORBIDDEN_TEXT = (
     "route valid",
     "sdk blocked",
     "sdk json",
+    "sdk/p0 progress",
     "tests passed",
     "validation passed",
+    "approved runtime evidence",
+    "approved in-game evidence",
+    "runtime evidence",
+    "discord authorization",
+    "discord authorized",
+    "live-op authorization",
+    "live ops authorization",
+    "public sdk ready",
+    "stable sdk ready",
+    "plugin hub ready",
+    "publication ready",
     "raw log",
     "player text",
     "token",
@@ -119,6 +131,11 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def load_webhook_url(args: argparse.Namespace) -> str:
+    if args.channel == "beta-test":
+        raise SystemExit(
+            "beta-test webhook sends are deprecated; use "
+            "scripts/discord_beta_bridge.py --send-beta-notice for channel 1513238083741683934"
+        )
     env_values = parse_env_file(args.env_file)
     env_name = CHANNELS[args.channel]["env"]
     webhook_url = os.environ.get(env_name) or env_values.get(env_name)
@@ -156,7 +173,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--confirm-approved-send",
         action="store_true",
-        help="Required for a real webhook send after a current-turn approval and dry-run review.",
+        help="Required for a real webhook send after standing launch authority or current-turn approval and dry-run review.",
     )
     parser.add_argument(
         "--approval-scope",

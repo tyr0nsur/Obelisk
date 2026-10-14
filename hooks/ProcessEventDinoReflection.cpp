@@ -2,12 +2,105 @@
 
 #include <array>
 #include <cstring>
+#include <string_view>
+#include <utility>
 
 namespace Obelisk::Hooks::ProcessEventDinoReflection
 {
+    Gate EvaluateGate(const char* enableDinoReflection,
+                      bool observerDebugProfileEnabled,
+                      bool observerDebugWindowEnabled,
+                      bool instanceMarkerEnabled,
+                      const char* binarySha256)
+    {
+        if (!enableDinoReflection || std::strcmp(enableDinoReflection, "1") != 0)
+            return {};
+
+        if (!observerDebugProfileEnabled)
+            return {GateStatus::MissingObserverDebugProfile, {}};
+
+        if (!observerDebugWindowEnabled)
+            return {GateStatus::MissingObserverDebugWindow, {}};
+
+        if (!instanceMarkerEnabled)
+            return {GateStatus::MissingInstanceMarker, {}};
+
+        if (!binarySha256 || binarySha256[0] == '\0')
+            return {GateStatus::MissingBinarySha256, {}};
+
+        if (std::string_view(binarySha256) != Obelisk::UE::RuntimeReflection::kSupportedShooterGameServerSha256)
+            return {GateStatus::UnsupportedBinarySha256, binarySha256};
+
+        return {GateStatus::Enabled, binarySha256};
+    }
+
+    bool IsReflectedDinoNameIndex(int32_t nameIndex)
+    {
+        return nameIndex == 8267 || nameIndex == 8269;
+    }
+
+    bool ShouldAttemptObservation(uint64_t observationLimit)
+    {
+        return observationLimit != 0;
+    }
+
+    bool ShouldAttemptRuntimeObservation(uint64_t observationLimit)
+    {
+        return ShouldAttemptObservation(observationLimit);
+    }
+
+    bool ShouldAttemptRuntimeObservation(const std::atomic<uint64_t>& observationCounter,
+                                         uint64_t observationLimit)
+    {
+        return HasObservationBudgetRemaining(observationCounter, observationLimit);
+    }
+
+    bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t observationLimit)
+    {
+        return ShouldAttemptRuntimeObservation(observationLimit) &&
+            IsReflectedDinoNameIndex(nameIndex);
+    }
+
+    bool ShouldLogObservation(uint64_t observationNumber, uint64_t observationLimit)
+    {
+        return ShouldAttemptObservation(observationLimit) &&
+            observationNumber != 0 &&
+            observationNumber <= observationLimit;
+    }
+
+    bool HasObservationBudgetRemaining(const std::atomic<uint64_t>& counter, uint64_t observationLimit)
+    {
+        return ShouldAttemptObservation(observationLimit) && counter.load() < observationLimit;
+    }
+
+    bool TryReserveObservationBudget(std::atomic<uint64_t>& counter,
+                                     uint64_t observationLimit,
+                                     uint64_t& observationNumber)
+    {
+        if (!ShouldAttemptObservation(observationLimit))
+        {
+            observationNumber = 0;
+            return false;
+        }
+
+        uint64_t current = counter.load();
+        while (current < observationLimit)
+        {
+            if (counter.compare_exchange_weak(current, current + 1))
+            {
+                observationNumber = current + 1;
+                return true;
+            }
+        }
+
+        observationNumber = 0;
+        return false;
+    }
+
     namespace
     {
         constexpr int32_t kAddPassengerNameIndex = 8267;
+        constexpr int32_t kAllowCarryCharacterNameIndex = 8269;
         constexpr int32_t kPrimalDinoCharacterNameIndex = 8265;
         constexpr int32_t kACharacterNameIndex = 4044;
         constexpr int32_t kReturnValueNameIndex = 17716;
@@ -147,6 +240,92 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
         }
     }
 
+    Attempt TryIdentifyInvocation(const Gate& gate,
+                                  int32_t nameIndex,
+                                  const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+                                  void* function,
+                                  void* params)
+    {
+        if (!gate.Enabled())
+            return {};
+
+        if (!IsReflectedDinoNameIndex(nameIndex))
+        {
+            return {
+                AttemptStatus::NonDinoFunction,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
+                {},
+            };
+        }
+
+        Obelisk::UE::RuntimeReflection::ReadOptions options =
+            Obelisk::UE::RuntimeReflection::MakeReadOptionsForBinary(gate.BinarySha256, true);
+
+        Obelisk::UE::DinoReflection::DinoInvocation invocation;
+        Obelisk::UE::RuntimeReflection::ReadResult result;
+        try
+        {
+            result = Obelisk::UE::DinoReflection::TryIdentifyDinoInvocation(
+                reader, options, function, params, invocation);
+        }
+        catch (...)
+        {
+            return {
+                AttemptStatus::Rejected,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
+                {},
+            };
+        }
+        if (!result)
+            return {AttemptStatus::Rejected, std::move(result), {}};
+        if (invocation.FunctionNameIndex != nameIndex)
+        {
+            return {
+                AttemptStatus::Rejected,
+                Obelisk::UE::RuntimeReflection::ReadResult::Fail(
+                    Obelisk::UE::RuntimeReflection::ReadStatus::Implausible,
+                    "dino prefilter FName does not match reflected UFunction FName"),
+                {},
+            };
+        }
+
+        return {AttemptStatus::Matched, std::move(result), std::move(invocation)};
+    }
+
+    Attempt TryObserveInvocation(const Gate& gate,
+                                 int32_t nameIndex,
+                                 const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+                                 void* function,
+                                 void* params,
+                                 std::atomic<uint64_t>& observationCounter,
+                                 uint64_t observationLimit,
+                                 uint64_t& observationNumber)
+    {
+        observationNumber = 0;
+        if (!gate.Enabled())
+            return {};
+
+        if (!IsReflectedDinoNameIndex(nameIndex))
+        {
+            return {
+                AttemptStatus::NonDinoFunction,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Implausible, {}},
+                {},
+            };
+        }
+
+        if (!TryReserveObservationBudget(observationCounter, observationLimit, observationNumber))
+        {
+            return {
+                AttemptStatus::BudgetExhausted,
+                {Obelisk::UE::RuntimeReflection::ReadStatus::Disabled, {}},
+                {},
+            };
+        }
+
+        return TryIdentifyInvocation(gate, nameIndex, reader, function, params);
+    }
+
     bool TryBuildCopiedDinoScalarObservation(
         const Obelisk::UE::DinoReflection::DinoInvocation& invocation,
         CopiedDinoScalarObservation& out)
@@ -244,5 +423,16 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
         }
 
         return true;
+    }
+
+    bool TryBuildCopiedDinoScalarObservationForMatchedAttempt(
+        const Attempt& attempt,
+        CopiedDinoScalarObservation& out)
+    {
+        out = {};
+        if (attempt.Status != AttemptStatus::Matched)
+            return false;
+
+        return TryBuildCopiedDinoScalarObservation(attempt.Invocation, out);
     }
 }

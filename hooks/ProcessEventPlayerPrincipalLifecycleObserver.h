@@ -59,11 +59,25 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
         Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleInvocation Invocation;
     };
 
+    struct FunctionFNameNearMissDiagnostic
+    {
+        Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction Function =
+            Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction::HandleNewPlayer;
+        int32_t ExpectedFunctionNameIndex = -1;
+        int32_t ObservedFunctionNameIndex = -1;
+        int32_t OuterNameIndex = -1;
+        Obelisk::UE::RuntimeReflection::ReadResult Result = {
+            Obelisk::UE::RuntimeReflection::ReadStatus::Disabled,
+            {},
+        };
+    };
+
     enum class LifecycleRole
     {
         SessionStart,
         SessionEnd,
         SessionStartRejected,
+        DiagnosticOnly,
     };
 
     enum class PrincipalAction
@@ -91,6 +105,7 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
         std::array<LifecycleBoolObservation, 2> BoolStorage{};
         size_t BoolCount = 0;
         std::array<Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField, 3> RedactedStorage{};
+        std::array<uint64_t, 3> RedactedProcessLocalSubjectTokens{};
         size_t RedactedCount = 0;
     };
 
@@ -102,25 +117,47 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
                       const char* logLimit,
                       const char* dispatchLimit);
     bool IsReflectedLifecycleNameIndex(int32_t nameIndex);
+    bool IsLifecycleDiagnosticCandidateNameIndex(int32_t nameIndex);
     bool HasObservationBudgetRemaining(const std::atomic<uint64_t>& counter, uint64_t limit);
     bool TryReserveObservationBudget(std::atomic<uint64_t>& counter,
                                      uint64_t limit,
                                      uint64_t& observationNumber);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t limit);
+    uint32_t ApprovedRuntimeEvidenceLogRoleMask(const CopiedLifecycleObservation& observation);
+    bool TryReserveApprovedRuntimeEvidenceLogBudget(std::atomic<uint64_t>& counter,
+                                                    std::atomic<uint32_t>& loggedRoleMask,
+                                                    const CopiedLifecycleObservation& observation,
+                                                    uint64_t limit,
+                                                    uint64_t& observationNumber);
 
     Attempt TryIdentifyInvocation(const Gate& gate,
                                   int32_t nameIndex,
                                   const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
                                   void* function,
                                   void* params);
+    Attempt TryIdentifyDiagnosticCandidateInvocation(const Gate& gate,
+                                                     int32_t nameIndex,
+                                                     const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+                                                     void* function,
+                                                     void* params);
+    bool TryIdentifyFunctionFNameNearMissDiagnostic(
+        const Gate& gate,
+        int32_t nameIndex,
+        const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
+        void* function,
+        FunctionFNameNearMissDiagnostic& out);
     Attempt TryObserveInvocation(const Gate& gate,
                                  int32_t nameIndex,
                                  const Obelisk::UE::RuntimeReflection::MemoryReader& reader,
                                  void* function,
                                  void* params,
                                  std::atomic<uint64_t>& observationCounter,
-                                 uint64_t& observationNumber);
+                                 uint64_t& observationNumber,
+                                 std::atomic<uint32_t>* approvedRuntimeEvidenceLoggedRoleMask = nullptr);
     bool TryBuildCopiedLifecycleObservation(
+        const Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleInvocation& invocation,
+        CopiedLifecycleObservation& out);
+    bool TryBuildCopiedLifecycleDiagnosticObservation(
         const Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleInvocation& invocation,
         CopiedLifecycleObservation& out);
     bool TryBuildCopiedLifecycleObservationAfterOriginal(bool originalWasCalled,
@@ -137,6 +174,7 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
 
     const char* LifecycleFunctionName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction function);
     const char* LifecycleTargetName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction function);
+    const char* LifecycleDiagnosticCandidateTargetName(int32_t nameIndex);
     const char* LifecycleFieldName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField field);
     const char* LifecycleRoleName(LifecycleRole role);
     const char* PrincipalActionName(PrincipalAction action);

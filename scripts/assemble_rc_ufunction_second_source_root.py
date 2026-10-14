@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
+import os
 import shutil
+import stat
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,7 +19,11 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from artifact_identity import ARTIFACT_IDENTITY_KEYS, complete_artifact_identity  # noqa: E402
 from reflection_target_sets import TARGET_SETS  # noqa: E402
-from snapshot_evidence_pack import reject_protected_input_path, reject_protected_output_path  # noqa: E402
+from snapshot_evidence_pack import (  # noqa: E402
+    reject_protected_input_path,
+    reject_protected_output_path,
+    reject_symlink_component,
+)
 
 
 SCHEMA = "obelisk.rc-ufunction-second-source-root-manifest.v1"
@@ -24,7 +31,6 @@ SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 RC_TARGET_SETS = (
     "minimal-second-source-intake",
     "structure-observer-intake",
-    "item-return-only-policy-slice",
     "chat-message-intake",
 )
 EVIDENCE_IDENTITY_FIELDS = (
@@ -39,9 +45,55 @@ EVIDENCE_IDENTITY_FIELDS = (
 )
 
 
+class SymlinkInputPathError(OSError):
+    def __init__(self, component: Path) -> None:
+        super().__init__(errno.ELOOP, f"path must not be a symlink: {component}")
+        self.component = component
+
+
+def open_regular_file_no_symlink(path: Path, *, label: str):
+    reject_symlink_component(path, label)
+    candidate = path.expanduser()
+    candidate = candidate if candidate.is_absolute() else candidate.absolute()
+    if not candidate.name:
+        raise OSError(errno.EINVAL, f"{label} must be a regular file: {candidate}")
+
+    common_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = common_flags | getattr(os, "O_DIRECTORY", 0)
+    file_flags = common_flags
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+        file_flags |= os.O_NOFOLLOW
+
+    parent_fd: int | None = None
+    try:
+        parent_fd = os.open(candidate.anchor, directory_flags)
+        for part in candidate.parts[1:-1]:
+            next_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = next_fd
+        fd = os.open(candidate.name, file_flags, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise SymlinkInputPathError(candidate) from exc
+        raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+    try:
+        status = os.fstat(fd)
+        if not stat.S_ISREG(status.st_mode):
+            raise OSError(errno.EINVAL, f"{label} must be a regular file: {candidate}")
+        return os.fdopen(fd, "rb")
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with open_regular_file_no_symlink(path, label="snapshot") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
@@ -49,9 +101,12 @@ def sha256_file(path: Path) -> str:
 
 def load_json(path: Path) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        with open_regular_file_no_symlink(path, label="snapshot") as handle:
+            payload = json.loads(handle.read().decode("utf-8"))
     except json.JSONDecodeError as exc:
         raise SystemExit(f"{path}: invalid JSON: {exc}") from exc
+    except SymlinkInputPathError as exc:
+        raise SystemExit(f"snapshot must not be a symlink: {exc.component}") from exc
     if not isinstance(payload, dict):
         raise SystemExit(f"{path}: expected JSON object")
     return payload
@@ -117,13 +172,20 @@ def required_targets() -> set[str]:
     return targets
 
 
-def snapshot_paths(root: Path) -> list[Path]:
-    root = reject_protected_input_path(root, "source root")
+def snapshot_paths(root: Path, *, label: str) -> list[Path]:
+    reject_symlink_component(root, label)
+    root = reject_protected_input_path(root, label)
+    reject_symlink_component(root, label)
     if root.is_file():
         return [root]
     if not root.exists():
         raise SystemExit(f"source root does not exist: {root}")
-    return sorted(path for path in root.rglob("*.snapshot.json") if path.is_file())
+    paths = []
+    for path in root.rglob("*.snapshot.json"):
+        reject_symlink_component(path, "snapshot")
+        if path.is_file():
+            paths.append(path)
+    return sorted(paths)
 
 
 def source_records(roots: dict[str, Path]) -> dict[str, dict[str, Any]]:
@@ -131,12 +193,17 @@ def source_records(roots: dict[str, Path]) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
     for target_set, root in roots.items():
         accepted_for_set = set(TARGET_SETS[target_set])
-        resolved_root = reject_protected_input_path(root, f"--{target_set}-root")
-        for path in snapshot_paths(resolved_root):
+        root_label = f"--{target_set}-root"
+        reject_symlink_component(root, root_label)
+        resolved_root = reject_protected_input_path(root, root_label)
+        reject_symlink_component(resolved_root, root_label)
+        for path in snapshot_paths(resolved_root, label=root_label):
             payload = load_json(path)
             key = target_key(payload, path)
             if key not in accepted_for_set:
-                continue
+                raise SystemExit(
+                    f"{path}: unexpected snapshot target for {target_set}: {key}"
+                )
             digest = sha256_file(path)
             relative_path = path.relative_to(resolved_root).as_posix()
             existing = records.get(key)
@@ -164,7 +231,9 @@ def source_records(roots: dict[str, Path]) -> dict[str, dict[str, Any]]:
 
 
 def write_output(records: dict[str, dict[str, Any]], output_root: Path, *, replace: bool) -> dict[str, Any]:
+    reject_symlink_component(output_root, "--output-root")
     output_root = reject_protected_output_path(output_root, "--output-root")
+    reject_symlink_component(output_root, "--output-root")
     if output_root.exists():
         if not replace:
             raise SystemExit(f"--output-root already exists: {output_root}")
@@ -180,7 +249,11 @@ def write_output(records: dict[str, dict[str, Any]], output_root: Path, *, repla
         used_relative_paths[relative] = key
         destination = output_root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(record["source_path"], destination)
+        source_path = Path(record["source_path"])
+        with open_regular_file_no_symlink(source_path, label="snapshot") as source, destination.open("wb") as target:
+            shutil.copyfileobj(source, target)
+        reject_symlink_component(source_path, "snapshot")
+        shutil.copystat(source_path, destination, follow_symlinks=False)
         snapshots.append(
             {
                 "target": key,
@@ -208,10 +281,17 @@ def write_output(records: dict[str, dict[str, Any]], output_root: Path, *, repla
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Public RC assembly is limited to minimal-second-source-intake, "
+            "structure-observer-intake, and chat-message-intake. "
+            "item-return-only-policy-slice is internal/planning backing and is "
+            "not accepted by this helper."
+        ),
+    )
     parser.add_argument("--minimal-root", required=True, type=Path)
     parser.add_argument("--structure-root", required=True, type=Path)
-    parser.add_argument("--item-return-root", required=True, type=Path)
     parser.add_argument("--chat-root", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--replace", action="store_true")
@@ -223,7 +303,6 @@ def main() -> int:
     roots = {
         "minimal-second-source-intake": args.minimal_root,
         "structure-observer-intake": args.structure_root,
-        "item-return-only-policy-slice": args.item_return_root,
         "chat-message-intake": args.chat_root,
     }
     manifest = write_output(source_records(roots), args.output_root, replace=args.replace)

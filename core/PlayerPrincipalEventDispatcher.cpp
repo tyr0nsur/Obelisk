@@ -1,7 +1,3 @@
-#if !defined(obelisk_EXPORTS)
-#define OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
-#endif
-
 #include "PlayerPrincipalEventDispatcher.h"
 #include "GameplayCallbackScope.h"
 #include "runtime/Logger.h"
@@ -9,6 +5,9 @@
 #include <algorithm>
 #include <array>
 #include <exception>
+#include <limits>
+#include <new>
+#include <stdexcept>
 
 namespace Obelisk::Core
 {
@@ -71,9 +70,25 @@ namespace Obelisk::Core
                 event.Bools[1].Field == PlayerPrincipalBoolField::ReturnValue;
         }
 
+        bool HasCanonicalAcceptedStartBools(const PlayerPrincipalEventView& event)
+        {
+            return HasCanonicalStartBools(event) &&
+                event.Bools[0].Value &&
+                event.Bools[1].Value;
+        }
+
+        bool HasCanonicalRejectedStartNoopBools(const PlayerPrincipalEventView& event)
+        {
+            return HasCanonicalStartBools(event) &&
+                event.Bools[0].Value &&
+                !event.Bools[1].Value;
+        }
+
         bool IsValidEvent(const PlayerPrincipalEventView& event)
         {
             if (!IsKnownEventKind(event.Kind) || !IsKnownAction(event.Action))
+                return false;
+            if (event.EventSequence == 0 || event.ServerProcessEpoch == 0)
                 return false;
             if (event.Bools.size() > kMaxBoolCount)
                 return false;
@@ -88,13 +103,10 @@ namespace Obelisk::Core
             {
             case PlayerPrincipalEventKind::SessionStart:
                 return event.Action == PlayerPrincipalAction::CandidateCreated &&
-                    HasCanonicalStartBools(event) &&
-                    event.Bools[0].Value &&
-                    event.Bools[1].Value;
+                    HasCanonicalAcceptedStartBools(event);
             case PlayerPrincipalEventKind::SessionStartRejected:
                 return event.Action == PlayerPrincipalAction::None &&
-                    HasCanonicalStartBools(event) &&
-                    !(event.Bools[0].Value && event.Bools[1].Value);
+                    HasCanonicalRejectedStartNoopBools(event);
             case PlayerPrincipalEventKind::SessionEnd:
                 return event.Action == PlayerPrincipalAction::CandidateInvalidated &&
                     event.Bools.empty();
@@ -176,10 +188,12 @@ namespace Obelisk::Core
         try
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
+            const uint64_t generation = AllocateGeneration();
+            if (generation == 0)
+                return 0;
             const uint64_t id = AllocateRegistrationId();
-            const uint64_t generation = m_NextGeneration++;
-            if (m_NextGeneration == 0)
-                m_NextGeneration = 1;
+            if (id == 0)
+                return 0;
             m_Registrations.push_back({id, generation, owner, subscription});
             m_SubscriptionCount.fetch_add(1, std::memory_order_release);
             return id;
@@ -200,15 +214,39 @@ namespace Obelisk::Core
 
     uint64_t PlayerPrincipalEventDispatcher::AllocateRegistrationId()
     {
-        uint64_t id = 0;
-        do
+        while (m_NextRegistrationId != 0)
         {
-            id = m_NextRegistrationId++;
-            if (m_NextRegistrationId == 0)
-                m_NextRegistrationId = 1;
-        } while (id == 0 || HasRegistrationId(id));
+            const uint64_t candidate = m_NextRegistrationId;
+            if (m_NextRegistrationId == std::numeric_limits<uint64_t>::max())
+                m_NextRegistrationId = 0;
+            else
+                ++m_NextRegistrationId;
 
-        return id;
+            if (candidate == 0 ||
+                HasRegistrationId(candidate) ||
+                m_IssuedRegistrationIds.find(candidate) != m_IssuedRegistrationIds.end())
+            {
+                continue;
+            }
+
+            m_IssuedRegistrationIds.insert(candidate);
+            return candidate;
+        }
+
+        return 0;
+    }
+
+    uint64_t PlayerPrincipalEventDispatcher::AllocateGeneration()
+    {
+        if (m_NextGeneration == 0)
+            return 0;
+
+        const uint64_t generation = m_NextGeneration;
+        if (m_NextGeneration == std::numeric_limits<uint64_t>::max())
+            m_NextGeneration = 0;
+        else
+            ++m_NextGeneration;
+        return generation;
     }
 
     bool PlayerPrincipalEventDispatcher::HasRegistrationId(uint64_t registrationId) const
@@ -237,6 +275,7 @@ namespace Obelisk::Core
 
         std::vector<PlayerPrincipalEventSubscription> removed;
         std::exception_ptr deferredFailure;
+        void* removedOwner = nullptr;
         size_t before = 0;
         size_t after = 0;
         try
@@ -262,18 +301,6 @@ namespace Obelisk::Core
             removed.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
-            auto keepEnd = std::remove_if(m_Registrations.begin(),
-                                          m_Registrations.end(),
-                                          [registrationId, &removed](const Registration& item) {
-                                              if (item.Id != registrationId)
-                                                  return false;
-                                              removed.push_back(item.Subscription);
-                                              return true;
-                                          });
-            m_Registrations.erase(keepEnd, m_Registrations.end());
-            after = m_Registrations.size();
-            if (before > after)
-                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             uint64_t cleanupBatchId = 0;
             if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
             {
@@ -281,7 +308,22 @@ namespace Obelisk::Core
                 if (m_NextCleanupBatchId == 0)
                     m_NextCleanupBatchId = 1;
             }
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            if (m_DispatchDepth > 0 && cleanupBatchId != 0)
+                ReserveDeferredDestroyFailureSlots(matchingCount);
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [registrationId, &removed, &removedOwner](const Registration& item) {
+                                              if (item.Id != registrationId)
+                                                  return false;
+                                              removedOwner = item.Owner;
+                                              removed.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId, removedOwner))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
                 removed = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
@@ -303,10 +345,15 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Player principal event unregister failed with an unknown exception.");
             return false;
         }
-        for (const PlayerPrincipalEventSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        std::exception_ptr cleanupFailure;
+        std::vector<PlayerPrincipalEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(removedOwner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
         return after != before;
     }
 
@@ -342,6 +389,15 @@ namespace Obelisk::Core
             removed.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (m_DispatchDepth > 0 && cleanupBatchId != 0)
+                ReserveDeferredDestroyFailureSlots(matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [owner, registrationId, &removed](const Registration& item) {
@@ -354,14 +410,7 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            uint64_t cleanupBatchId = 0;
-            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
-            {
-                cleanupBatchId = m_NextCleanupBatchId++;
-                if (m_NextCleanupBatchId == 0)
-                    m_NextCleanupBatchId = 1;
-            }
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId, owner))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
                 removed = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
@@ -401,16 +450,31 @@ namespace Obelisk::Core
             return 0;
 
         std::vector<PlayerPrincipalEventSubscription> removed;
+        std::vector<PlayerPrincipalEventSubscription> currentRemoved;
+        std::exception_ptr retainedFailure;
         std::exception_ptr deferredFailure;
         std::vector<PlayerPrincipalEventSubscription> deferredFailures;
         size_t retainedCount = 0;
         size_t before = 0;
         size_t after = 0;
+        const auto retainPendingOwnerCleanupFailures = [&]() {
+            if (!removed.empty())
+                RetainFailedOwnerDestroySubscriptions(owner, removed, retainedFailure);
+            if (!currentRemoved.empty())
+                RetainFailedOwnerDestroySubscriptions(owner, currentRemoved);
+        };
         try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
-            removed = TakeFailedOwnerDestroySubscriptions(owner);
+            removed = TakeFailedOwnerDestroySubscriptions(owner, retainedFailure);
             retainedCount = removed.size();
+#ifdef OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+            if (retainedCount != 0 && m_FailNextFailedOwnerDestroyRetrySetupForTesting)
+            {
+                m_FailNextFailedOwnerDestroyRetrySetupForTesting = false;
+                throw std::bad_alloc();
+            }
+#endif
             before = m_Registrations.size();
             const size_t matchingCount = static_cast<size_t>(
                 std::count_if(m_Registrations.begin(),
@@ -425,24 +489,27 @@ namespace Obelisk::Core
                     !IsDispatchCleanupComplete())
                 {
                     m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                    removed = TakeFailedOwnerDestroySubscriptions(owner, retainedFailure);
+                    retainedCount = removed.size();
+#ifdef OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+                    if (retainedCount != 0 && m_FailNextFailedOwnerDestroyRetrySetupForTesting)
+                    {
+                        m_FailNextFailedOwnerDestroyRetrySetupForTesting = false;
+                        throw std::bad_alloc();
+                    }
+#endif
+                    if (retainedCount != 0)
+                    {
+                        removed.reserve(retainedCount);
+                    }
                 }
-                return 0;
+                if (retainedCount == 0)
+                    return 0;
             }
             removed.reserve(retainedCount + matchingCount);
+            currentRemoved.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
-            auto keepEnd = std::remove_if(m_Registrations.begin(),
-                                          m_Registrations.end(),
-                                          [owner, &removed](const Registration& item) {
-                                              if (item.Owner != owner)
-                                                  return false;
-                                              removed.push_back(item.Subscription);
-                                              return true;
-                                          });
-            m_Registrations.erase(keepEnd, m_Registrations.end());
-            after = m_Registrations.size();
-            if (before > after)
-                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             uint64_t cleanupBatchId = 0;
             if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
             {
@@ -450,17 +517,28 @@ namespace Obelisk::Core
                 if (m_NextCleanupBatchId == 0)
                     m_NextCleanupBatchId = 1;
             }
-            std::vector<PlayerPrincipalEventSubscription> currentRemoved(
-                removed.begin() + static_cast<std::ptrdiff_t>(retainedCount),
-                removed.end());
+            if (m_DispatchDepth > 0 && cleanupBatchId != 0)
+                ReserveDeferredDestroyFailureSlots(matchingCount);
+            auto keepEnd = std::remove_if(m_Registrations.begin(),
+                                          m_Registrations.end(),
+                                          [owner, &currentRemoved](const Registration& item) {
+                                              if (item.Owner != owner)
+                                                  return false;
+                                              currentRemoved.push_back(item.Subscription);
+                                              return true;
+                                          });
+            m_Registrations.erase(keepEnd, m_Registrations.end());
+            after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             const bool queuedForDeferredDestroy = m_DispatchDepth > 0 && !currentRemoved.empty();
-            if (QueueOrDestroyRemovedSubscriptions(currentRemoved, lock, cleanupBatchId))
+            if (QueueOrDestroyRemovedSubscriptions(currentRemoved, lock, cleanupBatchId, owner))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
                 deferredFailures = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
             }
-            if (queuedForDeferredDestroy)
-                removed.erase(removed.begin() + static_cast<std::ptrdiff_t>(retainedCount), removed.end());
+            if (!queuedForDeferredDestroy)
+                removed.insert(removed.end(), currentRemoved.begin(), currentRemoved.end());
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -468,12 +546,14 @@ namespace Obelisk::Core
         }
         catch (const std::exception& e)
         {
+            retainPendingOwnerCleanupFailures();
             if (Obelisk::Logger::IsInitialized())
                 OBELISK_ERROR("Player principal event owner cleanup failed: {}", e.what());
             throw;
         }
         catch (...)
         {
+            retainPendingOwnerCleanupFailures();
             if (Obelisk::Logger::IsInitialized())
                 OBELISK_ERROR("Player principal event owner cleanup failed with an unknown exception.");
             throw;
@@ -481,6 +561,8 @@ namespace Obelisk::Core
         std::exception_ptr cleanupFailure;
         std::vector<PlayerPrincipalEventSubscription> failed =
             DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
+        if (retainedFailure)
+            cleanupFailure = cleanupFailure ? cleanupFailure : retainedFailure;
         if (deferredFailure)
         {
             cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
@@ -496,15 +578,26 @@ namespace Obelisk::Core
     bool PlayerPrincipalEventDispatcher::QueueOrDestroyRemovedSubscriptions(
         std::vector<PlayerPrincipalEventSubscription>& removed,
         std::unique_lock<std::mutex>&,
-        uint64_t cleanupBatchId)
+        uint64_t cleanupBatchId,
+        void* owner)
     {
         if (removed.empty())
             return false;
 
         if (m_DispatchDepth > 0)
         {
-            for (const PlayerPrincipalEventSubscription& subscription : removed)
-                m_PendingDestroy.push_back({subscription, cleanupBatchId});
+            const bool needsFailureReservation = cleanupBatchId != 0;
+            try
+            {
+                for (const PlayerPrincipalEventSubscription& subscription : removed)
+                    m_PendingDestroy.push_back({subscription, cleanupBatchId, owner});
+            }
+            catch (...)
+            {
+                if (needsFailureReservation)
+                    ReleaseDeferredDestroyFailureSlots(removed.size());
+                throw;
+            }
             removed.clear();
             return !IsInsideAnyGameplayCallback();
         }
@@ -512,15 +605,38 @@ namespace Obelisk::Core
         return false;
     }
 
-    std::vector<PlayerPrincipalEventSubscription> PlayerPrincipalEventDispatcher::TakeFailedOwnerDestroySubscriptions(void* owner)
+    std::vector<PlayerPrincipalEventSubscription> PlayerPrincipalEventDispatcher::TakeFailedOwnerDestroySubscriptions(
+        void* owner,
+        std::exception_ptr& firstFailure)
     {
         std::vector<PlayerPrincipalEventSubscription> subscriptions;
+        const size_t fallbackCount =
+            m_HasFallbackFailedOwnerDestroy && m_FallbackFailedOwnerDestroy.Owner == owner ? 1 : 0;
+        const size_t matchingCount = static_cast<size_t>(
+            std::count_if(m_FailedOwnerDestroy.begin(),
+                          m_FailedOwnerDestroy.end(),
+                          [owner](const FailedOwnerDestroy& item) {
+                              return item.Owner == owner;
+                          }));
+        subscriptions.reserve(fallbackCount + matchingCount);
+        if (m_HasFallbackFailedOwnerDestroy &&
+            m_FallbackFailedOwnerDestroy.Owner == owner)
+        {
+            if (!firstFailure && m_FallbackFailedOwnerDestroy.UnreportedFailure)
+                firstFailure = m_FallbackFailedOwnerDestroy.UnreportedFailure;
+            subscriptions.push_back(m_FallbackFailedOwnerDestroy.Subscription);
+            m_HasFallbackFailedOwnerDestroy = false;
+            m_FallbackFailedOwnerDestroy = {};
+        }
+
         auto keepEnd = std::remove_if(
             m_FailedOwnerDestroy.begin(),
             m_FailedOwnerDestroy.end(),
-            [owner, &subscriptions](const FailedOwnerDestroy& item) {
+            [owner, &subscriptions, &firstFailure](const FailedOwnerDestroy& item) {
                 if (item.Owner != owner)
                     return false;
+                if (!firstFailure && item.UnreportedFailure)
+                    firstFailure = item.UnreportedFailure;
                 subscriptions.push_back(item.Subscription);
                 return true;
             });
@@ -530,15 +646,57 @@ namespace Obelisk::Core
 
     void PlayerPrincipalEventDispatcher::RetainFailedOwnerDestroySubscriptions(
         void* owner,
-        const std::vector<PlayerPrincipalEventSubscription>& subscriptions)
+        const std::vector<PlayerPrincipalEventSubscription>& subscriptions,
+        std::exception_ptr unreportedFailure)
     {
         if (!owner || subscriptions.empty())
             return;
 
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        m_FailedOwnerDestroy.reserve(m_FailedOwnerDestroy.size() + subscriptions.size());
         for (const PlayerPrincipalEventSubscription& subscription : subscriptions)
-            m_FailedOwnerDestroy.push_back({owner, subscription});
+            RetainFailedOwnerDestroySubscriptionNoThrow(owner, subscription, unreportedFailure);
+    }
+
+    void PlayerPrincipalEventDispatcher::RetainFailedOwnerDestroySubscriptionNoThrow(
+        void* owner,
+        const PlayerPrincipalEventSubscription& subscription,
+        std::exception_ptr unreportedFailure)
+    {
+        if (!owner)
+            return;
+
+        try
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            m_FailedOwnerDestroy.push_back({owner, subscription, unreportedFailure});
+        }
+        catch (...)
+        {
+            try
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                if (!m_HasFallbackFailedOwnerDestroy)
+                {
+                    m_FallbackFailedOwnerDestroy = {owner, subscription, unreportedFailure};
+                    m_HasFallbackFailedOwnerDestroy = true;
+                    return;
+                }
+            }
+            catch (...)
+            {
+            }
+
+            if (Obelisk::Logger::IsInitialized())
+            {
+                try
+                {
+                    OBELISK_ERROR(
+                        "Player principal deferred owner DestroyUserData failure storage failed while fallback was occupied.");
+                }
+                catch (...)
+                {
+                }
+            }
+        }
     }
 
     std::vector<PlayerPrincipalEventSubscription> PlayerPrincipalEventDispatcher::TakeDeferredDestroyFailures(
@@ -548,6 +706,28 @@ namespace Obelisk::Core
         std::vector<PlayerPrincipalEventSubscription> failedSubscriptions;
         if (cleanupBatchId == 0)
             return failedSubscriptions;
+
+        const size_t fallbackCount =
+            m_HasFallbackDeferredDestroyFailure &&
+                    m_FallbackDeferredDestroyFailure.CleanupBatchId == cleanupBatchId
+                ? 1
+                : 0;
+        const size_t matchingCount = static_cast<size_t>(
+            std::count_if(m_DeferredDestroyFailures.begin(),
+                          m_DeferredDestroyFailures.end(),
+                          [cleanupBatchId](const DeferredDestroyFailure& failure) {
+                              return failure.CleanupBatchId == cleanupBatchId;
+                          }));
+        failedSubscriptions.reserve(fallbackCount + matchingCount);
+        if (m_HasFallbackDeferredDestroyFailure &&
+            m_FallbackDeferredDestroyFailure.CleanupBatchId == cleanupBatchId)
+        {
+            if (!firstFailure)
+                firstFailure = m_FallbackDeferredDestroyFailure.Failure;
+            failedSubscriptions.push_back(m_FallbackDeferredDestroyFailure.Subscription);
+            m_HasFallbackDeferredDestroyFailure = false;
+            m_FallbackDeferredDestroyFailure = {};
+        }
 
         auto keepEnd = std::remove_if(
             m_DeferredDestroyFailures.begin(),
@@ -564,6 +744,68 @@ namespace Obelisk::Core
         return failedSubscriptions;
     }
 
+    void PlayerPrincipalEventDispatcher::ReserveDeferredDestroyFailureSlots(size_t count)
+    {
+        if (count == 0)
+            return;
+
+        m_DeferredDestroyFailures.reserve(
+            m_DeferredDestroyFailures.size() + m_ReservedDeferredDestroyFailureSlots + count);
+        m_ReservedDeferredDestroyFailureSlots += count;
+    }
+
+    void PlayerPrincipalEventDispatcher::ReleaseDeferredDestroyFailureSlots(size_t count)
+    {
+        m_ReservedDeferredDestroyFailureSlots =
+            count >= m_ReservedDeferredDestroyFailureSlots
+                ? 0
+                : m_ReservedDeferredDestroyFailureSlots - count;
+    }
+
+    void PlayerPrincipalEventDispatcher::RecordDeferredDestroyFailure(
+        uint64_t cleanupBatchId,
+        const PlayerPrincipalEventSubscription& subscription,
+        std::exception_ptr failure)
+    {
+        if (cleanupBatchId == 0)
+            return;
+
+        if (m_ReservedDeferredDestroyFailureSlots > 0)
+            --m_ReservedDeferredDestroyFailureSlots;
+
+        try
+        {
+#ifdef OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS
+            if (m_FailNextDeferredDestroyFailureRecordForTesting)
+            {
+                m_FailNextDeferredDestroyFailureRecordForTesting = false;
+                throw std::bad_alloc();
+            }
+#endif
+            m_DeferredDestroyFailures.push_back({cleanupBatchId, subscription, failure});
+            return;
+        }
+        catch (...)
+        {
+            if (!m_HasFallbackDeferredDestroyFailure)
+            {
+                m_FallbackDeferredDestroyFailure = {
+                    cleanupBatchId,
+                    subscription,
+                    failure,
+                };
+                m_HasFallbackDeferredDestroyFailure = true;
+                return;
+            }
+
+            if (Obelisk::Logger::IsInitialized())
+            {
+                OBELISK_ERROR(
+                    "Player principal deferred DestroyUserData failure storage failed while fallback was occupied.");
+            }
+        }
+    }
+
     bool PlayerPrincipalEventDispatcher::IsDispatchCleanupComplete() const
     {
         return m_DispatchDepth == 0 && m_PendingDestroy.empty() && m_PendingDestroyInProgress == 0;
@@ -572,7 +814,6 @@ namespace Obelisk::Core
     void PlayerPrincipalEventDispatcher::FinishDispatch()
     {
         std::vector<PendingDestroy> pending;
-        std::vector<DeferredDestroyFailure> failures;
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             if (m_DispatchDepth == 0)
@@ -590,34 +831,35 @@ namespace Obelisk::Core
         {
             try
             {
-                DestroySubscriptionUserData(item.Subscription, item.CleanupBatchId != 0);
+                const bool retainForOwnerCleanup = item.CleanupBatchId == 0 && item.Owner != nullptr;
+                DestroySubscriptionUserData(item.Subscription, item.CleanupBatchId != 0 || retainForOwnerCleanup);
+                if (item.CleanupBatchId != 0)
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    ReleaseDeferredDestroyFailureSlots(1);
+                }
             }
             catch (...)
             {
                 if (item.CleanupBatchId == 0)
+                {
+                    RetainFailedOwnerDestroySubscriptionNoThrow(
+                        item.Owner,
+                        item.Subscription,
+                        std::current_exception());
                     continue;
-                try
-                {
-                    failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()});
                 }
-                catch (...)
-                {
-                }
+
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                RecordDeferredDestroyFailure(
+                    item.CleanupBatchId,
+                    item.Subscription,
+                    std::current_exception());
             }
         }
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingDestroyInProgress -= pending.size();
-            try
-            {
-                m_DeferredDestroyFailures.insert(
-                    m_DeferredDestroyFailures.end(),
-                    failures.begin(),
-                    failures.end());
-            }
-            catch (...)
-            {
-            }
         }
         m_DispatchCv.notify_all();
     }
@@ -626,7 +868,25 @@ namespace Obelisk::Core
     void PlayerPrincipalEventDispatcher::SetNextRegistrationIdForTesting(uint64_t nextRegistrationId)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        m_NextRegistrationId = nextRegistrationId == 0 ? 1 : nextRegistrationId;
+        m_NextRegistrationId = nextRegistrationId;
+    }
+
+    void PlayerPrincipalEventDispatcher::SetNextGenerationForTesting(uint64_t nextGeneration)
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_NextGeneration = nextGeneration;
+    }
+
+    void PlayerPrincipalEventDispatcher::FailNextDeferredDestroyFailureRecordForTesting()
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FailNextDeferredDestroyFailureRecordForTesting = true;
+    }
+
+    void PlayerPrincipalEventDispatcher::FailNextFailedOwnerDestroyRetrySetupForTesting()
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FailNextFailedOwnerDestroyRetrySetupForTesting = true;
     }
 #endif
 

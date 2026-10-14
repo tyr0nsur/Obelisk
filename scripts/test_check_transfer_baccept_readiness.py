@@ -63,30 +63,137 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual("obelisk.transfer-baccept-readiness-check.v1", payload["schema"])
         self.assertTrue(payload["ready"])
+        self.assertEqual(readiness.NON_AUTHORIZING_READY_SCOPE, payload["ready_scope"])
+        self.assertTrue(
+            set(readiness.NON_AUTHORIZING_READY_DOES_NOT_SATISFY)
+            <= set(payload["does_not_satisfy_readiness"])
+        )
         self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertTrue(payload["offline_only"])
+        self.assertTrue(payload["candidate_only"])
+        self.assertTrue(payload["candidate_only_mode"])
+        self.assertEqual("approved_runtime_evidence_missing", payload["current_route_blocker"])
+        self.assertEqual(
+            "approved_runtime_principal_lifecycle_evidence_bundle",
+            payload["required_runtime_evidence"],
+        )
+        guardrail = payload["multi_surface_beta_capture_guardrail"]
+        self.assertEqual("candidate_only_non_counting", guardrail["status"])
+        self.assertEqual("approved_runtime_evidence_missing", guardrail["current_route_blocker"])
+        self.assertFalse(guardrail["counts_as_approved_runtime_evidence"])
+        self.assertFalse(guardrail["counts_as_runtime_evidence"])
+        self.assertFalse(guardrail["clears_approved_runtime_evidence_missing"])
+        self.assertFalse(guardrail["replaces_player_principal_triplet"])
+        self.assertFalse(guardrail["sdk_p0_unlock_allowed"])
+        self.assertFalse(guardrail["side_lane_counts_toward_sdk"])
+        self.assertFalse(guardrail["side_lane_counts_toward_p0"])
+        self.assertTrue(payload["not_artifact_gate"])
         self.assertTrue(payload["consume_only"])
-        self.assertFalse(payload["public_sdk_ready"])
-        self.assertFalse(payload["public_transfer_sdk_ready"])
-        self.assertFalse(payload["public_abi_ready"])
-        self.assertFalse(payload["runtime_ready"])
-        self.assertFalse(payload["transfer_payload_public_contract_ready"])
-        self.assertFalse(payload["downloaded_character_public_contract_ready"])
-        self.assertFalse(payload["dino_payload_public_contract_ready"])
-        self.assertFalse(payload["player_identity_public_contract_ready"])
-        self.assertFalse(payload["cross_map_state_public_contract_ready"])
-        self.assertFalse(payload["resource_handle_public_contract_ready"])
-        self.assertFalse(payload["identity_ready"])
-        self.assertFalse(payload["ownership_ready"])
-        self.assertFalse(payload["mutation_ready"])
-        self.assertFalse(payload["return_override_ready"])
-        self.assertFalse(payload["v1_completion_ready"])
-        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["sdk_p0_unlock_allowed"])
+        self.assertFalse(payload["side_lane_counts_toward_sdk"])
+        self.assertFalse(payload["side_lane_counts_toward_p0"])
+        for key in readiness.REPORT_FALSE_FLAGS:
+            self.assertIn(key, payload)
+            self.assertFalse(payload[key], key)
+        for key, expected in readiness.REPORT_ZERO_FIELDS.items():
+            self.assertIn(key, payload)
+            self.assertEqual(expected, payload[key], key)
+        non_claims_text = "\n".join(payload["non_claims"])
+        self.assertIn("internal offline planning evidence only", non_claims_text)
+        self.assertIn("does not claim runtime validation", non_claims_text)
+        self.assertIn("public Transfer SDK", non_claims_text)
+        self.assertIn("does not claim v1 completion", non_claims_text)
+        self.assertIn("P0 dependency-chain credit", non_claims_text)
+        self.assertIn("does not replace approved player-principal lifecycle runtime evidence", non_claims_text)
+        self.assertIn("multi-surface beta capture pack and plan artifacts are prep only", non_claims_text)
         self.assertEqual(1, payload["summary"]["copied_bool_count"])
         self.assertEqual(
             ["ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept"],
             payload["summary"]["copied_fields"],
         )
         self.assertEqual(10, len(payload["summary"]["forbidden_fields"]))
+
+    def test_symlinked_root_and_manifest_paths_are_rejected_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            root_link = Path(temp_dir) / "pack-link"
+            root_link.symlink_to(root, target_is_directory=True)
+
+            result = self.run_checker(
+                "--root",
+                str(root_link),
+                "--manifest",
+                str(root_link / manifest.name),
+                "--expected-manifest-sha256",
+                sha256,
+                "--skip-artifact-gates",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        path_blockers = [blocker for blocker in report["blockers"] if blocker["reason"] == "path_rejected"]
+        self.assertTrue(any(blocker.get("label") == "--root" for blocker in path_blockers))
+        self.assertTrue(any(blocker.get("label") == "--manifest" for blocker in path_blockers))
+        self.assertTrue(all("symlink" in blocker.get("detail", "") for blocker in path_blockers))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            manifest_link = Path(temp_dir) / "manifest-link.json"
+            manifest_link.symlink_to(manifest)
+            result = self.run_checker(*self.checker_args(root, manifest_link, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("path_rejected", {blocker["reason"] for blocker in report["blockers"]})
+        self.assertTrue(any(blocker.get("label") == "--manifest" for blocker in report["blockers"]))
+
+    def test_manifest_symlink_swap_after_path_precheck_is_rejected_before_content_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            swapped_target = Path(temp_dir) / "swapped-policy.json"
+            swapped_target.write_text('{"schema": "swapped"}', encoding="utf-8")
+            original_safe_path = readiness.safe_path
+            swapped = False
+
+            def race_safe_path(path: Path, label: str, blockers: list[dict]) -> Path | None:
+                nonlocal swapped
+                resolved = original_safe_path(path, label, blockers)
+                if label == "--manifest" and resolved is not None and not swapped:
+                    swapped = True
+                    manifest.unlink()
+                    manifest.symlink_to(swapped_target)
+                return resolved
+
+            with mock.patch.object(readiness, "safe_path", side_effect=race_safe_path):
+                report = readiness.build_report(root, manifest, sha256, skip_artifact_gates=True)
+
+        self.assertFalse(report["ready"])
+        self.assertIn("manifest_path_is_symlink", {blocker["reason"] for blocker in report["blockers"]})
+        self.assertNotIn("schema_mismatch", {blocker["reason"] for blocker in report["blockers"]})
+
+    def test_protected_manifest_path_is_rejected_before_policy_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            original_reject = readiness.reject_protected_input_path
+
+            def reject_manifest(path: Path, label: str) -> Path:
+                if label == "--manifest":
+                    raise SystemExit("simulated protected input path")
+                return original_reject(path, label)
+
+            with mock.patch.object(readiness, "reject_protected_input_path", side_effect=reject_manifest):
+                with mock.patch.object(readiness, "read_policy") as read_policy:
+                    report = readiness.build_report(root, manifest, sha256, skip_artifact_gates=True)
+
+        self.assertFalse(report["ready"])
+        self.assertIn("path_rejected", {blocker["reason"] for blocker in report["blockers"]})
+        self.assertTrue(any(blocker.get("label") == "--manifest" for blocker in report["blockers"]))
+        read_policy.assert_not_called()
 
     def test_policy_fixture_requires_consume_accept_and_promote_block(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -184,6 +291,122 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         reasons = {blocker["reason"] for blocker in report["blockers"]}
         self.assertIn("forbidden_positive_claim_value", reasons)
+
+    def test_policy_rejects_readiness_alias_overclaims(self) -> None:
+        cases = (
+            ("ready_for_public_sdk", True),
+            ("publicReady", True),
+            ("sdkReady", True),
+            ("p0Ready", True),
+            ("publicStatus", "enabled"),
+            ("sdkStatus", "supported"),
+            ("p0Status", "ready"),
+            ("counts_toward_v1_completion", True),
+            ("runtimeValidated", True),
+            ("transferPayloadPublicContractReady", True),
+            ("release_candidate_ready", True),
+            ("source_ready", True),
+            ("source_status", True),
+            ("readiness_status", "ready"),
+        )
+        for key, value in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir) / "pack"
+                    payload = self.make_policy()
+                    payload["coverage"][key] = value
+                    manifest, sha256 = self.write_pack(root, payload)
+                    result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                reasons = {blocker["reason"] for blocker in report["blockers"]}
+                self.assertIn("readiness_alias_overclaim", reasons)
+
+    def test_policy_rejects_source_label_positive_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["sourceLabel"] = "ready"
+            payload["sourceLabels"] = ["candidate-only", "supported"]
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("policy_unexpected_field", reasons)
+        self.assertIn("readiness_alias_overclaim", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in report["blockers"]
+            if blocker["reason"] == "readiness_alias_overclaim"
+        }
+        self.assertIn("$.sourceLabel", paths)
+        self.assertIn("$.sourceLabels[1]", paths)
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(0, report["complete_sdk_claim_progress_contribution"])
+        self.assertTrue(report["candidate_only"])
+        self.assertFalse(report["sdk_p0_unlock_allowed"])
+
+    def test_policy_rejects_nested_status_result_outcome_and_count_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["public_module"] = {
+                "status": "accepted",
+                "result": "validated",
+                "outcome": "ready",
+                "public_transfer_sdk_surface_count": 1,
+                "target_count": 1,
+            }
+            payload["runtime_capture"] = {"outcome": "enabled", "progress": 1}
+            payload["v1_readiness"] = {"result": "v1-ready"}
+            payload["p0_dependency_chain"] = {"status": "supported"}
+            payload["readiness"] = {"approved": True}
+            payload["v1"] = {"complete": True}
+            payload["public_sdk"] = {"enabled": True}
+            payload["runtime"] = {"validated": True}
+            payload["candidate"] = {"accepted": True}
+            payload["package_shape"] = {"passed": True}
+            payload["support_tier"] = {"active": True}
+            payload["plugin_hub"] = {"ready": True}
+            payload["target_set"] = {"promoted": True}
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("policy_unexpected_field", reasons)
+        self.assertIn("readiness_alias_overclaim", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in report["blockers"]
+            if blocker["reason"] == "readiness_alias_overclaim"
+        }
+        self.assertIn("$.public_module.status", paths)
+        self.assertIn("$.public_module.result", paths)
+        self.assertIn("$.public_module.outcome", paths)
+        self.assertIn("$.public_module.public_transfer_sdk_surface_count", paths)
+        self.assertNotIn("$.public_module.target_count", paths)
+        self.assertIn("$.runtime_capture.outcome", paths)
+        self.assertIn("$.runtime_capture.progress", paths)
+        self.assertIn("$.v1_readiness.result", paths)
+        self.assertIn("$.p0_dependency_chain.status", paths)
+        self.assertIn("$.readiness.approved", paths)
+        self.assertIn("$.v1.complete", paths)
+        self.assertIn("$.public_sdk.enabled", paths)
+        self.assertIn("$.runtime.validated", paths)
+        self.assertIn("$.candidate.accepted", paths)
+        self.assertIn("$.package_shape.passed", paths)
+        self.assertIn("$.support_tier.active", paths)
+        self.assertIn("$.plugin_hub.ready", paths)
+        self.assertIn("$.target_set.promoted", paths)
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(0, report["p0_dependency_chain_claim_progress_contribution"])
 
     def test_policy_rejects_extra_or_wrong_copied_bool(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

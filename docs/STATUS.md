@@ -57,6 +57,41 @@ Contributor reading guide:
 - keep operator deployment details outside public SDK docs unless they define a stable
   runtime contract.
 
+Current-status non-authorization: this page grants no current-turn exact live-op scope,
+no current-turn exact approval for operations, Discord send, server/log read, marker/env
+change, protected live-server filesystem access, restart, deploy, Plugin Hub
+publication, or stable/public SDK claim. Historical TheIsland, Ragnarok, and Genesis2
+material and historical server names are non-authorizing. The following are not live
+authorization, runtime evidence, SDK evidence, approved in-game evidence, SDK/P0
+progress, live-op authorization, Discord authorization, publication authority, runtime
+readiness, public SDK readiness, stable SDK readiness, Plugin Hub readiness, support-tier
+activation, stable SDK claims, or stable claims: request packs, status reports,
+`progress_normalization_trace`, source_overclaim diagnostics, the latest
+release-readiness pass, release-readiness passes, `source_overclaim_total_flag_count=0`,
+the latest validation pass, six-agent closure notes, Codex cache cleanup,
+passive observation, passive player evidence, passive player summaries, passive summaries,
+passive snapshots, passive monitor ticks, passive monitor output, passive monitors,
+passive triplets, public reachability, beta tester notices, beta notices, future beta
+notices, Discord notice drafts, package-shape installs, package installs, explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+install/package success, package-shape install success, install/package-shape checks,
+support-tier labels, package shape, package-shape/public package readiness, Plugin Hub
+planning, scoped non-complete release statements, side-lane candidates/accounting, prior
+approvals, historical live approvals/map names, historical approvals/map names, closure requests,
+and tests. They may be cited only as chronology/request context; they
+remain non-authorizing/non-evidence unless a claim names both the current-turn exact
+approval for the scoped action and the accepted checker evidence for the evidence result.
+The route remains SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and blocked on
+`approved_runtime_evidence_missing`.
+A separately recorded standing live authority, if one exists for named operations, is
+authorization only; it does not supply runtime evidence, SDK/P0 progress, public SDK
+readiness, publication authority, stable SDK readiness, Plugin Hub readiness,
+support-tier activation, package-shape/public package readiness, or a stable/complete SDK
+claim.
+Deferred C++ observer patch notes and diagnostic/passive lifecycle material are planning
+context only; they do not satisfy approved runtime principal lifecycle evidence and do
+not advance SDK/P0 progress, public SDK readiness, or stable SDK claims.
+
 The current ARK server setup is a validation adapter used to check Obelisk in a
 real UE4 Linux process. Adapter operations are documented here only when they
 define or protect runtime behavior.
@@ -76,8 +111,8 @@ define or protect runtime behavior.
 | `LD_PRELOAD` bootstrap | Stable baseline | Runtime loads through the central install layout. |
 | Central install root | Stable baseline | Operator-chosen Obelisk root with `lib/`, `plugins/`, `config/`, `logs/`, and `state/instances/`; examples should use placeholders such as `<obelisk-root>`. |
 | Multi-server shared root | Stable baseline | Multiple ARK processes may share Obelisk `lib/`, `plugins/`, and `config/` when each process has a unique `OBELISK_INSTANCE_ID`; logs, markers, and mutable runtime state stay per instance. |
-| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copying or deploying them into an ARK binary directory requires a current approved adapter-validation window with rollback. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts. |
-| Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK artifacts; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. |
+| ARK/LinuxGSM validation adapter | Stable baseline | Versioned wrappers live under `packaging/linuxgsm/`; copying or deploying them into an ARK binary directory requires a current-turn approved adapter-validation window with rollback. Use `scripts/check_linuxgsm_wrapper_drift.sh` before maintenance restarts. |
+| Installer plugin posture | Stable baseline | `scripts/install_obelisk.sh` installs runtime/SDK package-shape artifacts only; plugins are published with `scripts/install_obelisk_plugin.sh`, which stages under a non-`.so` name before atomic rename into `plugins/`. Installer success does not grant runtime readiness, live-ops approval, Plugin Hub readiness/publication, support-tier activation, stable SDK claims, or v1 SDK completion. |
 | Operator CLI | Experimental | `scripts/obelisk.py` exposes read-only `status`, `instances list`, `plugins list`, and `plugins show`; lifecycle commands are planned after LinuxGSM integration and explicit restart safety gates. |
 | Per-instance runtime flags | Stable baseline | `OBELISK_INSTANCE_ID` selects logs and markers under `state/instances/<id>/`; map markers are obsolete. |
 | ProcessEvent hook | Stable baseline | Stable validation enables the hook while plugin loading is disabled through `OBELISK_DISABLE_PLUGINS=1`; live posture must be verified with `check_obelisk_server_posture.sh` before making claims. |
@@ -93,17 +128,17 @@ define or protect runtime behavior.
 | `oChatLogger` | Experimental | First-party `ChatMessageEvent` smoke-test example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; safe-disabled by default, requires active config before chat registration, and logs event metadata plus copied message size only, not player identity or raw chat text. |
 | `oChatAudit` | Experimental | First-party `ChatMessageEvent` digest/audit example excluded from the default build and release scope unless `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON`; safe-disabled by default and never logs raw chat text or player identity. |
 | Game interaction surface | Experimental | Obelisk can observe selected UE4 `ProcessEvent` calls through debug-gated filtered callbacks when the target `FName` index is known. Outside the promoted `GameplayPolicyEvent` surface and the minimal `ChatMessageEvent` RC notification surface, gameplay mutation, return overrides, arbitrary UE4 calls, and public module SDK dispatch remain blocked until reflection-backed parameter decoding, ownership policy, and isolated runtime evidence exist. |
-| GameplayPolicyEvent | Promoted v0.1 SDK surface; v1 status `promoted-experimental-only` | Public copied POD policy event backed by accepted `structure-observer-intake` evidence, accepted ReturnValue-only `item-return-only-policy-slice` evidence, plus accepted compact inventory/structure layouts from `minimal-second-source-intake`; the structure-backed claim points to fresh [`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md) and remains layout-only support for copied/redacted policy backing. This is not a v1 completion claim. Plugins use owner-token handle registration, event-kind masks, and owner-scoped unregister. Payloads expose only approved scalar fields through `field_mask`, `bool_values`, and `int32_values`; pincode values, player identity, object/item/inventory identity, lookup, `ResourceHandle`, raw params, FName/GObjects indices, UE pointers, mutation, and return overrides remain blocked. Inventory-backed signals use the same `GameplayPolicyEvent` family, not a separate Inventory SDK. |
-| ChatMessageEvent | v0.1-rc SDK ABI surface; v1 status `promoted-experimental-only` | Minimal copied UTF-8 chat notification contract for plugins that parse text locally. This is not a v1 completion claim. Plugins use owner-token handle registration and owner-scoped unregister. Payloads expose `send_mode`, copied-payload flags, a process-local sequence, and message bytes only; sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked. The target layout has accepted second-source evidence, and the `enable-chat-events` producer path has approved copied-log plugin-facing delivery validation with 18 accepted events covering all four known send modes (`0..3`) and no privacy blockers. Historical `enable-chat-reflection` observer logs still do not satisfy delivery evidence. |
+| GameplayPolicyEvent | Promoted v0.1 SDK surface; v1 status `promoted-experimental-only` | Public copied POD policy event backed by accepted `structure-observer-intake` evidence plus accepted compact inventory/structure layouts from `minimal-second-source-intake`; ReturnValue-only `item-return-only-policy-slice` remains planning-only/internal backing evidence and is not a public RC/default target set. The structure-backed claim points to fresh [`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md) and remains layout-only support for copied/redacted policy backing. This is not a v1 completion claim. Plugins use owner-token handle registration, event-kind masks, and owner-scoped unregister. Payloads expose only approved scalar fields through `field_mask`, `bool_values`, and `int32_values`; pincode values, player identity, object/item/inventory identity, lookup, `ResourceHandle`, raw params, FName/GObjects indices, UE pointers, mutation, and return overrides remain blocked. Inventory-backed signals use the same `GameplayPolicyEvent` family, not a separate Inventory SDK. |
+| ChatMessageEvent | v0.1-rc SDK ABI surface; v1 status `promoted-experimental-only` | Minimal copied UTF-8 chat notification contract for plugins that parse text locally. This is not a v1 completion claim. Plugins use owner-token handle registration and owner-scoped unregister. Payloads expose `send_mode`, copied-payload flags, a process-local sequence, and message bytes only; sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked. The target layout has accepted second-source evidence, and the `enable-chat-events` producer path has historical, surface-local accepted copied-log plugin-facing delivery validation with 18 accepted events covering all four known send modes (`0..3`) and no privacy blockers. That chat delivery evidence is not current P0 approved runtime evidence, current-turn live-op approval, SDK/P0 progress, public SDK readiness, or v1 completion. Historical `enable-chat-reflection` observer logs still do not satisfy delivery evidence. |
 | Resource kind descriptors | Promoted v0.1 SDK category metadata only | `DescribeResourceKind` exposes metadata-only category descriptors for known resource kinds, currently `STRUCTURE` and `INVENTORY_ITEM`: stable category name, supported `GameplayPolicyEvent` masks, supported field masks, and explicit flags that the category has no identity or lookup. It is not a `ResourceHandle`, object identity, lookup API, persistent handle, or proof that two events refer to the same game object. |
 | Gameplay policy event descriptors | Promoted v0.1 SDK event metadata only | `DescribeGameplayPolicyEventKind` exposes metadata-only descriptors for promoted `GameplayPolicyEvent` kinds: stable event name, resource category, event-kind mask, supported field mask, and copied-payload/backing flags. It is metadata for promoted kinds only, not a complete gameplay inventory, separate module SDK, object identity, UE lookup, mutation path, or return-override API. |
-| Resources API | Not ready | Real resource identity, lookup, mutation, coordinates, ownership, and cross-event correlation remain postponed until identity stability, privacy, lifecycle, validity, and cross-instance semantics are proven. The next strict ResourceHandle blocker is runtime-only: rejected object samples plus runtime serial reuse/wraparound semantics through candidate-only runtime manifests after an operator-approved live-ops brief. Offline zero-serial cohorts and strict serial-policy artifacts remain internal candidate evidence; they do not prove public lookup safety, persistent handles, identity, mutation, or return overrides. |
+| Resources API | Not ready | Real resource identity, lookup, mutation, coordinates, ownership, and cross-event correlation remain postponed until identity stability, privacy, lifecycle, validity, and cross-instance semantics are proven. The next strict ResourceHandle blocker is runtime-only: rejected object samples plus runtime serial reuse/wraparound semantics through candidate-only runtime manifests after a current-turn operator-approved live-ops brief. Offline zero-serial cohorts and strict serial-policy artifacts remain internal candidate evidence; they do not prove public lookup safety, persistent handles, identity, mutation, or return overrides. |
 | Internal copied structure events | Internal bridge | `core/StructureEventDispatcher` remains the internal copied-scalar bridge that feeds `GameplayPolicyEvent` and participates in plugin-owner cleanup on init failure/unload. It is not a public `StructureEvents` SDK. |
 | Internal copied inventory policy events | Internal bridge | `core/InventoryPolicyEventDispatcher` remains an internal copied-scalar bridge for inventory policy observation and feeds inventory-backed `GameplayPolicyEvent` dispatch. It is not a public Inventory SDK, public callback ABI, capability bit, mutation surface, return override, or resource identity API. |
 | ReflectionScanner | Experimental | Use for isolated captures with explicit gates; keep disabled by default. |
 | Runtime debug control | Experimental | Marker-triggered post-start probes for short debug windows; stable posture rejects `OBELISK_ENABLE_DEBUG_CONTROL`. |
 | Binary-hash-gated module observers | Experimental | Internal observation paths for exact candidate functions; metadata logging is gated by env, supported binary SHA, `OBELISK_WRAPPER_PROFILE=observer-debug`, `allow-observer-debug-window`, `allow-experimental-observers`, and the observer marker on the same instance. Outside the promoted `GameplayPolicyEvent` bridge, module observers have no plugin dispatch or public ABI yet. Chat is one historical observer in this family, not the center of the SDK. |
-| Reflection snapshot tooling | Experimental | Sanitized UFunction and ScriptStruct fixtures, manifest regeneration, focal/batch snapshot command planning, dry-run UFunction target-set regeneration planning, and offline comparison support second-source research. Focal/batch snapshot plans are pre-target-set, candidate-only command plans from reviewed offline inputs; they are not snapshot extraction, command execution, layout acceptance, runtime approval, or SDK promotion. The public RC default UFunction target sets are `minimal-second-source-intake`, `structure-observer-intake`, `item-return-only-policy-slice`, and `chat-message-intake`; additional named target sets support isolated second-source research and promotion review only when a release or PR names them explicitly. When second-source readiness is required, `scripts/check_release_readiness.sh` preflights the configured UFunction root before build/test/install work so missing roots, stale or incomplete artifact identity, missing current `BoolProperty` tail metadata, and ambiguous RC target coverage fail closed. The refreshed default `minimal-second-source-intake` evidence remains layout-only with `promotion_ready=false`; accepted transfer evidence for `transfer-ufunction-intake` and `transfer-scriptstruct` is also layout-only/offline and does not promote a public Transfer SDK, payload decoding, object identity, runtime hooks, mutation, return overrides, or `ResourceHandle`. Fixtures, redacted signatures, and plans are candidate-only evidence, not SDK contracts. |
+| Reflection snapshot tooling | Experimental | Sanitized UFunction and ScriptStruct fixtures, manifest regeneration, focal/batch snapshot command planning, dry-run UFunction target-set regeneration planning, and offline comparison support second-source research. Focal/batch snapshot plans are pre-target-set, candidate-only command plans from reviewed offline inputs; they are not snapshot extraction, command execution, layout acceptance, runtime approval, or SDK promotion. The public RC default UFunction target sets are `minimal-second-source-intake`, `structure-observer-intake`, and `chat-message-intake`; `item-return-only-policy-slice` is planning-only/internal backing evidence, not a public RC/default target set. Additional named target sets support isolated second-source research and promotion review only when a release or PR names them explicitly. When second-source readiness is required, `scripts/check_release_readiness.sh` preflights the configured UFunction root before build/test/install work so missing roots, stale or incomplete artifact identity, missing current `BoolProperty` tail metadata, and ambiguous RC target coverage fail closed. The refreshed default `minimal-second-source-intake` evidence remains layout-only with `promotion_ready=false`; accepted transfer evidence for `transfer-ufunction-intake` and `transfer-scriptstruct` is also layout-only/offline and does not promote a public Transfer SDK, payload decoding, object identity, runtime hooks, mutation, return overrides, or `ResourceHandle`. Fixtures, redacted signatures, and plans are candidate-only evidence, not SDK contracts. |
 | Raw FString/FName inference | Experimental | Evidence gathering only until reflection-backed decoding replaces it. |
 | GNames/FNamePool resolution | Not ready | Priority research item. |
 | GObjects/GUObjectArray enumeration | Not ready | Validate object shapes in isolation before accepting offsets. |
@@ -164,16 +199,28 @@ It intentionally fails on the current post-RC tree; passing the core-first relea
 alone is not enough to claim `v1.0 stable`. The release statement is part of the gate
 because every non-chain non-promoted blocker must be named as excluded or post-v1, while
 the P0 dependency chain must be promoted with evidence.
+The default CI release-readiness job is the core-first/package-shape baseline and does
+not run the complete-SDK claim gate. `--require-v1-sdk-completion` is only for an
+explicit stable SDK claim attempt with a reviewed release statement and current gate
+evidence.
 Current SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
 and the stable SDK claim switch is disabled. Excluded/post-v1 accounting does not count
 as completion progress for a complete SDK claim.
 The current executable SDK gate reports `stable_claim_allowed=false` and the canonical
 P0 route blocker `approved_runtime_evidence_missing`; until the gate output changes, do
-not reinterpret technical foundation, copied-event seeds, package-shape checks, Plugin
+not reinterpret technical foundation, the latest release-readiness pass, copied-event
+seeds, package-shape checks, explicit-version non-`EXACT`
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks, Plugin
 Hub planning, or side-lane accounting as public SDK readiness or a stable SDK claim.
-Package-shape checks also do not authorize runtime readiness, live-op approval, Plugin Hub
-readiness/publication, support-tier activation, public module coverage, or production
-stable SDK wording.
+Package-shape checks, package-shape installs, and package installs also do not authorize
+runtime readiness, live-op approval, Plugin Hub readiness/publication, support-tier
+activation, public module coverage, or production stable SDK wording. Nested or split
+report aliases for package shape, scoped non-complete release statement outcomes, passive
+evidence, passive player evidence, side lanes, Plugin Hub, CMake/header checks, passive
+monitor ticks, passive monitors, public reachability, `progress_normalization_trace`,
+source_overclaim diagnostics, `source_overclaim_total_flag_count=0`, release-readiness
+passes, historical live approvals/map names, historical approvals/map names, beta notices,
+or support-tier labels must still normalize to zero SDK/P0 progress.
 
 Current completion snapshot for agents and contributors:
 
@@ -181,16 +228,26 @@ Current completion snapshot for agents and contributors:
   `obelisk.player_identity.v1`, `obelisk.permissions_admin.v1`,
   `obelisk.command_chat_response_path.v1`, and `obelisk.commands_replies.v1`.
 - v1 demand-family promotion gate: `0/12` promoted for the gated claim.
-- Scoped non-P0 release-statement bookkeeping: `0/7` reviewed outcomes recorded in the
-  default gate without a statement. A generated scoped statement can validate those
-  seven rows as `7/7` bookkeeping, but that only reduces wording/accounting blockers; it
-  still leaves P0 `0/4`, the v1 demand-family gate `0/12`, and
+- Scoped non-P0 release-statement bookkeeping: the default checker uses
+  `docs/SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md` when present and records `8/8`
+  reviewed scoped outcomes. That only reduces wording/accounting blockers; it still
+  leaves P0 `0/4`, the v1 demand-family gate `0/12`, and
   `stable_claim_allowed=false`.
 - Current executable route blocker: `approved_runtime_evidence_missing`. Accepted runtime
   evidence may advance only to the locked planning blocker
   `identity_public_contract_gate_missing`; it still does not unlock public identity,
   permissions/admin, command response, command replies, runtime readiness, public ABI, or
   a stable SDK claim.
+- Debug-first SDK acceleration path: keep the blocker chain explicit as
+  `approved_runtime_evidence_missing` -> approved runtime principal lifecycle evidence
+  bundle -> identity public contract gate. The next useful evidence artifact is the
+  copied, checker-accepted
+  `approved_runtime_principal_lifecycle_evidence_bundle` for the required
+  `session_start`, `session_start_rejected`, and `session_end` lifecycle roles. Until
+  that approved bundle is accepted, the compact SDK report must remain blocked at SDK
+  `0/12`, P0 `0/4`, with no runtime readiness, public SDK readiness, public ABI/header
+  readiness, stable SDK claim, live-op authorization, Discord authorization, publication
+  authority, or Plugin Hub readiness.
 
 ## Current Game Interaction Boundary
 
@@ -207,7 +264,7 @@ Current safe interaction shape:
   policy signals, without identity, lookup, mutation, return override, or UE internals;
 - consume `ChatMessageEvent` as copied UTF-8 notification data without sender identity,
   command routing, chat mutation, return override, or UE internals;
-- restore stable posture after any approved debug-server experiment.
+- restore stable posture after any current-turn approved debug-server experiment.
 
 Blocked from stable plugin APIs until promoted with evidence:
 
@@ -238,11 +295,12 @@ plugins in the repository or another staging location until isolated validation
 passes.
 
 Do not restart, change markers, or run Obelisk tests on shared or player-facing instances
-without explicit operator approval for the target, rollback plan, and shutdown
-expectations. For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or scanner-like
-probes, use only a specifically approved debug/development run window with rollback.
+without explicit current-turn operator approval for the target, rollback plan, and
+shutdown expectations. For `gcore`, `ptrace`, ReflectionScanner, broad tracing, or
+scanner-like probes, use only a current-turn specifically approved debug/development run
+window with rollback.
 
-After any scanner/plugin capture or runtime redeploy on an approved debug target, run
+After any scanner/plugin capture or runtime redeploy on a current-turn approved debug target, run
 `scripts/check_obelisk_server_posture.sh --expect-stable --map <map> --instance
 <instance-id>` before treating the harness as stable. The check is read-only and should
 fail closed rather than depending on a live experiment to reveal stale runtime state.

@@ -13,9 +13,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+import check_player_identity_runtime_principal_lifecycle_window_manifest as window_manifest_checker  # noqa: E402
 SAFE_OFFLINE_WORKSPACE_DIR = tempfile.TemporaryDirectory(prefix="obelisk-safe-offline-workspace-")
 SAFE_OFFLINE_WORKSPACE = Path(SAFE_OFFLINE_WORKSPACE_DIR.name)
 _OLD_TEST_WORKSPACE_ROOT = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
@@ -37,9 +37,13 @@ else:
     os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = _OLD_ALLOW_TEST_WORKSPACES
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 WINDOW_START = (datetime.now(timezone.utc) - timedelta(minutes=20)).replace(microsecond=0)
-WINDOW_END = WINDOW_START + timedelta(minutes=10)
+WINDOW_END = WINDOW_START + timedelta(minutes=20)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+LIFECYCLE_PROPERTY_FNAME_DRIFT_REASON = (
+    "lifecycle_property_FName_drift_expected_name_index_28411"
+    "_observed_name_index_28418_previous_name_index_28411"
+)
 TEST_COMMIT = subprocess.check_output(
     ["git", "rev-parse", "HEAD"],
     cwd=SCRIPT_DIR.parents[0],
@@ -53,11 +57,21 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
     WINDOW_MARKERS,
+    current_turn_approval_scope,
+    deployment_intent,
+    direct_join_plan,
     env_lines,
+    exact_target_scope,
     markdown_request,
     operator_approval_receipt_payload,
     operator_live_ops_brief,
+    passive_wait_boundary,
+    player_notice_action,
+    player_presence_safety,
+    planned_obelisk_build_identity,
     post_window_replay_contract,
+    rollback_plan,
+    runtime_triplet_contract,
 )
 
 
@@ -93,10 +107,6 @@ def preflight_payload(
         "server_operations_authorized": False,
         "runtime_work_authorized": False,
         "request_pack_counts_as_approved_runtime_evidence": False,
-        "observer_env_counts_as_approved_runtime_evidence": False,
-        "operator_request_counts_as_approved_runtime_evidence": False,
-        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
-        "bundle_output_counts_as_approved_runtime_evidence": False,
         "preflight_counts_as_approved_runtime_evidence": False,
         "window_manifest_counts_as_approved_runtime_evidence": False,
         "completed_receipt_counts_as_approved_runtime_evidence": False,
@@ -110,6 +120,16 @@ def preflight_payload(
         "v1_completion_ready": False,
         "stable_claim_allowed": False,
         "route_ready": False,
+        "observer_env_counts_as_approved_runtime_evidence": False,
+        "operator_request_counts_as_approved_runtime_evidence": False,
+        "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+        "copied_log_presence_counts_as_approved_runtime_evidence": False,
+        "bundle_output_counts_as_approved_runtime_evidence": False,
+        "dry_run_success_counts_as_approved_runtime_evidence": False,
+        "historical_target_names_authorize_runtime": False,
+        "marker_env_readiness_counts_as_approved_runtime_evidence": False,
+        "player_notice_counts_as_approved_runtime_evidence": False,
+        "public_reachability_counts_as_approved_runtime_evidence": False,
         "sdk_accounting_counts_as_completed_surface": False,
         "p0_accounting_counts_as_promoted_surface": False,
         "mode": mode,
@@ -130,6 +150,7 @@ def preflight_payload(
             "sha256": "1" * 64,
         },
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
+        "diagnostic_candidates_enabled": False,
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": False,
@@ -138,6 +159,16 @@ def preflight_payload(
         "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
     }
     return json.dumps(payload, sort_keys=True) + "\n"
+
+
+def log_clock(offset_minutes: int) -> str:
+    return (WINDOW_START + timedelta(minutes=offset_minutes)).strftime("[%Y-%m-%dT%H:%M:%SZ]")
+
+
+def log_clock_seconds(offset_minutes: int, offset_seconds: int) -> str:
+    return (WINDOW_START + timedelta(minutes=offset_minutes, seconds=offset_seconds)).strftime(
+        "[%Y-%m-%dT%H:%M:%SZ]"
+    )
 
 
 def runtime_log_lines() -> list[str]:
@@ -149,27 +180,82 @@ def runtime_log_lines() -> list[str]:
         "[info] ProcessEvent absolute x64 hook installed successfully. patch_size=18 trampoline=0x767c6aaa4000",
         "[info] ReflectionScanner disabled. Set OBELISK_ENABLE_REFLECTION_SCANNER=1 to run the experimental scanner.",
         "[warning] Plugin loading disabled by OBELISK_DISABLE_PLUGINS=1.",
-        f"[info] PlayerPrincipalLifecycleObserver enabled binary_sha256={SHA} "
+        f"{log_clock(1)} [info] PlayerPrincipalLifecycleObserver enabled binary_sha256={SHA} "
         "target_set=players-lifecycle-anchor-candidates limit=10 dispatch_limit=0 "
         "delivery_claim=none principal_claim=none.",
-        "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+        f"{log_clock(2)} [info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
         "target=ShooterGameMode.HandleNewPlayer post_original=true "
         "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,1 "
         "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
-        "principal_action=candidate_created principal_id_logged=false "
+        "principal_action=candidate_created apply_status=session_start_created correlation_status=not_applicable principal_id_logged=false "
         "principal_generation_logged=false delivery_claim=none.",
-        "[info] PlayerPrincipalLifecycleObserver event sequence=2 role=session_start_rejected "
-        "target=ShooterGameMode.HandleNewPlayer post_original=true "
-        "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,1 "
-        "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
-        "principal_action=none principal_id_logged=false principal_generation_logged=false "
+        f"{log_clock(3)} [info] PlayerPrincipalLifecycleObserver event sequence=2 role=session_start_rejected "
+        "target=ShooterGameMode.CheckJoinInProgress post_original=true "
+        "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,0 "
+        "redacted_count=1 redacted_fields=NewPlayer "
+        "principal_action=none apply_status=session_start_rejected_noop correlation_status=not_applicable principal_id_logged=false principal_generation_logged=false "
         "delivery_claim=none.",
-        "[info] PlayerPrincipalLifecycleObserver event sequence=3 role=session_end "
+        f"{log_clock(4)} [info] PlayerPrincipalLifecycleObserver event sequence=3 role=session_end "
         "target=ShooterGameMode.OnLogout post_original=true copied_bool_fields= "
         "copied_bool_values= redacted_count=1 redacted_fields=Exiting "
-        "principal_action=candidate_invalidated principal_id_logged=false "
+        "principal_action=candidate_invalidated apply_status=session_end_invalidated correlation_status=matched principal_id_logged=false "
         "principal_generation_logged=false delivery_claim=none.",
     ]
+
+
+def runtime_posture_lines_without_lifecycle_observer() -> list[str]:
+    return [
+        line
+        for line in runtime_log_lines()
+        if "PlayerPrincipalLifecycleObserver " not in line
+    ]
+
+
+def runtime_log_lines_with_handle_new_player_rejected_start() -> list[str]:
+    return [
+        (
+            f"{log_clock(3)} [info] PlayerPrincipalLifecycleObserver event sequence=2 "
+            "role=session_start_rejected target=ShooterGameMode.HandleNewPlayer "
+            "post_original=true copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,1 "
+            "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+            "principal_action=none apply_status=session_start_rejected_noop "
+            "correlation_status=not_applicable principal_id_logged=false "
+            "principal_generation_logged=false delivery_claim=none."
+        )
+        if " role=session_start_rejected " in line
+        else line
+        for line in runtime_log_lines()
+    ]
+
+
+def runtime_log_lines_with_duplicate_start_end_context() -> list[str]:
+    lines = runtime_log_lines()
+    duplicate_start = lines[8].replace("sequence=1", "sequence=2").replace(
+        log_clock(2),
+        log_clock_seconds(2, 30),
+    )
+    selected_rejected = lines[9].replace("sequence=2", "sequence=3")
+    selected_end = lines[10].replace("sequence=3", "sequence=4")
+    duplicate_end = selected_end.replace("sequence=4", "sequence=5").replace(
+        log_clock(4),
+        log_clock(5),
+    )
+    lines[8:11] = [lines[8], duplicate_start, selected_rejected, selected_end, duplicate_end]
+    return lines
+
+
+def diagnostic_candidate_line(
+    *,
+    sequence: int,
+    target: str,
+    reason: str = LIFECYCLE_PROPERTY_FNAME_DRIFT_REASON,
+) -> str:
+    return (
+        f"[info] PlayerPrincipalLifecycleDiagnostic candidate sequence={sequence} "
+        f"target={target} fname_index=2170 post_original=true "
+        "accepted_lifecycle_target=true reflection_status=rejected read_status=implausible "
+        f"reason={reason} params_logged=false identity_logged=false evidence_claim=none."
+    )
 
 
 class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
@@ -189,10 +275,11 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
 
         self.assertNotIn(SERVER_ROOT_WRITE_OPT_IN_ENV, env)
 
-    def write_summary(self, temp_dir: Path) -> Path:
+    def write_summary(self, temp_dir: Path, *, log_lines: list[str] | None = None) -> Path:
         log_path = temp_dir / "live-validation-logs" / RUN_ID / "Obelisk.log"
+        lines = runtime_log_lines() if log_lines is None else log_lines
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+        log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         result = subprocess.run(
             [sys.executable, str(ANALYZER), "--obelisk-commit", TEST_COMMIT, str(log_path)],
             check=False,
@@ -224,6 +311,10 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 "instance": "arkserver2",
                 "map_name": "TheIsland",
                 "binary_sha256": SHA,
+                "obelisk_commit": summary["evidence"]["obelisk_commit"],
+                "obelisk_build_artifact": None,
+                "obelisk_build_artifact_sha256": None,
+                "obelisk_build_artifact_label": None,
             },
         )()
         observer_env_lines = env_lines(request_args)
@@ -236,6 +327,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             "ark_binary_sha256": SHA,
             "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
+            "planned_obelisk_build_identity": planned_obelisk_build_identity(request_args),
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             "approved_window": {
                 "start_utc": WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -243,6 +335,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             },
             "restart_expectation": "restart",
             "final_posture": "stable",
+            "diagnostic_candidates_enabled": False,
             "authorization_flags": dict(AUTHORIZATION_FLAGS),
             "user_policy": "no_regular_users",
             "notice_path": "not_applicable",
@@ -252,13 +345,21 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             "observer_env_file": "observer-window.env",
             "marker_set": WINDOW_MARKERS,
             "forbidden_markers": FORBIDDEN_MARKERS,
-            "rollback": {
-                "owner": "operator",
-                "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
-            },
             "non_claims": NON_CLAIMS,
         }
+        request_payload["exact_target_scope"] = exact_target_scope(request_payload)
+        request_payload["player_notice_action"] = player_notice_action(request_payload)
+        request_payload["player_presence_safety"] = player_presence_safety(request_payload)
+        request_payload["passive_wait_boundary"] = passive_wait_boundary(request_payload)
+        request_payload["direct_join_plan"] = direct_join_plan(request_payload)
+        request_payload["runtime_triplet_contract"] = runtime_triplet_contract()
+        request_payload["rollback"] = rollback_plan(request_payload["target"], "operator")
         request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
+        request_payload["current_turn_approval_scope"] = current_turn_approval_scope(
+            request_payload,
+            observer_env_lines,
+        )
+        request_payload["deployment_intent"] = deployment_intent(request_payload)
         request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
             request_payload,
             observer_env_lines,
@@ -275,20 +376,18 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             operator_request,
             markdown_request(request_payload, observer_env_lines),
         )
+        receipt_payload = operator_approval_receipt_payload(
+            request_payload,
+            request_json_path=request_pack,
+            request_md_path=operator_request,
+            env_path=observer_env,
+            operator_approved=True,
+            operator_reference="operator",
+            approved_at_utc=(WINDOW_START - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
         operator_approval_receipt_sha256 = write_sidecar(
             operator_approval_receipt,
-            json.dumps(
-                operator_approval_receipt_payload(
-                    request_payload,
-                    request_json_path=request_pack,
-                    request_md_path=operator_request,
-                    env_path=observer_env,
-                    operator_approved=True,
-                    operator_reference="test-current-turn-approval",
-                    approved_at_utc=(WINDOW_START - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                ),
-                sort_keys=True,
-            )
+            json.dumps(receipt_payload, sort_keys=True)
             + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
@@ -372,17 +471,48 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        result = subprocess.run(
-            [sys.executable, str(WINDOW_CHECKER), "--json", "--post-window-replay", str(manifest_path)],
-            check=False,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=safe_test_env(),
-        )
-        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        old_roots = window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        old_request_keys = window_manifest_checker.EXPECTED_REQUEST_PACK_TOP_LEVEL_KEYS
+        old_receipt_keys = window_manifest_checker.EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS
+        old_test_root = os.environ.get("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE")
+        old_allow_prefixes = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+        try:
+            os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = str(temp_dir)
+            os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+            window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (temp_dir,)
+            window_manifest_checker.EXPECTED_REQUEST_PACK_TOP_LEVEL_KEYS = (
+                old_request_keys | {"direct_join_plan"}
+            )
+            window_manifest_checker.EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = (
+                old_receipt_keys | {"direct_join_plan"}
+            )
+            fields = window_manifest_checker.load_manifest(manifest_path)
+            validation = window_manifest_checker.validate_manifest(
+                fields,
+                manifest_path,
+                post_window_replay=True,
+            )
+            report = window_manifest_checker.build_report(
+                fields,
+                validation,
+                manifest_path,
+                post_window_replay=True,
+            )
+        finally:
+            window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+            window_manifest_checker.EXPECTED_REQUEST_PACK_TOP_LEVEL_KEYS = old_request_keys
+            window_manifest_checker.EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = old_receipt_keys
+            if old_test_root is None:
+                os.environ.pop("OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE", None)
+            else:
+                os.environ["OBELISK_TEST_APPROVED_OFFLINE_WORKSPACE"] = old_test_root
+            if old_allow_prefixes is None:
+                os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+            else:
+                os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_allow_prefixes
+        self.assertEqual(validation.blockers, [], json.dumps(report, sort_keys=True))
         check_path = temp_dir / "window.check.json"
-        check_path.write_text(result.stdout, encoding="utf-8")
+        check_path.write_text(json.dumps(report, sort_keys=True) + "\n", encoding="utf-8")
         return check_path
 
     def run_builder(
@@ -441,6 +571,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 manifest["schema"],
                 "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
             )
+            self.assertEqual(manifest["artifact_status"], "approved_runtime_observer_summary")
+            self.assertEqual(manifest["readiness_classification"], "runtime_evidence_only")
             self.assertEqual(manifest["approval"]["reviewed_by"], "runtime-reviewer")
             self.assertEqual(
                 manifest["approval"]["review_note"],
@@ -452,23 +584,120 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 "removed_observer_env_and_markers_preserved_disable_plugins",
             )
             self.assertEqual(manifest["operational_window"]["log_budget"], "10")
+            copied_log = Path(manifest["operational_window"]["copied_log"]["path"])
+            self.assertEqual(
+                manifest["source_summary"]["modules"]["player_principal_lifecycle"]["observed_event_cases"][1]["target"],
+                "ShooterGameMode.CheckJoinInProgress",
+            )
+            self.assertEqual(
+                Path(manifest["operational_window"]["manifest"]["path"]).resolve(),
+                copied_log.parent / "window-manifest.env",
+            )
+            self.assertEqual(
+                Path(manifest["operational_window"]["request_pack"]["path"]).resolve(),
+                copied_log.parent / "window-request.json",
+            )
+            self.assertEqual(
+                Path(manifest["operational_window"]["operator_approval_receipt"]["path"]).resolve(),
+                copied_log.parent / "operator-approval-receipt.json",
+            )
             self.assertIn(
                 "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
                 manifest["operational_window"]["non_claims"],
             )
             self.assertFalse(manifest["approval"]["server_operations_authorized_by_this_manifest"])
             self.assertFalse(manifest["promotion_ready"])
+            self.assertFalse(manifest["public_abi_ready"])
+            self.assertFalse(manifest["public_sdk_ready"])
+            self.assertFalse(manifest["runtime_ready"])
+            self.assertFalse(manifest["v1_completion_ready"])
 
             checker = self.run_checker(manifest_path)
             self.assertEqual(checker.returncode, 0, checker.stderr)
             report = json.loads(checker.stdout)
             self.assertTrue(report["ready"])
+            self.assertEqual(report["ready_scope"], "runtime_evidence_only")
             self.assertTrue(report["runtime_evidence_ready"])
             self.assertFalse(report["promotion_ready"])
+            self.assertFalse(report["public_abi_ready"])
+            self.assertFalse(report["public_sdk_ready"])
+            self.assertFalse(report["runtime_ready"])
+            self.assertFalse(report["v1_completion_ready"])
+            self.assertEqual(report["non_evidence_reasons"], [])
+            self.assertEqual(report["artifact_path_issues"], [])
             self.assertEqual(
                 report["observed_runtime_cases"],
                 ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
             )
+
+    def test_rejects_handle_new_player_rejected_start_triplet_before_writing_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(
+                temp_dir,
+                log_lines=runtime_log_lines_with_handle_new_player_rejected_start(),
+            )
+            window_check = self.write_window_check(temp_dir, summary_path)
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "--source-summary observed_event_cases must match approved "
+                "CheckJoinInProgress rejected-start lifecycle triplet",
+                result.stderr,
+            )
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_duplicate_start_end_context_before_writing_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(
+                temp_dir,
+                log_lines=runtime_log_lines_with_duplicate_start_end_context(),
+            )
+            window_check = self.write_window_check(temp_dir, summary_path)
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "--source-summary observed_event_cases must contain exactly one approved "
+                "CheckJoinInProgress rejected-start lifecycle triplet",
+                result.stderr,
+            )
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_bound_fname_drift_manifest_as_source_summary(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = temp_dir / "source-bound-fname-drift-manifest.json"
+            summary_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.player-principal-source-bound-fname-drift-manifest.v1",
+                        "ready": False,
+                        "runtime_evidence_ready": False,
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            window_check = temp_dir / "window.check.json"
+            window_check.write_text("{}\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "--source-summary source_bound_drift_manifest_is_not_approved_runtime_evidence",
+                result.stderr,
+            )
+            self.assertFalse(manifest_path.exists())
 
     def test_rejects_window_manifest_check_not_generated_in_post_window_replay_mode(self) -> None:
         with self.temp_offline_workspace() as temp:
@@ -502,13 +731,242 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("must not include broad ProcessEvent detour trace lines", result.stderr)
             self.assertFalse(manifest_path.exists())
 
+    def test_rejects_source_summary_that_claims_runtime_evidence_ready(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["runtime_evidence_ready"] = True
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("runtime_evidence_ready must remain false", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_public_reachability_evidence_alias(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["public_reachability"] = {
+                "counts_as_approved_runtime_evidence": True,
+                "query_status": "reachable",
+            }
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.public_reachability.counts_as_approved_runtime_evidence", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_support_package_positive_alias(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["audit"] = {"package_label": "runtime evidence accepted"}
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.audit.package_label", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_accepted_bundle_alias(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["accepted_bundle_source_summary"] = True
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.accepted_bundle_source_summary", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_zero_source_overclaim_status_alias(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["status"] = "blocked"
+            summary["source_overclaim_total_flag_count"] = 0
+            summary["source_overclaim_summary"] = {"total": 0}
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.source_overclaim_", result.stderr)
+            self.assertIn("source_overclaim/status alias", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_lifecycle_role_alias(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["modules"]["player_principal_lifecycle"]["role_alias"] = {
+                "alias": "session_start_rejected",
+                "target": "ShooterGameMode.CheckJoinInProgress",
+                "counts_as_role": True,
+            }
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.modules.player_principal_lifecycle.role_alias", result.stderr)
+            self.assertIn("lifecycle role alias", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_passive_snapshot_copied_as_source_summary(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["schema"] = "obelisk.player-principal-passive-snapshot.v1"
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("source_summary_passive_snapshot_not_runtime_observer_summary", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_non_runtime_observer_source_summary_schemas_concretely(self) -> None:
+        cases = (
+            (
+                "passive_activity_triage",
+                "obelisk.player-principal-passive-activity-triage.v1",
+                "source_summary_passive_activity_triage_not_runtime_observer_summary",
+            ),
+            (
+                "public_reachability",
+                "obelisk.player-principal-public-reachability-check.v1",
+                "source_summary_public_reachability_not_runtime_observer_summary",
+            ),
+            (
+                "sdk_status_report",
+                "obelisk.sdk-status-report.v1",
+                "source_summary_sdk_status_report_not_runtime_observer_summary",
+            ),
+            (
+                "public_sdk_progress_normalization_trace",
+                "obelisk.public-sdk-v1-progress-normalization-trace.v1",
+                "source_summary_public_sdk_progress_normalization_trace_not_runtime_observer_summary",
+            ),
+            (
+                "public_sdk_completion_summary",
+                "obelisk.public-sdk-v1-completion-summary.v1",
+                "source_summary_public_sdk_completion_summary_not_runtime_observer_summary",
+            ),
+            (
+                "window_request_check",
+                "obelisk.player-principal-lifecycle-window-request-check.v1",
+                "source_summary_window_request_check_not_runtime_observer_summary",
+            ),
+            (
+                "planning_sources_report",
+                "obelisk.player-identity-planning-source-manifests-build-report.v1",
+                "source_summary_planning_source_manifests_build_report_not_runtime_observer_summary",
+            ),
+            (
+                "scoped_release_statement",
+                "obelisk.scoped-release-statement-outcomes.v1",
+                "source_summary_scoped_release_statement_not_runtime_observer_summary",
+            ),
+            (
+                "installed_sdk_package_shape",
+                "obelisk.installed-sdk-package-shape.v1",
+                "source_summary_installed_sdk_package_shape_not_runtime_observer_summary",
+            ),
+            (
+                "public_contract_decision_record",
+                "obelisk.player-identity-public-contract-decision-record.v1",
+                "source_summary_contract_review_artifact_not_runtime_observer_summary",
+            ),
+            (
+                "public_contract_gap_report",
+                "obelisk.player-identity-public-contract-gap-report.v1",
+                "source_summary_contract_review_artifact_not_runtime_observer_summary",
+            ),
+            (
+                "generic_player_notice_action",
+                "obelisk.player-notice-action.v1",
+                "source_summary_player_notice_action_not_runtime_observer_summary",
+            ),
+            (
+                "ready_log_copy",
+                "obelisk.player-principal-lifecycle-ready-log-copy.v1",
+                "source_summary_ready_log_copy_not_runtime_observer_summary",
+            ),
+        )
+        for name, schema, expected in cases:
+            with self.subTest(name=name):
+                with self.temp_offline_workspace() as temp:
+                    temp_dir = Path(temp)
+                    summary_path = self.write_summary(temp_dir)
+                    window_check = self.write_window_check(temp_dir, summary_path)
+                    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                    summary["schema"] = schema
+                    summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+                    manifest_path = temp_dir / "approved-manifest.json"
+
+                    result = self.run_builder(summary_path, window_check, manifest_path)
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(expected, result.stderr)
+                    self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_contract_review_aliases(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["contract_review"] = {
+                "accepted_for_contract_review": True,
+                "reviewed_hash_current_contract_review_only": True,
+            }
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("$.contract_review", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
     def test_rejects_generated_manifest_that_fails_consume_checker(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             window_check = self.write_window_check(temp_dir, summary_path)
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
-            summary["modules"]["player_principal_lifecycle"].pop("observed_event_cases")
+            summary["modules"]["player_principal_lifecycle"]["functions"][
+                "ShooterGameMode.CheckJoinInProgress"
+            ]["details"]["redacted_count"] = [2]
             summary_path.write_text(json.dumps(summary), encoding="utf-8")
             manifest_path = temp_dir / "approved-manifest.json"
 
@@ -516,7 +974,104 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("generated approved manifest failed consume checker", result.stderr)
-            self.assertIn("runtime_summary_observed_event_cases_missing", result.stderr)
+            self.assertIn("runtime_summary_detail_values_unexpected", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_backed_by_passive_monitor_metadata(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(
+                temp_dir,
+                log_lines=[
+                    "tick utc=2026-06-04T05:00:00Z",
+                    "query instance=arkserver map=Ragnarok query_port=27015 status=ok players=1/70",
+                    "player_presence_detected instance=arkserver map=Ragnarok",
+                    "observer_tail instance=arkserver status=matched lines=3 scan_lines=200 limit=10",
+                    *runtime_log_lines(),
+                ],
+            )
+            window_check = self.write_window_check(temp_dir, summary_path)
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("generated approved manifest failed consume checker", result.stderr)
+            self.assertIn("source_summary_copied_log_contains_passive_monitor_metadata", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_source_summary_backed_by_timestamp_prefixed_passive_monitor_metadata(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(
+                temp_dir,
+                log_lines=[
+                    "[2026-06-04T05:00:00Z] tick utc=2026-06-04T05:00:00Z",
+                    "[2026-06-04T05:00:01Z] query instance=arkserver map=Ragnarok "
+                    "query_port=27015 status=ok players=1/70",
+                    "[2026-06-04T05:00:02Z] player_presence_detected instance=arkserver map=Ragnarok",
+                    "[2026-06-04T05:00:03Z] observer_tail instance=arkserver "
+                    "status=matched lines=3 scan_lines=200 limit=10",
+                    *runtime_log_lines(),
+                ],
+            )
+            window_check = self.write_window_check(temp_dir, summary_path)
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("generated approved manifest failed consume checker", result.stderr)
+            self.assertIn("source_summary_copied_log_contains_passive_monitor_metadata", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_diagnostic_only_handle_new_player_logout_drift_summary(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            lines = [
+                *runtime_posture_lines_without_lifecycle_observer(),
+                "[info] PlayerPrincipalLifecycleDiagnostic candidate-only logging enabled "
+                "target_set=players-lifecycle-anchor-candidates limit=10 "
+                "params_logged=false identity_logged=false evidence_claim=none principal_claim=none.",
+                diagnostic_candidate_line(
+                    sequence=1,
+                    target="ShooterGameMode.HandleNewPlayer",
+                ),
+                diagnostic_candidate_line(
+                    sequence=2,
+                    target="ShooterGameMode.OnLogout",
+                ),
+            ]
+            summary_path = self.write_summary(temp_dir, log_lines=lines)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--source-summary diagnostic candidates are not approved runtime evidence", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
+    def test_rejects_zero_count_function_fname_near_miss_diagnostic_maps(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            module = summary["modules"]["player_principal_lifecycle"]
+            module["diagnostic_candidate_count"] = 0
+            module["diagnostic_candidate_reason_counts"] = {"FunctionFNameNearMiss": 1}
+            module["diagnostic_candidate_read_status_counts"] = {"ok": 1}
+            module["diagnostic_candidate_target_counts"] = {
+                "ShooterGameMode.CheckJoinInProgress": 1,
+            }
+            summary_path.write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--source-summary diagnostic candidates are not approved runtime evidence", result.stderr)
             self.assertFalse(manifest_path.exists())
 
     def test_generated_manifest_still_fails_closed_for_promote_mode(self) -> None:
@@ -533,6 +1088,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("promote_blocked_until_identity_public_contract_gate", report["blockers"])
             self.assertTrue(report["runtime_evidence_ready"])
             self.assertFalse(report["promotion_ready"])
+            self.assertFalse(report["public_abi_ready"])
 
     def test_rejects_protected_source_summary_path_before_reading(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

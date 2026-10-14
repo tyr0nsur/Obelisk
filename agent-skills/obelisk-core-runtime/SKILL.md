@@ -154,6 +154,11 @@ Own these areas:
   there are no authorized callbacks. Future player identity surfaces must treat
   no-subscriber, disabled gate, unsupported binary/window, zero budget, nonmatching FName,
   and invalid shape as no-copy/no-retain paths.
+- Approved runtime player-principal lifecycle evidence logging must reserve per-role log
+  budget only after the copied observation has been applied and the final status is safe:
+  `session_start_created`, `session_start_rejected_noop`, or `session_end_invalidated`
+  with a valid matched logout correlation. A canonical `OnLogout` shape alone must not
+  consume the approved `session_end` slot.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
   plugin-owned callback cleanup and before `dlclose`. Retained retry paths must not call
   shutdown more than once for the same mapped plugin.

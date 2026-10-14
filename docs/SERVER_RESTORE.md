@@ -1,19 +1,48 @@
 # ARK Server Restore Notes
 
-Use this when SteamCMD, LinuxGSM, or the ARK app install rewrites server files and the two
-LinuxGSM instances need to be restored quickly.
+Use this when SteamCMD, LinuxGSM, or the ARK app install rewrites server files and the ARK
+LinuxGSM instances need to be restored quickly. Never run more than two ARK servers at
+once; an approved posture transition must confirm one instance is off before another is
+brought online.
 
 Operator-only runbook: these commands are not contributor authorization. They require
 current-turn approval before any `/servidor/ark` read/write, stop/start/restart, backup,
 restore, runtime observation, or live log read.
+Current-turn exact scope is required for live server/log reads, marker/env changes,
+Discord sends, and runtime capture; passive/read-only observations and beta tester
+notices are not exceptions, and this restore note does not create that scope.
+Historical approvals, release-readiness/package-shape/install success, Plugin Hub or
+support-tier labels, public reachability, passive monitor output, passive monitors,
+`progress_normalization_trace`, source_overclaim diagnostics,
+`source_overclaim_total_flag_count=0`, the latest validation pass, six-agent closure
+notes, `.codex` cleanup, exact-version
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+package installs, historical live approvals/map names, historical approvals/map names,
+and beta notices are chronology only. They do not create live-op authorization, Discord
+authorization, runtime evidence/readiness, SDK/P0 progress, public SDK readiness,
+publication authority, Plugin Hub readiness, support-tier activation,
+package-shape/public package readiness, stable SDK readiness, or stable SDK claims.
+Treat every live read of server state or logs as scoped operator work; copied offline
+artifacts may be reviewed without expanding that scope.
 
 ## Current Instances
 
 - `arkserver`: Ragnarok, `OBELISK_INSTANCE_ID=arkserver`
 - `arkserver2`: TheIsland, `OBELISK_INSTANCE_ID=arkserver2`
+- `arkserver3`: Genesis2, `OBELISK_INSTANCE_ID=arkserver3`; game UDP `7783`,
+  raw UDP `7784`, Steam query UDP `27017`, RCON TCP `27022`
 - Shared ARK root: `/servidor/ark`
 - Shared serverfiles: `/servidor/ark/serverfiles`
 - Shared cluster id currently observed: `MiClusterArk`
+
+Genesis2 public reachability note: local health is not enough after router/NAT/firewall
+or port-forwarding work. After any approved router/NAT/firewall or port-forwarding
+change, verify Genesis2 public Steam/GameDig query from outside the LAN; local health does
+not prove public reachability. If Genesis2 is healthy locally but absent from public
+query, treat missing forwarding for UDP `7783`/`7784`/`27017` as the likely network-scope
+cause until operator/network evidence says otherwise. This is operator knowledge only; it
+does not authorize starts, stops, restarts, router/NAT/firewall edits, port forwarding, or
+any other network changes without current-turn approval.
 
 ## Configs To Preserve
 
@@ -29,6 +58,7 @@ LinuxGSM instance config also matters:
 ```text
 /servidor/ark/lgsm/config-lgsm/arkserver/arkserver.cfg
 /servidor/ark/lgsm/config-lgsm/arkserver/arkserver2.cfg
+/servidor/ark/lgsm/config-lgsm/arkserver/arkserver3.cfg
 /servidor/ark/lgsm/config-lgsm/arkserver/common.cfg
 /servidor/ark/lgsm/config-lgsm/arkserver/secrets-*.cfg
 ```
@@ -73,7 +103,7 @@ It contains:
 - LinuxGSM `arkserver/*.cfg`
 - `MANIFEST.txt` with SHA256 hashes and running server command lines at backup time
 
-Ragnarok gameplay config note:
+Historical Ragnarok gameplay config note, not current authorization:
 
 - `AllowCaveBuildingPvP=True` was applied in
   `GameUserSettings.ini` on 2026-05-27 after explicit operator approval, then
@@ -112,6 +142,37 @@ cp -a "$backup_root/lgsm/config-lgsm/arkserver/"*.cfg \
   /servidor/ark/lgsm/config-lgsm/arkserver/
 ```
 
+When restoring `GameUserSettings.ini`, verify that `[MessageOfTheDay]` keeps
+`Message=` on one physical line with literal `\n` separators. Restoring an older backup
+can reintroduce a multiline MOTD that ARK/dashboards may parse as broken text.
+The dashboard normalizes its managed `GameUserSettings.ini` writes, but direct scripts
+such as `/home/flowcommunity-ark/fix_configs.py`,
+`/home/flowcommunity-ark/apply_fibercraft_settings.py`, historical scratch scripts,
+LinuxGSM default install copies, manual edits, and RCON/admin `SetMessageOfTheDay`
+operations can still reintroduce or preserve a broken MOTD if their input is already
+split or incomplete.
+
+Use `scripts/normalize_ark_motd_ini.py` on an offline staged copy before copying
+`GameUserSettings.ini` back to `/servidor/ark`:
+
+```bash
+backup_root="/home/flowcommunity-ark/backups/ark-config-latest"
+staged_ini="/tmp/ark-GameUserSettings.ini"
+cp -a "$backup_root/serverfiles/ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini" "$staged_ini"
+python3 scripts/normalize_ark_motd_ini.py "$staged_ini" --check --json
+python3 scripts/normalize_ark_motd_ini.py "$staged_ini" --write --json
+python3 scripts/normalize_ark_motd_ini.py "$staged_ini" --check --json
+```
+
+`--check` exits `1` when the staged file still needs normalization; use `--write` only on
+the staged copy, then copy that staged file during the approved restore step. The
+normalizer rejects direct or symlink-resolved paths under `/servidor/ark` unless
+`--allow-protected-path` is passed. That flag is for an already approved maintenance
+workflow only; it does not authorize live config reads/writes, server starts, restarts,
+runtime observation, or validation. The tool edits only `[MessageOfTheDay]` `Message=`
+continuation lines and leaves unrelated INI sections, keys, comments, and blank lines
+unchanged.
+
 ## Post-Restore Checks
 
 Before starting servers:
@@ -134,7 +195,8 @@ tr '\0' '\n' < /proc/$(pgrep -f '^./ShooterGameServer TheIsland' | head -n1)/env
 
 These are live runtime/log observations, not offline receipts or copied-log review.
 Skip them unless the current approval names the target instances, restart window,
-evidence paths, rollback, and shutdown/posture expectation.
+marker/env gates when applicable, evidence paths, rollback, shutdown/posture expectation,
+and any notice/send path required for player-facing validation.
 
 Expected safe Obelisk posture for development baseline:
 

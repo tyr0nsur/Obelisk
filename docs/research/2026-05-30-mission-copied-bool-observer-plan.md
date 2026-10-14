@@ -48,6 +48,26 @@ This closes the Mission compact bool second-source gap for observer planning onl
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,
 array payload, mutation, return override, or server-validation gates.
 
+## Fixture-Boundary / Internal Report Boundary
+
+Mission copied-bool fixture-boundary checks, policy-slice reports, scalar-candidate
+summaries, attestations, and internal observer reports are offline evidence-only and
+planning-only. They may preserve the fixture contract for future review, but they are not
+a public Mission SDK, runtime readiness, v1 completion, transfer authority,
+reward/mutation authority, item or mission payload authority, server authorization,
+operator approval, or live-observation approval.
+Release-readiness passes, exact-version
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks,
+package installs, `progress_normalization_trace`, source_overclaim diagnostics,
+`source_overclaim_total_flag_count=0`, the latest validation pass, six-agent closure
+notes, `.codex` cleanup, beta notices, passive monitors, and historical live approvals/map
+names do not change that Mission boundary or imply stable SDK or Plugin Hub readiness.
+
+Any internal report that mentions Mission transfer, reward, mutation, item, player,
+controller, or mission-pressure terms must use them only as excluded demand signals. Those
+terms must not be turned into callback authority, copied payload authority, transfer or
+reward authority, server-side authorization, or SDK completion evidence.
+
 ## Future-Agent Bridge Lane
 
 The exact internal bridge lane is: consume the current focused

@@ -13,6 +13,11 @@ from pathlib import Path
 from typing import Any
 
 import validate_offline_artifact_gate as offline_gate
+from plan_obelisk_multi_surface_beta_capture import (
+    CURRENT_ROUTE_BLOCKER,
+    REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+)
+from reflection_target_sets import NON_AUTHORIZING_READY_DOES_NOT_SATISFY, NON_AUTHORIZING_READY_SCOPE
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -35,6 +40,255 @@ REQUIRED_NON_CLAIM_TOKENS = (
     "does not promote runtime hook wiring",
     "public Transfer SDK",
 )
+REPORT_FALSE_FLAGS = {
+    "approved_runtime_evidence": False,
+    "approved_runtime_evidence_ready": False,
+    "artifact_gate_ready": False,
+    "clears_approved_runtime_evidence_missing": False,
+    "complete_sdk_ready": False,
+    "contributes_to_public_sdk_v1": False,
+    "contributes_to_v1_completion": False,
+    "counts_as_approved_runtime_evidence": False,
+    "counts_as_runtime_evidence": False,
+    "counts_toward_complete_sdk": False,
+    "counts_toward_complete_sdk_claim": False,
+    "counts_toward_p0_dependency_chain_claim": False,
+    "counts_toward_public_sdk": False,
+    "counts_toward_public_sdk_v1": False,
+    "counts_toward_runtime": False,
+    "side_lane_counts_toward_sdk": False,
+    "side_lane_counts_toward_p0": False,
+    "sdk_p0_unlock_allowed": False,
+    "counts_toward_v1_completion": False,
+    "cross_map_state_public_contract_ready": False,
+    "dino_payload_public_contract_ready": False,
+    "dispatcher_ready": False,
+    "dispatcher_wiring_ready": False,
+    "downloaded_character_public_contract_ready": False,
+    "identity_ready": False,
+    "live_ops_ready": False,
+    "mutation_ready": False,
+    "ownership_ready": False,
+    "player_identity_public_contract_ready": False,
+    "p0_ready": False,
+    "promotion_ready": False,
+    "public_ready": False,
+    "public_abi_ready": False,
+    "public_api_ready": False,
+    "public_completion_ready": False,
+    "public_contract_ready": False,
+    "public_header_allowed": False,
+    "public_header_ready": False,
+    "public_metadata_helpers_ready": False,
+    "public_module_ready": False,
+    "public_or_runtime_accounting_allowed": False,
+    "public_release_ready": False,
+    "public_sdk_ready": False,
+    "public_transfer_sdk_ready": False,
+    "release_candidate_ready": False,
+    "replaces_player_principal_evidence": False,
+    "replaces_player_principal_triplet": False,
+    "resource_handle_public_contract_ready": False,
+    "return_override_ready": False,
+    "runtime_capture_ready": False,
+    "runtime_hook_ready": False,
+    "runtime_hook_wiring_ready": False,
+    "runtime_ready": False,
+    "runtime_validated": False,
+    "runtime_validation_ready": False,
+    "sdk_ready": False,
+    "server_validation_ready": False,
+    "stable_sdk_ready": False,
+    "transfer_payload_decoding_ready": False,
+    "transfer_payload_public_contract_ready": False,
+    "v1_completion_evidence": False,
+    "v1_completion_ready": False,
+    "v1_public_sdk_ready": False,
+    "v1_ready": False,
+    "v1_release_ready": False,
+}
+REPORT_ZERO_FIELDS = {
+    "complete_sdk_claim_progress_contribution": 0,
+    "p0_dependency_chain_claim_progress_contribution": 0,
+    "v1_completion_progress_contribution": 0,
+}
+REPORT_NON_CLAIMS = [
+    "candidate readiness is internal offline planning evidence only",
+    "does not claim runtime validation, runtime hook wiring, dispatcher wiring, live-op readiness, or server validation",
+    "does not claim public Transfer SDK, public API, public ABI, public header, public contract, or public metadata helper readiness",
+    "does not claim v1 completion, release readiness, stable SDK status, complete SDK status, P0 dependency-chain credit, promotion readiness, or public/runtime accounting credit",
+    "does not expose transfer payloads, downloaded characters, dino payload, player identity, cross-map state, or ResourceHandle as a public contract",
+    "does not replace approved player-principal lifecycle runtime evidence",
+    "multi-surface beta capture pack and plan artifacts are prep only and remain non-counting before the player-principal blocker is solved",
+]
+TRANSFER_READINESS_ALIAS_EXACT_KEYS = {
+    "artifact_gate_ready",
+    "complete_sdk_ready",
+    "contributes_to_public_sdk_v1",
+    "contributes_to_v1_completion",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_public_sdk_v1",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "dispatcher_ready",
+    "dispatcher_wiring_ready",
+    "live_ops_ready",
+    "public_or_runtime_accounting_allowed",
+    "release_candidate_ready",
+    "runtime_validated",
+    "runtime_validation_ready",
+    "server_validation_ready",
+    "source_accepted",
+    "source_available",
+    "source_label",
+    "source_labels",
+    "source_marker",
+    "source_markers",
+    "source_readiness",
+    "source_ready",
+    "source_stable",
+    "source_status",
+    "source_support",
+    "source_tier",
+    "source_validated",
+    "source_validation",
+    "stable_sdk_ready",
+    *REPORT_ZERO_FIELDS,
+    "v1_completion_evidence",
+    "v1_public_sdk_ready",
+    "v1_ready",
+    "v1_release_ready",
+}
+TRANSFER_READINESS_ALIAS_SUBJECTS = (
+    "complete_sdk",
+    "cross_map_state",
+    "dino_payload",
+    "dispatcher",
+    "downloaded_character",
+    "identity",
+    "live_ops",
+    "ownership",
+    "player_identity",
+    "p0",
+    "public",
+    "public_abi",
+    "public_api",
+    "public_contract",
+    "public_header",
+    "public_metadata",
+    "public_module",
+    "public_or_runtime",
+    "public_release",
+    "public_sdk",
+    "public_transfer_sdk",
+    "release_candidate",
+    "resource_handle",
+    "return_override",
+    "runtime",
+    "runtime_capture",
+    "sdk",
+    "server_validation",
+    "source",
+    "stable_sdk",
+    "transfer_payload",
+    "transfer_sdk",
+    "v1",
+)
+TRANSFER_READINESS_ALIAS_CONTEXTS = (
+    "accounting",
+    "allowed",
+    "available",
+    "claim",
+    "complete",
+    "completion",
+    "contract",
+    "counts_toward",
+    "enabled",
+    "exposed",
+    "promot",
+    "public",
+    "ready",
+    "readiness",
+    "release",
+    "runtime",
+    "stable",
+    "status",
+    "validated",
+    "validation",
+)
+POSITIVE_SOURCE_STATUS_VALUES = {
+    "accepted",
+    "active",
+    "approved",
+    "available",
+    "complete",
+    "completed",
+    "enabled",
+    "passed",
+    "promoted",
+    "public",
+    "public_ready",
+    "ready",
+    "release_ready",
+    "release_supported",
+    "runtime",
+    "runtime_ready",
+    "sdk_ready",
+    "stable",
+    "stable_ready",
+    "supported",
+    "true",
+    "validated",
+    "v1_ready",
+}
+TRANSFER_CONTEXTUAL_STATUS_KEYS = {
+    "accepted",
+    "active",
+    "approved",
+    "complete",
+    "enabled",
+    "outcome",
+    "passed",
+    "promoted",
+    "readiness",
+    "ready",
+    "result",
+    "stable",
+    "state",
+    "status",
+    "validated",
+}
+TRANSFER_CONTEXTUAL_ACCOUNTING_TERMS = (
+    "contribution",
+    "count",
+    "counts",
+    "progress",
+)
+TRANSFER_NEUTRAL_POSITIVE_METADATA_KEYS = {
+    "copied_bool_count",
+    "forbidden_field_count",
+    "input_target_count",
+    "source_binding_count",
+    "target_count",
+}
+TRANSFER_NEUTRAL_POSITIVE_METADATA_SUFFIXES = (
+    "_field_count",
+    "_target_count",
+)
+TRANSFER_READINESS_CONTEXT_KEYS = {
+    "candidate",
+    "package_shape",
+    "plugin_hub",
+    "public_sdk",
+    "readiness",
+    "runtime",
+    "support_tier",
+    "target_set",
+    "v1",
+}
 POLICY_TOP_LEVEL_ALLOWED_KEYS = {
     "copied_bool",
     "coverage",
@@ -201,11 +455,52 @@ def run_gate(root: Path, manifest: Path, mode: str) -> tuple[int, dict[str, Any]
     return result.returncode, payload, result.stderr.strip()
 
 
+def build_multi_surface_beta_capture_guardrail() -> dict[str, Any]:
+    return {
+        "status": "candidate_only_non_counting",
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "required_first_artifact": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
+        "approved_runtime_evidence": False,
+        "approved_runtime_evidence_ready": False,
+        "clears_approved_runtime_evidence_missing": False,
+        "counts_as_approved_runtime_evidence": False,
+        "counts_as_runtime_evidence": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "side_lane_counts_toward_sdk": False,
+        "side_lane_counts_toward_p0": False,
+        "sdk_p0_unlock_allowed": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "runtime_ready": False,
+        "runtime_capture_ready": False,
+        "public_sdk_ready": False,
+        "public_transfer_sdk_ready": False,
+        "stable_sdk_ready": False,
+        "v1_completion_ready": False,
+        "replaces_player_principal_evidence": False,
+        "replaces_player_principal_triplet": False,
+        "non_claim": (
+            "candidate multi-surface beta capture pack/plan artifacts are prep only; "
+            "they do not satisfy approved player-principal runtime evidence"
+        ),
+    }
+
+
 def read_policy(manifest: Path, blockers: list[dict[str, Any]], expected_sha256: str) -> dict[str, Any] | None:
     try:
-        content = manifest.read_bytes()
+        with offline_gate.open_regular_file_no_symlink(manifest) as handle:
+            content = handle.read()
         manifest_sha256 = hashlib.sha256(content).hexdigest()
         parsed = json.loads(content.decode("utf-8"))
+    except offline_gate.SymlinkPathError as exc:
+        append_blocker(
+            blockers,
+            "manifest_path_is_symlink",
+            path=str(manifest),
+            symlink_component=str(exc.component),
+        )
+        return None
     except OSError as exc:
         append_blocker(blockers, "manifest_unreadable", path=str(manifest), detail=str(exc))
         return None
@@ -278,6 +573,121 @@ def reject_public_contract_claim_values(value: Any, blockers: list[dict[str, Any
     if PUBLIC_CONTRACT_SURFACE_RE.search(value) is None or PUBLIC_CONTRACT_CONTEXT_RE.search(value) is None:
         return
     append_blocker(blockers, "forbidden_public_contract_claim_value", path=path, value=value)
+
+
+def is_transfer_readiness_alias_key(key: str) -> bool:
+    normalized = offline_gate.normalized_claim_key(key)
+    if normalized in TRANSFER_READINESS_ALIAS_EXACT_KEYS or normalized in REPORT_FALSE_FLAGS:
+        return True
+    return any(subject in normalized for subject in TRANSFER_READINESS_ALIAS_SUBJECTS) and any(
+        context in normalized for context in TRANSFER_READINESS_ALIAS_CONTEXTS
+    )
+
+
+def normalized_trail_leaf_key(trail: str) -> str:
+    leaf = trail.rsplit(".", 1)[-1]
+    leaf = re.sub(r"\[\d+\]$", "", leaf)
+    return offline_gate.normalized_claim_key(leaf)
+
+
+def positive_source_alias_value(value: str) -> bool:
+    normalized = offline_gate.normalized_claim_key(value)
+    return normalized in POSITIVE_SOURCE_STATUS_VALUES or normalized.endswith("_ready")
+
+
+def positive_numeric_claim(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+
+def positive_transfer_alias_value(value: Any) -> bool:
+    if value is True or positive_numeric_claim(value):
+        return True
+    return isinstance(value, str) and positive_source_alias_value(value)
+
+
+def transfer_neutral_positive_metadata_key(key: str) -> bool:
+    return key in TRANSFER_NEUTRAL_POSITIVE_METADATA_KEYS or any(
+        key.endswith(suffix) for suffix in TRANSFER_NEUTRAL_POSITIVE_METADATA_SUFFIXES
+    )
+
+
+def transfer_accounting_alias_key(key: str) -> bool:
+    return any(term in key for term in TRANSFER_CONTEXTUAL_ACCOUNTING_TERMS)
+
+
+def transfer_context_key(key: str) -> bool:
+    if key in {"accepted_for_internal_planning", "copied_bool_count", "forbidden_field_count"}:
+        return False
+    if key in TRANSFER_READINESS_CONTEXT_KEYS:
+        return True
+    return is_transfer_readiness_alias_key(key) or bool(
+        any(subject in key for subject in TRANSFER_READINESS_ALIAS_SUBJECTS)
+    )
+
+
+def reject_contextual_transfer_readiness_alias_overclaims(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    *,
+    path: str = "$",
+    claim_context: bool = False,
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_path = f"{path}.{key}"
+            normalized_key = offline_gate.normalized_claim_key(str(key))
+            child_context = claim_context or transfer_context_key(normalized_key)
+            if (
+                is_transfer_readiness_alias_key(normalized_key)
+                and positive_transfer_alias_value(child)
+                and not transfer_neutral_positive_metadata_key(normalized_key)
+            ):
+                append_blocker(blockers, "readiness_alias_overclaim", path=key_path, field=normalized_key)
+            if (
+                child_context
+                and normalized_key in TRANSFER_CONTEXTUAL_STATUS_KEYS
+                and positive_transfer_alias_value(child)
+            ):
+                append_blocker(blockers, "readiness_alias_overclaim", path=key_path, field=normalized_key, value=child)
+            if (
+                child_context
+                and transfer_accounting_alias_key(normalized_key)
+                and not transfer_neutral_positive_metadata_key(normalized_key)
+                and positive_numeric_claim(child)
+            ):
+                append_blocker(blockers, "readiness_alias_overclaim", path=key_path, field=normalized_key, value=child)
+            reject_contextual_transfer_readiness_alias_overclaims(
+                child,
+                blockers,
+                path=key_path,
+                claim_context=child_context,
+            )
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_contextual_transfer_readiness_alias_overclaims(
+                child,
+                blockers,
+                path=f"{path}[{index}]",
+                claim_context=claim_context,
+            )
+        return
+    if claim_context and isinstance(value, str) and positive_source_alias_value(value):
+        append_blocker(blockers, "readiness_alias_overclaim", path=path, value=value)
+
+
+def reject_transfer_readiness_alias_overclaims(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    for trail, value in offline_gate.collect_bool_fields(policy):
+        key = normalized_trail_leaf_key(trail)
+        if value is True and is_transfer_readiness_alias_key(key):
+            append_blocker(blockers, "readiness_alias_overclaim", path=trail, field=key)
+    for trail, value in offline_gate.collect_string_fields(policy):
+        key = normalized_trail_leaf_key(trail)
+        if is_transfer_readiness_alias_key(key) and positive_source_alias_value(value):
+            append_blocker(blockers, "readiness_alias_overclaim", path=trail, field=key, value=value)
+    for trail, value in offline_gate.collect_promoted_status_overclaims(policy):
+        append_blocker(blockers, "readiness_alias_overclaim", path=trail, value=value)
+    reject_contextual_transfer_readiness_alias_overclaims(policy, blockers)
 
 
 def validate_copied_bool(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -511,6 +921,7 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         )
     reject_positive_claim_values(policy, blockers, path="$")
     reject_public_contract_claim_values(policy, blockers, path="$")
+    reject_transfer_readiness_alias_overclaims(policy, blockers)
 
     return {
         "input_targets": sorted(input_targets),
@@ -584,31 +995,25 @@ def build_report(
                 )
 
     ready = not blockers
+    beta_capture_guardrail = build_multi_surface_beta_capture_guardrail()
     return {
         "schema": REPORT_SCHEMA,
         "status": "candidate_ready" if ready else "blocked",
         "ready": ready,
+        "ready_scope": NON_AUTHORIZING_READY_SCOPE,
+        "does_not_satisfy_readiness": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "required_runtime_evidence": REQUIRED_PLAYER_PRINCIPAL_RUNTIME_EVIDENCE,
         "accepted_for_internal_planning": ready,
+        "offline_only": True,
+        "candidate_only": True,
+        "candidate_only_mode": True,
         "not_artifact_gate": True,
         "consume_only": True,
-        "public_sdk_ready": False,
-        "public_transfer_sdk_ready": False,
-        "public_abi_ready": False,
-        "runtime_ready": False,
-        "runtime_hook_wiring_ready": False,
-        "transfer_payload_decoding_ready": False,
-        "transfer_payload_public_contract_ready": False,
-        "downloaded_character_public_contract_ready": False,
-        "dino_payload_public_contract_ready": False,
-        "player_identity_public_contract_ready": False,
-        "cross_map_state_public_contract_ready": False,
-        "resource_handle_public_contract_ready": False,
-        "identity_ready": False,
-        "ownership_ready": False,
-        "mutation_ready": False,
-        "return_override_ready": False,
-        "v1_completion_ready": False,
-        "promotion_ready": False,
+        "multi_surface_beta_capture_guardrail": beta_capture_guardrail,
+        **REPORT_FALSE_FLAGS,
+        **REPORT_ZERO_FIELDS,
         "root": str(root if root is not None else root_arg),
         "manifest": str(manifest if manifest is not None else manifest_path),
         "expected_manifest_sha256": expected_manifest_sha256,
@@ -616,12 +1021,7 @@ def build_report(
         "promote_gate": promote_gate,
         "summary": summary,
         "blockers": blockers,
-        "non_claims": [
-            "candidate readiness is internal planning evidence only",
-            "does not promote Transfer SDK, public ABI, identity, ownership, mutation, return override, runtime hook wiring, dispatcher wiring, payload decoding, or v1 completion",
-            "does not replace public SDK, runtime, ABI, ownership, privacy, second-source, or live-ops promotion gates",
-            "does not expose transfer payloads, downloaded characters, dino payload, player identity, cross-map state, or ResourceHandle as a public contract",
-        ],
+        "non_claims": REPORT_NON_CLAIMS,
     }
 
 

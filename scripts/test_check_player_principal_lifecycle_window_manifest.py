@@ -94,6 +94,89 @@ class PlayerPrincipalLifecycleWindowManifestAliasTests(unittest.TestCase):
         self.assertEqual(short.stdout, long.stdout)
         self.assertEqual(short.stderr, long.stderr)
 
+    def test_post_window_replay_rejects_suspicious_extra_json_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for filename, payload in {
+                "operator-approval-receipt.template.json": {
+                    "schema": long_checker.APPROVAL_RECEIPT_SCHEMA,
+                    "status": "generated_template",
+                },
+                "partial-evidence.json": {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
+                },
+                "historical-runtime-evidence.json": {
+                    "schema": "obelisk.player-principal-historical-evidence.v1",
+                },
+                "passive-snapshot.json": {
+                    "schema": "obelisk.player-principal-passive-snapshot.v1",
+                },
+                "public-reachability.json": {
+                    "schema": "obelisk.player-principal-public-reachability-check.v1",
+                },
+                "sdk-status-report.json": {
+                    "schema": "obelisk.sdk-status-report.v1",
+                },
+            }.items():
+                (root / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+            blockers: list[dict[str, object]] = []
+            long_checker.validate_unexpected_post_window_json_sidecars(
+                root,
+                blockers,
+                post_window_replay=True,
+            )
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn(
+            "unexpected_json_sidecar_generated_receipt_template_not_post_window_replay_evidence",
+            reasons,
+        )
+        self.assertIn("unexpected_json_sidecar_partial_evidence_not_approved_runtime_evidence", reasons)
+        self.assertIn("unexpected_json_sidecar_historical_evidence_not_approved_runtime_evidence", reasons)
+        self.assertIn("unexpected_json_sidecar_passive_snapshot_not_approved_runtime_evidence", reasons)
+        self.assertIn("unexpected_json_sidecar_public_reachability_not_approved_runtime_evidence", reasons)
+        self.assertIn("unexpected_json_sidecar_status_report_not_approved_runtime_evidence", reasons)
+        self.assertIn(
+            "unexpected_json_sidecar_passive_snapshot_sidecar_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn(
+            "unexpected_json_sidecar_public_reachability_sidecar_not_approved_runtime_evidence",
+            reasons,
+        )
+        self.assertIn("unexpected_json_sidecar_sdk_status_report_sidecar_not_approved_runtime_evidence", reasons)
+
+    def test_receipt_verified_requires_post_window_replay_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "window-manifest.env"
+            validation = long_checker.Validation(
+                blockers=[],
+                target=long_checker.Target(instance="arkserver2", map_name="TheIsland"),
+                user_policy="no_regular_users",
+                copied_log_status="approved_offline_workspace",
+            )
+            fields = {
+                "operator_approval_receipt_path": str(Path(temp_dir) / "operator-approval-receipt.json"),
+                "operator_approval_receipt_sha256": "0" * 64,
+            }
+
+            pre_window_report = long_checker.build_report(
+                fields,
+                validation,
+                manifest,
+                post_window_replay=False,
+            )
+            replay_report = long_checker.build_report(
+                fields,
+                validation,
+                manifest,
+                post_window_replay=True,
+            )
+
+        self.assertFalse(pre_window_report["operator_approval_receipt"]["verified"])
+        self.assertTrue(replay_report["operator_approval_receipt"]["verified"])
+
 
 if __name__ == "__main__":
     unittest.main()

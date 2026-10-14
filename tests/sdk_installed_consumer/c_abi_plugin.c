@@ -11,6 +11,14 @@
 #define ASSERT_ALIGN(type, expected) _Static_assert(_Alignof(type) == (expected), #type " alignment changed")
 #define ASSERT_OFFSET(type, field, expected) \
     _Static_assert(offsetof(type, field) == (expected), #type "." #field " offset changed")
+#define ASSERT_FIELD_END(type, field, expected) \
+    _Static_assert( \
+        offsetof(type, field) + sizeof(((type*)0)->field) == (expected), \
+        #type "." #field " end offset changed")
+#define ASSERT_FIELD_ENDS_STRUCT(type, field) \
+    _Static_assert( \
+        offsetof(type, field) + sizeof(((type*)0)->field) == sizeof(type), \
+        #type "." #field " must remain the final ABI field")
 
 #ifndef OBELISK_CMAKE_CHAT_MESSAGE_EVENT_ABI_VERSION
 #error "Installed Obelisk CMake ABI variables were not passed to the C consumer build"
@@ -46,6 +54,7 @@ ASSERT_OFFSET(ObeliskChatMessageEvent, reserved0, 12);
 ASSERT_OFFSET(ObeliskChatMessageEvent, flags, 16);
 ASSERT_OFFSET(ObeliskChatMessageEvent, sequence, 24);
 ASSERT_OFFSET(ObeliskChatMessageEvent, message, 32);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskChatMessageEvent, message);
 
 ASSERT_SIZE(ObeliskGameplayPolicyEvent, 64);
 ASSERT_ALIGN(ObeliskGameplayPolicyEvent, 8);
@@ -57,6 +66,7 @@ ASSERT_OFFSET(ObeliskGameplayPolicyEvent, flags, 16);
 ASSERT_OFFSET(ObeliskGameplayPolicyEvent, field_mask, 24);
 ASSERT_OFFSET(ObeliskGameplayPolicyEvent, bool_values, 32);
 ASSERT_OFFSET(ObeliskGameplayPolicyEvent, int32_values, 40);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskGameplayPolicyEvent, int32_values);
 
 ASSERT_SIZE(ObeliskResourceKindDescriptor, 136);
 ASSERT_ALIGN(ObeliskResourceKindDescriptor, 8);
@@ -69,6 +79,7 @@ ASSERT_OFFSET(ObeliskResourceKindDescriptor, supported_gameplay_policy_event_mas
 ASSERT_OFFSET(ObeliskResourceKindDescriptor, supported_gameplay_policy_field_mask, 32);
 ASSERT_OFFSET(ObeliskResourceKindDescriptor, stable_name, 40);
 ASSERT_OFFSET(ObeliskResourceKindDescriptor, display_name, 72);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskResourceKindDescriptor, display_name);
 
 ASSERT_SIZE(ObeliskGameplayPolicyEventDescriptor, 152);
 ASSERT_ALIGN(ObeliskGameplayPolicyEventDescriptor, 8);
@@ -81,6 +92,7 @@ ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, event_kind_mask, 24);
 ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, field_mask, 32);
 ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, stable_name, 40);
 ASSERT_OFFSET(ObeliskGameplayPolicyEventDescriptor, display_name, 88);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskGameplayPolicyEventDescriptor, display_name);
 
 ASSERT_SIZE(ObeliskPluginMetadata, 48);
 ASSERT_ALIGN(ObeliskPluginMetadata, 8);
@@ -100,8 +112,15 @@ ASSERT_OFFSET(ObeliskPluginInitContext, config_dir, 8);
 ASSERT_OFFSET(ObeliskPluginInitContext, config_path, 16);
 ASSERT_OFFSET(ObeliskPluginInitContext, instance_id, 24);
 ASSERT_OFFSET(ObeliskPluginInitContext, plugin_owner_token, 32);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskPluginInitContext, plugin_owner_token);
 
-ASSERT_SIZE(ObeliskApi, 216);
+ASSERT_SIZE(ObeliskApi, 264);
+ASSERT_OFFSET(ObeliskApi, RegisterCommandWithOwnerTokenHandle, 216);
+ASSERT_OFFSET(ObeliskApi, UnregisterCommandWithOwnerToken, 224);
+ASSERT_OFFSET(ObeliskApi, ReplyToCommandWithOwnerToken, 232);
+ASSERT_OFFSET(ObeliskApi, GetCommandPlayerWithOwnerToken, 240);
+ASSERT_OFFSET(ObeliskApi, RegisterPlayerLifecycleWithOwnerTokenHandle, 248);
+ASSERT_OFFSET(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken, 256);
 ASSERT_ALIGN(ObeliskApi, 8);
 ASSERT_OFFSET(ObeliskApi, LogInfo, 0);
 ASSERT_OFFSET(ObeliskApi, LogWarn, 8);
@@ -111,6 +130,7 @@ ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEvent, 32);
 ASSERT_OFFSET(ObeliskApi, RegisterPreProcessEventForNameIndex, 40);
 ASSERT_OFFSET(ObeliskApi, RegisterPostProcessEventForNameIndex, 48);
 ASSERT_OFFSET(ObeliskApi, CallProcessEvent, 56);
+ASSERT_FIELD_END(ObeliskApi, CallProcessEvent, 64);
 ASSERT_OFFSET(ObeliskApi, abi_version, 64);
 ASSERT_OFFSET(ObeliskApi, struct_size, 68);
 ASSERT_OFFSET(ObeliskApi, capabilities, 72);
@@ -131,6 +151,7 @@ ASSERT_OFFSET(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle, 184);
 ASSERT_OFFSET(ObeliskApi, UnregisterChatMessageEventWithOwnerToken, 192);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle), 200);
 ASSERT_OFFSET(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken), 208);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, UnregisterPlayerLifecycleWithOwnerToken);
 
 static const char* kDefaultConfig = "{\n"
     "  \"enabled\": false,\n"
@@ -141,7 +162,6 @@ static const char* kDefaultConfig = "{\n"
 static ObeliskApi g_Api;
 static bool g_HasApi = false;
 static uint64_t g_OwnerToken = 0;
-static uint64_t g_ProcessEventHandle = 0;
 static uint64_t g_GameplayPolicyEventHandle = 0;
 static uint64_t g_GameplayPolicyEventUserData = 0xC0FFEE05;
 static bool g_GameplayPolicyEventSeen = false;
@@ -321,6 +341,8 @@ static void CompileGameplayPolicyAbi(void)
     volatile uint64_t requested_by_player = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER;
     volatile uint64_t ignore_cooldown = OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN;
     volatile uint64_t category_only = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY;
+    volatile uint64_t no_identity = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY;
+    volatile uint64_t no_lookup = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
     volatile uint64_t chat_copied_payload = OBELISK_CHAT_MESSAGE_EVENT_FLAG_COPIED_PAYLOAD;
     ObeliskStringView chat_message_view = {"!ping", 5};
     ObeliskChatMessageEvent chat_event = {
@@ -431,6 +453,8 @@ static void CompileGameplayPolicyAbi(void)
     (void)requested_by_player;
     (void)ignore_cooldown;
     (void)category_only;
+    (void)no_identity;
+    (void)no_lookup;
     (void)chat_copied_payload;
     (void)chat_message_view;
     (void)descriptor;
@@ -443,30 +467,14 @@ static bool PathExists(const char* path)
     return path && stat(path, &st) == 0;
 }
 
-static bool OnProcessEvent(void* object, void* function, void* params)
-{
-    (void)object;
-    (void)function;
-    (void)params;
-    return true;
-}
-
-static bool HasProcessEventHandleApi(const ObeliskApi* api)
-{
-    return api &&
-        (api->capabilities & OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS) != 0 &&
-        (api->capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES) != 0 &&
-        (api->capabilities & OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS) != 0 &&
-        api->struct_size >= offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
-            sizeof(api->UnregisterProcessEventCallbackWithOwnerToken) &&
-        api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle &&
-        api->UnregisterProcessEventCallbackWithOwnerToken;
-}
+static bool HasApiMetadataPrefix(const ObeliskApi* api);
 
 static bool HasChatMessageEventApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_CHAT_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle) +
+            sizeof(api->RegisterChatMessageEventWithOwnerTokenHandle) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
             sizeof(api->UnregisterChatMessageEventWithOwnerToken) &&
         api->RegisterChatMessageEventWithOwnerTokenHandle &&
@@ -475,8 +483,10 @@ static bool HasChatMessageEventApi(const ObeliskApi* api)
 
 static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle) +
+            sizeof(api->RegisterGameplayPolicyEventWithOwnerTokenHandle) &&
         api->struct_size >= offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
             sizeof(api->UnregisterGameplayPolicyEventWithOwnerToken) &&
         api->RegisterGameplayPolicyEventWithOwnerTokenHandle &&
@@ -485,8 +495,10 @@ static bool HasGameplayPolicyEventApi(const ObeliskApi* api)
 
 static bool HasScheduledApi(const ObeliskApi* api)
 {
-    return api &&
+    return HasApiMetadataPrefix(api) &&
         (api->capabilities & OBELISK_API_CAPABILITY_TIMERS) != 0 &&
+        api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) +
+            sizeof(api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)) &&
         api->struct_size >= offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) +
             sizeof(api->OBELISK_CONCAT(Unregister, TimerWithOwnerToken)) &&
         api->OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle) &&
@@ -504,7 +516,7 @@ static bool ValidateResourceKindDescriptor(const ObeliskApi* api,
         OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
         OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
 
-    if (!api ||
+    if (!HasApiMetadataPrefix(api) ||
         (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) == 0 ||
         api->struct_size < offsetof(ObeliskApi, DescribeResourceKind) + sizeof(api->DescribeResourceKind) ||
         !api->DescribeResourceKind)
@@ -536,7 +548,7 @@ static bool ValidateGameplayPolicyEventDescriptor(const ObeliskApi* api,
 {
     ObeliskGameplayPolicyEventDescriptor descriptor;
 
-    if (!api ||
+    if (!HasApiMetadataPrefix(api) ||
         (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) == 0 ||
         api->struct_size < offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
             sizeof(api->DescribeGameplayPolicyEventKind) ||
@@ -643,11 +655,6 @@ static bool ValidateGameplayPolicyDescriptors(const ObeliskApi* api)
 
 static void UnregisterCallbacks(void)
 {
-    if (g_HasApi && g_ProcessEventHandle != 0 && g_Api.UnregisterProcessEventCallbackWithOwnerToken)
-    {
-        g_Api.UnregisterProcessEventCallbackWithOwnerToken(g_OwnerToken, g_ProcessEventHandle);
-        g_ProcessEventHandle = 0;
-    }
     if (g_HasApi && g_TimerHandle != 0 && g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken))
     {
         g_Api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken)(g_OwnerToken, g_TimerHandle);
@@ -670,7 +677,6 @@ static void ResetState(void)
     memset(&g_Api, 0, sizeof(g_Api));
     g_HasApi = false;
     g_OwnerToken = 0;
-    g_ProcessEventHandle = 0;
     g_GameplayPolicyEventHandle = 0;
     g_GameplayPolicyEventSeen = false;
     g_GameplayPolicyEventAccepted = false;
@@ -678,6 +684,20 @@ static void ResetState(void)
     g_ChatMessageEventSeenModes = 0;
     g_TimerHandle = 0;
     g_TimerSeen = false;
+}
+
+static bool HasApiMetadataPrefix(const ObeliskApi* api)
+{
+    if (!api ||
+        api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+    {
+        return false;
+    }
+
+    if (api->abi_version != OBELISK_API_ABI_VERSION)
+        return false;
+
+    return true;
 }
 
 __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -702,8 +722,7 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     if (!api || !context)
         return false;
 
-    if (api->abi_version != OBELISK_API_ABI_VERSION ||
-        api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities) ||
+    if (!HasApiMetadataPrefix(api) ||
         context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
         context->struct_size < sizeof(ObeliskPluginInitContext))
     {
@@ -723,24 +742,14 @@ __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         !PathExists(context->config_dir) ||
         !PathExists(context->config_path))
     {
+        ResetState();
         return false;
     }
 
     if (!ValidateGameplayPolicyDescriptors(api))
-        return false;
-
-    if (HasProcessEventHandleApi(api))
     {
-        g_ProcessEventHandle = api->RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
-            g_OwnerToken,
-            42,
-            OnProcessEvent);
-        if (g_ProcessEventHandle == 0)
-        {
-            UnregisterCallbacks();
-            ResetState();
-            return false;
-        }
+        ResetState();
+        return false;
     }
 
     if (HasGameplayPolicyEventApi(api))
@@ -822,4 +831,9 @@ __attribute__((visibility("default"))) bool InstallLayoutConsumer_ChatMessageEve
 __attribute__((visibility("default"))) bool InstallLayoutConsumer_ScheduledCallbackSeen()
 {
     return g_TimerSeen;
+}
+
+__attribute__((visibility("default"))) bool InstallLayoutConsumer_CopiedApiRetained()
+{
+    return g_HasApi;
 }

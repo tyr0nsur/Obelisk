@@ -20,6 +20,11 @@ Options:
   --server-binary <path>          ShooterGameServer binary path.
   --expected-binary-sha256 <sha>  Required ShooterGameServer SHA256.
   --env-file <path>               Effective key=value env snapshot for observer-window mode.
+  --allow-diagnostic-candidates   Permit and require candidate-only diagnostic env in observer-window mode.
+  --allow-live-procfs-read        Permit live /proc reads for --map posture checks. This
+                                  is not live-ops authorization; use only with separate approval.
+  --allow-protected-root          Permit protected-root validation reads and pass through posture
+                                  acknowledgement. This is not live-ops authorization.
   --run-id <id>                   Runtime window run id to bind into --json sidecar.
   --window-manifest <path>        Expected copied window manifest path for --json sidecar.
   --copied-log <path>             Expected copied Obelisk log path for --json sidecar.
@@ -49,6 +54,9 @@ PROC_ROOT="/proc"
 ALLOW_STOPPED=0
 OFFLINE_ONLY=0
 JSON_OUTPUT=0
+ALLOW_DIAGNOSTIC_CANDIDATES=0
+ALLOW_LIVE_PROCFS_READ=0
+ALLOW_PROTECTED_ROOT=0
 SERVER_ROOT="/servidor/ark"
 APPROVED_OFFLINE_ROOT="/servidor/ark/workspace-offline"
 
@@ -89,6 +97,18 @@ while [[ $# -gt 0 ]]; do
         --env-file)
             ENV_FILE="${2:?missing env file}"
             shift 2
+            ;;
+        --allow-diagnostic-candidates)
+            ALLOW_DIAGNOSTIC_CANDIDATES=1
+            shift
+            ;;
+        --allow-live-procfs-read)
+            ALLOW_LIVE_PROCFS_READ=1
+            shift
+            ;;
+        --allow-protected-root)
+            ALLOW_PROTECTED_ROOT=1
+            shift
             ;;
         --run-id)
             RUN_ID="${2:?missing run id}"
@@ -192,6 +212,10 @@ fi
     echo "--mode must be stable or observer-window." >&2
     exit 2
 }
+if [[ "${ALLOW_DIAGNOSTIC_CANDIDATES}" == "1" && "${MODE}" != "observer-window" ]]; then
+    echo "--allow-diagnostic-candidates is only valid with --mode observer-window." >&2
+    exit 2
+fi
 [[ -n "${EXPECTED_BINARY_SHA256}" ]] || { echo "--expected-binary-sha256 is required." >&2; exit 2; }
 [[ "${EXPECTED_BINARY_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
     echo "--expected-binary-sha256 must be lowercase SHA256 hex." >&2
@@ -204,6 +228,55 @@ resolved_existing_path() {
         realpath -e -- "${path}"
     else
         readlink -f -- "${path}"
+    fi
+}
+
+is_under_path() {
+    local path="$1"
+    local parent="$2"
+
+    [[ "${path}" == "${parent}" || "${path}" == "${parent}/"* ]]
+}
+
+reject_live_procfs_read_path() {
+    local label="$1"
+    local path="$2"
+    local absolute_path
+    local resolved_path
+
+    if [[ "${ALLOW_LIVE_PROCFS_READ}" == "1" ]]; then
+        return 0
+    fi
+
+    absolute_path="$(realpath -s -m "${path}")"
+    if is_under_path "${absolute_path}" "/proc"; then
+        echo "${label} must not read the live /proc tree without --allow-live-procfs-read: ${absolute_path}" >&2
+        exit 2
+    fi
+
+    resolved_path="$(realpath -m "${path}")"
+    if is_under_path "${resolved_path}" "/proc"; then
+        echo "${label} must not resolve into the live /proc tree without --allow-live-procfs-read: ${path} -> ${resolved_path}" >&2
+        exit 2
+    fi
+}
+
+reject_protected_proc_root_path() {
+    local label="$1"
+    local path="$2"
+    local absolute_path
+    local resolved_path
+
+    absolute_path="$(realpath -s -m "${path}")"
+    if is_under_path "${absolute_path}" "${SERVER_ROOT}"; then
+        echo "${label} must not read from protected server root ${SERVER_ROOT}: ${absolute_path}" >&2
+        exit 2
+    fi
+
+    resolved_path="$(realpath -m "${path}")"
+    if is_under_path "${resolved_path}" "${SERVER_ROOT}"; then
+        echo "${label} must not read from protected server root ${SERVER_ROOT}: ${path} -> ${resolved_path}" >&2
+        exit 2
     fi
 }
 
@@ -236,6 +309,29 @@ reject_protected_live_path() {
             esac
             ;;
     esac
+}
+
+require_protected_root_ack_for_path() {
+    local label="$1"
+    local path="$2"
+    local absolute_path
+    local resolved
+
+    if [[ "${ALLOW_PROTECTED_ROOT}" == "1" ]]; then
+        return 0
+    fi
+
+    absolute_path="$(realpath -s -m "${path}")"
+    if is_under_path "${absolute_path}" "${SERVER_ROOT}"; then
+        echo "${label} must not read from protected server root ${SERVER_ROOT} without --allow-protected-root: ${absolute_path}" >&2
+        exit 2
+    fi
+
+    resolved="$(resolved_existing_path "${path}" 2>/dev/null || printf '%s' "${path}")"
+    if is_under_path "${resolved}" "${SERVER_ROOT}"; then
+        echo "${label} must not resolve under protected server root ${SERVER_ROOT} without --allow-protected-root: ${path} -> ${resolved}" >&2
+        exit 2
+    fi
 }
 
 require_regular_file() {
@@ -376,6 +472,10 @@ forbid_env_key() {
 env_key_is_allowed_window_posture() {
     local key="$1"
 
+    if [[ "${ALLOW_DIAGNOSTIC_CANDIDATES}" == "1" && "${key}" == "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES" ]]; then
+        return 0
+    fi
+
     case "${key}" in
         OBELISK_INSTANCE_ID|\
         OBELISK_ENABLE_PROCESS_EVENT_HOOK|\
@@ -452,6 +552,11 @@ require_observer_window_env() {
     require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT 10
     require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT 0
     require_env_value OBELISK_PE_TRACE_LIMIT 0
+    if [[ "${ALLOW_DIAGNOSTIC_CANDIDATES}" == "1" ]]; then
+        require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES 1
+    else
+        forbid_env_key OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DIAGNOSTIC_CANDIDATES
+    fi
 
     for key in \
         LD_PRELOAD \
@@ -500,25 +605,36 @@ require_observer_window_env() {
 
 find_shooter_pid_for_map() {
     local map="$1"
-    local proc_dir pid cmdline
-
-    if [[ "${PROC_ROOT}" == "/proc" ]]; then
-        PGREP_BIN="${PGREP_BIN:-pgrep}"
-        "${PGREP_BIN}" -f "(^|/)ShooterGameServer ${map}" | head -n1 || true
-        return 0
-    fi
+    local proc_dir pid cmdline_path
 
     for proc_dir in "${PROC_ROOT%/}"/*; do
         [[ -d "${proc_dir}" ]] || continue
         pid="$(basename -- "${proc_dir}")"
         [[ "${pid}" =~ ^[0-9]+$ ]] || continue
-        [[ -r "${proc_dir}/cmdline" ]] || continue
-        cmdline="$(tr '\0' ' ' < "${proc_dir}/cmdline")"
-        if [[ "${cmdline}" =~ (^|/)ShooterGameServer[[:space:]]+${map} ]]; then
+        cmdline_path="${proc_dir}/cmdline"
+        [[ -r "${cmdline_path}" ]] || continue
+        reject_protected_proc_root_path "proc cmdline fixture" "${cmdline_path}"
+        reject_live_procfs_read_path "proc cmdline fixture" "${cmdline_path}"
+        if cmdline_matches_map "${cmdline_path}" "${map}"; then
             printf '%s\n' "${pid}"
             return 0
         fi
     done
+}
+
+cmdline_matches_map() {
+    local cmdline_path="$1"
+    local map="$2"
+    local arg
+    local -a args=()
+
+    while IFS= read -r -d '' arg; do
+        args+=("${arg}")
+    done < "${cmdline_path}" || true
+
+    [[ "${#args[@]}" -ge 2 ]] || return 1
+    [[ "$(basename -- "${args[0]}")" == "ShooterGameServer" ]] || return 1
+    [[ "${args[1]}" == "${map}" || "${args[1]}" == "${map}"\?* ]]
 }
 
 if [[ "${OFFLINE_ONLY}" == "1" ]]; then
@@ -541,6 +657,22 @@ if [[ "${OFFLINE_ONLY}" == "1" ]]; then
         echo "--offline-only rejects --map because it would inspect live process posture." >&2
         exit 1
     fi
+fi
+
+require_protected_root_ack_for_path "Obelisk root" "${OBELISK_ROOT}"
+require_protected_root_ack_for_path "Installed wrapper" "${INSTALLED_WRAPPER}"
+require_protected_root_ack_for_path "Server binary" "${SERVER_BINARY}"
+if [[ -n "${ENV_FILE}" ]]; then
+    require_protected_root_ack_for_path "Env file" "${ENV_FILE}"
+fi
+if [[ -n "${WINDOW_MANIFEST}" ]]; then
+    require_protected_root_ack_for_path "Window manifest" "${WINDOW_MANIFEST}"
+fi
+if [[ -n "${COPIED_LOG}" ]]; then
+    require_protected_root_ack_for_path "Copied log" "${COPIED_LOG}"
+fi
+if [[ -n "${EVIDENCE_DIR}" ]]; then
+    require_protected_root_ack_for_path "Evidence directory" "${EVIDENCE_DIR}"
 fi
 
 require_regular_file "Server binary" "${SERVER_BINARY}"
@@ -599,17 +731,27 @@ else
 fi
 
 if [[ -n "${MAP}" ]]; then
+    reject_protected_proc_root_path "--proc-root" "${PROC_ROOT}"
+    reject_live_procfs_read_path "--proc-root" "${PROC_ROOT}"
     shooter_pid="$(find_shooter_pid_for_map "${MAP}")"
     if [[ -n "${shooter_pid}" ]]; then
-        if [[ "${MODE}" != "stable" ]]; then
-            echo "Running observer-window posture is not checked by this preflight; use it before launch or after rollback." >&2
-            exit 1
+        posture_args=(
+            --pid "${shooter_pid}"
+            --instance "${INSTANCE}"
+            --proc-root "${PROC_ROOT}"
+        )
+        if [[ "${MODE}" == "stable" ]]; then
+            posture_args=(--expect-stable "${posture_args[@]}")
+        else
+            posture_args=(--expect-observer-debug "${posture_args[@]}")
         fi
-        "${SCRIPT_DIR}/check_obelisk_server_posture.sh" \
-            --expect-stable \
-            --pid "${shooter_pid}" \
-            --instance "${INSTANCE}" \
-            --proc-root "${PROC_ROOT}" >/dev/null
+        if [[ "${ALLOW_LIVE_PROCFS_READ}" == "1" ]]; then
+            posture_args+=(--allow-live-procfs-read)
+        fi
+        if [[ "${ALLOW_PROTECTED_ROOT}" == "1" ]]; then
+            posture_args+=(--allow-protected-root)
+        fi
+        "${SCRIPT_DIR}/check_obelisk_server_posture.sh" "${posture_args[@]}" >/dev/null
     elif [[ "${ALLOW_STOPPED}" != "1" ]]; then
         echo "No running ShooterGameServer found for ${MAP}; pass --allow-stopped if this is expected." >&2
         exit 1
@@ -633,6 +775,9 @@ if [[ "${JSON_OUTPUT}" == "1" ]]; then
     export OBELISK_PREFLIGHT_WRAPPER_SHA="${wrapper_sha}"
     export OBELISK_PREFLIGHT_ENV="${ENV_FILE}"
     export OBELISK_PREFLIGHT_ENV_SHA="${env_sha}"
+    export OBELISK_PREFLIGHT_DIAGNOSTIC_CANDIDATES="${ALLOW_DIAGNOSTIC_CANDIDATES}"
+    export OBELISK_PREFLIGHT_LIVE_PROCFS_READ_ACK="${ALLOW_LIVE_PROCFS_READ}"
+    export OBELISK_PREFLIGHT_PROTECTED_ROOT_ACK="${ALLOW_PROTECTED_ROOT}"
     export OBELISK_PREFLIGHT_RUN_ID="${RUN_ID}"
     export OBELISK_PREFLIGHT_WINDOW_MANIFEST="${WINDOW_MANIFEST}"
     export OBELISK_PREFLIGHT_COPIED_LOG="${COPIED_LOG}"
@@ -652,7 +797,11 @@ def optional_file(path: str, sha256: str) -> dict | None:
 
 payload = {
     "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+    "status": "preflight_passed_no_runtime_approval_or_evidence",
     "ready": True,
+    "ready_scope": "offline_preflight_checks_only",
+    "preflight_passed": True,
+    "current_turn_operator_approval_required": True,
     "server_operations_authorized": False,
     "runtime_work_authorized": False,
     "request_pack_counts_as_approved_runtime_evidence": False,
@@ -672,11 +821,33 @@ payload = {
     "observer_env_counts_as_approved_runtime_evidence": False,
     "operator_request_counts_as_approved_runtime_evidence": False,
     "copied_log_metadata_counts_as_approved_runtime_evidence": False,
+    "copied_log_presence_counts_as_approved_runtime_evidence": False,
     "bundle_output_counts_as_approved_runtime_evidence": False,
+    "dry_run_success_counts_as_approved_runtime_evidence": False,
+    "historical_target_names_authorize_runtime": False,
+    "marker_env_readiness_counts_as_approved_runtime_evidence": False,
+    "player_notice_counts_as_approved_runtime_evidence": False,
+    "public_reachability_counts_as_approved_runtime_evidence": False,
     "sdk_accounting_counts_as_completed_surface": False,
     "p0_accounting_counts_as_promoted_surface": False,
     "authorization_source": "none_preflight_sidecar_only",
     "approved_runtime_evidence_source": "none_preflight_sidecar_only",
+    "current_turn_authorized": False,
+    "current_turn_approval_recorded": False,
+    "preflight_records_current_turn_approval": False,
+    "current_turn_approval_scope_status": "requires_exact_current_turn_operator_approval",
+    "current_turn_approval_required_fields": [
+        "target",
+        "marker_env_gates",
+        "restart_window",
+        "rollback",
+        "evidence_paths",
+        "final_posture",
+    ],
+    "approval_scope_non_authorization": (
+        "preflight dry-run only; does not authorize deployment, server operations, marker/env "
+        "changes, restart, runtime capture, approved runtime evidence, public readiness, or SDK completion"
+    ),
     "mode": os.environ["OBELISK_PREFLIGHT_MODE"],
     "run_id": os.environ["OBELISK_PREFLIGHT_RUN_ID"] or None,
     "instance": os.environ["OBELISK_PREFLIGHT_INSTANCE"],
@@ -701,12 +872,39 @@ payload = {
         os.environ["OBELISK_PREFLIGHT_ENV"],
         os.environ["OBELISK_PREFLIGHT_ENV_SHA"],
     ),
+    "deployment_intent": {
+        "intent_type": "lifecycle_anchor_drift_fix_deploy_request_only",
+        "status": "request_only_not_authorized",
+        "target": {
+            "instance": os.environ["OBELISK_PREFLIGHT_INSTANCE"],
+            "map": os.environ["OBELISK_PREFLIGHT_MAP"] or None,
+        },
+        "request_only": True,
+        "deployment_authorized": False,
+        "restart_authorized": False,
+        "runtime_capture_authorized": False,
+        "counts_as_approved_runtime_evidence": False,
+        "non_authorization": (
+            "drift-fix deployment intent only; does not authorize deployment, server operations, "
+            "marker/env changes, restart, runtime capture, approved runtime evidence, public readiness, "
+            "or SDK completion"
+        ),
+    },
+    "diagnostic_candidates_enabled": os.environ["OBELISK_PREFLIGHT_DIAGNOSTIC_CANDIDATES"] == "1",
+    "live_procfs_read_acknowledged": os.environ["OBELISK_PREFLIGHT_LIVE_PROCFS_READ_ACK"] == "1",
+    "protected_root_validation_acknowledged": os.environ["OBELISK_PREFLIGHT_PROTECTED_ROOT_ACK"] == "1",
+    "live_read_acknowledgement_counts_as_authorization": False,
     "marker_dir": os.environ["OBELISK_PREFLIGHT_MARKER_DIR"],
     "offline_only": os.environ["OBELISK_PREFLIGHT_OFFLINE_ONLY"] == "1",
     "allow_stopped": os.environ["OBELISK_PREFLIGHT_ALLOW_STOPPED"] == "1",
     "checked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     "posture_check": "accepted",
     "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
+    "non_claims": [
+        "preflight pass is offline check acceptance only",
+        "preflight does not authorize deployment, server operations, marker/env changes, restart, or runtime capture",
+        "preflight does not count as approved runtime evidence, public readiness, SDK readiness, or v1 completion",
+    ],
 }
 print(json.dumps(payload, indent=2, sort_keys=True))
 PY

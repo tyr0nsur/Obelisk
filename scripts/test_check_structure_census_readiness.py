@@ -387,6 +387,49 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
 
+    def test_runtime_sample_route_and_sdk_progress_overclaims_fail_closed_without_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            payload = json.loads(readiness.read_text(encoding="utf-8"))
+            payload["approvedRuntimeSamplesReady"] = True
+            payload["routeAccepted"] = True
+            payload["sdkProgressReady"] = True
+            payload["completeSdkReadiness"] = True
+            payload["publicLookupProgress"] = True
+            payload["mutationReadiness"] = True
+            payload["notes"] = [
+                "route acceptance is ready",
+                "approved runtime samples make SDK progress accepted",
+                "SDK progress is accepted",
+                "public lookup is ready",
+                "mutation readiness accepted",
+                "complete SDK readiness is accepted",
+            ]
+            readiness.write_text(json.dumps(payload), encoding="utf-8")
+            blockers: list[dict] = []
+
+            result = CHECKER.validate_second_source_readiness(payload, blockers, path=readiness)
+
+        self.assertEqual(result["status"], "blocked")
+        overclaims = [
+            blocker
+            for blocker in blockers
+            if blocker["reason"] == "second_source_readiness_surface_overclaim"
+        ]
+        surfaces = {blocker["surface"] for blocker in overclaims}
+        self.assertIn("approvedRuntimeSamplesReady", surfaces)
+        self.assertIn("routeAccepted", surfaces)
+        self.assertIn("sdkProgressReady", surfaces)
+        self.assertIn("completeSdkReadiness", surfaces)
+        self.assertIn("publicLookupProgress", surfaces)
+        self.assertIn("mutationReadiness", surfaces)
+        self.assertIn("route_acceptance", surfaces)
+        self.assertIn("runtime_samples", surfaces)
+        self.assertIn("sdk_progress", surfaces)
+        self.assertIn("public_lookup", surfaces)
+        self.assertIn("mutation", surfaces)
+        self.assertIn("v1_completion", surfaces)
+
     def test_policy_alias_and_string_overclaims_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"

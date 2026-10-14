@@ -106,6 +106,10 @@ namespace
         throw 7;
     }
 
+    void NoopCallback(const MissionCopiedBoolEventView&, void*)
+    {
+    }
+
     void TestMissionCopiedBoolSurfaceIsInternalObservationOnly()
     {
         const auto [kind, bools] = MissionCopiedBoolEventView{};
@@ -340,6 +344,180 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0,
                 "self-unregister destroy mission callback remained registered");
         Require(dispatcher.Dispatch(MakeEvent(bools)) == 0, "self-unregistered callback ran twice");
+    }
+
+    struct SelfUnregisterFailingDestroyState
+    {
+        MissionCopiedBoolEventDispatcher* Dispatcher = nullptr;
+        uint64_t RegistrationId = 0;
+        int Calls = 0;
+        int DestroyCalls = 0;
+        bool FailNextDestroy = true;
+    };
+
+    void SelfUnregisterFailingDestroyCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<SelfUnregisterFailingDestroyState*>(userData);
+        ++state->Calls;
+        Require(state->Dispatcher != nullptr, "self-unregister failing destroy callback had no dispatcher");
+        Require(state->Dispatcher->Unregister(state->RegistrationId),
+                "self-unregister failing destroy callback could not unregister itself");
+    }
+
+    void FailsOnceSelfUnregisterDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<SelfUnregisterFailingDestroyState*>(userData);
+        ++state->DestroyCalls;
+        if (state->FailNextDestroy)
+        {
+            state->FailNextDestroy = false;
+            throw std::runtime_error("expected self-unregister mission destroy failure");
+        }
+    }
+
+    void TestSelfUnregisterDestroyFailureIsRetainedForOwnerCleanup()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterFailingDestroyState state{&dispatcher, 0, 0, 0, true};
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        state.RegistrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterFailingDestroyCallback, &state, FailsOnceSelfUnregisterDestroyUserData});
+        Require(state.RegistrationId != 0, "self-unregister failing destroy registration failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                "self-unregister failing destroy callback did not dispatch");
+        Require(state.Calls == 1, "self-unregister failing destroy callback ran wrong count");
+        Require(state.DestroyCalls == 1, "self-unregister failing destroy did not run once");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "self-unregister failing destroy callback stayed dispatchable after failure");
+
+        bool retryThrew = false;
+        size_t retryRemoved = 0;
+        try
+        {
+            retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            retryThrew = true;
+        }
+
+        Require(retryThrew,
+                "owner cleanup hid unreported self-unregister mission destroy failure");
+        Require(retryRemoved == 0,
+                "throwing owner cleanup reported a completed self-unregister mission cleanup");
+        Require(state.DestroyCalls == 2,
+                "owner cleanup did not retry self-unregister mission destroy failure");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed self-unregister mission destroy retry was not idempotent");
+    }
+
+    struct WaitingOwnerCleanupSelfUnregisterState
+    {
+        MissionCopiedBoolEventDispatcher* Dispatcher = nullptr;
+        uint64_t RegistrationId = 0;
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool Unregistered = false;
+        bool ReleaseCallback = false;
+        int Calls = 0;
+        int DestroyCalls = 0;
+        int FailuresRemaining = 1;
+    };
+
+    void WaitingOwnerCleanupSelfUnregisterCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<WaitingOwnerCleanupSelfUnregisterState*>(userData);
+        Require(state->Dispatcher != nullptr, "waiting owner cleanup mission callback had no dispatcher");
+        ++state->Calls;
+        Require(state->Dispatcher->Unregister(state->RegistrationId),
+                "waiting owner cleanup mission callback could not unregister itself");
+        {
+            std::unique_lock<std::mutex> lock(state->Mutex);
+            state->Unregistered = true;
+            state->Cv.notify_all();
+            state->Cv.wait(lock, [state]() { return state->ReleaseCallback; });
+        }
+    }
+
+    void FailsOnceWaitingOwnerCleanupDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<WaitingOwnerCleanupSelfUnregisterState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->DestroyCalls;
+        if (state->FailuresRemaining > 0)
+        {
+            --state->FailuresRemaining;
+            throw std::runtime_error("expected waiting owner cleanup mission destroy failure");
+        }
+    }
+
+    void TestWaitingOwnerCleanupObservesSelfUnregisterDeferredDestroyFailure()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        WaitingOwnerCleanupSelfUnregisterState state{&dispatcher};
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        state.RegistrationId = dispatcher.Register(
+            &owner,
+            {WaitingOwnerCleanupSelfUnregisterCallback,
+             &state,
+             FailsOnceWaitingOwnerCleanupDestroyUserData});
+        Require(state.RegistrationId != 0,
+                "waiting owner cleanup mission self-unregister registration failed");
+
+        std::thread dispatchThread([&]() {
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                    "waiting owner cleanup mission callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock,
+                                      std::chrono::seconds(2),
+                                      [&state]() { return state.Unregistered; }),
+                    "waiting owner cleanup mission callback did not unregister");
+        }
+        Require(dispatcher.SubscriptionCount() == 0,
+                "waiting owner cleanup mission callback remained dispatchable");
+
+        std::atomic<bool> cleanupThrew{false};
+        std::atomic<bool> cleanupFinished{false};
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "waiting owner cleanup mission completed before deferred destroy ran");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "waiting owner cleanup mission hid self-unregister deferred DestroyUserData failure");
+        Require(state.DestroyCalls == 2,
+                "waiting owner cleanup mission did not retry deferred DestroyUserData before reporting failure");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed waiting owner cleanup mission retry was not idempotent");
     }
 
     struct OwnerCleanupDuringDispatchState
@@ -754,6 +932,222 @@ namespace
         Require(!dispatcher.Unregister(id), "completed granular mission unregister was not idempotent");
     }
 
+    struct DeferredMultiRetryDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int FirstDestroyCalls = 0;
+        int SecondDestroyCalls = 0;
+    };
+
+    void DeferredMultiRetryBlockingCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FirstDeferredRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->FirstDestroyCalls;
+        if (state->FirstDestroyCalls == 1)
+            throw std::runtime_error("expected first deferred mission destroy failure");
+    }
+
+    void SecondDeferredRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DeferredMultiRetryDestroyState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->SecondDestroyCalls;
+        if (state->SecondDestroyCalls == 1)
+            throw std::runtime_error("expected second deferred mission destroy failure");
+    }
+
+    void TestOwnerCleanupRetriesAllDeferredDestroyUserDataFailures()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredMultiRetryDestroyState state;
+        std::atomic<bool> cleanupThrew{false};
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        Require(dispatcher.Register(
+                    &owner,
+                    {DeferredMultiRetryBlockingCallback, &state, FirstDeferredRetryDestroyUserData}) != 0,
+                "first deferred multi-retry mission registration failed");
+        Require(dispatcher.Register(
+                    &owner,
+                    {DeferredMultiRetryBlockingCallback, &state, SecondDeferredRetryDestroyUserData}) != 0,
+                "second deferred multi-retry mission registration failed");
+
+        std::thread dispatchThread([&]() {
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                    "deferred multi-retry mission dispatch did not skip owner-cleaned snapshot");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "deferred multi-retry mission callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred multi-retry mission cleanup did not remove dispatchable callbacks");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "deferred multi-retry mission cleanup hid DestroyUserData failures");
+        Require(state.FirstDestroyCalls == 1,
+                "first deferred multi-retry mission cleanup was not attempted once");
+        Require(state.SecondDestroyCalls == 1,
+                "second deferred multi-retry mission cleanup was not attempted once");
+        Require(dispatcher.Dispatch(MakeEvent(bools)) == 0,
+                "deferred multi-retry mission cleanup left callbacks dispatchable after failure");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 2,
+                "deferred multi-retry mission cleanup did not retain every failed subscription");
+        Require(state.FirstDestroyCalls == 2,
+                "first deferred multi-retry mission cleanup was not retried");
+        Require(state.SecondDestroyCalls == 2,
+                "second deferred multi-retry mission cleanup was not retried");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed deferred multi-retry mission cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred multi-retry mission cleanup left callbacks dispatchable after retry");
+    }
+
+    struct DeferredFailureRecordFallbackState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        int DestroyCalls = 0;
+    };
+
+    void DeferredFailureRecordFallbackCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredFailureRecordFallbackState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void FallbackFailsThenCountsDestroy(void* userData)
+    {
+        auto* state = static_cast<DeferredFailureRecordFallbackState*>(userData);
+        std::lock_guard<std::mutex> lock(state->Mutex);
+        ++state->DestroyCalls;
+        if (state->DestroyCalls == 1)
+            throw std::runtime_error("expected mission deferred failure-record destroy failure");
+    }
+
+    void TestDeferredDestroyFailureRecordStorageFailureIsRetainedForOwnerRetry()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredFailureRecordFallbackState state;
+        std::atomic<bool> cleanupThrewRuntimeError{false};
+        std::atomic<bool> cleanupThrewUnexpected{false};
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        Require(dispatcher.Register(
+                    &owner,
+                    {DeferredFailureRecordFallbackCallback, &state, FallbackFailsThenCountsDestroy}) != 0,
+                "deferred failure-record fallback mission registration failed");
+
+        std::thread dispatchThread([&dispatcher, &bools]() {
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                    "deferred failure-record fallback mission dispatch did not run");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "deferred failure-record fallback mission callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                dispatcher.FailNextDeferredDestroyFailureRecordForTesting();
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrewRuntimeError.store(true, std::memory_order_release);
+            }
+            catch (...)
+            {
+                cleanupThrewUnexpected.store(true, std::memory_order_release);
+            }
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred failure-record fallback mission cleanup did not remove dispatchable callback");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupThrewRuntimeError.load(std::memory_order_acquire),
+                "deferred failure-record mission storage failure hid original DestroyUserData failure");
+        Require(!cleanupThrewUnexpected.load(std::memory_order_acquire),
+                "deferred failure-record mission fallback propagated the wrong exception type");
+        Require(state.DestroyCalls == 1,
+                "deferred failure-record fallback mission first cleanup did not destroy once");
+        Require(dispatcher.Dispatch(MakeEvent(bools)) == 0,
+                "deferred failure-record fallback mission left callback dispatchable after failure");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "deferred failure-record fallback mission did not retain failed subscription for retry");
+        Require(state.DestroyCalls == 2,
+                "deferred failure-record fallback mission retry did not rerun DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed deferred failure-record fallback mission cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred failure-record fallback mission left callbacks dispatchable after retry");
+    }
+
     void TestCallbackExceptionDoesNotStopDispatch()
     {
         MissionCopiedBoolEventDispatcher dispatcher;
@@ -882,6 +1276,59 @@ namespace
                 "completed mission cleanup was not idempotent");
         Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left mission callbacks dispatchable");
     }
+
+    void TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "retry setup failure mission registration failed");
+
+        bool firstCleanupThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            firstCleanupThrew = true;
+        }
+
+        Require(firstCleanupThrew,
+                "retry setup failure fixture did not create a retained mission DestroyUserData failure");
+        Require(state.FailingCalls == 1,
+                "retry setup failure fixture did not attempt first mission DestroyUserData cleanup");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "retry setup failure fixture left mission callback dispatchable after first cleanup");
+
+        dispatcher.FailNextFailedOwnerDestroyRetrySetupForTesting();
+        bool setupFailureThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::bad_alloc&)
+        {
+            setupFailureThrew = true;
+        }
+
+        Require(setupFailureThrew,
+                "mission owner cleanup retry setup failure did not propagate to PluginManager");
+        Require(state.FailingCalls == 1,
+                "mission owner cleanup retry setup failure reran DestroyUserData before setup completed");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "mission owner cleanup retry setup failure did not retain pending DestroyUserData for retry");
+        Require(state.FailingCalls == 2,
+                "mission owner cleanup retry setup failure did not retry retained DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "mission owner cleanup retry setup failure retry was not idempotent after success");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "mission owner cleanup retry setup failure left callback dispatchable");
+    }
 }
 
 int main()
@@ -897,14 +1344,19 @@ int main()
         TestUnregisterForOwnerRequiresMatchingOwner();
         TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
         TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
+        TestSelfUnregisterDestroyFailureIsRetainedForOwnerCleanup();
+        TestWaitingOwnerCleanupObservesSelfUnregisterDeferredDestroyFailure();
         TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks();
         TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestGranularUnregisterPropagatesDeferredDestroyFailure();
+        TestOwnerCleanupRetriesAllDeferredDestroyUserDataFailures();
+        TestDeferredDestroyFailureRecordStorageFailureIsRetainedForOwnerRetry();
         TestCallbackExceptionDoesNotStopDispatch();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();
         TestOwnerCleanupRetriesFailedDestroyUserData();
+        TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData();
     }
     catch (const std::exception& e)
     {

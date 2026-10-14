@@ -5,7 +5,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 TEST_TEMP_ROOT="$(mktemp -d)"
-trap 'rm -rf "${TEST_TEMP_ROOT}"' EXIT
+TEST_IGNORED_REPORT_ROOT=""
+
+cleanup_test_roots() {
+    rm -rf "${TEST_TEMP_ROOT}"
+    if [[ -n "${TEST_IGNORED_REPORT_ROOT}" ]]; then
+        rm -rf "${TEST_IGNORED_REPORT_ROOT}"
+    fi
+}
+trap cleanup_test_roots EXIT
 
 count_temp_roots() {
     find /tmp -maxdepth 1 -type d \
@@ -45,6 +53,13 @@ for expected in \
     "--ufunction-second-source-target-set" \
     "--scriptstruct-second-source-target-set" \
     "--second-source-report-dir" \
+    "Must be new or empty" \
+    "check_public_sdk_v1_completion.py --json" \
+    "report_obelisk_sdk_status.py --json" \
+    "default CI/baseline invocation must not pass --require-v1-sdk-completion" \
+    "explicit stable SDK claim attempt" \
+    "OBELISK_BUILD_DIR" \
+    "OBELISK_BUILD_JOBS" \
     "OBELISK_UFUNCTION_SECOND_SOURCE_ROOT" \
     "OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT" \
     "OBELISK_SECOND_SOURCE_REPORT_DIR"; do
@@ -110,13 +125,336 @@ if ! grep -Fq -- "--v1-sdk-release-statement must not read from protected server
     exit 1
 fi
 
-v1_gate_line="$(grep -n 'check_public_sdk_v1_completion.py' scripts/check_release_readiness.sh | head -n1 | cut -d: -f1)"
+before_protected_build_roots="$(count_temp_roots)"
+set +e
+protected_build_dir_output="$(
+    OBELISK_BUILD_DIR=/servidor/ark/obelisk/build \
+        scripts/check_release_readiness.sh --allow-dirty 2>&1
+)"
+status=$?
+set -e
+after_protected_build_roots="$(count_temp_roots)"
+
+if [[ "${before_protected_build_roots}" != "${after_protected_build_roots}" ]]; then
+    printf 'protected build-dir error path leaked release temp roots: before=%s after=%s\n' \
+        "${before_protected_build_roots}" "${after_protected_build_roots}" >&2
+    exit 1
+fi
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected OBELISK_BUILD_DIR to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_build_dir_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "OBELISK_BUILD_DIR must not read/write under protected server root /servidor/ark" <<<"${protected_build_dir_output}"; then
+    printf 'missing protected OBELISK_BUILD_DIR error\n%s\n' \
+        "${protected_build_dir_output}" >&2
+    exit 1
+fi
+
+protected_live_link="${TEST_TEMP_ROOT}/protected-live-link"
+ln -s /servidor/ark "${protected_live_link}"
+set +e
+protected_build_dir_symlink_output="$(
+    OBELISK_BUILD_DIR="${protected_live_link}/obelisk/build" \
+        scripts/check_release_readiness.sh --allow-dirty 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected symlinked protected OBELISK_BUILD_DIR to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_build_dir_symlink_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "OBELISK_BUILD_DIR must not read/write under protected server root /servidor/ark" <<<"${protected_build_dir_symlink_output}"; then
+    printf 'missing symlinked protected OBELISK_BUILD_DIR error\n%s\n' \
+        "${protected_build_dir_symlink_output}" >&2
+    exit 1
+fi
+
+before_invalid_jobs_roots="$(count_temp_roots)"
+set +e
+invalid_jobs_output="$(
+    OBELISK_BUILD_JOBS=0 scripts/check_release_readiness.sh --allow-dirty 2>&1
+)"
+status=$?
+set -e
+after_invalid_jobs_roots="$(count_temp_roots)"
+
+if [[ "${before_invalid_jobs_roots}" != "${after_invalid_jobs_roots}" ]]; then
+    printf 'invalid jobs error path leaked release temp roots: before=%s after=%s\n' \
+        "${before_invalid_jobs_roots}" "${after_invalid_jobs_roots}" >&2
+    exit 1
+fi
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected invalid OBELISK_BUILD_JOBS to exit 2, got %s\n%s\n' \
+        "${status}" "${invalid_jobs_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "OBELISK_BUILD_JOBS must be a positive integer, got: 0" <<<"${invalid_jobs_output}"; then
+    printf 'missing invalid OBELISK_BUILD_JOBS error\n%s\n' "${invalid_jobs_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_ufunction_root_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-second-source-readiness \
+        --ufunction-second-source-root "${protected_live_link}/workspace-offline/ufunction-snapshots" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected symlinked protected UFunction root to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_ufunction_root_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "--ufunction-second-source-root must not read from protected server root /servidor/ark" <<<"${protected_ufunction_root_output}"; then
+    printf 'missing symlinked protected UFunction root error\n%s\n' \
+        "${protected_ufunction_root_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_workspace_report_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-second-source-readiness \
+        --second-source-report-dir /servidor/ark/workspace-offline/obelisk-release-reports 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected workspace-offline report dir to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_workspace_report_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "--second-source-report-dir must not write under protected server root /servidor/ark" <<<"${protected_workspace_report_output}"; then
+    printf 'missing protected workspace-offline report dir error\n%s\n' \
+        "${protected_workspace_report_output}" >&2
+    exit 1
+fi
+
+stale_cli_report_dir="${TEST_TEMP_ROOT}/stale-cli-second-source-reports"
+mkdir -p "${stale_cli_report_dir}"
+printf '{}\n' > "${stale_cli_report_dir}/old-second-source-readiness.json"
+before_stale_report_roots="$(count_temp_roots)"
+set +e
+stale_cli_report_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-second-source-readiness \
+        --second-source-report-dir "${stale_cli_report_dir}" 2>&1
+)"
+status=$?
+set -e
+after_stale_report_roots="$(count_temp_roots)"
+if [[ "${before_stale_report_roots}" != "${after_stale_report_roots}" ]]; then
+    printf 'stale report-dir error path leaked release temp roots: before=%s after=%s\n' \
+        "${before_stale_report_roots}" "${after_stale_report_roots}" >&2
+    exit 1
+fi
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected stale second-source report dir to exit 2, got %s\n%s\n' \
+        "${status}" "${stale_cli_report_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Second-source report dir must be new or empty; refusing stale generated report root" <<<"${stale_cli_report_output}"; then
+    printf 'missing stale second-source report dir error\n%s\n' \
+        "${stale_cli_report_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_rc_smoke_candidate_output="$(
+    scripts/check_rc_layout_evidence_smoke.sh \
+        --candidate-root /servidor/ark/workspace-offline/rc-ufunction-root 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected RC smoke candidate root to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_rc_smoke_candidate_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "--candidate-root must not read from protected server root /servidor/ark" <<<"${protected_rc_smoke_candidate_output}"; then
+    printf 'missing protected RC smoke candidate root error\n%s\n' \
+        "${protected_rc_smoke_candidate_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_rc_smoke_candidate_symlink_output="$(
+    scripts/check_rc_layout_evidence_smoke.sh \
+        --candidate-root "${protected_live_link}/workspace-offline/rc-ufunction-root" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected symlinked protected RC smoke candidate root to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_rc_smoke_candidate_symlink_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "--candidate-root must not read from protected server root /servidor/ark" <<<"${protected_rc_smoke_candidate_symlink_output}"; then
+    printf 'missing symlinked protected RC smoke candidate root error\n%s\n' \
+        "${protected_rc_smoke_candidate_symlink_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_install_layout_root_output="$(
+    scripts/test_install_obelisk_layout.sh /servidor/ark/obelisk-layout-check 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected install layout root to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_install_layout_root_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Install layout test root must not write under protected server root /servidor/ark" <<<"${protected_install_layout_root_output}"; then
+    printf 'missing protected install layout root error\n%s\n' \
+        "${protected_install_layout_root_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_install_layout_symlink_root_output="$(
+    scripts/test_install_obelisk_layout.sh "${protected_live_link}/obelisk-layout-check" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected symlinked protected install layout root to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_install_layout_symlink_root_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Install layout test root must not write under protected server root /servidor/ark" <<<"${protected_install_layout_symlink_root_output}"; then
+    printf 'missing symlinked protected install layout root error\n%s\n' \
+        "${protected_install_layout_symlink_root_output}" >&2
+    exit 1
+fi
+
+set +e
+protected_install_layout_build_dir_output="$(
+    OBELISK_BUILD_DIR=/servidor/ark/obelisk/build \
+        scripts/test_install_obelisk_layout.sh "${TEST_TEMP_ROOT}/install-layout-build-dir-root" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected install layout build dir to exit 2, got %s\n%s\n' \
+        "${status}" "${protected_install_layout_build_dir_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "OBELISK_BUILD_DIR must not read from protected server root /servidor/ark" <<<"${protected_install_layout_build_dir_output}"; then
+    printf 'missing protected install layout build dir error\n%s\n' \
+        "${protected_install_layout_build_dir_output}" >&2
+    exit 1
+fi
+
+set +e
+v1_sdk_scoped_statement_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-v1-sdk-completion \
+        --v1-sdk-release-statement docs/SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -eq 0 ]]; then
+    printf 'scoped non-complete v1 release statement must not pass complete-SDK gate\n%s\n' \
+        "${v1_sdk_scoped_statement_output}" >&2
+    exit 1
+fi
+for expected in \
+    "Public SDK v1 completion gate blocked." \
+    "The stable v1 SDK claim remains disabled" \
+    "complete_sdk_claim_requires_promoted_demand_families" \
+    "v1_required_dependency_chain_unpromoted"; do
+    if ! grep -Fq -- "${expected}" <<<"${v1_sdk_scoped_statement_output}"; then
+        printf 'missing scoped non-complete v1 gate blocker: %s\n%s\n' \
+            "${expected}" "${v1_sdk_scoped_statement_output}" >&2
+        exit 1
+    fi
+done
+if grep -Fq -- "cmake -S . -B" <<<"${v1_sdk_scoped_statement_output}"; then
+    printf 'v1 SDK completion blocker should fail before configure/build work\n%s\n' \
+        "${v1_sdk_scoped_statement_output}" >&2
+    exit 1
+fi
+
+v1_gate_call_count="$(grep -Fc 'run_step check_public_sdk_v1_stable_claim_gate' scripts/check_release_readiness.sh)"
+if [[ "${v1_gate_call_count}" != "1" ]]; then
+    printf 'v1 SDK stable-claim gate must have exactly one executable call, got %s\n' \
+        "${v1_gate_call_count}" >&2
+    exit 1
+fi
+v1_gate_opt_in_block="$(
+    awk '
+        /^if \[\[ "\$\{REQUIRE_V1_SDK_COMPLETION\}" == "1" \]\]; then/ { printing = 1 }
+        printing { print }
+        printing && /^fi$/ { exit }
+    ' scripts/check_release_readiness.sh
+)"
+if [[ -z "${v1_gate_opt_in_block}" ]]; then
+    printf 'missing v1 SDK completion opt-in block\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- 'run_step check_public_sdk_v1_stable_claim_gate' <<<"${v1_gate_opt_in_block}"; then
+    printf 'v1 SDK stable-claim gate must be called only from the REQUIRE_V1_SDK_COMPLETION opt-in block\n%s\n' \
+        "${v1_gate_opt_in_block}" >&2
+    exit 1
+fi
+if grep -Fq -- 'cmake -S . -B' <<<"${v1_gate_opt_in_block}"; then
+    printf 'v1 SDK completion opt-in block must not include configure/build work\n%s\n' \
+        "${v1_gate_opt_in_block}" >&2
+    exit 1
+fi
+v1_gate_line="$(grep -n 'run_step check_public_sdk_v1_stable_claim_gate' scripts/check_release_readiness.sh | cut -d: -f1)"
 configure_line="$(grep -n 'cmake -S . -B' scripts/check_release_readiness.sh | head -n1 | cut -d: -f1)"
 if [[ -z "${v1_gate_line}" || -z "${configure_line}" || "${v1_gate_line}" -ge "${configure_line}" ]]; then
     printf 'v1 SDK completion gate must run before core configure/build work: gate=%s configure=%s\n' \
         "${v1_gate_line}" "${configure_line}" >&2
     exit 1
 fi
+if ! grep -Fq -- '--json >"${report_path}"' scripts/check_release_readiness.sh; then
+    printf 'v1 SDK completion gate must consume check_public_sdk_v1_completion.py --json\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- 'stable_claim_allowed must be true' scripts/check_release_readiness.sh; then
+    printf 'v1 SDK completion gate must validate stable_claim_allowed from JSON\n' >&2
+    exit 1
+fi
+
+sdk_status_gate_call_count="$(grep -Fc 'run_step check_sdk_status_report_non_claim_gate' scripts/check_release_readiness.sh)"
+if [[ "${sdk_status_gate_call_count}" != "1" ]]; then
+    printf 'SDK status report non-claim gate must have exactly one executable call, got %s\n' \
+        "${sdk_status_gate_call_count}" >&2
+    exit 1
+fi
+sdk_status_gate_line="$(grep -n 'run_step check_sdk_status_report_non_claim_gate' scripts/check_release_readiness.sh | cut -d: -f1)"
+if [[ -z "${sdk_status_gate_line}" || -z "${configure_line}" || "${sdk_status_gate_line}" -ge "${configure_line}" ]]; then
+    printf 'SDK status report non-claim gate must run before core configure/build work: gate=%s configure=%s\n' \
+        "${sdk_status_gate_line}" "${configure_line}" >&2
+    exit 1
+fi
+for expected in \
+    'scripts/report_obelisk_sdk_status.py --json' \
+    'status_report_only' \
+    'stable_sdk_ready' \
+    'source_overclaim_total_flag_count' \
+    'side_lane_source_overclaim_count' \
+    'complete_sdk_progress_ratio' \
+    'p0_chain_progress_ratio' \
+    'approved_runtime_principal_lifecycle_evidence_bundle' \
+    'SDK status report remained blocked/non-claim with zero source overclaims'; do
+    if ! grep -Fq -- "${expected}" scripts/check_release_readiness.sh; then
+        printf 'SDK status report non-claim gate missing source contract: %s\n' "${expected}" >&2
+        exit 1
+    fi
+done
 
 if ! grep -Fq -- "Public SDK v1 stable claim gate passed." scripts/check_release_readiness.sh; then
     printf 'missing precise v1 stable-claim pass wording in release gate\n' >&2
@@ -146,6 +484,36 @@ if ! grep -Fq -- "Release gate output is evidence for this exact gate only" scri
     printf 'missing release gate final non-claim wording\n' >&2
     exit 1
 fi
+if ! grep -Fq -- "Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4, stable_claim_allowed=false, active blocker approved_runtime_evidence_missing." scripts/check_release_readiness.sh; then
+    printf 'missing release gate current route blocker non-claim wording\n' >&2
+    exit 1
+fi
+ci_release_readiness_block="$(
+    awk '
+        /^  release-readiness:/ { printing = 1 }
+        printing { print }
+        /^  reflection-base-readiness:/ { exit }
+    ' .github/workflows/ci.yml
+)"
+if [[ -z "${ci_release_readiness_block}" ]]; then
+    printf 'missing CI release-readiness job block\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- 'run: scripts/check_release_readiness.sh' <<<"${ci_release_readiness_block}"; then
+    printf 'CI release-readiness job must run the baseline release gate command\n%s\n' \
+        "${ci_release_readiness_block}" >&2
+    exit 1
+fi
+if ! grep -Fq -- 'core-first baseline only' <<<"${ci_release_readiness_block}"; then
+    printf 'CI release-readiness job must document that it is the core-first baseline only\n%s\n' \
+        "${ci_release_readiness_block}" >&2
+    exit 1
+fi
+if grep -Ev '^[[:space:]]*#' <<<"${ci_release_readiness_block}" | grep -Fq -- '--require-v1-sdk-completion'; then
+    printf 'CI release-readiness commands must not request the complete-SDK claim gate by default\n%s\n' \
+        "${ci_release_readiness_block}" >&2
+    exit 1
+fi
 
 if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
     printf 'missing production symbol-surface help text\n' >&2
@@ -157,9 +525,21 @@ for expected in \
     "support-tier activation" \
     "runtime readiness" \
     "stable SDK claim" \
-    "v1 SDK completion"; do
+    "v1 SDK completion" \
+    "SDK blocker promotion 0/12" \
+    "P0 dependency chain 0/4" \
+    "stable_claim_allowed=false" \
+    "approved_runtime_evidence_missing"; do
     if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
         printf 'missing release gate non-claim help text: %s\n' "${expected}" >&2
+        exit 1
+    fi
+done
+for expected in \
+    "install/SDK package-shape dry-runs" \
+    "installed CMake package non-claim metadata"; do
+    if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
+        printf 'missing release gate package-shape help text: %s\n' "${expected}" >&2
         exit 1
     fi
 done
@@ -172,7 +552,6 @@ fi
 for expected in \
     "Defaults to the public RC target sets" \
     "structure-observer-intake" \
-    "item-return-only-policy-slice" \
     "chat-message-intake"; do
     if ! grep -Fq -- "${expected}" <<<"${help_output}"; then
         printf 'missing public RC target-set help text: %s\n' "${expected}" >&2
@@ -182,6 +561,10 @@ done
 
 if ! grep -Fq -- "temporary directory under the release check root" <<<"${help_output}"; then
     printf 'missing temporary second-source report dir help text\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- "must not traverse symlink path components" <<<"${help_output}"; then
+    printf 'missing second-source symlink path-component help text\n' >&2
     exit 1
 fi
 
@@ -232,7 +615,6 @@ assert_ufunction_target_sets_after_defaults() {
     local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
         "minimal-second-source-intake"
         "structure-observer-intake"
-        "item-return-only-policy-slice"
         "chat-message-intake"
     )
     local UFUNCTION_SECOND_SOURCE_TARGET_SETS=("$@")
@@ -252,14 +634,30 @@ assert_ufunction_target_sets_after_defaults() {
 }
 
 assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice,chat-message-intake"
+    "minimal-second-source-intake,structure-observer-intake,chat-message-intake"
 assert_ufunction_target_sets_after_defaults \
-    "chat-message-intake,minimal-second-source-intake,structure-observer-intake,item-return-only-policy-slice" \
+    "chat-message-intake,minimal-second-source-intake,structure-observer-intake" \
     "chat-message-intake"
-assert_ufunction_target_sets_after_defaults \
-    "minimal-second-source-intake,item-return-only-policy-slice,structure-observer-intake,chat-message-intake" \
-    "minimal-second-source-intake" \
-    "item-return-only-policy-slice"
+
+set +e
+item_return_target_set_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-second-source-readiness \
+        --ufunction-second-source-target-set item-return-only-policy-slice 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected item-return-only-policy-slice release target set to exit 2, got %s\n%s\n' \
+        "${status}" "${item_return_target_set_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "item-return-only-policy-slice is planning/guidance-only and cannot be used as a release readiness UFunction target set." <<<"${item_return_target_set_output}"; then
+    printf 'missing item-return-only release target-set rejection\n%s\n' \
+        "${item_return_target_set_output}" >&2
+    exit 1
+fi
 
 merge_function="$(sed -n '/^merge_second_source_status()/,/^}/p' scripts/check_release_readiness.sh)"
 if [[ -z "${merge_function}" ]]; then
@@ -334,6 +732,163 @@ if ! grep -Fq -- 'run_step check_production_runtime_symbols' scripts/check_relea
     exit 1
 fi
 
+package_shape_vars_block="$(
+    sed -n '/^PACKAGE_SHAPE_NON_CLAIM_CMAKE_VARS=(/,/^)/p' scripts/check_release_readiness.sh
+)"
+if [[ -z "${package_shape_vars_block}" ]]; then
+    printf 'missing package-shape non-claim CMake variable list\n' >&2
+    exit 1
+fi
+eval "${package_shape_vars_block}"
+
+require_file_contains_function="$(sed -n '/^require_file_contains()/,/^}/p' scripts/check_release_readiness.sh)"
+package_shape_contract_function="$(sed -n '/^check_package_shape_non_claim_contract()/,/^}/p' scripts/check_release_readiness.sh)"
+if [[ -z "${require_file_contains_function}" || -z "${package_shape_contract_function}" ]]; then
+    printf 'missing package-shape source non-claim contract guard\n' >&2
+    exit 1
+fi
+eval "${require_file_contains_function}"
+eval "${package_shape_contract_function}"
+check_package_shape_non_claim_contract
+
+for expected in \
+    'Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS' \
+    'package-shape-evidence-only' \
+    'PACKAGE_SHAPE_NON_CLAIM_CMAKE_VARS[@]' \
+    'Plugin Hub seed work is parked until the complete SDK blocker chain is resolved.' \
+    'The plugin installer only publishes an already-built `.so`; it does not validate Plugin Hub' \
+    'Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency chain 0/4, stable_claim_allowed=false, active blocker approved_runtime_evidence_missing.' \
+    'These package-shape markers do not resolve route completion for the current complete SDK' \
+    'stable_claim_allowed=false' \
+    'approved_runtime_evidence_missing'; do
+    if ! grep -Fq -- "${expected}" <<<"${package_shape_contract_function}"; then
+        printf 'missing package-shape source contract logic: %s\n%s\n' \
+            "${expected}" "${package_shape_contract_function}" >&2
+        exit 1
+    fi
+done
+for expected in "${PACKAGE_SHAPE_NON_CLAIM_CMAKE_VARS[@]}"; do
+    if ! grep -Fq -- "set(${expected} FALSE)" cmake/ObeliskConfig.cmake.in; then
+        printf 'CMake package config template must keep %s false\n' "${expected}" >&2
+        exit 1
+    fi
+    if ! grep -Fq -- "${expected}=FALSE" docs/INSTALL.md; then
+        printf 'install docs must list %s as false package-shape metadata\n' "${expected}" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq -- 'run_step check_package_shape_non_claim_contract' scripts/check_release_readiness.sh; then
+    printf 'release readiness must run package-shape source non-claim contract guard\n' >&2
+    exit 1
+fi
+
+protected_path_helpers="$(
+    awk '
+        /^SERVER_ROOT=/ { print; next }
+        /^is_under_path\(\)/ { printing = 1 }
+        /^while \[\[/ { printing = 0 }
+        printing { print }
+    ' scripts/check_release_readiness.sh
+)"
+if [[ -z "${protected_path_helpers}" ]]; then
+    printf 'missing protected path helpers\n' >&2
+    exit 1
+fi
+eval "${protected_path_helpers}"
+
+installed_package_function="$(
+    sed -n '/^check_installed_cmake_package_non_claim_metadata()/,/^}/p' scripts/check_release_readiness.sh
+)"
+if [[ -z "${installed_package_function}" ]]; then
+    printf 'missing installed CMake package non-claim metadata guard\n' >&2
+    exit 1
+fi
+for expected in \
+    'ObeliskConfig.cmake' \
+    'ObeliskConfigVersion.cmake' \
+    'ObeliskTargets.cmake' \
+    'find_package(Obelisk 0.1.0 EXACT CONFIG QUIET COMPONENTS SDK)' \
+    'Installed Obelisk package accepted an exact stable-looking 0.1.0 SDK request' \
+    'find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)' \
+    'Obelisk::obelisk_sdk' \
+    'Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev"' \
+    'Obelisk_RELEASE_CHANNEL STREQUAL "dev"' \
+    'Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS STREQUAL "package-shape-evidence-only"' \
+    'Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED' \
+    'Obelisk_PLUGIN_HUB_READINESS_CLAIM_ALLOWED' \
+    'Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED' \
+    'reject_protected_path "Installed CMake package root" "read from" "${install_root}"' \
+    'Installed Obelisk package enabled forbidden readiness marker'; do
+    if ! grep -Fq -- "${expected}" <<<"${installed_package_function}"; then
+        printf 'missing installed CMake package non-claim guard logic: %s\n%s\n' \
+            "${expected}" "${installed_package_function}" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq -- 'run_step check_installed_cmake_package_non_claim_metadata "${LAYOUT_CHECK_ROOT}"' scripts/check_release_readiness.sh; then
+    printf 'release readiness must validate installed CMake package non-claim metadata after install layout\n' >&2
+    exit 1
+fi
+eval "${installed_package_function}"
+
+set +e
+protected_installed_package_output="$(
+    RELEASE_CHECK_ROOT="${TEST_TEMP_ROOT}/installed-package-protected-root" \
+    check_installed_cmake_package_non_claim_metadata "/servidor/ark/obelisk" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected installed CMake package guard to reject protected root, got %s\n%s\n' \
+        "${status}" "${protected_installed_package_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Installed CMake package root must not read from protected server root /servidor/ark" <<<"${protected_installed_package_output}"; then
+    printf 'missing protected installed CMake package root error\n%s\n' \
+        "${protected_installed_package_output}" >&2
+    exit 1
+fi
+
+set +e
+missing_installed_package_output="$(
+    RELEASE_CHECK_ROOT="${TEST_TEMP_ROOT}/installed-package-missing-root" \
+    check_installed_cmake_package_non_claim_metadata "${TEST_TEMP_ROOT}/missing-install-root" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -eq 0 ]]; then
+    printf 'installed CMake package guard accepted a missing package root\n%s\n' \
+        "${missing_installed_package_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Installed CMake package config missing" <<<"${missing_installed_package_output}"; then
+    printf 'missing installed CMake package guard error\n%s\n' \
+        "${missing_installed_package_output}" >&2
+    exit 1
+fi
+
+mkdir -p "${TEST_TEMP_ROOT}/installed-package-no-version/lib/cmake/Obelisk"
+touch \
+    "${TEST_TEMP_ROOT}/installed-package-no-version/lib/cmake/Obelisk/ObeliskConfig.cmake" \
+    "${TEST_TEMP_ROOT}/installed-package-no-version/lib/cmake/Obelisk/ObeliskTargets.cmake"
+set +e
+missing_version_output="$(
+    RELEASE_CHECK_ROOT="${TEST_TEMP_ROOT}/installed-package-missing-version-root" \
+    check_installed_cmake_package_non_claim_metadata "${TEST_TEMP_ROOT}/installed-package-no-version" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -eq 0 ]]; then
+    printf 'installed CMake package guard accepted a missing version config\n%s\n' \
+        "${missing_version_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Installed CMake package version config missing" <<<"${missing_version_output}"; then
+    printf 'missing installed CMake package version guard error\n%s\n' \
+        "${missing_version_output}" >&2
+    exit 1
+fi
+
 second_source_report_dir_default_block="$(
     awk '
         /^if \[\[ "\$\{REQUIRE_SECOND_SOURCE_READINESS\}" == "1" && -z "\$\{SECOND_SOURCE_REPORT_DIR\}" \]\]; then/ { printing = 1 }
@@ -359,21 +914,6 @@ assert_second_source_report_dir_default() {
 }
 
 assert_second_source_report_dir_default
-
-protected_path_helpers="$(
-    awk '
-        /^SERVER_ROOT=/ { print; next }
-        /^APPROVED_OFFLINE_WORKSPACE_ROOT=/ { print; next }
-        /^is_under_path\(\)/ { printing = 1 }
-        /^while \[\[/ { printing = 0 }
-        printing { print }
-    ' scripts/check_release_readiness.sh
-)"
-if [[ -z "${protected_path_helpers}" ]]; then
-    printf 'missing protected path helpers\n' >&2
-    exit 1
-fi
-eval "${protected_path_helpers}"
 
 assert_second_source_root_commit_validation() {
     local candidate_root="${TEST_TEMP_ROOT}/cross-ref-ufunction-root"
@@ -1127,7 +1667,6 @@ assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets() {
     local PUBLIC_RC_UFUNCTION_SECOND_SOURCE_TARGET_SETS=(
         "minimal-second-source-intake"
         "structure-observer-intake"
-        "item-return-only-policy-slice"
         "chat-message-intake"
     )
     local UFUNCTION_SECOND_SOURCE_TARGET_SETS=()
@@ -1180,14 +1719,6 @@ assert_minimal_only_ufunction_root_does_not_satisfy_public_rc_target_sets() {
                     exit 1
                 fi
                 assert_public_rc_report_state "${report_path}" "${target_set}" false 2 4
-                ;;
-            item-return-only-policy-slice)
-                if [[ "${status}" -eq 0 ]]; then
-                    printf 'minimal-only UFunction second source unexpectedly satisfied item return RC target set\n%s\n' \
-                        "${output}" >&2
-                    exit 1
-                fi
-                assert_public_rc_report_state "${report_path}" "${target_set}" false 0 3
                 ;;
             chat-message-intake)
                 if [[ "${status}" -eq 0 ]]; then
@@ -1308,10 +1839,45 @@ assert_protected_path_rejected \
     "read from" \
     "${with_symlink_dir}/snapshots" \
     "--scriptstruct-second-source-root must not read from protected server root /servidor/ark"
+assert_protected_path_rejected \
+    "--second-source-report-dir" \
+    "write under" \
+    "/servidor/ark/workspace-offline/reports" \
+    "--second-source-report-dir must not write under protected server root /servidor/ark"
 assert_path_not_rejected_by_prefix_only "/servidor/ark-not-live/reports"
-assert_path_not_rejected_by_prefix_only "/servidor/ark/workspace-offline/reports"
+empty_existing_report_dir="${TEST_TEMP_ROOT}/empty-existing-second-source-reports"
+mkdir -p "${empty_existing_report_dir}"
+assert_report_dir_validates "${empty_existing_report_dir}"
 assert_report_dir_validates "local/release-readiness-options-test"
 assert_report_dir_validates "local/release-readiness-options-test/"
+symlink_component_target="${TEST_TEMP_ROOT}/report-component-target"
+symlink_component_parent="${TEST_TEMP_ROOT}/report-component-link"
+mkdir -p "${symlink_component_target}"
+ln -s "${symlink_component_target}" "${symlink_component_parent}"
+assert_report_dir_rejected \
+    "${symlink_component_parent}/reports" \
+    "Second-source report dir must not resolve through symlink path components"
+stale_temp_report_dir="${TEST_TEMP_ROOT}/stale-second-source-reports"
+mkdir -p "${stale_temp_report_dir}"
+printf '{}\n' > "${stale_temp_report_dir}/old-readiness.json"
+assert_report_dir_rejected \
+    "${stale_temp_report_dir}" \
+    "Second-source report dir must be new or empty; refusing stale generated report root"
+report_dir_file="${TEST_TEMP_ROOT}/second-source-report-file"
+printf '{}\n' > "${report_dir_file}"
+assert_report_dir_rejected \
+    "${report_dir_file}" \
+    "Second-source report dir must be a directory"
+report_dir_symlink="${TEST_TEMP_ROOT}/second-source-report-symlink"
+ln -s "${empty_existing_report_dir}" "${report_dir_symlink}"
+assert_report_dir_rejected \
+    "${report_dir_symlink}" \
+    "Second-source report dir must be a real directory, not a symlink"
+TEST_IGNORED_REPORT_ROOT="$(mktemp -d local/release-readiness-options-stale.XXXXXX)"
+printf '{}\n' > "${TEST_IGNORED_REPORT_ROOT}/old-readiness.json"
+assert_report_dir_rejected \
+    "${TEST_IGNORED_REPORT_ROOT}" \
+    "Second-source report dir must be new or empty; refusing stale generated report root"
 assert_report_dir_rejected \
     "second-source-reports" \
     "Second-source report dir inside the repository must be ignored"
@@ -1377,6 +1943,51 @@ fi
 
 if ! grep -Fq -- "Second-source roots, target sets, or report dirs require --require-second-source-readiness." <<<"${report_dir_without_gate_output}"; then
     printf 'missing report-dir option validation error\n%s\n' "${report_dir_without_gate_output}" >&2
+    exit 1
+fi
+
+nonlive_second_source_target="${TEST_TEMP_ROOT}/nonlive-second-source-target"
+nonlive_second_source_link="${TEST_TEMP_ROOT}/nonlive-second-source-link"
+mkdir -p "${nonlive_second_source_target}/candidate"
+ln -s "${nonlive_second_source_target}" "${nonlive_second_source_link}"
+set +e
+nonlive_symlink_second_source_output="$(
+    scripts/check_release_readiness.sh \
+        --allow-dirty \
+        --require-second-source-readiness \
+        --ufunction-second-source-root "${nonlive_second_source_link}/candidate" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected non-live symlinked UFunction root to exit 2, got %s\n%s\n' \
+        "${status}" "${nonlive_symlink_second_source_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "--ufunction-second-source-root must not resolve through symlink path components" <<<"${nonlive_symlink_second_source_output}"; then
+    printf 'missing non-live symlinked UFunction root error\n%s\n' \
+        "${nonlive_symlink_second_source_output}" >&2
+    exit 1
+fi
+
+install_layout_component_target="${TEST_TEMP_ROOT}/install-layout-component-target"
+install_layout_component_link="${TEST_TEMP_ROOT}/install-layout-component-link"
+mkdir -p "${install_layout_component_target}"
+ln -s "${install_layout_component_target}" "${install_layout_component_link}"
+set +e
+install_layout_symlink_component_output="$(
+    scripts/test_install_obelisk_layout.sh "${install_layout_component_link}/layout-root" 2>&1
+)"
+status=$?
+set -e
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected install layout root through symlink component to exit 2, got %s\n%s\n' \
+        "${status}" "${install_layout_symlink_component_output}" >&2
+    exit 1
+fi
+if ! grep -Fq -- "Install layout test root must not resolve through symlink path components" <<<"${install_layout_symlink_component_output}"; then
+    printf 'missing install layout symlink component error\n%s\n' \
+        "${install_layout_symlink_component_output}" >&2
     exit 1
 fi
 

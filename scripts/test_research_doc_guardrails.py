@@ -15,10 +15,17 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import evaluate_resource_handle_revalidation as resourcehandle_evaluator  # noqa: E402
 import build_player_identity_runtime_principal_lifecycle_evidence_bundle as identity_bundle_builder  # noqa: E402
+from check_public_sdk_v1_completion import release_statement_forbidden_broad_claims  # noqa: E402
 
 
 def normalized(text: str) -> str:
     return " ".join(text.split())
+
+
+CURRENT_TURN_EXACT_SCOPE = (
+    "Current-turn exact scope is required for live server/log reads, marker/env changes, "
+    "Discord sends, and runtime capture"
+)
 
 
 class ResearchDocGuardrailTests(unittest.TestCase):
@@ -225,6 +232,26 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         )
         self._assert_identity_bundle_flags_match_builder_cli(documented_flags)
 
+    def test_player_principal_observer_brief_requires_exact_checkjoin_rejected_start(self) -> None:
+        observer_brief = (
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md"
+        ).read_text(encoding="utf-8")
+        compact = normalized(observer_brief)
+
+        self.assertIn("ShooterGameMode.CheckJoinInProgress(1,0)", observer_brief)
+        self.assertIn(
+            "CheckJoinInProgress` is the only approved `session_start_rejected` source",
+            compact,
+        )
+        self.assertIn(
+            "`HandleNewPlayer` bool combinations are diagnostic only and are not approved "
+            "`session_start_rejected` evidence",
+            compact,
+        )
+        self.assertIn("`bIsFromLogin=1` and `ReturnValue=0`", compact)
+        self.assertNotIn("canonical rejected anchor `bIsFromLogin=0` and `ReturnValue=1`", observer_brief)
+        self.assertNotIn("`HandleNewPlayer` is an approved `session_start_rejected` source", compact)
+
     def test_player_lifecycle_six_candidate_evidence_is_labeled_scratch_not_durable(self) -> None:
         fixture_gap = (
             REPO_ROOT / "docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md"
@@ -245,7 +272,8 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("limited to\n  `HandleNewPlayer` and `OnLogout`", runtime_plan)
         self.assertIn("scratch triage unless materialized into an approved offline artifact/root", runtime_plan)
         self.assertIn("six committed base fixtures", observer_brief)
-        self.assertIn("limited to\n  `HandleNewPlayer` and `OnLogout`", observer_brief)
+        self.assertIn("lifecycle-anchor evidence is currently limited to\n  `HandleNewPlayer` and `OnLogout`", observer_brief)
+        self.assertIn("`ShooterGameMode.CheckJoinInProgress(1,0)` is the only approved", observer_brief)
         self.assertIn("scratch triage unless\n  materialized into an approved offline artifact/root", observer_brief)
         self.assertNotIn(
             "`players-lifecycle-anchor-candidates` has accepted planning-layout evidence for six",
@@ -255,6 +283,802 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             "six lifecycle-anchor planning targets accepted across two offline\n  roots",
             observer_brief,
         )
+
+    def test_june4_fast_path_keeps_passive_snapshot_as_non_evidence(self) -> None:
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+        current = (REPO_ROOT / "docs/agent-handoff/CURRENT.md").read_text(encoding="utf-8")
+        compact = (
+            REPO_ROOT / "docs/agent-handoff/COMPACT_CONTEXT.md"
+        ).read_text(encoding="utf-8")
+
+        fast_compact = normalized(fast_path)
+        current_compact = normalized(current)
+        compact_compact = normalized(compact)
+
+        for label, text in (
+            ("fast-path", fast_compact),
+            ("current", current_compact),
+            ("compact", compact_compact),
+        ):
+            with self.subTest(doc=label, invariant="active two-map passive wait"):
+                self.assertIn("arkserver` / `Ragnarok", text)
+                if label == "current":
+                    self.assertIn("Genesis2 still lacks `session_end`", text)
+                else:
+                    self.assertIn("arkserver3` / `Genesis2", text)
+                self.assertRegex(text, r"passive (?:wait|monitor)")
+                self.assertTrue(
+                    "arkserver2` / `TheIsland` is off" in text
+                    or "`arkserver2` / `TheIsland` explicitly approved" in text
+                    or "TheIsland `arkserver2`" in text,
+                    f"{label}: expected either historical off-state or current TheIsland binding",
+                )
+                self.assertIn("Never keep three ARK servers running", text)
+            with self.subTest(doc=label, invariant="no chained restarts"):
+                self.assertRegex(text, r"(?i)do not (?:chain )?restarts? while waiting|avoid repeated restarts")
+            with self.subTest(doc=label, invariant="runtime evidence blocker"):
+                self.assertIn("approved_runtime_evidence_missing", text)
+            with self.subTest(doc=label, invariant="passive snapshot non-evidence"):
+                self.assertIn("ready=false", text)
+                self.assertTrue(
+                    "approved_runtime_evidence=false" in text
+                    or "approved runtime evidence false" in text,
+                    f"{label}: passive snapshot must preserve approved runtime evidence false",
+                )
+            with self.subTest(doc=label, invariant="latest snapshot identity"):
+                self.assertIn(
+                    "/tmp/obelisk-passive-evidence-snapshots/passive-manual-20260604T085119Z-arkserver+arkserver2-3215640/manifest.json",
+                    text,
+                )
+                self.assertIn("captured_at_utc=2026-06-04T08:51:19Z", text)
+                self.assertIn("3261082", text)
+                self.assertRegex(text, r"diagnostic(?:_candidate_count|_candidates)=17")
+                self.assertIn("HandleNewPlayer=7", text)
+                self.assertIn("OnLogout=5", text)
+                self.assertIn("CheckJoinInProgress=2", text)
+                self.assertIn("K2_PostLogin=3", text)
+                self.assertIn("HandleNewPlayer=4", text)
+                self.assertIn("OnLogout=3", text)
+                self.assertRegex(text, r"accepted(?:_count)?=0")
+                self.assertRegex(text, r"rejected(?:_count)?=0")
+                self.assertIn("passive_snapshot_non_evidence", text)
+                self.assertIn("approved-evidence checker rejects", text)
+
+        self.assertIn("All six previously open delegated agents were closed", fast_path)
+        self.assertIn("all six spawned agents were closed", current_compact)
+        self.assertIn("all six previously open agents were closed", compact_compact)
+        self.assertIn("no active sub-agent was left open", fast_compact)
+        self.assertIn("Six-Agent Integration", fast_path)
+        self.assertIn("All six agents from the current round were closed", fast_path)
+        self.assertIn("All six agents from the prior round were closed", fast_path)
+        self.assertIn("no new sub-agent work is opened by this note", fast_compact)
+        self.assertIn("offline/local hardening", fast_path)
+        self.assertIn("No live-server write", fast_compact)
+        self.assertIn("marker/env mutation", fast_compact)
+        self.assertIn("not approved runtime evidence", fast_compact)
+        self.assertIn("The route remains `approved_runtime_evidence_missing`", fast_path)
+        self.assertIn("stable_claim_allowed=false", fast_path)
+        self.assertIn("SDK remains `0/12`, P0 `0/4`", fast_path)
+        self.assertIn(
+            "until real copied `PlayerPrincipalLifecycleObserver event` lines are accepted by the evidence checkers",
+            fast_compact,
+        )
+        self.assertIn(
+            "no accepted `PlayerPrincipalLifecycleObserver event`, `session_start`, `session_start_rejected`, or `session_end` lines",
+            fast_compact,
+        )
+        self.assertIn("PlayerPrincipalLifecycleObserver event", compact_compact)
+        for event_name in ("session_start", "session_start_rejected", "session_end"):
+            with self.subTest(event=event_name):
+                self.assertIn(event_name, fast_compact)
+                self.assertIn(event_name, current_compact)
+                self.assertIn(event_name, compact_compact)
+
+        self.assertIn("Operator instruction captured on `2026-06-04`", fast_path)
+        self.assertIn("scoped passive server tests", fast_compact)
+        self.assertIn("offline development continues in parallel", fast_compact)
+        self.assertIn("This does not authorize repeated restarts while waiting", fast_compact)
+        self.assertIn("publication, or SDK readiness claims", fast_compact)
+        self.assertIn(
+            "Historical correction recorded later on 2026-06-04: routing had moved from TheIsland to the two-server Ragnarok+Genesis2 posture",
+            fast_compact,
+        )
+        self.assertIn("then-active two-server pair", fast_compact)
+        self.assertIn("never keep three ark servers running", fast_compact.lower())
+        self.assertIn("arkserver3:Genesis2:27017", fast_compact)
+        self.assertIn("/tmp/obelisk_passive_player_monitor_arkserver_arkserver3.log", fast_compact)
+        self.assertIn("79.116.87.223:27017", fast_compact)
+        self.assertIn("public GameDig query", fast_compact)
+        self.assertIn("map `Gen2`", fast_compact)
+        self.assertIn("connect=79.116.87.223:7783", fast_compact)
+        self.assertIn("the earlier public-query/NAT blocker is resolved", fast_compact)
+        self.assertIn("process_control=none", fast_compact)
+        self.assertIn("Monitor ticks, copied passive snapshots", fast_compact)
+        self.assertIn("`--latest-diff` output", fast_compact)
+        self.assertIn("FName-drift diffs", fast_compact)
+        self.assertIn("diagnostic-only; they are not runtime evidence", fast_compact)
+        self.assertIn("passive_activity_triage", fast_compact)
+        self.assertIn("classification only", fast_compact)
+        self.assertIn("non-claim wording must not describe it as public/runtime readiness", fast_compact)
+        self.assertIn(
+            "the copied approved sibling-set bundle with real `PlayerPrincipalLifecycleObserver event` lines for `session_start`, `session_start_rejected`, and `session_end`",
+            fast_compact,
+        )
+        self.assertRegex(
+            fast_compact,
+            r"do not chain restarts while waiting|not approval for .* chained restarts while waiting",
+        )
+        self.assertIn("not approval for new marker/env changes, deploys, restarts", fast_compact)
+        self.assertIn(
+            "Any future active server operation must get a fresh current-turn approval",
+            fast_path,
+        )
+        self.assertIn("exact instance or instances, marker/env gates", fast_compact)
+        self.assertIn("process-control window, evidence paths", fast_compact)
+        self.assertIn("no-public-readiness/no-publication boundaries", fast_compact)
+        self.assertIn(
+            "Passive wait docs, monitor output, passive snapshots, and diagnostic summaries cannot be reused as that approval",
+            fast_compact,
+        )
+        latest_theisland_statement = normalized(
+            """
+            Durable statement for future agents: the `2026-06-04T11:30:21Z` TheIsland
+            passive detection at
+            `/tmp/obelisk-passive-evidence-snapshots/passive-detect-20260604T113021Z-arkserver2-3261082`
+            is useful diagnostic material only, not accepted evidence; it is missing
+            `session_start`, `session_start_rejected`, and `session_end`, the remaining
+            diagnostic mismatch is `lifecycle_property_FName_mismatch`, and that
+            historical TheIsland passive route is no longer active routing.
+            `arkserver2` / `TheIsland` was later recorded as off while `arkserver` / `Ragnarok`
+            and `arkserver3` / `Genesis2:27017` were the then-active passive pair.
+            """
+        )
+        self.assertIn(latest_theisland_statement, fast_compact)
+        for forbidden in (
+            "Current correction: active routing",
+            "Current run directory",
+            "current top-level runtime facts",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, fast_path)
+        self.assertIn("organic `arkserver2` / `TheIsland` player presence at `2026-06-04T11:30:21Z`", fast_compact)
+        self.assertIn("latest passive snapshot path", fast_compact)
+        self.assertIn("passive-detect-20260604T113021Z-arkserver2-3261082", fast_compact)
+        self.assertIn("TheIsland's remaining diagnostic mismatch is `lifecycle_property_FName_mismatch`", fast_path)
+
+    def test_june4_fast_path_index_entry_is_historical_non_authorizing(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+
+        entries = [
+            line
+            for line in readme.splitlines()
+            if "2026-06-04-arkserver2-runtime-sdk-fast-path.md" in line
+        ]
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        entry_compact = normalized(entry)
+        scope_compact = normalized(
+            fast_path.split("## Scope", 1)[1].split(
+                "## 2026-06-04 Offline Completion Checker", 1
+            )[0]
+        )
+
+        for phrase in (
+            "historical `arkserver2` / `TheIsland` debug-target approval",
+            "superseded by Ragnarok+Genesis2 passive-route facts",
+            "non-authorizing research chronology only",
+            "not public SDK readiness",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, entry_compact)
+
+        self.assertNotIn(
+            "operator-approved `arkserver2` / `TheIsland` debug target and fastest safe route",
+            entry,
+        )
+        self.assertIn(
+            "Interpret every old `active`, `current`, or `then-current` server/map phrase",
+            scope_compact,
+        )
+        self.assertIn("timestamped historical context, not standing authorization", scope_compact)
+        self.assertIn("current-turn live reads", scope_compact)
+        self.assertIn("marker/env changes", scope_compact)
+        self.assertIn("process control", scope_compact)
+        self.assertIn("runtime capture", scope_compact)
+        self.assertIn("publication, or SDK/P0 progress", scope_compact)
+
+    def test_june4_snapshot_on_detect_and_scoped_statement_are_non_claims(self) -> None:
+        fast_path = normalized(
+            (REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md").read_text(
+                encoding="utf-8"
+            )
+        )
+        current = normalized((REPO_ROOT / "docs/agent-handoff/CURRENT.md").read_text(encoding="utf-8"))
+
+        for label, text in (("fast-path", fast_path), ("current", current)):
+            with self.subTest(doc=label, invariant="snapshot trigger"):
+                self.assertIn("scripts/monitor_ark_player_presence_passive.sh", text)
+                self.assertIn("/tmp/obelisk-passive-evidence-snapshots", text)
+                self.assertIn("/tmp/obelisk_passive_player_monitor_arkserver_arkserver3.log", text)
+                self.assertIn("players=1+", text)
+                if label == "fast-path":
+                    self.assertIn("--snapshot-output-root", text)
+                    self.assertIn("--snapshot-monitor-log", text)
+                else:
+                    self.assertRegex(text, r"snapshot(?:s)? under|--snapshot-output-root")
+            with self.subTest(doc=label, invariant="snapshot remains non-evidence"):
+                self.assertIn("ready=false", text)
+                self.assertTrue(
+                    "approved_runtime_evidence=false" in text
+                    or "approved runtime evidence false" in text,
+                    f"{label}: snapshot must preserve approved runtime evidence false",
+                )
+                self.assertIn("approved_runtime_evidence_missing", text)
+
+        self.assertIn(
+            "only calls `scripts/capture_player_principal_passive_snapshot.py` after `players=1+` is detected",
+            fast_path,
+        )
+        self.assertIn("Until that happens, no new snapshot directory is created", fast_path)
+        self.assertTrue(
+            "review the snapshot before any marker/server change" in current
+            or "snapshots after `players=1+` are review-only until a future scoped marker/server change"
+            in current,
+            "CURRENT.md must keep passive snapshots review-only before marker/server changes",
+        )
+
+        scoped_statement = REPO_ROOT / "docs" / "SCOPED_NON_COMPLETE_V1_RELEASE_STATEMENT.md"
+        self.assertTrue(
+            scoped_statement.exists(),
+            "durable scoped statement must remain present as non-claim bookkeeping",
+        )
+
+        statement = scoped_statement.read_text(encoding="utf-8")
+        self.assertEqual(release_statement_forbidden_broad_claims(statement), [])
+        self.assertIn("non-claim bookkeeping only", statement)
+        self.assertIn("Scoped outcome rows: 8; non-claim bookkeeping only", statement)
+        self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", statement)
+        self.assertIn("do not authorize stable/full/production SDK wording", statement)
+        self.assertNotRegex(statement.lower(), r"\b(?:runtime|public sdk|sdk)\s+ready\b")
+        self.assertNotRegex(statement, r"readiness(?:_claim)?(?:_allowed)?=(?:true|TRUE)")
+
+        outcome_lines = [
+            line
+            for line in statement.splitlines()
+            if line and not line.startswith("#")
+        ]
+        self.assertEqual(len(outcome_lines), 8)
+        for line in outcome_lines:
+            with self.subTest(line=line):
+                self.assertRegex(line, r": (?:post-v1|excluded) - (?:no |mission excluded,)")
+                self.assertNotIn("stable_claim_allowed=true", line)
+                self.assertNotIn("complete_sdk_claim_allowed=true", line)
+
+        forbidden_unlocks = (
+            "stable_claim_allowed=true",
+            "complete_sdk_claim_allowed=true",
+            "public_sdk_ready=true",
+            "sdk_ready=true",
+            "sdk_claim_ready=true",
+            "runtime_ready=true",
+            "current_route_blocker=identity_public_contract_gate_missing",
+            "sdk_progress=12/12",
+            "p0_progress=4/4",
+            "SDK `12/12`",
+            "P0 `4/4`",
+        )
+        for phrase in forbidden_unlocks:
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, statement)
+
+    def test_june4_fast_path_keeps_current_head_artifacts_as_non_approval(self) -> None:
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+        guardrail = normalized(
+            fast_path.split("## Durable Guardrail", 1)[1].split(
+                "## Required Evidence Siblings", 1
+            )[0]
+        )
+
+        for phrase in (
+            "Current-head offline fixes",
+            "continuous-development cadence",
+            "closed sub-agent or all-six-agents-closed notes",
+            "package-shape/install success",
+            "package installs",
+            "exact-version `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks",
+            "`source_overclaim_total_flag_count=0`",
+            "passing local tests",
+            "local validation results",
+            "the latest validation pass",
+            "six-agent closure notes",
+            "`.codex` cleanup",
+            "scoped release statements",
+            "request/preflight artifacts",
+            "passive monitor ticks",
+            "passive monitor output",
+            "organic player presence",
+            "diagnostic candidate lines",
+            "`fastest_next_sdk_unblock` objects",
+            "generated repo temp dirs",
+            "passive snapshots",
+            "Mission copied-bool fixture-boundary reports",
+            "internal Mission copied-bool summaries",
+            "Inventory copied-signal stability reports",
+            "Transfer `bAccept` readiness reports",
+            "Transfer ScriptStruct readiness",
+            "Buff fixture manifest/source binding",
+            "Dino scalar readiness",
+            "route post-evidence P0 lock simulation",
+            "Mission/Transfer/Dino/Tribe umbrella accounting",
+        ):
+            with self.subTest(artifact=phrase):
+                self.assertIn(phrase, guardrail)
+
+        self.assertIn("review/planning artifacts only", guardrail)
+        self.assertIn("candidate-only/non-authorizing", guardrail)
+        self.assertIn(
+            "cannot be read as SDK completion, runtime readiness, live ops approval, P0 progress",
+            guardrail,
+        )
+        self.assertIn("SDK/P0/runtime progress", guardrail)
+        self.assertIn("stable readiness", guardrail)
+        self.assertIn("public/stable progress", guardrail)
+        self.assertIn(
+            "They do not authorize live ops, server/log reads, deploy/restart/marker/env changes, server-operation approval, approved runtime evidence, runtime readiness, public SDK readiness, or complete SDK progress",
+            guardrail,
+        )
+        self.assertIn("offline evidence-only and planning-only", guardrail)
+        self.assertIn("public Mission SDK", guardrail)
+        self.assertIn("v1 completion", guardrail)
+        self.assertIn("transfer authority", guardrail)
+        self.assertIn("reward/mutation authority", guardrail)
+        self.assertIn("server authorization", guardrail)
+        self.assertIn(
+            "Sub-agent closure, repeated local hardening rounds, install/package shape success, exact-version `COMPONENTS SDK` package-shape validation, zero `source_overclaim_total_flag_count`, the latest validation pass, `.codex` cleanup, and local validation results are process/accounting hygiene only",
+            guardrail,
+        )
+        self.assertIn("they do not move SDK, P0, or v1 counters", guardrail)
+        self.assertIn("cannot substitute for accepted runtime evidence or current-turn operator approval", guardrail)
+        self.assertIn("cleanup/test artifacts only", guardrail)
+        self.assertIn("not handoff evidence", guardrail)
+        self.assertIn("tests/core/PlayerIdentityPromotion*", guardrail)
+        self.assertIn("tests/sdk_consumer/player_identity_promotion*", guardrail)
+        self.assertIn("fresh current-turn operator approval for the exact active operation", guardrail)
+        self.assertIn("accepted copied `PlayerPrincipalLifecycleObserver event` lines", guardrail)
+        for event_name in ("session_start", "session_start_rejected", "session_end"):
+            with self.subTest(event=event_name):
+                self.assertIn(event_name, guardrail)
+        self.assertIn("approved_runtime_evidence_missing", guardrail)
+        self.assertIn("complete_sdk_ready=false", guardrail)
+        self.assertIn("complete_sdk_progress_ratio=0/12", guardrail)
+        self.assertIn("stable_claim_allowed=false", guardrail)
+
+    def test_player_backed_notice_must_be_sent_before_evidence_window(self) -> None:
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+
+        fast_guardrail = normalized(
+            fast_path.split("## Durable Guardrail", 1)[1].split(
+                "## 2026-06-04 20:30 Second Supervised Integration", 1
+            )[0]
+        )
+        evidence_siblings = normalized(
+            fast_path.split("## Required Evidence Siblings", 1)[1].split("## Non-Claims", 1)[0]
+        )
+        readme_compact = normalized(readme)
+
+        for label, text in (
+            ("fast-path", fast_guardrail),
+            ("README", readme_compact),
+        ):
+            with self.subTest(doc=label, invariant="notice action"):
+                self.assertIn("beta testers Discord", text)
+                self.assertIn("approved dry-run-checked notice", text)
+                self.assertIn("player_notice_action", text)
+                self.assertIn("notice dry-run output", text)
+                self.assertIn("sent-notice attestation", text)
+                self.assertRegex(text, r"sent before .*")
+                self.assertIn("documented but not sent", text)
+            with self.subTest(doc=label, invariant="not documentation-only"):
+                self.assertIn("executable", text)
+                self.assertRegex(text, r"not (?:a )?passive")
+                self.assertIn("evidence intake", text)
+            with self.subTest(doc=label, invariant="notice action non-authorization"):
+                self.assertIn("communication", text)
+                self.assertRegex(text, r"not .*runtime evidence")
+                self.assertIn("live-ops approval", text)
+                self.assertRegex(text, r"SDK(?:/P0)? progress")
+                self.assertIn("public readiness", text)
+                self.assertIn("public SDK readiness", text)
+
+        self.assertIn("executable required action, not a passive note", fast_guardrail)
+        self.assertIn("request the missing notice/send scope", fast_guardrail)
+        self.assertIn(CURRENT_TURN_EXACT_SCOPE, readme_compact)
+        self.assertIn(
+            "That standing authority survives compaction until revoked, but it is authorization only",
+            readme_compact,
+        )
+        self.assertIn("copied-log analysis", readme_compact)
+        self.assertIn("They do not count as runtime evidence", readme_compact)
+        self.assertIn("not enough for the window or its evidence intake", readme_compact)
+        self.assertIn("sent-notice attestation", evidence_siblings)
+        for phrase in (
+            "approved notice path",
+            "dry-run result",
+            "send action",
+            "send timestamp",
+            "reviewer/operator scope",
+            "blocks approved evidence intake",
+            "secret-free metadata only",
+            "webhook token",
+            "secret environment assignment",
+            "secret-bearing dry-run output",
+            "communication proof only",
+            "live-ops approval",
+            "SDK progress",
+            "public readiness",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, evidence_siblings)
+
+    def test_approved_evidence_bundles_stay_non_authorizing_non_claims(self) -> None:
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+
+        fast_guardrail = normalized(
+            fast_path.split("## Durable Guardrail", 1)[1].split(
+                "## Required Evidence Siblings", 1
+            )[0]
+        )
+        readme_compact = normalized(readme)
+
+        for label, text in (
+            ("fast-path", fast_guardrail),
+            ("README", readme_compact),
+        ):
+            with self.subTest(doc=label, invariant="consume-only"):
+                self.assertIn("Approved evidence intake", text)
+                self.assertIn("consume-only and non-authorizing", text)
+                self.assertIn("checker-accepted approved runtime bundle", text)
+                self.assertIn("approved_runtime_evidence_missing", text)
+            with self.subTest(doc=label, invariant="non-claim"):
+                self.assertIn("SDK/P0 progress", text)
+                self.assertIn("public SDK readiness", text)
+                self.assertIn("runtime readiness", text)
+                self.assertIn("publication", text)
+                self.assertIn("complete/stable SDK", text)
+
+    def test_research_index_keeps_package_shape_and_local_validation_as_non_claims(self) -> None:
+        readme = normalized((REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8"))
+
+        for phrase in (
+            "Request packs",
+            "package-shape/install success",
+            "exact-version `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks",
+            "package installs",
+            "support-tier labels",
+            "prior approvals",
+            "historical live approvals/map names",
+            "historical approvals/map names",
+            "passing local tests",
+            "local validation results",
+            "the latest validation pass",
+            "six-agent closure notes",
+            "`.codex` cleanup",
+            "scoped release statements",
+            "release-readiness passes",
+            "copied evidence bundle shape",
+            "closure requests",
+            "evidence-closure reports",
+            "Discord notice drafts",
+            "CMake/header checks",
+            "public reachability",
+            "passive observation",
+            "passive monitor output",
+            "passive monitors",
+            "passive summaries",
+            "passive snapshots",
+            "passive triplets",
+            "diagnostic candidate lines",
+            "diagnostic logs",
+            "status reports",
+            "status-helper route reports",
+            "`progress_normalization_trace`",
+            "source_overclaim diagnostics",
+            "`source_overclaim_total_flag_count=0`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, readme)
+
+        for phrase in (
+            "Notice actions have the same boundary",
+            "they are not evidence-window approval",
+            "unless both `docs/agent-handoff/CURRENT.md` and",
+            "record an active standing launch authority",
+            "Historical TheIsland/Ragnarok/Genesis2 material",
+            "prior approvals",
+            "authorization only",
+            "closed-agent accounting and `.codex` cleanup are process hygiene only",
+            "Plugin Hub publication",
+            "approved in-game evidence",
+            "accounting or diagnostic artifacts only",
+            "They do not move SDK, P0, or v1 counters",
+            "cannot be reused as complete SDK readiness",
+            "SDK evidence",
+            "approved in-game evidence",
+            "SDK/P0 progress",
+            "public SDK readiness",
+            "runtime readiness",
+            "live-op authorization",
+            "Discord authorization",
+            "publication authority",
+            "Plugin Hub readiness",
+            "package-shape/public package readiness",
+            "live-ops approval",
+            "stable SDK claim",
+            "stable SDK claims",
+            "Ragnarok role-complete passive triplet",
+            "is diagnostic-only/passive and is not the accepted copied approved sibling-set bundle",
+            "Genesis2 still lacks `session_end`",
+            "SDK `0/12`",
+            "P0 `0/4`",
+            "stable_claim_allowed=false",
+            "approved_runtime_evidence_missing",
+        ):
+            with self.subTest(boundary=phrase):
+                self.assertIn(phrase, readme)
+
+        for positive_claim in (
+            "package_shape_counts_toward_sdk=true",
+            "local_validation_counts_toward_p0=true",
+            "passive_monitor_counts_toward_sdk=true",
+            "diagnostic_candidates_count_as_runtime_evidence=true",
+            "bundle_shape_counts_toward_complete_sdk=true",
+            "public_reachability_authorizes_live_ops=true",
+            "closure_request_authorizes_runtime_capture=true",
+            "notice_action_counts_toward_sdk_progress=true",
+            "diagnostic_logs_count_as_runtime_evidence=true",
+            "passive_triplet_counts_as_approved_evidence=true",
+            "status_report_counts_toward_p0=true",
+            "progress_normalization_trace_counts_toward_p0=true",
+            "source_overclaim_diagnostics_count_as_runtime_evidence=true",
+            "source_overclaim_total_flag_count_zero_counts_as_stable_sdk=true",
+            "latest_validation_pass_counts_toward_p0=true",
+            "six_agent_closure_authorizes_live_ops=true",
+            "codex_cleanup_counts_as_sdk_evidence=true",
+            "exact_components_sdk_package_shape_counts_as_plugin_hub_readiness=true",
+            "release_readiness_pass_authorizes_runtime=true",
+            "package_installs_authorize_public_package_readiness=true",
+            "historical_approvals_map_names_authorize_live_ops=true",
+            "historical_live_approvals_map_names_authorize_live_ops=true",
+            "passive_monitors_approve_plugin_hub_readiness=true",
+        ):
+            with self.subTest(claim=positive_claim):
+                self.assertNotIn(positive_claim, readme.lower())
+
+    def test_compaction_invariants_preserve_no_evidence_notice_passive_and_server_auth(self) -> None:
+        fast_path = normalized(
+            (REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md").read_text(
+                encoding="utf-8"
+            )
+        )
+        readme = normalized((REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8"))
+
+        for label, text in (
+            ("fast-path", fast_path),
+            ("README", readme),
+        ):
+            with self.subTest(doc=label, invariant="compaction sentence"):
+                self.assertIn("Compaction invariant for future agents", text)
+                self.assertIn("no complete approved in-game evidence exists yet", text)
+                self.assertIn("communication artifacts, not evidence", text)
+                self.assertIn("passive diagnostics are diagnostic-only/non-evidence", text)
+                if label == "README":
+                    self.assertIn("closed-agent accounting and `.codex` cleanup are process hygiene only", text)
+                self.assertRegex(text, r"no standby sub-agent remains")
+                self.assertRegex(text, r"no current-turn server authorization")
+                if label == "README":
+                    self.assertIn("live reads of server state or logs", text)
+                    self.assertIn("marker/env changes", text)
+                    self.assertIn("Discord sends", text)
+                    self.assertIn("runtime capture", text)
+            with self.subTest(doc=label, invariant="route locked"):
+                self.assertIn("approved_runtime_evidence_missing", text)
+                self.assertIn("stable_claim_allowed=false", text)
+            with self.subTest(doc=label, invariant="no positive flags"):
+                self.assertNotIn("complete_approved_in_game_evidence=true", text)
+                self.assertNotIn("beta_notice_is_evidence=true", text)
+                self.assertNotIn("passive_diagnostics_are_evidence=true", text)
+                self.assertNotIn("standby_sub_agent_open=true", text)
+                self.assertNotIn("current_turn_server_authorization=true", text)
+
+    def test_checkjoin_gap_round_preserves_authority_and_non_evidence_boundaries(self) -> None:
+        current_text = (REPO_ROOT / "docs/agent-handoff/CURRENT.md").read_text(encoding="utf-8")
+        compact_text = (REPO_ROOT / "docs/agent-handoff/COMPACT_CONTEXT.md").read_text(encoding="utf-8")
+        note_text = (
+            REPO_ROOT / "docs/research/2026-06-07-checkjoin-runtime-evidence-gap.md"
+        ).read_text(encoding="utf-8")
+
+        for header, text in (
+            ("## Active Objective", current_text),
+            ("## Live Authority And Safety", current_text),
+            ("## 2026-06-08 Event-Split Offline Integration Round", compact_text),
+            ("## Event-Split And Post-Runtime Contract Prep", note_text),
+        ):
+            with self.subTest(header=header):
+                self.assertIn(header, text)
+
+        active_objective = normalized(
+            current_text.split("## Active Objective", 1)[1].split("## Live Authority And Safety", 1)[0]
+        )
+        live_authority = normalized(
+            current_text.split("## Live Authority And Safety", 1)[1].split("## Latest Development State", 1)[0]
+        )
+        compact_resume = normalized(
+            compact_text.split("## Resume Protocol", 1)[1].split("## Standing Live-Ops Authorization", 1)[0]
+        )
+        compact_event_round = normalized(
+            compact_text.split("## 2026-06-08 Event-Split Offline Integration Round", 1)[1].split(
+                "## Canonical References",
+                1,
+            )[0]
+        )
+        note_scope = normalized(note_text.split("## Scope", 1)[1].split("## Audited Inputs", 1)[0])
+        event_split = normalized(
+            note_text.split("## Event-Split And Post-Runtime Contract Prep", 1)[1]
+        )
+        note_compact = normalized(note_text)
+
+        for phrase in (
+            "route samples",
+            "beta notices",
+            "package-shape installs",
+            "status reports remain non-evidence and non-progress",
+        ):
+            with self.subTest(section="active objective", phrase=phrase):
+                self.assertIn(phrase, active_objective)
+        self.assertIn("Technical progress alone is not runtime evidence or readiness", live_authority)
+        self.assertIn("standing authority is preserved as authorization only, not evidence or readiness", live_authority)
+        self.assertIn("preserve the standing launch authority and safety limits", compact_resume)
+        self.assertIn("do not convert that authority into runtime evidence, SDK/P0 progress", compact_resume)
+
+        self.assertIn("non-authorizing research facts only", note_scope)
+        self.assertIn("does not claim approved runtime evidence, runtime readiness", note_scope)
+        self.assertIn("progress against SDK/P0 counters", note_scope)
+
+        for phrase in (
+            "ready_log_evidence_split",
+            "obelisk.player-principal-lifecycle-ready-log-copy-evidence-split.v1",
+            "player_principal_lifecycle_event_split_summary",
+            "diagnostic and routing aids only",
+            "approved_runtime_evidence=false",
+            "runtime_evidence_ready=false",
+            "public_sdk_ready=false",
+            "SDK/P0 progress `0`",
+            "do not authorize runtime work",
+            "diagnostic lines or start/end-only material still cannot be bundled/promoted",
+            "post_runtime_contract_gap_diagnostic",
+            "once the approved runtime principal lifecycle bundle exists",
+            "fail-closed",
+        ):
+            with self.subTest(section="event split", phrase=phrase):
+                self.assertIn(phrase, event_split)
+
+        for phrase in (
+            "diagnostic_route_sample_non_evidence",
+            "does not read params, copy player identity, dispatch events, satisfy lifecycle roles, or count toward runtime evidence",
+            "The new route-sample action preserves `approved_runtime_evidence=false`, `runtime_ready=false`, `public_sdk_ready=false`, and SDK/P0 progress `0`",
+            "as package-shape/install evidence only",
+            "notice artifacts, status reports, and planning-source artifacts do not clear it",
+            "Do not treat them as approved runtime evidence, second-source evidence, public SDK readiness",
+        ):
+            with self.subTest(section="checkjoin note", phrase=phrase):
+                self.assertIn(phrase, note_compact)
+
+        for phrase in (
+            "All six agents completed or were closed by lead; no standby sub-agent remains",
+            "No live/server/RCON/Discord/deploy/marker/env/GitHub/release operation occurred",
+            "keeping every split path non-evidence",
+            "without granting runtime authorization or progress",
+        ):
+            with self.subTest(section="compact event round", phrase=phrase):
+                self.assertIn(phrase, compact_event_round)
+
+        combined = normalized(f"{current_text}\n{compact_text}\n{note_text}").lower()
+        for positive_claim in (
+            "event_split_counts_toward_sdk=true",
+            "post_runtime_diagnostic_counts_toward_p0=true",
+            "route_samples_count_as_runtime_evidence=true",
+            "beta_notices_count_as_progress=true",
+            "package_shape_counts_toward_sdk=true",
+            "agent_closure_counts_as_evidence=true",
+            "standing_authority_counts_as_readiness=true",
+        ):
+            with self.subTest(claim=positive_claim):
+                self.assertNotIn(positive_claim, combined)
+
+    def test_side_lane_accounting_stays_candidate_only_and_non_authorizing(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+        readme_compact = normalized(readme)
+        fast_compact = normalized(
+            fast_path.split("## Durable Guardrail", 1)[1].split(
+                "## Required Evidence Siblings", 1
+            )[0]
+        )
+
+        for label, text in (
+            ("README", readme_compact),
+            ("fast-path", fast_compact),
+        ):
+            with self.subTest(doc=label, invariant="named side lanes"):
+                self.assertIn("Inventory copied-signal stability", text)
+                self.assertIn("Mission copied-bool fixture-boundary", text)
+                self.assertIn("Transfer `bAccept`", text)
+                self.assertIn("Transfer ScriptStruct readiness", text)
+                self.assertIn("Buff fixture manifest/source binding", text)
+                self.assertIn("Dino scalar readiness", text)
+                self.assertIn("route post-evidence P0 lock simulation", text)
+                self.assertIn("Mission/Transfer/Dino/Tribe umbrella accounting", text)
+            with self.subTest(doc=label, invariant="non-authorizing boundary"):
+                self.assertIn("candidate-only/non-authorizing", text)
+                self.assertIn("SDK completion", text)
+                self.assertIn("SDK/P0/runtime progress", text)
+                self.assertIn("runtime readiness", text)
+                self.assertIn("live ops approval", text)
+                self.assertIn("P0 progress", text)
+                self.assertIn("approved runtime evidence", text)
+                self.assertIn("public SDK readiness", text)
+                self.assertIn("stable readiness", text)
+                self.assertIn("server/log reads", text)
+
+        latest_round = normalized(
+            fast_path.split("## 2026-06-05 Transfer/Buff/Dino Side-Lane Guardrail Round", 1)[1].split(
+                "## Required Evidence Siblings", 1
+            )[0]
+        )
+        for phrase in (
+            "Transfer ScriptStruct, Buff manifest/source binding, Dino scalar, and accounting-integration results",
+            "candidate-only/non-authorizing",
+            "do not authorize live ops, server/log reads",
+            "SDK/P0/runtime/public/stable progress",
+            "Transfer/Buff/Dino SDK readiness",
+            "runtime readiness",
+            "public SDK readiness",
+            "P0 progress",
+            "stable SDK status",
+        ):
+            with self.subTest(doc="latest-round", phrase=phrase):
+                self.assertIn(phrase, latest_round)
+
+        for positive_claim in (
+            "inventory_copied_signal_stability_counts_toward_p0=true",
+            "mission_fixture_boundary_counts_toward_sdk=true",
+            "transfer_baccept_runtime_ready=true",
+            "transfer_scriptstruct_counts_toward_sdk=true",
+            "buff_fixture_source_binding_counts_toward_p0=true",
+            "dino_scalar_counts_toward_p0=true",
+            "dino_scalar_public_sdk_ready=true",
+            "post_evidence_p0_lock_simulation_counts_toward_runtime=true",
+            "mission_transfer_dino_tribe_umbrella_p0_progress=true",
+            "side_lane_live_ops_approved=true",
+            "side_lane_server_log_reads_authorized=true",
+        ):
+            with self.subTest(claim=positive_claim):
+                self.assertNotIn(positive_claim, f"{readme_compact} {fast_compact}".lower())
 
     def _documented_identity_bundle_flags(
         self, path: Path, section_start: str, section_end: str
@@ -846,6 +1670,74 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             ):
                 self.assertIn(phrase, primalitem_compact)
 
+    def test_mission_copied_bool_fixture_boundary_reports_are_non_claims(self) -> None:
+        mission_plan = (
+            REPO_ROOT / "docs/research/2026-05-30-mission-copied-bool-observer-plan.md"
+        ).read_text(encoding="utf-8")
+        fast_path = (
+            REPO_ROOT / "docs/research/2026-06-04-arkserver2-runtime-sdk-fast-path.md"
+        ).read_text(encoding="utf-8")
+
+        mission_boundary = normalized(
+            mission_plan.split("## Fixture-Boundary / Internal Report Boundary", 1)[1].split(
+                "## Future-Agent Bridge Lane", 1
+            )[0]
+        )
+        fast_guardrail = normalized(
+            fast_path.split("## Durable Guardrail", 1)[1].split(
+                "## Required Evidence Siblings", 1
+            )[0]
+        )
+
+        for label, text in (
+            ("mission-plan", mission_boundary),
+            ("fast-path", fast_guardrail),
+        ):
+            with self.subTest(doc=label, invariant="fixture-boundary scope"):
+                self.assertIn("Mission copied-bool", text)
+                self.assertIn("offline evidence-only and planning-only", text)
+            for phrase in (
+                "public Mission SDK",
+                "runtime readiness",
+                "v1 completion",
+                "transfer authority",
+                "reward/mutation authority",
+                "server authorization",
+                "operator approval",
+                "live-observation approval",
+            ):
+                with self.subTest(doc=label, phrase=phrase):
+                    self.assertIn(phrase, text)
+
+        for phrase in (
+            "excluded demand signals",
+            "must not be turned into callback authority",
+            "copied payload authority",
+            "transfer or reward authority",
+            "server-side authorization",
+            "SDK completion evidence",
+            "the latest validation pass",
+            "six-agent closure notes",
+            "`.codex` cleanup",
+        ):
+            with self.subTest(file="mission-plan", phrase=phrase):
+                self.assertIn(phrase, mission_boundary)
+
+        forbidden_positive_flags = (
+            "mission_sdk_ready=true",
+            "public_mission_sdk_ready=true",
+            "mission_runtime_ready=true",
+            "mission_v1_completion_ready=true",
+            "mission_transfer_authority=true",
+            "mission_reward_authority=true",
+            "mission_mutation_authority=true",
+            "server_authorization=true",
+        )
+        combined = f"{mission_boundary} {fast_guardrail}".lower()
+        for flag in forbidden_positive_flags:
+            with self.subTest(flag=flag):
+                self.assertNotIn(flag, combined)
+
     def test_second_source_intake_runbook_keeps_planner_phases_explicit(self) -> None:
         runbook = REPO_ROOT / "docs/research/2026-05-28-second-source-core-intake-runbook.md"
         text = runbook.read_text(encoding="utf-8")
@@ -1003,7 +1895,9 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("record `command -v`", combined)
         self.assertIn("version output when available", combined)
         self.assertIn("Direct or symlink-resolved reads from a protected server root", packs)
-        self.assertIn("direct or symlink-resolved protected `/servidor/ark` paths", research)
+        self.assertIn("direct or symlink-resolved protected live-server paths", research)
+        self.assertIn("`<offline-artifact-root>`", research)
+        self.assertNotIn("/servidor/ark", research)
 
     def test_fname_manifest_plan_keeps_indices_binary_scoped(self) -> None:
         note = REPO_ROOT / "docs/research/2026-05-28-fname-index-manifest-plan.md"

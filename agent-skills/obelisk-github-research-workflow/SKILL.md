@@ -22,14 +22,16 @@ the center of the project.
 
 Treat `v1.0` stable as the complete public SDK contract for plugin authors, not just a
 stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
-`docs/public_sdk_surfaces.json` as the current surface map when planning promotion work,
-while remembering that those documents are a planning contract until a release gate
-packages or supersedes them.
+`docs/public_sdk_surfaces.json` as the current surface map when planning promotion work.
+Those documents are planning/compatibility inputs, not public readiness or release
+authorization by themselves; stable SDK wording still requires the completion checker to
+allow the claim and a current release-manager/lead publication decision.
 Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
 of high-demand blockers that prevent a complete v1 SDK claim. Installed-SDK examples are
-contributor smoke/package-shape evidence only; they are not Plugin Hub work and cannot
-declare v1 complete while blockers remain planning or post-v1. Plugin Hub work remains
-post-SDK-complete. Explicitly excluded blockers require a reviewed v1 release
+contributor smoke/package-shape evidence only; they are not Plugin Hub work, support-tier
+activation, public package readiness, or stable SDK evidence and cannot declare v1 complete
+while blockers remain planning or post-v1. Plugin Hub work remains post-SDK-complete.
+Explicitly excluded blockers require a reviewed v1 release
 statement with scoped wording; exclusions do not permit claiming a complete SDK for the
 excluded capability.
 
@@ -57,9 +59,23 @@ release-policy claim. Treat `ResourceHandle` and object identity/lifetime as a
 cross-cutting SDK blocker for any surface that needs post-callback object correlation,
 lookup, mutation, or persistent handles.
 Do not interpret request-pack prepared, `preflight=ok`, `accepted_for_planning`,
-`planning_layout_gate.ready=true`, or command response route planning as runtime approval,
-public SDK readiness, runtime readiness, release readiness, reply/send-chat ABI, command
-router, or v1 completion.
+`planning_layout_gate.ready=true`, `progress_normalization_trace`, source_overclaim
+diagnostics, `source_overclaim_total_flag_count=0`, the latest release-readiness pass,
+release-readiness passes, the latest validation pass, closed-agent/all-six-agent closure
+notes, `.codex` cleanup, install/package or package-shape success, package-shape
+installs, package installs, exact-version
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` package-shape checks, beta
+notice drafts/actions, passive monitor ticks/output, passive monitors, passive player
+summaries/snapshots, public reachability, Plugin Hub planning, side-lane candidate
+accounting, support-tier labels, prior approvals, historical live approvals/map names,
+historical approvals/map names, historical TheIsland/Ragnarok/Genesis2 names, or command
+response route planning as live
+authorization, runtime evidence, approved in-game evidence, SDK/P0 progress, live-op
+authorization, Discord authorization, publication authority, public SDK readiness, runtime
+readiness, release readiness, stable SDK readiness, stable SDK claim, Plugin Hub
+readiness, support-tier activation, reply/send-chat ABI, command router, or v1 completion.
+They are chronology/planning/accounting only unless the exact claim names both the
+current-turn exact approval and the accepted checker evidence.
 
 Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts. Pass
 only the blocker context that changes the agent's concrete task.
@@ -87,6 +103,10 @@ only the blocker context that changes the agent's concrete task.
   local.
 - If current user direction or handoff state says GitHub publication is closed for the
   current work, do not run `git push`; report the validated local checkpoint state instead.
+- Do not draft or send Discord updates unless explicitly approved for the current turn.
+  Endpoints are operator secrets. Use `scripts/send_discord_embed.py --dry-run` before any
+  confirmed community send, then require `--confirm-approved-send` and
+  `--approval-scope community` for the approved scope.
 - Do not commit server artifacts: `.so`, logs, core files, local configs, state markers, or
   build directories.
 - Server restore documentation is allowed, but never stage copied `/servidor/ark` config
@@ -107,6 +127,9 @@ only the blocker context that changes the agent's concrete task.
   are no stale stand-by agents from the previous round. Close completed or obsolete agents
   before spawning new ones, and record any still-active agent with a concrete
   polling/integration plan.
+- For each delegated agent, record the expert role/scope, owned paths, result,
+  validation/risk, and closed-or-polling status in the lead integration summary or
+  handoff before compaction or another round.
 - Pass sub-agents only the context they need: task objective, ownership scope, files they
   may edit, files they must not edit, relevant skills to read, current safety baseline, and
   expected deliverable.
@@ -222,17 +245,21 @@ verification.
 Do not draft or send Discord updates unless explicitly approved for the current turn.
 Do not draft or send community announcements unless explicitly delegated. Endpoints are
 operator secrets in ignored `local/discord-webhooks.env`; use only
-`OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL` variable
-names. Use Discord only for major public, modder-facing milestones or operator-approved
-beta-test windows. Never use Discord for routine validation, internal agent status,
+`OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` for public/community webhook sends. Beta-test
+windows use the bot path `scripts/discord_beta_bridge.py --send-beta-notice` against
+channel `1513238083741683934`; `OBELISK_BETA_TEST_WEBHOOK_URL` is deprecated for real
+beta sends. Use Discord only for major public, modder-facing milestones or
+operator-approved beta-test windows. Never use Discord for routine validation, internal agent status,
 speculative reversing notes, private live-ops detail, raw player text, or secrets.
-Operators should prefer the guarded helper instead of hand-written webhook calls. Always
-run `scripts/send_discord_embed.py --dry-run` first and send one concise professional
-embed with title, description, status/scope, and 2-5 public-safe fields.
+Operators should prefer the guarded helper instead of hand-written HTTP calls. Always
+dry-run first and send one concise professional notice.
 
 Example dry-run command: `python3 scripts/send_discord_embed.py --channel community --title "..." --description "..." --status "..." --scope "..." --field "Cambio=..." --field "Impacto=..."`.
-After current-turn approval and dry-run review, repeat with `--confirm-approved-send
---approval-scope community` or `--approval-scope beta-test`; the approval scope must match `--channel`.
+After current-turn approval and dry-run review for community, repeat with
+`--confirm-approved-send --approval-scope community`; the approval scope must match
+`--channel`. For beta testers, dry-run and send through `python3
+scripts/discord_beta_bridge.py --send-beta-notice --content "..." --dry-run`, then repeat
+with `--confirm-approved-send` after approval for the exact beta window.
 
 ## Research And Skills
 

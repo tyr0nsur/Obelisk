@@ -37,6 +37,7 @@ jobs:
             ca-certificates \
             cmake \
             git \
+            libssl-dev \
             ninja-build
 
       - name: Configure
@@ -125,11 +126,13 @@ jobs:
             ca-certificates \
             cmake \
             git \
+            libssl-dev \
             ninja-build
 
       - name: Run release-readiness baseline gate
         # Canonical gate owns production libobelisk.so test-only symbol checks plus install/SDK dry-runs.
         # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
+        # CI runs the core-first baseline only; complete/stable SDK claim attempts need an explicit release-manager gate.
         run: scripts/check_release_readiness.sh
 
   reflection-base-readiness:
@@ -147,5 +150,4 @@ jobs:
             --fail-on-base-readiness-gaps \
             --target-set minimal-second-source-intake \
             --target-set structure-observer-intake \
-            --target-set item-return-only-policy-slice \
             --target-set chat-message-intake

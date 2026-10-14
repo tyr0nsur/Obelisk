@@ -6,9 +6,16 @@ namespace
 {
     bool HasMinimalApiPrefix(const ObeliskApi* api)
     {
-        return api &&
-            api->abi_version == OBELISK_API_ABI_VERSION &&
-            api->struct_size >= offsetof(ObeliskApi, struct_size) + sizeof(api->struct_size);
+        if (!api ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+        {
+            return false;
+        }
+
+        if (api->abi_version != OBELISK_API_ABI_VERSION)
+            return false;
+
+        return true;
     }
 
     constexpr const char* kDefaultConfig = R"json({

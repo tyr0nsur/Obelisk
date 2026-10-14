@@ -69,6 +69,10 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             payload["allowed_public_surface_after_player_identity"],
             ["query-only fail-closed permission decision checks over copied principals"],
         )
+        post_identity = payload["post_identity_next_requirement"]
+        self.assertEqual("public_header_gate_missing", post_identity["route_blocker_to_use"])
+        self.assertFalse(post_identity["identity_alias_or_stale_source_unlock_allowed"])
+        self.assertFalse(post_identity["runtime_evidence_alone_unlock_allowed"])
         self.assertFalse(payload["allow_without_policy_provenance_allowed"])
         self.assertEqual(payload["public_permission_cache_contract"], "none")
         self.assertEqual(payload["public_command_reply_contract"], "none")
@@ -102,6 +106,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         for behavior in (
             "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
             "player identity planning evidence alone cannot enable permissions/admin",
+            "RCON, ListPlayers, Kick, ServerListPlayers, ServerKickPlayer, admin snapshots, static thunk, route candidate, source-ready, status, and command aliases are admin orientation or operational metadata only and cannot unlock permissions/admin public readiness, runtime readiness, route state, or SDK/P0 progress",
+            "admin_kind, alias_source, source_alias, status_source, ListPlayers, Kick, RCON, admin snapshots, source-ready, and status alias records require the current hash-bound player-identity promotion certificate before any route, readiness, or SDK/P0 accounting claim; without it they fail closed and remain non-counting",
             "runtime observation must establish principal identity before permissions/admin can consume it",
             "operator config enables surfaces or policy inputs only and cannot establish principal identity",
             "command text cannot establish principal identity",
@@ -131,13 +137,16 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(
             set(abi["required_fields_or_equivalent"]),
             {
+                "plugin_owner_token",
                 "principal_handle",
                 "principal_generation",
                 "principal_scope_flags",
+                "server_process_epoch",
                 "action",
                 "action_size",
                 "resource_scope",
                 "resource_scope_size",
+                "request_flags",
             },
         )
         self.assertIn("owner-token scoped call", abi["required_properties"])
@@ -356,6 +365,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             with self.subTest(cache_field=field):
                 self.assertIn(field, cache_fields)
                 self.assertIn(field, normalized_note)
+
+        self.assertIn("request_flags", query_fields)
+        self.assertIn("request_flags", normalized_note)
 
         self.assertIn("no public permission cache ABI", normalized_note)
         self.assertIn("does not add public headers", normalized_note)

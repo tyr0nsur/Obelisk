@@ -51,19 +51,23 @@ def manifest() -> dict:
             "post_original": True,
             "role": "session_start",
             "principal_action": "candidate_created",
+            "apply_status": "session_start_created",
+            "correlation_status": "not_applicable",
             "delivery_claim": "none",
         },
         {
             "case": "session_start_rejected_anchor",
-            "target": "ShooterGameMode.HandleNewPlayer",
+            "target": "ShooterGameMode.CheckJoinInProgress",
             "copied_fields": ["bIsFromLogin", "ReturnValue"],
             "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
-            "copied_bool_values": ["0", "1"],
-            "redacted_count": 3,
-            "redacted_fields": ["NewPlayer", "PlayerData", "PlayerCharacter"],
+            "copied_bool_values": ["1", "0"],
+            "redacted_count": 1,
+            "redacted_fields": ["NewPlayer"],
             "post_original": True,
             "role": "session_start_rejected",
             "principal_action": "none",
+            "apply_status": "session_start_rejected_noop",
+            "correlation_status": "not_applicable",
             "delivery_claim": "none",
         },
         {
@@ -77,6 +81,8 @@ def manifest() -> dict:
             "post_original": True,
             "role": "session_end",
             "principal_action": "candidate_invalidated",
+            "apply_status": "session_end_invalidated",
+            "correlation_status": "matched",
             "delivery_claim": "none",
         },
         {
@@ -90,6 +96,8 @@ def manifest() -> dict:
             "post_original": False,
             "role": "none",
             "principal_action": "none",
+            "apply_status": "none",
+            "correlation_status": "none",
             "delivery_claim": "none",
         },
         {
@@ -103,6 +111,8 @@ def manifest() -> dict:
             "post_original": False,
             "role": "none",
             "principal_action": "none",
+            "apply_status": "none",
+            "correlation_status": "none",
             "delivery_claim": "none",
         },
     ]
@@ -140,6 +150,8 @@ def manifest() -> dict:
                 "post_original": observation["post_original"],
                 "role": observation["role"],
                 "principal_action": observation["principal_action"],
+                "apply_status": observation["apply_status"],
+                "correlation_status": observation["correlation_status"],
                 "delivery_claim": observation["delivery_claim"],
                 "raw_payload_retained": False,
             }
@@ -351,6 +363,54 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("window_manifest_check_is_not_runtime_evidence", report["blockers"])
         self.assertFalse(report["runtime_evidence_ready"])
         self.assertEqual(report["remaining_blockers"], ["approved_runtime_evidence_missing"])
+
+    def test_rejects_adjacent_reports_and_sidecars_as_shape_evidence(self) -> None:
+        cases = {
+            "obelisk.runtime-observer-log-summary.v1": "runtime_observer_summary_is_not_shape_fixture_evidence",
+            "obelisk.players-identity-runtime-principal-start-end-evidence-check.v1": (
+                "start_end_only_check_is_not_lifecycle_evidence"
+            ),
+            "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1": (
+                "approved_evidence_check_report_is_not_shape_fixture"
+            ),
+            "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1": (
+                "bundle_preflight_report_is_not_shape_fixture"
+            ),
+            "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1": (
+                "generated_bundle_report_is_not_shape_fixture"
+            ),
+            "obelisk.player-principal-lifecycle-ready-log-copy.v1": (
+                "ready_log_copy_report_is_not_shape_fixture"
+            ),
+            "obelisk.player-principal-lifecycle-runtime-evidence-status.v1": (
+                "runtime_evidence_status_sidecar_is_not_shape_fixture"
+            ),
+            "obelisk.player-principal-lifecycle-strict-triplet-candidate-summary.v1": (
+                "strict_triplet_candidate_summary_is_not_shape_fixture"
+            ),
+            "obelisk.sdk-status-report.v1": "sdk_status_report_is_not_shape_fixture",
+            "obelisk.internal-module-readiness.v1": (
+                "internal_module_readiness_sidecar_is_not_shape_fixture"
+            ),
+        }
+
+        for schema, expected_blocker in cases.items():
+            with self.subTest(schema=schema):
+                payload = {
+                    "schema": schema,
+                    "ready": True,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                }
+                result = self.run_checker(payload, check=False)
+
+                self.assertNotEqual(result.returncode, 0)
+                report = json.loads(result.stdout)
+                self.assertIn("schema_mismatch", report["blockers"])
+                self.assertIn(expected_blocker, report["blockers"])
+                self.assertFalse(report["approved_runtime_evidence_present"])
+                self.assertFalse(report["runtime_evidence_ready"])
+                self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
 
 
 if __name__ == "__main__":

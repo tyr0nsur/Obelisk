@@ -18,12 +18,153 @@ REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflect
 TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
 PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
 RELEASE_READINESS_TARGET_SETS = REFLECTION_TARGET_SET_VARS["RELEASE_READINESS_TARGET_SETS"]
+INTERNAL_LAYOUT_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["INTERNAL_LAYOUT_ONLY_TARGET_SETS"]
 PUBLIC_RC_UFUNCTION_TARGET_SETS = [
     "minimal-second-source-intake",
     "structure-observer-intake",
-    "item-return-only-policy-slice",
     "chat-message-intake",
 ]
+
+COPIED_DISPATCHER_PUBLIC_HEADER_BLOCKED_TOKENS = (
+    "MissionCopiedBool",
+    "MISSION_COPIED_BOOL",
+    "ObeliskMission",
+    "OBELISK_API_CAPABILITY_MISSION",
+    "RegisterMission",
+    "UnregisterMission",
+    "ObeliskPlayerPrincipal",
+    "ObeliskPrincipalId",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
+    "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_EVENTS",
+    "RegisterPlayerPrincipal",
+    "RegisterPlayerIdentity",
+    "RegisterPlayerPrincipalEvent",
+    "UnregisterPlayerPrincipal",
+    "UnregisterPlayerIdentity",
+    "ResolvePlayerPrincipal",
+    "ResolvePlayerIdentity",
+    "StructureEventDispatcher",
+    "InventoryPolicyEventDispatcher",
+    "ItemReturnEventDispatcher",
+    "PlayerPrincipalEventDispatcher",
+    "MissionCopiedBoolEventDispatcher",
+    "RegisterStructureEvent",
+    "RegisterStructure",
+    "UnregisterStructure",
+    "OBELISK_API_CAPABILITY_STRUCTURE",
+    "RegisterInventoryEvent",
+    "RegisterInventory",
+    "UnregisterInventory",
+    "OBELISK_API_CAPABILITY_INVENTORY",
+    "RegisterItemEvent",
+    "RegisterItem",
+    "UnregisterItem",
+    "OBELISK_API_CAPABILITY_ITEM",
+    "ObeliskInventoryEvent",
+    "ObeliskItemEvent",
+    "ObeliskItemReturnEvent",
+    "ReturnOverride",
+)
+
+COPIED_DISPATCHER_PUBLIC_CLAIM_PATHS = (
+    "README.md",
+    "CHANGELOG.md",
+    "docs/RELEASE.md",
+    "docs/STATUS.md",
+    ".github/pull_request_template.md",
+)
+
+SIDE_LANE_PUBLIC_HEADER_BLOCKED_TOKENS = (
+    "InventoryCustomFilter",
+    "ObeliskInventoryCustomFilter",
+    "OBELISK_API_CAPABILITY_INVENTORY_CUSTOM_FILTER",
+    "RegisterInventoryCustomFilter",
+    "UnregisterInventoryCustomFilter",
+    "UnfilteredItemsList",
+    "FilteredItemsList",
+    "TransferScriptStruct",
+    "TransferPayload",
+    "TransferBAccept",
+    "ObeliskTransfer",
+    "ObeliskTransferPayload",
+    "ObeliskTransferScriptStruct",
+    "ObeliskTransferBAccept",
+    "OBELISK_API_CAPABILITY_TRANSFER",
+    "OBELISK_API_CAPABILITY_TRANSFER_PAYLOAD",
+    "OBELISK_API_CAPABILITY_TRANSFER_SCRIPTSTRUCT",
+    "OBELISK_API_CAPABILITY_TRANSFER_BACCEPT",
+    "RegisterTransfer",
+    "RegisterTransferPayload",
+    "RegisterTransferScriptStruct",
+    "RegisterTransferBAccept",
+    "UnregisterTransfer",
+    "UnregisterTransferPayload",
+    "UnregisterTransferScriptStruct",
+    "UnregisterTransferBAccept",
+    "BuffStatus",
+    "ObeliskBuff",
+    "ObeliskBuffStatus",
+    "OBELISK_API_CAPABILITY_BUFF",
+    "OBELISK_API_CAPABILITY_BUFF_STATUS",
+    "RegisterBuff",
+    "RegisterBuffStatus",
+    "UnregisterBuff",
+    "UnregisterBuffStatus",
+    "DinoScalar",
+    "CopiedDinoScalar",
+    "ObeliskDino",
+    "ObeliskDinoScalar",
+    "OBELISK_API_CAPABILITY_DINO",
+    "OBELISK_API_CAPABILITY_DINO_SCALAR",
+    "RegisterDino",
+    "RegisterDinoScalar",
+    "UnregisterDino",
+    "UnregisterDinoScalar",
+)
+
+SIDE_LANE_INTERNAL_TARGET_SETS = (
+    "inventory-custom-filter-array-boundary",
+    "transfer-scriptstruct",
+    "transfer-ufunction-intake",
+    "transfer-baccept-only-policy-slice",
+    "buff-compact-intake",
+    "buff-breadth-intake",
+    "dino-compact-intake",
+)
+
+SIDE_LANE_PUBLIC_DOC_CLAIM_PATHS = (
+    "README.md",
+    "CHANGELOG.md",
+    "docs/RELEASE.md",
+    "docs/STATUS.md",
+    "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    ".github/pull_request_template.md",
+)
+
+SIDE_LANE_DOC_SUBJECT_RE = re.compile(
+    r"\b(?:InventoryCustomFilter|inventory-custom-filter|inventory[_-]custom[_-]filter|"
+    r"TransferScriptStruct|transfer-scriptstruct|transfer[_-]baccept|"
+    r"Transfer\s+`?bAccept`?|Transfer\s+payload|transfer\s+payload|"
+    r"Buff/status|Buff\s+status|BuffStatus|buff_status|Dino\s+scalar|"
+    r"DinoScalar|dino_scalar|dino-compact)\b",
+    re.IGNORECASE,
+)
+PUBLIC_DOC_POSITIVE_CLAIM_RE = re.compile(
+    r"\b(?:public\s+(?:SDK|ABI|API|header|callback|capability|surface|contract)|"
+    r"release[- ]supported|stable(?:\s+(?:SDK|surface|baseline))?|production(?:-ready)?|"
+    r"promoted|ready|readiness|v1(?:\.0)?\s+(?:SDK|complete|ready)|complete\s+SDK)\b",
+    re.IGNORECASE,
+)
+PUBLIC_DOC_NEGATIVE_SCOPE_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|must\s+not|cannot|not\s+(?:a\s+)?public|"
+    r"no\s+public|no\s+(?:runtime|Mission|Transfer|Dino|Buff|Buff/status)|"
+    r"not\s+included|absent|blocked|excluded|candidate-only|layout-only|internal|"
+    r"offline|test-only|planning|non-claim|not\s+part\s+of|not\s+promote|"
+    r"does\s+not\s+promote|stay\s+internal|stays\s+internal|remain\s+absent|"
+    r"remain\s+roadmap|remains\s+roadmap)\b",
+    re.IGNORECASE,
+)
 
 
 def read(relative: str) -> str:
@@ -36,6 +177,11 @@ def normalized(text: str) -> str:
 
 def normalized_contains(text: str, expected: str) -> bool:
     return normalized(expected) in normalized(text)
+
+
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
 
 
 def sentences(text: str) -> list[str]:
@@ -213,7 +359,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn(item, changelog)
 
     def test_game_interaction_boundary_stays_non_mutating(self) -> None:
-        readme = read("README.md")
         release = read("docs/RELEASE.md")
         status = read("docs/STATUS.md")
 
@@ -240,24 +385,258 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(item, status)
 
-        for item in [
-            "`CallProcessEvent` is a low-level trampoline escape hatch",
-            "Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted",
-        ]:
-            with self.subTest(file="README.md", item=item):
-                self.assertIn(item, readme)
+    def test_historical_sdk_docs_expose_completion_gate_totals(self) -> None:
+        # The current prototype README is not the broader complete-SDK roadmap.
+        # Keep the historical promotion accounting in its release-contract docs.
+        for path in ("docs/STATUS.md", "docs/SDK_V1_COMPATIBILITY.md"):
+            text = normalized(read(path))
+            for item in (
+                "SDK `0/12`",
+                "P0 `0/4`",
+                "`stable_claim_allowed=false`",
+                "`approved_runtime_evidence_missing`",
+            ):
+                with self.subTest(file=path, item=item):
+                    self.assertIn(item, text)
 
-    def test_readme_exposes_current_sdk_completion_gate_totals(self) -> None:
-        readme = read("README.md")
+    def test_status_compat_and_release_docs_preserve_current_non_claim_memory(self) -> None:
+        docs = {
+            "docs/STATUS.md": read("docs/STATUS.md"),
+            "docs/SDK_V1_COMPATIBILITY.md": read("docs/SDK_V1_COMPATIBILITY.md"),
+            "docs/RELEASE.md": read("docs/RELEASE.md"),
+        }
 
-        for item in [
-            "complete-SDK progress is\n  `0/12`",
-            "the P0 dependency chain is `0/4`",
-            "`stable_claim_allowed=false`",
-            "the active route blocker is `approved_runtime_evidence_missing`",
-        ]:
-            with self.subTest(file="README.md", item=item):
-                self.assertIn(item, readme)
+        for path, text in docs.items():
+            compact = normalized(text)
+            for phrase in (
+                "no current-turn exact live-op scope",
+                "Discord send",
+                "Plugin Hub publication",
+                "public SDK readiness",
+                "Historical TheIsland",
+                "Ragnarok",
+                "Genesis2",
+                "the latest release-readiness pass",
+                "release-readiness passes",
+                "the latest validation pass",
+                "six-agent closure notes",
+                "Codex cache cleanup",
+                "`progress_normalization_trace`",
+                "source_overclaim diagnostics",
+                "`source_overclaim_total_flag_count=0`",
+                "request packs",
+                "passive observation",
+                "passive player evidence",
+                "passive player summaries",
+                "passive summaries",
+                "passive snapshots",
+                "passive monitor ticks",
+                "passive monitor output",
+                "passive monitors",
+                "public reachability",
+                "beta tester notices",
+                "beta notices",
+                "future beta notices",
+                "Discord notice drafts",
+                "package-shape installs",
+                "package installs",
+                "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
+                "install/package success",
+                "package-shape install success",
+                "install/package-shape checks",
+                "support-tier labels",
+                "prior approvals",
+                "historical live approvals/map names",
+                "historical approvals/map names",
+                "passive triplets",
+                "status reports",
+                "closure requests",
+                "package shape",
+                "package-shape/public package readiness",
+                "Plugin Hub planning",
+                "side-lane candidates/accounting",
+                "tests",
+                "runtime evidence",
+                "runtime readiness",
+                "SDK evidence",
+                "SDK/P0",
+                "live-op authorization",
+                "Discord authorization",
+                "approved in-game evidence",
+                "publication",
+                "stable SDK readiness",
+                "Plugin Hub readiness",
+                "support-tier activation",
+                "stable SDK claims",
+                "stable claims",
+                "current-turn exact approval",
+                "accepted checker evidence",
+                "SDK `0/12`",
+                "P0 `0/4`",
+                "`stable_claim_allowed=false`",
+                "`approved_runtime_evidence_missing`",
+            ):
+                with self.subTest(file=path, phrase=phrase):
+                    self.assertIn(phrase, compact)
+
+        for positive_claim in (
+            "current_turn_exact_live_op_scope=true",
+            "discord_send_authorized=true",
+            "plugin_hub_publication_allowed=true",
+            "public_sdk_readiness=true",
+            "stable_v1_claim_allowed=true",
+            "passive_triplets_are_approved_in_game_evidence=true",
+            "status_reports_count_as_approved_in_game_evidence=true",
+            "package_shape_counts_as_approved_in_game_evidence=true",
+            "tests_count_as_approved_in_game_evidence=true",
+            "progress_normalization_trace_counts_as_evidence=true",
+            "source_overclaim_diagnostics_count_toward_sdk=true",
+            "source_overclaim_total_flag_count_zero_counts_toward_sdk=true",
+            "latest_validation_pass_counts_toward_p0=true",
+            "six_agent_closure_authorizes_runtime=true",
+            "codex_cleanup_counts_as_sdk_progress=true",
+            "release_readiness_pass_authorizes_runtime=true",
+            "exact_components_sdk_package_shape_counts_toward_stable_sdk=true",
+            "discord_authorization=true",
+        ):
+            combined = " ".join(normalized(text).lower() for text in docs.values())
+            with self.subTest(claim=positive_claim):
+                self.assertNotIn(positive_claim, combined)
+
+    def test_public_status_release_and_scoped_statement_keep_standing_authority_non_evidence(self) -> None:
+        docs = {
+            "docs/STATUS.md": read("docs/STATUS.md"),
+            "docs/RELEASE.md": read("docs/RELEASE.md"),
+        }
+
+        for path, text in docs.items():
+            compact = normalized(text)
+            with self.subTest(file=path, phrase="standing live authority"):
+                self.assertIn("standing live authority", compact)
+            with self.subTest(file=path, phrase="authorization only"):
+                self.assertIn("authorization only", compact)
+            with self.subTest(file=path, phrase="does not supply"):
+                self.assertRegex(
+                    compact,
+                    re.compile(
+                        r"standing live authority[^.]*authorization only[^.]*does not supply"
+                        r"[^.]*runtime evidence[^.]*SDK/P0 progress[^.]*public SDK readiness"
+                        r"[^.]*publication authority[^.]*stable SDK readiness"
+                        r"[^.]*Plugin Hub readiness[^.]*support-tier activation"
+                        r"[^.]*package-shape/public package readiness"
+                        r"[^.]*stable/complete SDK claim",
+                        re.IGNORECASE,
+                    ),
+                )
+
+        template = read("release/v1/public-sdk/scoped-release-statement-template.md")
+        compact_template = normalized(template)
+        for phrase in (
+            "Scoped checker `8/8` means wording/bookkeeping only",
+            "Package-shape/install checks",
+            "support-tier labels",
+            "Plugin Hub planning",
+            "standing live authority",
+            "non-evidence/non-progress context only",
+            "do not authorize v1 completion",
+            "stable/full/production SDK wording",
+            "public SDK readiness",
+            "package/publication readiness",
+            "SDK/P0 progress",
+            "runtime evidence",
+        ):
+            with self.subTest(file="release/v1/public-sdk/scoped-release-statement-template.md", phrase=phrase):
+                self.assertIn(phrase, compact_template)
+
+    def test_handoff_skill_preserves_current_non_authorizing_alias_boundary(self) -> None:
+        handoff_skill = read("agent-skills/obelisk-agent-handoff/SKILL.md")
+        compact = normalized(handoff_skill)
+
+        for phrase in (
+            "Authorization and evidence status are separate facts",
+            "`progress_normalization_trace`",
+            "source_overclaim diagnostics",
+            "`source_overclaim_total_flag_count=0`",
+            "the latest release-readiness pass",
+            "release-readiness passes",
+            "the latest validation pass",
+            "closed sub-agent/all-six-agents-closed notes",
+            "`.codex` cleanup",
+            "passive player evidence",
+            "passive player summaries",
+            "passive summaries/snapshots/triplets",
+            "passive monitor ticks/output",
+            "passive monitors",
+            "beta notices",
+            "future beta notices",
+            "package-shape installs",
+            "package installs",
+            "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
+            "package-shape install success",
+            "install/package-shape checks",
+            "support-tier or package-shape labels",
+            "Plugin Hub planning",
+            "scoped non-complete release statements",
+            "side-lane candidates/accounting",
+            "prior approvals",
+            "historical live approvals/map names",
+            "historical approvals/map names",
+            "TheIsland",
+            "Ragnarok",
+            "Genesis2",
+            "non-authorizing/non-evidence",
+            "both the current-turn exact approval",
+            "accepted checker evidence",
+            "current-turn live-op scope",
+            "runtime evidence",
+            "SDK evidence",
+            "approved in-game evidence",
+            "SDK/P0 progress",
+            "live-op authorization",
+            "Discord authorization",
+            "publication authority",
+            "runtime readiness",
+            "public SDK readiness",
+            "package-shape/public package readiness",
+            "stable SDK readiness",
+            "Plugin Hub readiness",
+            "support-tier activation",
+            "stable SDK claims",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, compact)
+
+        for positive_claim in (
+            "future_beta_notice_counts_as_evidence=true",
+            "latest_release_readiness_authorizes_runtime=true",
+            "package_shape_counts_toward_sdk=true",
+            "side_lane_candidate_counts_toward_p0=true",
+            "plugin_hub_readiness_allowed=true",
+            "support_tier_activation_allowed=true",
+            "progress_normalization_trace_counts_toward_p0=true",
+            "source_overclaim_diagnostic_is_runtime_evidence=true",
+            "source_overclaim_total_flag_count_zero_is_stable_sdk_evidence=true",
+            "latest_validation_pass_is_runtime_evidence=true",
+            "all_six_agents_closed_counts_toward_sdk=true",
+            "codex_cleanup_authorizes_publication=true",
+            "exact_components_sdk_package_shape_implies_plugin_hub_ready=true",
+        ):
+            with self.subTest(claim=positive_claim):
+                self.assertNotIn(positive_claim, compact.lower())
+
+    def test_assigned_public_docs_do_not_leak_protected_live_paths(self) -> None:
+        public_docs = {
+            "docs/STATUS.md": read("docs/STATUS.md"),
+            "docs/RELEASE.md": read("docs/RELEASE.md"),
+            "docs/SDK_V1_COMPATIBILITY.md": read("docs/SDK_V1_COMPATIBILITY.md"),
+            "docs/research/README.md": read("docs/research/README.md"),
+        }
+
+        for path, text in public_docs.items():
+            with self.subTest(file=path):
+                self.assertNotIn("/servidor/ark", text)
+                self.assertNotIn("protected `/servidor/ark`", text)
+                self.assertNotIn("`/servidor/ark`", text)
 
     def test_resource_programming_scope_stays_category_only_in_release_docs(self) -> None:
         release = read("docs/RELEASE.md")
@@ -289,9 +668,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "copied UTF-8 message\n  text, send mode, copied-payload flag, and process-local sequence only",
             "not a command SDK,\n  chat send/moderation API, sender identity API, UE lookup path, mutation surface, or\n  return-override authority",
             "accepted `chat-message-intake` second-source comparison",
-            "The runtime producer\nexists behind the `enable-chat-events` marker/env path",
-            "accepted copied-log validation\n  with 18 accepted delivery events covering send modes `0,1,2,3` through the",
-            "further beta\nobservation is regression/revalidation only unless a new promotion gate is defined",
+            "The runtime producer\nexists only when a current-turn scoped observer-debug run also has the\n`enable-chat-events` marker/env path, supported binary SHA, and positive dispatch budget",
+            "Historical, surface-local accepted copied-log delivery\nvalidation with 18 accepted delivery events covering send modes `0,1,2,3` exists for\nthat v0.1-rc path only",
+            "not current P0 approved runtime evidence, current-turn\nlive-op approval, SDK/P0 progress, public SDK readiness, or v1 completion",
+            "Further beta\nobservation is regression/revalidation only unless a new promotion gate is defined",
             "Do not count `enable-chat-reflection` observer evidence for\nthat claim",
         ]
         required_status_items = [
@@ -299,7 +679,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "Minimal copied UTF-8 chat notification contract for plugins that parse text locally",
             "sender/player identity, resource identity, raw `FString`, raw params, FName/GObjects indices, UE pointers, chat send/moderation/blocking, command routing, mutation, and return overrides remain blocked",
             "The target layout has accepted second-source evidence",
-            "the `enable-chat-events` producer path has approved copied-log plugin-facing delivery validation with 18 accepted events covering all four known send modes (`0..3`) and no privacy blockers",
+            "the `enable-chat-events` producer path has historical, surface-local accepted copied-log plugin-facing delivery validation with 18 accepted events covering all four known send modes (`0..3`) and no privacy blockers",
+            "That chat delivery evidence is not current P0 approved runtime evidence, current-turn live-op approval, SDK/P0 progress, public SDK readiness, or v1 completion",
             "Historical `enable-chat-reflection` observer logs still do not satisfy delivery evidence",
         ]
         forbidden_claims = [
@@ -310,6 +691,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "promotes a command SDK",
             "promotes sender/player identity",
             "promotes chat send/moderation",
+            "Accepted copied-log delivery validation with 18 accepted",
+            "Runtime producer delivery has accepted copied-log validation",
+            "the `enable-chat-events` producer path has accepted copied-log plugin-facing delivery validation",
+            "observer-debug approval",
             "live debug delivery validated",
             "end-to-end public milestone claim",
         ]
@@ -320,17 +705,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for item in required_status_items:
             with self.subTest(file="docs/STATUS.md", item=item):
                 self.assertIn(item, status)
-        for item in [
-            "v0.1-rc public C ABI slices:",
-            "Minimal v0.1-rc `ChatMessageEvent` callback ABI",
-            "This remains a copied notification contract only",
-        ]:
-            with self.subTest(file="README.md", item=item):
-                self.assertIn(item, readme)
-        self.assertLess(
-            readme.index("v0.1-rc public C ABI slices:"),
-            readme.index("Minimal v0.1-rc `ChatMessageEvent` callback ABI"),
-        )
+        # Mandatory RC scope wording belongs to RELEASE/STATUS. The prototype
+        # README still participates in the forbidden stable/promoted-claim checks.
         for item in forbidden_claims:
             for path, text in (("docs/RELEASE.md", release), ("docs/STATUS.md", status), ("README.md", readme)):
                 with self.subTest(file=path, item=item):
@@ -514,7 +890,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                     self.assertNotIn(stale, text)
 
     def test_release_readiness_is_the_documented_release_gate(self) -> None:
-        readme = read("README.md")
         release = read("docs/RELEASE.md")
         pr_template = read(".github/pull_request_template.md")
         ci = read(".github/workflows/ci.yml")
@@ -524,9 +899,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         build_skill = read("agent-skills/obelisk-build-system/SKILL.md")
         workflow_skill = read("agent-skills/obelisk-github-research-workflow/SKILL.md")
 
-        self.assertIn("scripts/check_release_readiness.sh", readme)
-        self.assertIn("canonical release gate", readme)
-        self.assertIn("Quick contributor loop", readme)
         self.assertIn("scripts/check_release_readiness.sh", release)
         self.assertIn("--ufunction-second-source-root <second-source-ufunction-snapshots>", release)
         self.assertIn("refreshed root recorded in", release)
@@ -572,7 +944,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Check committed public RC UFunction target sets", ci)
         self.assertNotIn("tests/fixtures/scriptstruct_snapshots", ci)
         self.assertNotIn("Check committed ScriptStruct promotion target sets", ci)
-        self.assertIn("all 12 public\n  RC snapshots across the four public target sets", changelog)
+        self.assertIn("public\n  RC snapshots", changelog)
         self.assertNotIn("all nine public\n  RC targets", changelog)
         self.assertRegex(
             ci,
@@ -583,14 +955,42 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ),
         )
         self.assertIn("--require-second-source-readiness", ci)
+        self.assertIn("core-first baseline only", ci)
+        ci_without_comments = "\n".join(
+            line for line in ci.splitlines() if not line.lstrip().startswith("#")
+        )
+        self.assertNotIn("--require-v1-sdk-completion", ci_without_comments)
         self.assertIn("Release readiness requires a clean worktree", script)
         self.assertIn("release-readiness baseline gate", script)
         self.assertIn("production libobelisk.so symbol surface checks", script)
+        self.assertIn(
+            "default CI/baseline invocation must not pass --require-v1-sdk-completion",
+            script,
+        )
+        self.assertIn("release-manager opt-in only", script)
+        self.assertEqual(script.count("run_step check_public_sdk_v1_stable_claim_gate"), 1)
+        self.assertRegex(
+            script,
+            re.compile(
+                r'if \[\[ "\$\{REQUIRE_V1_SDK_COMPLETION\}" == "1" \]\]; then\s+'
+                r"run_step check_public_sdk_v1_stable_claim_gate\s+else\s+"
+                r"run_step check_sdk_status_report_non_claim_gate\s+fi",
+                re.S,
+            ),
+        )
         self.assertIn("check_production_runtime_symbols", script)
         self.assertIn("Production libobelisk.so exposes test-only/internal symbols", script)
         self.assertIn("gameplay/module second-source layout-evidence gate was not run", script)
         self.assertIn("pre-build readiness metadata preflight", script)
         self.assertIn("current BoolProperty tail metadata", script)
+        self.assertIn(
+            "default CI release-readiness job runs this core-first baseline without the v1",
+            release,
+        )
+        self.assertIn(
+            "default CI release-readiness job is the core-first/package-shape baseline",
+            status,
+        )
         self.assertIn("test-only/internal symbol patterns", release)
         self.assertIn("Production `libobelisk.so` remains free of test-only/internal symbols", pr_template)
         self.assertIn("canonical release gate rejecting production `libobelisk.so`", status)
@@ -645,8 +1045,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("default second-source gate is intentionally scoped to the public RC UFunction target", release)
         self.assertIn("`minimal-second-source-intake`", release)
         self.assertIn("`structure-observer-intake`", release)
-        self.assertIn("`item-return-only-policy-slice`", release)
         self.assertIn("`chat-message-intake`", release)
+        self.assertIn("Item return-only evidence remains planning-only/internal", release)
         self.assertIn("accepted default intake is layout-only evidence", release)
         self.assertIn("promotion_gate.ready_scope=layout_only", release)
         self.assertIn("promotion_gate.promotion_ready=false", release)
@@ -690,11 +1090,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("cross-event correlation", status)
         self.assertIn("refreshed default `minimal-second-source-intake`", changelog)
         self.assertIn("does not promote public\n  Inventory/Structure SDKs", changelog)
-        self.assertIn("Mission target sets such as `mission-compact-intake` are", normalized(release))
-        self.assertIn(
-            "Transfer target sets such as `transfer-ufunction-intake` are also not part of the default gate",
-            normalized(release),
-        )
+        self.assertIn("Item-return, Mission, and Transfer target sets such as", normalized(release))
+        self.assertIn("`item-return-only-policy-slice`, `mission-compact-intake`, and `transfer-ufunction-intake`", normalized(release))
         self.assertIn(
             "Planning/guidance-only target sets such as `players-identity-lifecycle-intake` and",
             release,
@@ -702,7 +1099,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("`mission-copied-bool-policy-slice`", release)
         self.assertIn("NextGen/Plugin Hub planning target sets", release)
         self.assertIn("rejected by `scripts/check_release_readiness.sh`", release)
-        self.assertIn("not part of the default gate", release)
+        self.assertIn("are not part of that gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn("remaining item producer/runtime validation", normalized(release))
         self.assertIn("Mission copied-bool observer, and Transfer `bAccept` lanes stay internal", normalized(release))
@@ -920,7 +1317,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             install,
         )
         self.assertIn("The plugin installer only publishes an already-built `.so`", install)
-        self.assertIn("run the\nplugin installer with `--dry-run`", install)
+        self.assertNormalizedIn(
+            "run the plugin installer with `--dry-run` as an offline/package-shape check",
+            install,
+        )
+        self.assertNormalizedIn(
+            "A dry-run, package-shape install, or copied `.so` remains non-authorizing/non-evidence",
+            install,
+        )
         self.assertIn("adding a first-party example", release)
         self.assertIn("naming a popular plugin\n  family does not promote public SDK surface", release)
         self.assertNormalizedIn(
@@ -1050,7 +1454,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
     def test_core_timers_stay_distinct_from_gameplay_module_timer_apis(self) -> None:
         docs = {
-            "README.md": read("README.md"),
             "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
             "CONTRIBUTING.md": read("CONTRIBUTING.md"),
             "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
@@ -1131,7 +1534,6 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
     def test_arkapi_reference_is_names_demand_only_not_porting_or_copying(self) -> None:
         docs = {
-            "README.md": read("README.md"),
             "docs/ARCHITECTURE.md": read("docs/ARCHITECTURE.md"),
             "CONTRIBUTING.md": read("CONTRIBUTING.md"),
             "docs/agent-handoff/CURRENT.md": read("docs/agent-handoff/CURRENT.md"),
@@ -1214,11 +1616,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("are not reused or pushed", pr_lower)
 
     def test_disable_plugins_marker_is_documented_as_wrapper_input_not_runtime_gate(self) -> None:
-        readme = read("README.md")
         install = read("docs/INSTALL.md")
         status = read("docs/STATUS.md")
 
-        for path, text in (("README.md", readme), ("docs/INSTALL.md", install), ("docs/STATUS.md", status)):
+        for path, text in (("docs/INSTALL.md", install), ("docs/STATUS.md", status)):
             with self.subTest(file=path, item="marker named"):
                 self.assertIn("disable-plugins", text)
             with self.subTest(file=path, item="runtime env gate"):
@@ -1229,11 +1630,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                     r"disable-plugins.*(?:not an independent runtime gate|not a runtime gate by itself)",
                 )
 
-        normalized_readme = normalized(readme)
         normalized_install = normalized(install)
         normalized_status = normalized(status)
-        self.assertIn("LinuxGSM wrapper input", normalized_readme)
-        self.assertIn("not an independent runtime gate by itself", normalized_readme)
         self.assertIn("wrapper translates it into `OBELISK_DISABLE_PLUGINS=1`", normalized_install)
         self.assertIn("custom launchers must set that environment variable themselves", normalized_install)
         self.assertIn("when the wrapper or launcher sets `OBELISK_DISABLE_PLUGINS=1`", normalized_status)
@@ -1262,11 +1660,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/assemble_rc_ufunction_second_source_root.py", final_text)
         self.assertIn("--minimal-root", final_text)
         self.assertIn("--structure-root", final_text)
-        self.assertIn("--item-return-root", final_text)
         self.assertIn("--chat-root", final_text)
         self.assertIn("/tmp/obelisk-rc-ufunction-second-source-root", final_text)
         self.assertIn("--ufunction-second-source-root /tmp/obelisk-rc-ufunction-second-source-root", release_gate_text)
-        self.assertIn("must contain the candidate snapshots for all four", final_text)
         self.assertNotRegex(
             release_gate_text,
             r"--ufunction-second-source-root\s+/servidor/ark/workspace-offline/[^\\\n]*minimal[^\\\n]*/ufunction-snapshots",
@@ -1397,6 +1793,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
 
         self.assertIn("path_redacted", helper)
         self.assertIn("assert_no_manifest_path_leaks(manifest", helper)
+        self.assertNotIn("--item-return-root", helper)
 
     def test_checkpoint_scope_preserves_resource_and_post_rc_ordering(self) -> None:
         plan = read("docs/research/2026-05-29-rc-checkpoint-slicing-plan.md")
@@ -1532,6 +1929,165 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             self.assertIn("scripts/check_item_return_only_readiness.py --json", release_gate)
             self.assertIn("scripts/check_inventory_action_fixture_boundary.py --json", release_gate)
 
+    def test_copied_dispatcher_cleanup_parity_does_not_expand_public_sdk_scope(self) -> None:
+        public_header = strip_c_comments(read("include/obelisk/ObeliskApi.h"))
+
+        for token in COPIED_DISPATCHER_PUBLIC_HEADER_BLOCKED_TOKENS:
+            with self.subTest(file="include/obelisk/ObeliskApi.h", token=token):
+                self.assertNotIn(token, public_header)
+
+        public_claim_docs = {
+            path: read(path)
+            for path in COPIED_DISPATCHER_PUBLIC_CLAIM_PATHS
+        }
+        internal_dispatcher_names = (
+            "MissionCopiedBoolEventDispatcher",
+            "PlayerPrincipalEventDispatcher",
+            "StructureEventDispatcher",
+            "InventoryPolicyEventDispatcher",
+            "ItemReturnEventDispatcher",
+        )
+        positive_claim_words = (
+            r"ready|readiness|stable|promoted|production|public\s+(?:SDK|ABI|surface|callback)"
+        )
+        blocked_claim_surfaces = (
+            "MissionCopiedBool",
+            "ObeliskPlayerPrincipal",
+            "PlayerPrincipalEventDispatcher",
+        )
+
+        for path, text in public_claim_docs.items():
+            for dispatcher in internal_dispatcher_names:
+                dispatcher_mentions = [
+                    sentence
+                    for sentence in sentences(text)
+                    if dispatcher in sentence
+                ]
+                for mention in dispatcher_mentions:
+                    with self.subTest(file=path, dispatcher=dispatcher):
+                        self.assertRegex(
+                            normalized(mention),
+                            re.compile(
+                                r"\b(?:internal|test-only|not\s+(?:a\s+)?public|not plugin-facing|blocked)\b",
+                                re.IGNORECASE,
+                            ),
+                            "Public docs may name internal copied dispatchers only when the "
+                            "same statement keeps the surface non-public.",
+                        )
+
+            for surface in blocked_claim_surfaces:
+                claim_pattern = re.compile(
+                    rf"\b{re.escape(surface)}\b[^.\n]*\b(?:{positive_claim_words})\b",
+                    re.IGNORECASE,
+                )
+                with self.subTest(file=path, surface=surface):
+                    self.assertIsNone(claim_pattern.search(text))
+
+    def test_side_lane_tokens_do_not_become_public_header_or_docs_claims(self) -> None:
+        public_header = strip_c_comments(read("include/obelisk/ObeliskApi.h"))
+
+        for token in SIDE_LANE_PUBLIC_HEADER_BLOCKED_TOKENS:
+            with self.subTest(file="include/obelisk/ObeliskApi.h", token=token):
+                self.assertNotIn(token, public_header)
+
+        offenders: list[str] = []
+        for path in SIDE_LANE_PUBLIC_DOC_CLAIM_PATHS:
+            for sentence in sentences(read(path)):
+                if not SIDE_LANE_DOC_SUBJECT_RE.search(sentence):
+                    continue
+                if not PUBLIC_DOC_POSITIVE_CLAIM_RE.search(sentence):
+                    continue
+                if PUBLIC_DOC_NEGATIVE_SCOPE_RE.search(sentence):
+                    continue
+                offenders.append(f"{path}: {normalized(sentence)}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "Inventory custom-filter boundary, Transfer ScriptStruct/payload, Buff status, "
+            "and Dino scalar side-lane names may appear in public docs only as internal, "
+            "blocked, or non-public scope notes.",
+        )
+
+    def test_side_lane_target_sets_and_surface_manifest_stay_non_release_supported(self) -> None:
+        for target_set in SIDE_LANE_INTERNAL_TARGET_SETS:
+            with self.subTest(target_set=target_set):
+                self.assertIn(target_set, TARGET_SETS)
+                self.assertIn(target_set, INTERNAL_LAYOUT_ONLY_TARGET_SETS)
+                self.assertNotIn(target_set, RELEASE_READINESS_TARGET_SETS)
+                self.assertNotIn(target_set, PUBLIC_RC_UFUNCTION_TARGET_SETS)
+
+        surfaces_payload = json.loads(read("docs/public_sdk_surfaces.json"))
+        module_surface = next(
+            item
+            for item in surfaces_payload["surfaces"]
+            if item.get("id") == "obelisk.mission_transfer_dino_tribe.v1"
+        )
+        self.assertEqual(module_surface["status"], "planning")
+        self.assertEqual(module_surface["support_tier"], "blocked")
+        self.assertEqual(module_surface["public_contract"], [])
+        self.assertTrue(
+            module_surface["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"]
+        )
+
+        expected_leaf_ids = {"transfer", "dino_policy", "buff_status"}
+        leaf_units = {
+            leaf["id"]: leaf
+            for leaf in module_surface["leaf_decision_units"]
+            if leaf["id"] in expected_leaf_ids
+        }
+        self.assertEqual(set(leaf_units), expected_leaf_ids)
+        for leaf_id, leaf in leaf_units.items():
+            with self.subTest(leaf=leaf_id):
+                self.assertEqual(leaf["status"], "planning")
+                self.assertIn("no public", leaf["current_blocker"])
+                self.assertRegex(leaf["current_blocker"], r"\bSDK ABI\b")
+                self.assertIn("explicitly excluded", leaf["allowed_v1_outcome"])
+
+        for exclusion in ("Transfer SDK", "Dino SDK", "Buff/status SDK"):
+            with self.subTest(exclusion=exclusion):
+                self.assertIn(exclusion, module_surface["exclusions"])
+
+    def test_side_lane_readiness_checkers_publish_only_internal_non_claim_flags(self) -> None:
+        checker_expectations = {
+            "scripts/check_transfer_scriptstruct_readiness.py": (
+                "obelisk.transfer-scriptstruct-readiness-check.v1",
+                "transfer-scriptstruct",
+                "transfer_scriptstruct_payload_decode_blocked",
+                "does not promote public ScriptStruct or Transfer SDK callbacks",
+                '"public_transfer_sdk_ready": False',
+                '"transfer_payload_decoding_ready": False',
+            ),
+            "scripts/check_transfer_baccept_readiness.py": (
+                "obelisk.transfer-baccept-readiness-check.v1",
+                "transfer-baccept-only-policy-slice",
+                "does not claim public Transfer SDK, public API, public ABI, public header",
+                '"public_transfer_sdk_ready": False',
+                '"transfer_payload_decoding_ready": False',
+            ),
+            "scripts/check_buff_status_readiness.py": (
+                "obelisk.buff-status-readiness-check.v1",
+                "buff-compact-intake",
+                "buff-breadth-intake",
+                "buff_status_public_abi_ready",
+                '"public_buff_status_sdk_ready": False',
+                '"buff_status_callback_ready": False',
+            ),
+            "scripts/check_dino_scalar_readiness.py": (
+                "obelisk.dino-scalar-readiness-check.v1",
+                "dino-compact-intake",
+                "no public Dino SDK or C ABI",
+                '"public_dino_sdk_ready": False',
+                '"public_callback_ready": False',
+            ),
+        }
+
+        for path, expected_tokens in checker_expectations.items():
+            text = read(path)
+            for token in expected_tokens:
+                with self.subTest(file=path, token=token):
+                    self.assertIn(token, text)
+
     def test_installed_sdk_consumer_stays_in_release_gate_not_default_ctest(self) -> None:
         cmake = read("CMakeLists.txt")
         release_gate = read("scripts/check_release_readiness.sh")
@@ -1547,6 +2103,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         install = read("scripts/install_obelisk.sh")
         plugin_install = read("scripts/install_obelisk_plugin.sh")
         release_gate = read("scripts/check_release_readiness.sh")
+        install_doc = read("docs/INSTALL.md")
+        release_doc = read("docs/RELEASE.md")
+        status_doc = read("docs/STATUS.md")
 
         self.assertIn(
             'set(Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS "package-shape-evidence-only")',
@@ -1584,6 +2143,54 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                     self.assertIn("stable production readiness", compact)
             with self.subTest(surface=label, claim="v1 SDK"):
                 self.assertIn("v1 SDK completion", text)
+            if label in {"runtime installer", "release gate"}:
+                with self.subTest(surface=label, claim="current SDK blocker count"):
+                    self.assertIn("SDK blocker promotion 0/12", text)
+                with self.subTest(surface=label, claim="current P0 blocker count"):
+                    self.assertIn("P0 dependency chain 0/4", text)
+                with self.subTest(surface=label, claim="stable claim remains disabled"):
+                    self.assertIn("stable_claim_allowed=false", text)
+                with self.subTest(surface=label, claim="approved runtime blocker"):
+                    self.assertIn("approved_runtime_evidence_missing", text)
+
+        for path, text in (
+            ("docs/INSTALL.md", install_doc),
+            ("docs/RELEASE.md", release_doc),
+        ):
+            compact = normalized(text)
+            with self.subTest(file=path, claim="current SDK blocker count"):
+                self.assertIn("0/12", text)
+            with self.subTest(file=path, claim="current P0 blocker count"):
+                self.assertIn("0/4", text)
+            with self.subTest(file=path, claim="stable claim remains disabled"):
+                self.assertIn("stable_claim_allowed=false", text)
+            with self.subTest(file=path, claim="approved runtime blocker"):
+                self.assertIn("approved_runtime_evidence_missing", text)
+            with self.subTest(file=path, claim="no package-shape promotion"):
+                self.assertRegex(
+                    compact,
+                    re.compile(
+                        r"(?:package-shape|install/package-shape)[^.]*\b(?:do not|must not|does not)\b"
+                        r"[^.]*\b(?:runtime readiness|stable SDK claim|route completion)\b",
+                        re.IGNORECASE,
+                    ),
+                )
+
+        self.assertIn("These package-shape markers do not resolve", install_doc)
+        self.assertIn("Core-first release gates, the latest release-readiness pass", release_doc)
+        self.assertIn("package-shape installs", release_doc)
+        self.assertIn("package installs", release_doc)
+        self.assertIn(
+            "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
+            release_doc,
+        )
+        self.assertIn("`source_overclaim_total_flag_count=0`", release_doc)
+        self.assertIn("install/package-shape checks", release_doc)
+        self.assertIn("scoped non-complete release statement bookkeeping", normalized(release_doc))
+        self.assertIn("Installer success does not grant runtime readiness", status_doc)
+        self.assertIn("Plugin Hub readiness/publication", status_doc)
+        self.assertIn("support-tier activation", status_doc)
+        self.assertIn("stable SDK claims", status_doc)
 
     def test_installed_sdk_smoke_covers_release_examples_in_release_gate(self) -> None:
         release_gate = read("scripts/check_release_readiness.sh")
@@ -2169,6 +2776,15 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "core/MissionCopiedBoolEventDispatcher.cpp",
             "tests/core/MissionCopiedBoolEventDispatcherTests.cpp",
         ]
+        forbidden_cmake_surface_tokens = [
+            "core/MissionCopiedBoolEventDispatcher.cpp",
+            "core/MissionCopiedBoolEventDispatcher.h",
+            "tests/core/MissionCopiedBoolEventDispatcherTests.cpp",
+            "tests/perf/MissionCopiedBoolEventDispatcherBenchmark.cpp",
+            "mission_copied_bool_event_dispatcher",
+            "MissionCopiedBoolEventDispatcher",
+            "MissionCopiedBool",
+        ]
         obelisk_target = re.search(
             r"add_library\(obelisk SHARED\n(?P<sources>.*?)\n\)",
             cmake,
@@ -2208,6 +2824,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             is_benchmark_test_target = (
                 kind == "executable"
                 and name == "mission_copied_bool_event_dispatcher_benchmark"
+                and "EXCLUDE_FROM_ALL" in body
                 and "tests/perf/MissionCopiedBoolEventDispatcherBenchmark.cpp" in source_set
             )
             if is_dispatcher_unit_test_target:
@@ -2227,6 +2844,28 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 cmake,
             )
         self.assertEqual(offenders, [])
+
+        for match in re.finditer(
+            r"target_sources\(\s*(?P<target>obelisk|obelisk_sdk)\b(?P<body>.*?)\)",
+            cmake,
+            re.S,
+        ):
+            for token in forbidden_cmake_surface_tokens:
+                with self.subTest(target_sources=match.group("target"), token=token):
+                    self.assertNotIn(token, match.group("body"))
+
+        for match in re.finditer(r"install\((?P<body>.*?)\)", cmake, re.S):
+            install_body = match.group("body")
+            for token in forbidden_cmake_surface_tokens:
+                with self.subTest(cmake_install_block=install_body.strip().splitlines()[0], token=token):
+                    self.assertNotIn(token, install_body)
+
+        plugin_cmake_paths = sorted((REPO_ROOT / "plugins").rglob("CMakeLists.txt"))
+        for path in plugin_cmake_paths:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_cmake_surface_tokens:
+                with self.subTest(file=str(path.relative_to(REPO_ROOT)), token=token):
+                    self.assertNotIn(token, text)
 
         plugin_manager_paths = [
             "core/PluginManager.cpp",
@@ -2461,8 +3100,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         fixture_readme = read("tests/fixtures/ufunction_snapshots/README.md")
 
         self.assertIn("mission/transfer APIs", release)
-        self.assertIn("Mission target sets such as `mission-compact-intake` are", normalized(release))
-        self.assertIn("not part of the default gate", release)
+        self.assertIn("Item-return, Mission, and Transfer target sets such as", normalized(release))
+        self.assertIn("not part of that gate", release)
         self.assertIn("scalar-candidate summaries are review aids only, not RC scope", normalized(release))
         self.assertIn("missions", status)
         self.assertIn("remain roadmap items", status)

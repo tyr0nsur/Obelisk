@@ -218,7 +218,14 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual(
             {
                 "snapshot_schema": tool.SUPPORTED_SNAPSHOT_SCHEMA,
-                "input_snapshots": [{"id": "snapshot-0001", "sha256": expected_sha256}],
+                "input_snapshots": [
+                    {
+                        "id": "snapshot-0001",
+                        "sha256": expected_sha256,
+                        "target": "ShooterGameMode.CanRespawn",
+                        "targets": ["ShooterGameMode.CanRespawn"],
+                    }
+                ],
             },
             report["generated_from"],
         )
@@ -234,6 +241,13 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         safety = report["safety_summary"]
         self.assertEqual("candidate_only", safety["artifact_status"])
         self.assertIs(False, safety["promotion_ready"])
+        self.assertIs(False, safety["public_sdk_ready"])
+        self.assertIs(False, safety["p0_dependency_chain_ready"])
+        self.assertIs(False, safety["complete_sdk_ready"])
+        self.assertIs(False, safety["counts_toward_public_sdk"])
+        self.assertIs(False, safety["counts_toward_p0_dependency_chain_claim"])
+        self.assertEqual(0, safety["complete_sdk_claim_progress_contribution"])
+        self.assertEqual(0, safety["p0_dependency_chain_claim_progress_contribution"])
         self.assertEqual("offline_review_only", safety["intended_use"])
         self.assertEqual(3, safety["param_count_total"])
         self.assertEqual(0, safety["zero_param_signature_count"])
@@ -247,6 +261,9 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIn("function_flags_not_bound_to_exact_target_gate", safety["promotion_blockers_by_reason"])
         self.assertIn("membership_status_not_candidate_uobject", safety["promotion_blockers_by_reason"])
         self.assertIn("public_sdk", safety["not_promoted_surfaces"])
+        self.assertIn("target_set_lists", safety["not_promoted_surfaces"])
+        self.assertIn("source_markers", safety["not_promoted_surfaces"])
+        self.assertIn("p0_dependency_chain", safety["not_promoted_surfaces"])
 
         player = signature["params"][0]
         self.assertEqual("redacted_uobject_ref", player["type"])
@@ -282,6 +299,17 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual([], report["missing_targets"])
         self.assertEqual(4, report["snapshot_count"])
         self.assertEqual(4, report["signature_count"])
+        identity = report["artifact_identity"]
+        self.assertTrue(identity["path_redacted"])
+        self.assertEqual("7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520", identity["ark_binary_sha256"])
+        self.assertEqual("reflection_target_sets.py:item-compact-intake", identity["target_set_revision"])
+        self.assertEqual("obelisk.reflection-target-set-revision.v1", identity["target_set_revision_schema"])
+        self.assertRegex(identity["target_set_revision_source_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(identity["target_set_revision_source_sha256"], coverage["target_set_revision_source_sha256"])
+        self.assertIn(
+            "artifact_sha256:1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e",
+            identity["source_artifact_ids"],
+        )
         self.assertEqual(
             [
                 "PrimalItem.AllowEquipItem",
@@ -294,7 +322,7 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual(4, len(report["generated_from"]["input_snapshots"]))
         self.assertTrue(
             all(
-                set(snapshot.keys()) == {"id", "sha256"}
+                set(snapshot.keys()) == {"id", "sha256", "target", "targets"}
                 for snapshot in report["generated_from"]["input_snapshots"]
             )
         )
@@ -1541,6 +1569,24 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual(coverage["expected_targets"], coverage["emitted_targets"])
         self.assertEqual("snapshot", coverage["declared_target_sets"][0]["source"])
 
+    def test_direct_snapshot_without_source_target_set_is_not_exact_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "snapshot.json"
+            write_json(snapshot, self.snapshot_payload())
+
+            report = tool.build_report(snapshots=[snapshot])
+
+        coverage = report["target_set_coverage"]
+        self.assertEqual(tool.TARGET_SET_COVERAGE_SCHEMA, coverage["schema"])
+        self.assertEqual("not_declared", coverage["status"])
+        self.assertIs(False, coverage["complete"])
+        self.assertIs(False, coverage["exact_coverage"])
+        self.assertEqual("unscoped_direct_snapshots", coverage["coverage_scope"])
+        self.assertEqual(["source_target_set_required_for_exact_coverage"], coverage["blockers"])
+        self.assertEqual([], coverage["declared_target_sets"])
+        self.assertEqual([], coverage["expected_targets"])
+        self.assertEqual(["ShooterGameMode.CanRespawn"], coverage["emitted_targets"])
+
     def test_source_target_set_fails_closed_when_direct_snapshots_do_not_match(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
         paths, missing = tool.snapshot_paths_from_target_sets(fixture_root, ["item-compact-intake"])
@@ -1549,6 +1595,42 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             tool.build_report(snapshots=paths[:1], source_target_sets=["item-compact-intake"])
 
+    def test_source_target_set_rejects_manifest_source_overlap(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        paths, missing = tool.snapshot_paths_from_target_sets(fixture_root, ["item-compact-intake"])
+        self.assertEqual([], missing)
+
+        with self.assertRaisesRegex(
+            SystemExit,
+            "target set declared for both manifest and direct snapshots: item-compact-intake",
+        ):
+            tool.build_report(
+                snapshot_root=fixture_root,
+                target_sets=["item-compact-intake"],
+                snapshots=paths,
+                source_target_sets=["item-compact-intake"],
+            )
+
+    def test_rejects_duplicate_manifest_target_sets(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        with self.assertRaisesRegex(SystemExit, "duplicate --target-set value"):
+            tool.build_report(
+                snapshot_root=fixture_root,
+                target_sets=["item-compact-intake", "item-compact-intake"],
+            )
+
+    def test_rejects_duplicate_source_target_sets(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        paths, missing = tool.snapshot_paths_from_target_sets(fixture_root, ["item-compact-intake"])
+        self.assertEqual([], missing)
+
+        with self.assertRaisesRegex(SystemExit, "duplicate --source-target-set value"):
+            tool.build_report(
+                snapshots=paths,
+                source_target_sets=["item-compact-intake", "item-compact-intake"],
+            )
+
     def test_source_target_set_rejects_unknown_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = Path(tmp) / "snapshot.json"
@@ -1556,6 +1638,34 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
 
             with self.assertRaises(SystemExit):
                 tool.build_report(snapshots=[snapshot], source_target_sets=["not-a-target-set"])
+
+    def test_target_set_rejects_promotion_surface_alias_name(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "promotion/readiness alias"):
+            tool.expand_ufunction_target_sets(["stable-sdk-intake"])
+
+    def test_player_lifecycle_catalog_rejects_nearby_target_substitution(self) -> None:
+        from reflection_target_sets import TARGET_SETS, target_set_catalog_hygiene_issues
+
+        drifted = dict(TARGET_SETS)
+        drifted["players-lifecycle-anchor-candidates"] = (
+            "obelisk.ufunction-chain.snapshot.v1:GameMode.K2_PostLogin",
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.HandleNewPlayer",
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.OnLogout",
+        )
+
+        issues = target_set_catalog_hygiene_issues(target_sets=drifted)
+
+        self.assertIn(
+            "player_lifecycle_target_set_exact_mismatch",
+            {issue["reason"] for issue in issues},
+        )
+
+    def test_ufunction_target_set_rejects_scriptstruct_only_set(self) -> None:
+        with self.assertRaisesRegex(
+            SystemExit,
+            "target set did not include UFunction snapshots: transfer-scriptstruct",
+        ):
+            tool.expand_ufunction_target_sets(["transfer-scriptstruct"])
 
     def test_safety_summary_counts_zero_param_signatures(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1654,6 +1764,35 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
                 self.assertRaises(SystemExit),
             ):
                 tool.reject_protected_input_path("snapshot", link)
+
+    def test_rejects_direct_snapshot_symlink_even_outside_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target.snapshot.json"
+            write_json(target, self.snapshot_payload())
+            link = root / "link.snapshot.json"
+            link.symlink_to(target)
+
+            with self.assertRaisesRegex(SystemExit, "hash input must not be a symlink"):
+                tool.build_report(snapshots=[link])
+
+    def test_rejects_snapshot_manifest_symlink_even_outside_protected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real_manifest = root / "real-manifest.json"
+            write_json(real_manifest, {"sha_prefix": "sha", "targets": []})
+            (root / "manifest.json").symlink_to(real_manifest)
+
+            with self.assertRaisesRegex(SystemExit, "snapshot manifest must not be a symlink"):
+                tool.build_report(snapshot_root=root, target_sets=["item-compact-intake"])
+
+    def test_target_set_catalog_hygiene_blocks_named_coverage_builds(self) -> None:
+        with mock.patch(
+            "reflection_target_sets.target_set_catalog_hygiene_issues",
+            return_value=[{"target_set": "orphan-set", "reason": "target_set_missing_module_lane"}],
+        ):
+            with self.assertRaisesRegex(SystemExit, "target-set catalog hygiene failed: target_set_missing_module_lane"):
+                tool.expand_ufunction_target_sets(["item-compact-intake"])
 
     def test_labels_reference_out_array_flags(self) -> None:
         prop = {

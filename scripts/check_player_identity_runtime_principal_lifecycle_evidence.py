@@ -23,6 +23,52 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-c
 NEXT_BLOCKER = "approved_runtime_evidence_missing"
 REQUEST_PACK_SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
 WINDOW_MANIFEST_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
+RUNTIME_OBSERVER_SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
+START_END_EVIDENCE_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-start-end-evidence-check.v1"
+APPROVED_EVIDENCE_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
+APPROVED_EVIDENCE_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+BUNDLE_PREFLIGHT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1"
+BUNDLE_REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1"
+READY_LOG_COPY_SCHEMA = "obelisk.player-principal-lifecycle-ready-log-copy.v1"
+READY_LOG_COPY_EVIDENCE_SPLIT_SCHEMA = "obelisk.player-principal-lifecycle-ready-log-copy-evidence-split.v1"
+RUNTIME_EVIDENCE_STATUS_SCHEMA = "obelisk.player-principal-lifecycle-runtime-evidence-status.v1"
+RUNTIME_EVIDENCE_FAST_PATH_SCHEMA = "obelisk.player-principal-lifecycle-runtime-evidence-fast-path.v1"
+RUNTIME_EVIDENCE_ACCEPTANCE_STATE_SCHEMA = "obelisk.player-principal-lifecycle-runtime-evidence-acceptance-state.v1"
+RUNTIME_EVIDENCE_ACCEPTANCE_BOUNDARY_SCHEMA = "obelisk.player-principal-lifecycle-runtime-evidence-acceptance-boundary.v1"
+STRICT_TRIPLET_CANDIDATE_SUMMARY_SCHEMA = "obelisk.player-principal-lifecycle-strict-triplet-candidate-summary.v1"
+STRICT_TRIPLET_SELECTOR_SCHEMA = "obelisk.player-principal-lifecycle-strict-triplet-selector.v1"
+EXACT_TRIPLET_BUNDLE_ROUTE_SCHEMA = "obelisk.player-principal-lifecycle-exact-triplet-bundle-route.v1"
+SDK_STATUS_REPORT_SCHEMA = "obelisk.sdk-status-report.v1"
+SDK_STATUS_SIDE_LANE_SUMMARY_SCHEMA = "obelisk.sdk-status-side-lane-summary.v1"
+SDK_STATUS_CRITICAL_PATH_SUMMARY_SCHEMA = "obelisk.sdk-status-critical-path-summary.v1"
+APPROVED_IN_GAME_EVIDENCE_STATUS_SCHEMA = "obelisk.approved-in-game-evidence-status.v1"
+PUBLIC_SDK_V1_APPROVED_IN_GAME_EVIDENCE_STATUS_SCHEMA = "obelisk.public-sdk-v1-approved-in-game-evidence-status.v1"
+INTERNAL_MODULE_READINESS_SCHEMA = "obelisk.internal-module-readiness.v1"
+ADJACENT_NON_EVIDENCE_SCHEMA_BLOCKERS = {
+    REQUEST_PACK_SCHEMA: "request_pack_is_not_runtime_evidence",
+    WINDOW_MANIFEST_CHECK_SCHEMA: "window_manifest_check_is_not_runtime_evidence",
+    RUNTIME_OBSERVER_SUMMARY_SCHEMA: "runtime_observer_summary_is_not_shape_fixture_evidence",
+    START_END_EVIDENCE_CHECK_SCHEMA: "start_end_only_check_is_not_lifecycle_evidence",
+    APPROVED_EVIDENCE_SCHEMA: "approved_evidence_manifest_requires_approved_checker",
+    APPROVED_EVIDENCE_CHECK_SCHEMA: "approved_evidence_check_report_is_not_shape_fixture",
+    BUNDLE_PREFLIGHT_SCHEMA: "bundle_preflight_report_is_not_shape_fixture",
+    BUNDLE_REPORT_SCHEMA: "generated_bundle_report_is_not_shape_fixture",
+    READY_LOG_COPY_SCHEMA: "ready_log_copy_report_is_not_shape_fixture",
+    READY_LOG_COPY_EVIDENCE_SPLIT_SCHEMA: "ready_log_split_report_is_not_shape_fixture",
+    RUNTIME_EVIDENCE_STATUS_SCHEMA: "runtime_evidence_status_sidecar_is_not_shape_fixture",
+    RUNTIME_EVIDENCE_FAST_PATH_SCHEMA: "runtime_evidence_fast_path_sidecar_is_not_shape_fixture",
+    RUNTIME_EVIDENCE_ACCEPTANCE_STATE_SCHEMA: "runtime_evidence_acceptance_state_sidecar_is_not_shape_fixture",
+    RUNTIME_EVIDENCE_ACCEPTANCE_BOUNDARY_SCHEMA: "runtime_evidence_acceptance_boundary_sidecar_is_not_shape_fixture",
+    STRICT_TRIPLET_CANDIDATE_SUMMARY_SCHEMA: "strict_triplet_candidate_summary_is_not_shape_fixture",
+    STRICT_TRIPLET_SELECTOR_SCHEMA: "strict_triplet_selector_sidecar_is_not_shape_fixture",
+    EXACT_TRIPLET_BUNDLE_ROUTE_SCHEMA: "exact_triplet_bundle_route_sidecar_is_not_shape_fixture",
+    SDK_STATUS_REPORT_SCHEMA: "sdk_status_report_is_not_shape_fixture",
+    SDK_STATUS_SIDE_LANE_SUMMARY_SCHEMA: "sdk_status_side_lane_summary_is_not_shape_fixture",
+    SDK_STATUS_CRITICAL_PATH_SUMMARY_SCHEMA: "sdk_status_critical_path_summary_is_not_shape_fixture",
+    APPROVED_IN_GAME_EVIDENCE_STATUS_SCHEMA: "approved_in_game_evidence_status_is_not_shape_fixture",
+    PUBLIC_SDK_V1_APPROVED_IN_GAME_EVIDENCE_STATUS_SCHEMA: "public_sdk_approved_evidence_status_is_not_shape_fixture",
+    INTERNAL_MODULE_READINESS_SCHEMA: "internal_module_readiness_sidecar_is_not_shape_fixture",
+}
 
 REQUIRED_CASES = frozenset(
     (
@@ -42,7 +88,7 @@ REQUIRED_CASE_SEQUENCE = (
 )
 REQUIRED_TARGETS = {
     "session_start_anchor": "ShooterGameMode.HandleNewPlayer",
-    "session_start_rejected_anchor": "ShooterGameMode.HandleNewPlayer",
+    "session_start_rejected_anchor": "ShooterGameMode.CheckJoinInProgress",
     "session_end_anchor": "ShooterGameMode.OnLogout",
     "stale_after_logout": "post_logout_consumer_check",
     "malformed_or_unsupported_evidence": "principal_consumer_boundary",
@@ -63,14 +109,14 @@ REQUIRED_COPIED_BOOL_FIELDS = {
 }
 REQUIRED_COPIED_BOOL_VALUES = {
     "session_start_anchor": ("1", "1"),
-    "session_start_rejected_anchor": ("0", "1"),
+    "session_start_rejected_anchor": ("1", "0"),
     "session_end_anchor": (),
     "stale_after_logout": (),
     "malformed_or_unsupported_evidence": (),
 }
 REQUIRED_OBSERVATION_REDACTIONS = {
     "session_start_anchor": ("NewPlayer", "PlayerData", "PlayerCharacter"),
-    "session_start_rejected_anchor": ("NewPlayer", "PlayerData", "PlayerCharacter"),
+    "session_start_rejected_anchor": ("NewPlayer",),
     "session_end_anchor": ("Exiting",),
     "stale_after_logout": (),
     "malformed_or_unsupported_evidence": (),
@@ -93,6 +139,20 @@ REQUIRED_PRINCIPAL_ACTION = {
     "session_start_anchor": "candidate_created",
     "session_start_rejected_anchor": "none",
     "session_end_anchor": "candidate_invalidated",
+    "stale_after_logout": "none",
+    "malformed_or_unsupported_evidence": "none",
+}
+REQUIRED_APPLY_STATUS = {
+    "session_start_anchor": "session_start_created",
+    "session_start_rejected_anchor": "session_start_rejected_noop",
+    "session_end_anchor": "session_end_invalidated",
+    "stale_after_logout": "none",
+    "malformed_or_unsupported_evidence": "none",
+}
+REQUIRED_CORRELATION_STATUS = {
+    "session_start_anchor": "not_applicable",
+    "session_start_rejected_anchor": "not_applicable",
+    "session_end_anchor": "matched",
     "stale_after_logout": "none",
     "malformed_or_unsupported_evidence": "none",
 }
@@ -280,6 +340,8 @@ def build_template_manifest() -> dict[str, Any]:
                 "post_original": REQUIRED_POST_ORIGINAL[case],
                 "role": REQUIRED_ROLE[case],
                 "principal_action": REQUIRED_PRINCIPAL_ACTION[case],
+                "apply_status": REQUIRED_APPLY_STATUS[case],
+                "correlation_status": REQUIRED_CORRELATION_STATUS[case],
                 "delivery_claim": "none",
                 "raw_payload_retained": False,
             }
@@ -499,6 +561,22 @@ def validate_observations(observations: Any, blockers: list[dict[str, Any]]) -> 
                 case=case,
                 expected=REQUIRED_PRINCIPAL_ACTION.get(case),
             )
+        if observation.get("apply_status") != REQUIRED_APPLY_STATUS.get(case):
+            add(
+                blockers,
+                "observation_apply_status_mismatch",
+                f"{label}.apply_status",
+                case=case,
+                expected=REQUIRED_APPLY_STATUS.get(case),
+            )
+        if observation.get("correlation_status") != REQUIRED_CORRELATION_STATUS.get(case):
+            add(
+                blockers,
+                "observation_correlation_status_mismatch",
+                f"{label}.correlation_status",
+                case=case,
+                expected=REQUIRED_CORRELATION_STATUS.get(case),
+            )
         if observation.get("delivery_claim") != "none":
             add(blockers, "observation_delivery_claim_not_none", f"{label}.delivery_claim", case=case)
         if observation.get("raw_payload_retained") is not False:
@@ -551,10 +629,9 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        if payload.get("schema") == REQUEST_PACK_SCHEMA:
-            add(blockers, "request_pack_is_not_runtime_evidence", "$.schema")
-        elif payload.get("schema") == WINDOW_MANIFEST_CHECK_SCHEMA:
-            add(blockers, "window_manifest_check_is_not_runtime_evidence", "$.schema")
+        adjacent_schema_blocker = ADJACENT_NON_EVIDENCE_SCHEMA_BLOCKERS.get(payload.get("schema"))
+        if adjacent_schema_blocker is not None:
+            add(blockers, adjacent_schema_blocker, "$.schema")
         return Validation(blockers, [])
     keys = set(payload)
     missing = REQUIRED_TOP_LEVEL_KEYS - keys

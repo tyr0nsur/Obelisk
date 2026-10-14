@@ -14,6 +14,7 @@ from typing import Any
 
 import build_redacted_ufunction_signatures as redacted_ufunction_signatures
 import validate_offline_artifact_gate as offline_gate
+from reflection_target_sets import NON_AUTHORIZING_READY_DOES_NOT_SATISFY, NON_AUTHORIZING_READY_SCOPE
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -71,21 +72,115 @@ REQUIRED_NON_CLAIM_TOKENS = (
     "does not promote runtime hook wiring",
     "does not copy player/controller/character object refs",
 )
+CURRENT_SDK_BLOCKER = "approved_runtime_evidence_missing"
+BETA_CAPTURE_STATUS = "future_capture_targets_only"
+BETA_CAPTURE_TARGET_STATUS = "future_capture_target"
+BETA_CAPTURE_GATE = "dedicated_beta_capture_check_required"
+BETA_CAPTURE_SURFACE = "mission_copied_bool"
+BETA_CAPTURE_FALSE_OR_ZERO_FIELDS = (
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_ready",
+    "beta_capture_ready",
+    "candidate_capture_evidence_ready",
+    "candidate_capture_ready",
+    "clears_approved_runtime_evidence_missing",
+    "complete_sdk_claim_progress_contribution",
+    "complete_sdk_progress_contribution",
+    "complete_sdk_ready",
+    "counts_as_approved_runtime_evidence",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "debug_capture_ready",
+    "dependency_chain_completion_ready",
+    "mission_sdk_ready",
+    "mutation_authority_ready",
+    "mutation_ready",
+    "p0_dependency_chain_claim_progress_contribution",
+    "p0_dependency_chain_progress_contribution",
+    "p0_dependency_chain_ready",
+    "p0_ready",
+    "player_principal_replacement_ready",
+    "player_principal_runtime_evidence_ready",
+    "public_sdk_ready",
+    "replaces_player_principal_evidence",
+    "resource_handle_ready",
+    "return_override_ready",
+    "return_value_override_ready",
+    "runtime_capture_ready",
+    "runtime_evidence_ready",
+    "runtime_ready",
+    "sdk_progress",
+    "sdk_progress_contribution",
+    "sdk_ready",
+    "v1_completion",
+    "v1_completion_contribution",
+    "v1_completion_ready",
+)
+BETA_CAPTURE_ARTIFACT_KEYS = {
+    "beta_capture",
+    "beta_capture_pack",
+    "beta_capture_plan",
+    "beta_capture_prep",
+    "candidate_beta_capture_pack",
+    "candidate_beta_capture_plan",
+    "capture_pack",
+    "capture_plan",
+    "multi_surface_beta_capture",
+    "multi_surface_beta_capture_pack",
+    "multi_surface_beta_capture_plan",
+}
 FORBIDDEN_COPIED_RE = re.compile(
     r"(?:PlayerCharacter|PlayerPawn|Controller|OutItemIDs|GetPlayerUsableItems|identity|"
     r"lookup|mutation|object_refs|public_sdk|resource_handle|return_override|runtime|ue_pointer)",
     re.IGNORECASE,
 )
 FORBIDDEN_TRUE_READY_KEYS = {
+    "candidate_capture_evidence_ready",
+    "candidate_capture_ready",
+    "candidate_debug_capture_ready",
+    "capture_evidence_ready",
+    "capture_ready",
+    "debug_capture_evidence_ready",
+    "debug_capture_ready",
     "dispatcher_ready",
     "mission_payload_decoding_ready",
     "mission_sdk_ready",
     "mutation_ready",
+    "approved_runtime_evidence_missing_cleared",
+    "approved_runtime_evidence_ready",
+    "beta_capture_ready",
+    "clears_approved_runtime_evidence_missing",
+    "complete_sdk_ready",
+    "counts_as_approved_runtime_evidence",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_p0_dependency_chain_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "debug_capture_ready",
+    "dependency_chain_completion_ready",
+    "mutation_authority_ready",
+    "p0_dependency_chain_accounted",
+    "p0_dependency_chain_complete",
+    "p0_dependency_chain_ready",
+    "p0_ready",
+    "player_principal_replacement_ready",
+    "player_principal_runtime_evidence_ready",
     "public_abi_ready",
     "public_api_ready",
     "public_mission_sdk_ready",
+    "public_runtime_ready",
     "public_sdk_ready",
+    "replaces_player_principal_evidence",
+    "resource_handle_ready",
+    "resourcehandle_ready",
     "return_override_ready",
+    "return_value_override_ready",
+    "runtime_capture_ready",
+    "runtime_evidence_ready",
     "runtime_hook_ready",
     "runtime_hooks_ready",
     "runtime_ready",
@@ -96,7 +191,8 @@ FORBIDDEN_TRUE_READY_KEYS = {
 ALLOWED_OVERCLAIM_TEXT_PREFIXES = ("$.non_claims", "$.safety_summary.explicitly_excluded")
 AFFIRMATIVE_OVERCLAIM_CONTEXT_RE = re.compile(
     r"\b(?:ready|readiness|available|availability|supported|support|enabled|promoted|promotion|"
-    r"included|exposed|exposure|complete|completion|stable)\b",
+    r"supports?|enables?|promotes?|exposes?|publishes?|authorizes?|validates?|claims?|proves?|"
+    r"counts?|credits?|included|exposed|exposure|complete|completion|stable|allowed|unblocked|unlocked)\b",
     re.IGNORECASE,
 )
 NEGATED_OR_EXCLUDED_CONTEXT_RE = re.compile(
@@ -106,18 +202,30 @@ NEGATED_OR_EXCLUDED_CONTEXT_RE = re.compile(
 )
 ALLOWED_PREFIX_CLAIM_SUBJECT_RE = re.compile(
     r"\b(?:"
+    r"approved[_ -]?runtime[_ -]?evidence|"
     r"(?:public[_ -]?)?(?:mission|module)[_ -]?(?:sdk|api)|"
     r"public[_ -]?(?:abi|api|callback|descriptor|sdk)|"
     r"mission[_ -]?(?:callback|descriptor|event|identity)|"
     r"player[_ -]?identity|"
+    r"player[_ -]?principal(?:[_ -]?lifecycle)?[_ -]?evidence|"
     r"object[_ -]?identity|"
     r"identity|lookup|mutation|"
+    r"p0[_ -]?dependency[_ -]?chain|"
     r"resource[_ -]?handle|ResourceHandle|"
-    r"return[_ -]?override|"
-    r"runtime[_ -]?(?:hook|hooks|callback|callbacks|observer)"
+    r"return[_ -]?(?:value[_ -]?)?override|"
+    r"runtime[_ -]?(?:evidence|hook|hooks|callback|callbacks|observer|ready|readiness|support|capture|wiring|validation)"
     r")\b",
     re.IGNORECASE,
 )
+CANDIDATE_CAPTURE_PROMOTION_RE = re.compile(
+    r"\b(?:(?:multi[_ -]?surface\s+)?(?:beta|candidate|debug|candidate/debug)[_ -]?captures?|"
+    r"(?:multi[_ -]?surface\s+)?(?:beta|candidate|debug)[_ -]?capture[_ -]?(?:pack|plan|artifact|bundle)s?)\s+"
+    r"(?:(?:is|are)\s+(?:accepted|approved|available|enabled|evidence|progress|promoted|ready|runtime|supported|validated)|"
+    r"(?:counts?|credits?)\s+(?:toward|for)|"
+    r"(?:clears?|enables?|promotes?|replaces?|satisfies?|supports?|unlocks?|unblocks?|authorizes?|validates?))\b",
+    re.IGNORECASE,
+)
+POSITIVE_PROGRESS_RATIO_RE = re.compile(r"^\s*[1-9][0-9]*\s*/\s*[1-9][0-9]*\s*$")
 MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "abi ready": "public_abi",
     "allows mutation": "mutation",
@@ -125,40 +233,93 @@ MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "authority promoted": "authority",
     "authority ready": "authority",
     "authoritative identity": "authority_identity",
+    "candidate capture is evidence": "candidate_capture",
+    "candidate capture is progress": "candidate_capture",
+    "candidate capture is ready": "candidate_capture",
+    "candidate capture ready": "candidate_capture",
+    "approved runtime evidence accepted": "approved_runtime_evidence",
+    "approved runtime evidence present": "approved_runtime_evidence",
+    "approved runtime evidence ready": "approved_runtime_evidence",
+    "beta capture is evidence": "candidate_capture",
+    "beta capture is progress": "candidate_capture",
+    "beta capture is ready": "candidate_capture",
+    "beta capture pack is evidence": "candidate_capture",
+    "beta capture plan is evidence": "candidate_capture",
+    "clears approved_runtime_evidence_missing": "approved_runtime_evidence",
     "c abi ready": "public_abi",
+    "counts toward p0 dependency chain": "p0_dependency_chain",
+    "debug capture is evidence": "candidate_capture",
+    "debug capture is progress": "candidate_capture",
+    "debug capture is ready": "candidate_capture",
+    "debug capture ready": "candidate_capture",
+    "enables mutation": "mutation",
+    "enables resource handle": "resource_handle",
+    "enables resourcehandle": "resource_handle",
+    "enables return override": "return_override",
+    "enables runtime support": "runtime_ready",
     "hook wiring ready": "runtime_hooks",
     "identity promoted": "identity",
     "identity ready": "identity",
+    "multi-surface beta capture is evidence": "candidate_capture",
+    "multi surface beta capture is evidence": "candidate_capture",
     "mission authority": "authority",
     "mission identity": "identity",
     "mission sdk": "mission_sdk",
+    "mission sdk allowed": "mission_sdk",
+    "mission sdk unblocked": "mission_sdk",
+    "mission sdk unlocked": "mission_sdk",
     "mutation enabled": "mutation",
+    "mutation authority": "mutation",
     "mutation path": "mutation",
     "mutation ready": "mutation",
     "mutation supported": "mutation",
     "object identity": "identity",
     "player authority": "authority",
     "player identity": "identity",
+    "player principal evidence replaced": "player_principal_evidence",
+    "player-principal evidence replaced": "player_principal_evidence",
+    "replaces player principal evidence": "player_principal_evidence",
+    "replaces player principal lifecycle evidence": "player_principal_evidence",
+    "replaces player-principal evidence": "player_principal_evidence",
+    "replaces player-principal lifecycle evidence": "player_principal_evidence",
     "public abi": "public_abi",
+    "public sdk allowed": "public_sdk",
+    "public sdk unblocked": "public_sdk",
+    "public sdk unlocked": "public_sdk",
     "return override enabled": "return_override",
     "return override ready": "return_override",
     "return override supported": "return_override",
+    "return value override": "return_override",
+    "return value override enabled": "return_override",
+    "return value override ready": "return_override",
     "return overrides": "return_override",
+    "runtime evidence accepted": "approved_runtime_evidence",
+    "runtime evidence present": "approved_runtime_evidence",
+    "runtime evidence ready": "approved_runtime_evidence",
     "runtime hook ready": "runtime_hooks",
     "runtime hooks enabled": "runtime_hooks",
     "runtime hooks ready": "runtime_hooks",
     "runtime support active": "runtime_ready",
     "runtime support enabled": "runtime_ready",
+    "runtime support unblocked": "runtime_ready",
+    "runtime support unlocked": "runtime_ready",
     "runtime support ready": "runtime_ready",
     "runtime support supported": "runtime_ready",
     "umbrella leaf promoted": "umbrella_leaf_promotion",
     "umbrella leaf promotion": "umbrella_leaf_promotion",
+    "p0 dependency chain complete": "p0_dependency_chain",
+    "p0 dependency chain ready": "p0_dependency_chain",
     "v1 complete": "v1_completion",
     "v1 completion": "v1_completion",
+    "v1 completion allowed": "v1_completion",
+    "v1 completion unblocked": "v1_completion",
+    "v1 completion unlocked": "v1_completion",
     "v1 done": "v1_completion",
     "v1 ready": "v1_completion",
     "v1 support active": "v1_completion",
     "v1 support enabled": "v1_completion",
+    "v1 support unblocked": "v1_completion",
+    "v1 support unlocked": "v1_completion",
     "v1 support ready": "v1_completion",
     "v1 support supported": "v1_completion",
     "version 1 complete": "v1_completion",
@@ -173,8 +334,129 @@ FORBIDDEN_SUPPORT_STATUS_KEYS = {
     "v1_sdk_support",
     "v1_support",
 }
+SOURCE_READINESS_ALIAS_KEYS = {
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_status",
+    "source_accepted",
+    "source_available",
+    "source_label",
+    "source_labels",
+    "source_marker",
+    "source_markers",
+    "source_readiness",
+    "source_ready",
+    "source_stable",
+    "source_status",
+    "source_support",
+    "source_tier",
+    "source_validated",
+    "source_validation",
+    "runtime_evidence",
+    "runtime_evidence_status",
+    "player_principal_runtime_evidence",
+    "player_principal_runtime_evidence_status",
+}
+POSITIVE_SOURCE_STATUS_VALUES = {
+    "accepted",
+    "active",
+        "approved",
+        "available",
+        "allowed",
+        "complete",
+        "completed",
+        "enabled",
+    "passed",
+    "promoted",
+    "public",
+    "public_ready",
+    "ready",
+    "release_ready",
+    "release_supported",
+    "runtime",
+    "runtime_ready",
+    "sdk_ready",
+    "stable",
+    "stable_ready",
+        "supported",
+        "true",
+        "unblocked",
+        "unlocked",
+        "validated",
+        "v1_ready",
+    }
+CONTEXTUAL_READINESS_STATUS_KEYS = {
+    "accepted",
+    "active",
+    "approved",
+    "allowed",
+    "complete",
+    "enabled",
+    "outcome",
+    "passed",
+    "promoted",
+    "readiness",
+    "ready",
+    "result",
+    "stable",
+    "state",
+    "status",
+    "unblocked",
+    "unlocked",
+    "validated",
+}
+CONTEXTUAL_READINESS_PROGRESS_KEYS = {
+    "claim_progress",
+    "count",
+    "counts",
+    "counting",
+    "credit",
+    "credits",
+    "claim_credit",
+    "claim_credits",
+    "completion_credit",
+    "completion_credits",
+    "completion_contribution",
+    "completion_percent",
+    "completion_progress",
+    "completion_ratio",
+    "contribution",
+    "percent",
+    "progress",
+    "progress_contribution",
+    "progress_ratio",
+    "ratio",
+    "surface_count",
+}
+CONTEXTUAL_READINESS_KEY_RE = re.compile(
+    r"(?:approved[_-]?runtime[_-]?evidence|beta|public|sdk|api|abi|module|callback|descriptor|"
+    r"capability|runtime|capture|pack|plan|multi[_-]?surface|live[_-]?ops|source|v1|p0|"
+    r"complete|completion|dependency[_-]?chain|stable|promotion|resource[_-]?handle|"
+    r"return[_-]?(?:value[_-]?)?override|identity|lookup|mutation|player[_-]?principal|principal|support|tier)",
+    re.IGNORECASE,
+)
+CONTEXTUAL_READINESS_CONTAINER_KEYS = {
+    "beta_capture",
+    "beta_capture_pack",
+    "beta_capture_plan",
+    "beta_capture_prep",
+    "capture_pack",
+    "capture_plan",
+    "candidate",
+    "multi_surface_beta_capture",
+    "multi_surface_beta_capture_pack",
+    "multi_surface_beta_capture_plan",
+    "package_shape",
+    "plugin_hub",
+    "public_sdk",
+    "readiness",
+    "runtime",
+    "support_tier",
+    "target_set",
+    "v1",
+}
 AFFIRMATIVE_SUPPORT_STATUS_RE = re.compile(
-    r"\b(?:active|available|enabled|promoted|published|ready|release[-_\s]+supported|stable|supported)\b",
+    r"\b(?:active|available|allowed|enabled|promoted|published|ready|release[-_\s]+supported|"
+    r"stable|supported|unblocked|unlocked)\b",
     re.IGNORECASE,
 )
 PUBLIC_MISSION_C_API_RE = re.compile(
@@ -238,6 +520,14 @@ def parse_args() -> argparse.Namespace:
         "--skip-artifact-gates",
         action="store_true",
         help="Skip consume/promote gate subprocesses for hermetic policy-fixture tests.",
+    )
+    parser.add_argument(
+        "--fixture-boundary-only",
+        action="store_true",
+        help=(
+            "Validate only the repo fixture-regenerated Mission copied-bool boundary; "
+            "does not inspect --root/--manifest or claim attestation/public/runtime readiness."
+        ),
     )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
@@ -711,6 +1001,122 @@ def require_set(
     return actual_set
 
 
+def field_target(field: str) -> str:
+    return field.rsplit(".", 1)[0]
+
+
+def build_beta_capture_prep() -> dict[str, Any]:
+    targets: list[dict[str, Any]] = []
+    for target in sorted(EXPECTED_INPUT_TARGETS):
+        targets.append(
+            {
+                "target": target,
+                "surface": BETA_CAPTURE_SURFACE,
+                "target_set": INPUT_TARGET_SET,
+                "status": BETA_CAPTURE_TARGET_STATUS,
+                "source_evidence": "candidate_only_mission_copied_bool_policy_slice",
+                "capture_gate": BETA_CAPTURE_GATE,
+                "approved_runtime_evidence_ready": False,
+                "clears_approved_runtime_evidence_missing": False,
+                "player_principal_runtime_evidence_ready": False,
+                "replaces_player_principal_evidence": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "runtime_capture_ready": False,
+                "sdk_ready": False,
+                "sdk_progress": 0,
+                "p0_dependency_chain_ready": False,
+                "counts_toward_p0_dependency_chain_claim": False,
+                "copied_bool_fields": sorted(field for field in EXPECTED_COPIED_FIELDS if field_target(field) == target),
+                "redacted_fields": sorted(field for field in EXPECTED_REDACTED_FIELDS if field_target(field) == target),
+                "recognition_only": target not in EXPECTED_COPIED_TARGETS,
+            }
+        )
+    return {
+        "status": BETA_CAPTURE_STATUS,
+        "surface": BETA_CAPTURE_SURFACE,
+        "target_set": INPUT_TARGET_SET,
+        "source_evidence": "candidate_only_mission_copied_bool_policy_slice",
+        "capture_gate": BETA_CAPTURE_GATE,
+        "multi_surface_plan_role": "mission_copied_bool_surface_candidate_prep_only",
+        "approved_runtime_evidence_ready": False,
+        "runtime_evidence_ready": False,
+        "clears_approved_runtime_evidence_missing": False,
+        "approved_runtime_evidence_missing_cleared": False,
+        "player_principal_runtime_evidence_ready": False,
+        "replaces_player_principal_evidence": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "runtime_capture_ready": False,
+        "debug_capture_ready": False,
+        "sdk_ready": False,
+        "sdk_progress": 0,
+        "p0_dependency_chain_ready": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "targets": targets,
+        "non_claims": [
+            "future beta/debug capture target planning only",
+            "dedicated beta capture acceptance check is required before runtime use",
+            "does not clear approved_runtime_evidence_missing",
+            "does not replace player-principal lifecycle evidence",
+        ],
+    }
+
+
+def validate_beta_capture_entry(entry: Any, blockers: list[dict[str, Any]], path: str) -> str | None:
+    if not isinstance(entry, dict):
+        append_blocker(blockers, "beta_capture_target_malformed", path=path)
+        return None
+    target = entry.get("target")
+    if not isinstance(target, str) or target not in EXPECTED_INPUT_TARGETS:
+        append_blocker(blockers, "beta_capture_target_mismatch", path=f"{path}.target", target=target)
+    if entry.get("surface") not in {BETA_CAPTURE_SURFACE, "multi_surface", None}:
+        append_blocker(blockers, "beta_capture_surface_mismatch", path=f"{path}.surface", value=entry.get("surface"))
+    status = entry.get("status")
+    if status not in {BETA_CAPTURE_TARGET_STATUS, BETA_CAPTURE_STATUS, "candidate-only", "candidate-prep", "candidate_prep", None}:
+        append_blocker(blockers, "beta_capture_target_status_mismatch", path=f"{path}.status", value=status)
+    if entry.get("capture_gate") not in {BETA_CAPTURE_GATE, None}:
+        append_blocker(blockers, "beta_capture_gate_mismatch", path=f"{path}.capture_gate", value=entry.get("capture_gate"))
+    for key in BETA_CAPTURE_FALSE_OR_ZERO_FIELDS:
+        if key in entry and not claim_value_is_false_or_zero(entry.get(key)):
+            append_blocker(
+                blockers,
+                "beta_capture_readiness_overclaim",
+                path=f"{path}.{key}",
+                value=entry.get(key),
+            )
+    return target if isinstance(target, str) else None
+
+
+def validate_beta_capture_artifact(value: Any, blockers: list[dict[str, Any]], path: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        append_blocker(blockers, "beta_capture_artifact_malformed", path=path)
+        return
+    status = value.get("status")
+    if status not in {BETA_CAPTURE_STATUS, "candidate-only", "candidate-prep", "candidate_prep", "future_capture_plan_only"}:
+        append_blocker(blockers, "beta_capture_artifact_status_mismatch", path=f"{path}.status", value=status)
+    if value.get("surface") not in {BETA_CAPTURE_SURFACE, "multi_surface", None}:
+        append_blocker(blockers, "beta_capture_artifact_surface_mismatch", path=f"{path}.surface", value=value.get("surface"))
+    if value.get("capture_gate") not in {BETA_CAPTURE_GATE, None}:
+        append_blocker(blockers, "beta_capture_artifact_gate_mismatch", path=f"{path}.capture_gate", value=value.get("capture_gate"))
+    for key in BETA_CAPTURE_FALSE_OR_ZERO_FIELDS:
+        if key in value and not claim_value_is_false_or_zero(value.get(key)):
+            append_blocker(blockers, "beta_capture_readiness_overclaim", path=f"{path}.{key}", value=value.get(key))
+    targets = value.get("targets")
+    if targets is None:
+        return
+    if not isinstance(targets, list):
+        append_blocker(blockers, "beta_capture_targets_malformed", path=f"{path}.targets")
+        return
+    for index, entry in enumerate(targets):
+        validate_beta_capture_entry(entry, blockers, f"{path}.targets[{index}]")
+
+
 def validate_generated_from(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
     generated_from = policy.get("generated_from")
     if not isinstance(generated_from, dict):
@@ -912,6 +1318,107 @@ def normalize_claim_key(value: object) -> str:
     return separated.casefold().replace("-", "_").replace(" ", "_")
 
 
+def normalize_trail_leaf_key(trail: str) -> str:
+    leaf = trail.rsplit(".", 1)[-1]
+    leaf = re.sub(r"\[\d+\]$", "", leaf)
+    return normalize_claim_key(leaf)
+
+
+def positive_source_alias_value(value: str) -> bool:
+    normalized = normalize_claim_key(value)
+    return normalized in POSITIVE_SOURCE_STATUS_VALUES or normalized.endswith("_ready")
+
+
+def positive_numeric_claim(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
+
+
+def positive_progress_claim(value: Any) -> bool:
+    return positive_numeric_claim(value) or (
+        isinstance(value, str) and POSITIVE_PROGRESS_RATIO_RE.fullmatch(value) is not None
+    )
+
+
+def claim_value_is_false_or_zero(value: Any) -> bool:
+    return value is False or value is None or value == 0
+
+
+def positive_contextual_readiness_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if positive_numeric_claim(value):
+        return True
+    if not isinstance(value, str):
+        return False
+    return positive_source_alias_value(value)
+
+
+def contextual_readiness_key(normalized_key: str) -> bool:
+    if normalized_key in {
+        "accepted_for_internal_planning",
+        "copied_bool_count",
+        "redacted_field_count",
+    }:
+        return False
+    return normalized_key in CONTEXTUAL_READINESS_CONTAINER_KEYS or bool(
+        CONTEXTUAL_READINESS_KEY_RE.search(normalized_key)
+    )
+
+
+def contextual_readiness_progress_key(normalized_key: str) -> bool:
+    return normalized_key in CONTEXTUAL_READINESS_PROGRESS_KEYS or any(
+        normalized_key.endswith(f"_{key}") for key in CONTEXTUAL_READINESS_PROGRESS_KEYS
+    )
+
+
+def collect_contextual_readiness_object_overclaims(
+    value: Any,
+    *,
+    trail: str = "$",
+    claim_context: bool = False,
+) -> list[tuple[str, str]]:
+    overclaims: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized_key = normalize_claim_key(key)
+            child_context = claim_context or contextual_readiness_key(normalized_key)
+            if (
+                child_context
+                and normalized_key in CONTEXTUAL_READINESS_STATUS_KEYS
+                and positive_contextual_readiness_value(child)
+            ):
+                overclaims.append((child_trail, normalized_key))
+            elif (
+                child_context
+                and contextual_readiness_progress_key(normalized_key)
+                and positive_progress_claim(child)
+            ):
+                overclaims.append((child_trail, normalized_key))
+            if isinstance(child, (dict, list)):
+                overclaims.extend(
+                    collect_contextual_readiness_object_overclaims(
+                        child,
+                        trail=child_trail,
+                        claim_context=child_context,
+                    )
+                )
+        return overclaims
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            overclaims.extend(
+                collect_contextual_readiness_object_overclaims(
+                    child,
+                    trail=f"{trail}[{index}]",
+                    claim_context=claim_context,
+                )
+            )
+        return overclaims
+    if claim_context and (value is True or (isinstance(value, str) and positive_source_alias_value(value))):
+        overclaims.append((trail, "value"))
+    return overclaims
+
+
 def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     gate_blockers = offline_gate.validate_mission_copied_bool_policy_slice_manifest(
         policy,
@@ -934,12 +1441,16 @@ def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dic
 
     for trail, _ in offline_gate.collect_ready_overclaims(policy):
         append_blocker(blockers, "readiness_overclaim", field=trail)
+    for trail, claim in collect_contextual_readiness_object_overclaims(policy):
+        append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=claim)
     for trail, value in offline_gate.collect_bool_fields(policy):
-        key = trail.rsplit(".", 1)[-1]
+        key = normalize_trail_leaf_key(trail)
         if key == "not_artifact_gate" and value is False:
             append_blocker(blockers, "not_artifact_gate_contradiction", field=trail)
         if key == "consume_only" and value is False:
             append_blocker(blockers, "consume_only_not_true", field=trail)
+        if value is True and key in SOURCE_READINESS_ALIAS_KEYS:
+            append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=key)
         if value is True and key in FORBIDDEN_TRUE_READY_KEYS:
             append_blocker(blockers, "runtime_public_readiness_overclaim", field=trail)
     for trail, _, reason in offline_gate.collect_candidate_public_overclaims(
@@ -948,9 +1459,18 @@ def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dic
     ):
         append_blocker(blockers, "runtime_public_claim_overclaim", field=trail, claim=reason)
     for trail, raw_value in offline_gate.collect_string_fields(policy):
+        for match in CANDIDATE_CAPTURE_PROMOTION_RE.finditer(raw_value):
+            append_blocker(
+                blockers,
+                "mission_candidate_capture_overclaim",
+                field=trail,
+                claim=match.group(0),
+            )
         if any(trail.startswith(prefix) for prefix in ALLOWED_OVERCLAIM_TEXT_PREFIXES):
             continue
-        key = normalize_claim_key(trail.rsplit(".", 1)[-1])
+        key = normalize_trail_leaf_key(trail)
+        if key in SOURCE_READINESS_ALIAS_KEYS and positive_source_alias_value(raw_value):
+            append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=key)
         if key in FORBIDDEN_SUPPORT_STATUS_KEYS and AFFIRMATIVE_SUPPORT_STATUS_RE.search(raw_value):
             append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=key)
         text = raw_value.casefold()
@@ -1056,6 +1576,10 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         if token not in non_claims_text:
             append_blocker(blockers, "required_non_claim_missing", token=token)
 
+    for beta_key in BETA_CAPTURE_ARTIFACT_KEYS:
+        if beta_key in policy and isinstance(policy.get(beta_key), dict):
+            validate_beta_capture_artifact(policy.get(beta_key), blockers, path=f"$.{beta_key}")
+
     validate_internal_only_boundaries(policy, blockers)
 
     return {
@@ -1110,10 +1634,7 @@ def validate_regenerated_fixture_policy(blockers: list[dict[str, Any]]) -> dict[
         "policy_sha256": policy_sha256,
         "snapshot_root": "tests/fixtures/ufunction_snapshots",
         "summary": summary,
-        "public_sdk_ready": False,
-        "runtime_ready": False,
-        "promotion_ready": False,
-        "v1_completion": False,
+        **false_readiness_flags(),
     }
 
 
@@ -1168,6 +1689,9 @@ def build_attestation(
         "attestation_ready": attestation_ready,
         "consume_only": True,
         "internal_reusable_evidence_only": True,
+        "current_sdk_blocker": CURRENT_SDK_BLOCKER,
+        "next_blocker": CURRENT_SDK_BLOCKER,
+        "remaining_blockers": [CURRENT_SDK_BLOCKER],
         "reviewed_direct_policy_manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "expected_manifest_sha256": expected_manifest_sha256,
         "actual_manifest_sha256": actual_manifest_sha256,
@@ -1190,23 +1714,142 @@ def build_attestation(
             ),
         },
         "fixture_policy_regeneration": fixture_regeneration,
+        **false_readiness_flags(),
+    }
+
+
+def false_readiness_flags() -> dict[str, bool | int]:
+    return {
         "mission_sdk_ready": False,
+        "sdk_ready": False,
+        "sdk_progress": 0,
+        "sdk_progress_contribution": 0,
         "public_abi_ready": False,
         "public_sdk_ready": False,
         "runtime_observer_approved": False,
         "runtime_ready": False,
+        "runtime_evidence_ready": False,
+        "runtime_capture_ready": False,
+        "approved_runtime_evidence_ready": False,
+        "player_principal_runtime_evidence_ready": False,
+        "clears_approved_runtime_evidence_missing": False,
+        "approved_runtime_evidence_missing_cleared": False,
+        "counts_as_approved_runtime_evidence": False,
+        "replaces_player_principal_evidence": False,
         "identity_ready": False,
         "lookup_ready": False,
         "mutation_ready": False,
+        "mutation_authority_ready": False,
         "promotion_ready": False,
+        "resource_handle_ready": False,
         "return_override_ready": False,
+        "return_value_override_ready": False,
+        "candidate_capture_evidence_ready": False,
+        "debug_capture_evidence_ready": False,
+        "candidate_capture_progress_contribution": 0,
+        "complete_sdk_ready": False,
+        "stable_claim_allowed": False,
+        "counts_toward_complete_sdk_claim": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "complete_sdk_progress_contribution": 0,
+        "p0_ready": False,
+        "p0_dependency_chain_accounted": False,
+        "p0_dependency_chain_ready": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "p0_dependency_chain_progress_contribution": 0,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
         "v1_completion": False,
+        "v1_completion_ready": False,
+        "v1_completion_contribution": 0,
     }
 
 
+def build_fixture_boundary_report() -> dict[str, Any]:
+    blockers: list[dict[str, Any]] = []
+    fixture_regeneration = validate_regenerated_fixture_policy(blockers)
+    ready = not blockers and fixture_regeneration.get("status") == "accepted"
+    summary = fixture_regeneration.get("summary") if isinstance(fixture_regeneration.get("summary"), dict) else {}
+    report = {
+        "schema": REPORT_SCHEMA,
+        "mode": "fixture_boundary_only",
+        "status": "fixture_boundary_ready" if ready else "blocked",
+        "ready": ready,
+        "ready_scope": NON_AUTHORIZING_READY_SCOPE,
+        "does_not_satisfy_readiness": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
+        "fixture_boundary_only": True,
+        "fixture_boundary_ready": ready,
+        "accepted_for_internal_planning": ready,
+        "consume_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "current_sdk_blocker": CURRENT_SDK_BLOCKER,
+        "next_blocker": CURRENT_SDK_BLOCKER,
+        "remaining_blockers": [CURRENT_SDK_BLOCKER],
+        **false_readiness_flags(),
+        "beta_capture_prep": build_beta_capture_prep(),
+        "root_inspected": False,
+        "manifest_inspected": False,
+        "artifact_gates_run": False,
+        "consume_gate": {"returncode": None, "status": "not_run_fixture_boundary_only"},
+        "promote_gate": {"returncode": None, "status": "not_run_fixture_boundary_only", "blocker_reasons": []},
+        "fixture_policy_regeneration": fixture_regeneration,
+        "repo_public_runtime_frontier": {"status": "not_run_fixture_boundary_only"},
+        "attestation": {
+            "schema": ATTESTATION_SCHEMA,
+            "status": "not_attested",
+            "attestation_ready": False,
+            "consume_only": True,
+            "internal_reusable_evidence_only": True,
+            "current_sdk_blocker": CURRENT_SDK_BLOCKER,
+            "next_blocker": CURRENT_SDK_BLOCKER,
+            "remaining_blockers": [CURRENT_SDK_BLOCKER],
+            "reviewed_hash_pinned": False,
+            "consume_gate_proven": False,
+            "promote_block_proven": False,
+            "fixture_policy_regeneration_proven": ready,
+            "repo_public_runtime_frontier_proven": False,
+            "frontier_proven": False,
+            **false_readiness_flags(),
+        },
+        "summary": summary,
+        "blockers": blockers,
+        "non_claims": [
+            "fixture-boundary mode validates only repo-local regenerated Mission copied-bool fixture policy",
+            "fixture-boundary mode does not inspect copied artifact roots or manifests",
+            "fixture-boundary mode does not run consume/promote gates or produce offline attestation",
+            "candidate/debug captures before checker acceptance are non-evidence and non-progress",
+            "beta capture prep is future target planning only and is not approved runtime evidence",
+            "mission beta capture prep does not clear approved_runtime_evidence_missing or replace player-principal lifecycle evidence",
+            "Mission copied-bool recognizer remains SHA-gated; player/controller/character refs and OutItemIDs arrays are recognition-only",
+            "fixture-boundary mode does not promote Mission SDK, runtime readiness, public ABI, public SDK readiness, or v1 completion",
+        ],
+    }
+    report_readiness_blockers: list[dict[str, Any]] = []
+    validate_report_readiness_frontier(report, report_readiness_blockers)
+    if report_readiness_blockers:
+        blockers.extend(report_readiness_blockers)
+        report["status"] = "blocked"
+        report["ready"] = False
+        report["fixture_boundary_ready"] = False
+        report["accepted_for_internal_planning"] = False
+        report["attestation"]["fixture_policy_regeneration_proven"] = False
+        report["blockers"] = blockers
+    return report
+
+
 def build_report(
-    root_arg: Path, manifest_arg: Path | None, expected_manifest_sha256: str, skip_artifact_gates: bool = False
+    root_arg: Path,
+    manifest_arg: Path | None,
+    expected_manifest_sha256: str,
+    skip_artifact_gates: bool = False,
+    fixture_boundary_only: bool = False,
 ) -> dict[str, Any]:
+    if fixture_boundary_only:
+        return build_fixture_boundary_report()
+
     blockers: list[dict[str, Any]] = []
     root = safe_path(root_arg, "--root", blockers)
     manifest_path = manifest_arg if manifest_arg is not None else root_arg / DEFAULT_MANIFEST_NAME
@@ -1279,21 +1922,17 @@ def build_report(
         "schema": REPORT_SCHEMA,
         "status": "candidate_ready" if ready else "blocked",
         "ready": ready,
+        "ready_scope": NON_AUTHORIZING_READY_SCOPE,
+        "does_not_satisfy_readiness": list(NON_AUTHORIZING_READY_DOES_NOT_SATISFY),
         "accepted_for_internal_planning": ready,
         "consume_only": True,
         "internal_reusable_evidence_only": True,
         "not_artifact_gate": True,
-        "mission_sdk_ready": False,
-        "public_abi_ready": False,
-        "public_sdk_ready": False,
-        "runtime_observer_approved": False,
-        "runtime_ready": False,
-        "identity_ready": False,
-        "lookup_ready": False,
-        "mutation_ready": False,
-        "promotion_ready": False,
-        "return_override_ready": False,
-        "v1_completion": False,
+        "current_sdk_blocker": CURRENT_SDK_BLOCKER,
+        "next_blocker": CURRENT_SDK_BLOCKER,
+        "remaining_blockers": [CURRENT_SDK_BLOCKER],
+        **false_readiness_flags(),
+        "beta_capture_prep": build_beta_capture_prep(),
         "root": str(root if root is not None else root_arg),
         "manifest": str(manifest if manifest is not None else manifest_path),
         "expected_manifest_sha256": expected_manifest_sha256,
@@ -1307,6 +1946,10 @@ def build_report(
         "non_claims": [
             "candidate readiness is exactly consume-only internal reusable evidence",
             "candidate readiness is internal planning evidence only",
+            "candidate/debug captures before checker acceptance are non-evidence and non-progress",
+            "beta capture prep is future target planning only and is not approved runtime evidence",
+            "mission beta capture prep does not clear approved_runtime_evidence_missing or replace player-principal lifecycle evidence",
+            "Mission copied-bool recognizer remains SHA-gated; player/controller/character refs and OutItemIDs arrays are recognition-only",
             "does not promote Mission SDK, runtime Mission callbacks, mission identity, player identity, lookup, arrays, mutation, return override, or ResourceHandle",
             "does not replace owner-token API, plugin cleanup, SDK consumer, public ABI, lifecycle, privacy, or live-ops promotion gates",
         ],
@@ -1327,7 +1970,13 @@ def build_report(
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.root, args.manifest, args.expected_manifest_sha256, args.skip_artifact_gates)
+    report = build_report(
+        args.root,
+        args.manifest,
+        args.expected_manifest_sha256,
+        args.skip_artifact_gates,
+        args.fixture_boundary_only,
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
 

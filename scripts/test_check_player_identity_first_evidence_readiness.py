@@ -114,21 +114,114 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             text=True,
         )
 
+    def test_runtime_lifecycle_requirements_require_exact_checkjoin_rejected_start(self) -> None:
+        requirements = checker.runtime_principal_lifecycle_evidence_requirements()
+        rejected = next(
+            case
+            for case in requirements["minimum_required_runtime_observations"]
+            if case["case"] == "session_start_rejected_anchor"
+        )
+
+        self.assertEqual(rejected["target"], "ShooterGameMode.CheckJoinInProgress")
+        self.assertEqual(rejected["required_copied_bool_values"], ["1", "0"])
+        self.assertEqual(rejected["strict_shape"], "ShooterGameMode.CheckJoinInProgress(1,0)")
+        self.assertEqual(
+            rejected["accepted_alternatives"],
+            [
+                {
+                    "target": "ShooterGameMode.CheckJoinInProgress",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["1", "0"],
+                },
+            ],
+        )
+        self.assertEqual(
+            rejected["superseded_non_evidence_alternatives"],
+            [
+                {
+                    "target": "ShooterGameMode.HandleNewPlayer",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["0", "1"],
+                    "status": "superseded_non_evidence",
+                    "reason": (
+                        "historical HandleNewPlayer rejected-start tuple is ambiguous "
+                        "and no longer satisfies approved runtime evidence"
+                    ),
+                },
+                {
+                    "target": "ShooterGameMode.HandleNewPlayer",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["1", "0"],
+                    "status": "superseded_non_evidence",
+                    "reason": (
+                        "historical HandleNewPlayer rejected-start tuple is ambiguous "
+                        "and no longer satisfies approved runtime evidence"
+                    ),
+                },
+                {
+                    "target": "ShooterGameMode.HandleNewPlayer",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["0", "0"],
+                    "status": "superseded_non_evidence",
+                    "reason": (
+                        "historical HandleNewPlayer rejected-start tuple is ambiguous "
+                        "and no longer satisfies approved runtime evidence"
+                    ),
+                },
+            ],
+        )
+        self.assertEqual(
+            rejected["non_evidence_sources"],
+            [
+                "ShooterGameMode.HandleNewPlayer rejected-start tuples",
+                "passive snapshots",
+                "diagnostic-only lines",
+            ],
+        )
+        self.assertEqual(
+            rejected["diagnostic_candidate_boundary"],
+            {
+                "diagnostic_shape": "CheckJoinInProgress",
+                "diagnostic_exact_shape": "ShooterGameMode.CheckJoinInProgress(1,0)",
+                "diagnostic_lines_can_satisfy": False,
+                "required_observer_event": True,
+                "reason": (
+                    "diagnostic CheckJoinInProgress candidates may identify the "
+                    "right tuple, but approved runtime evidence requires the exact "
+                    "observer event with role=session_start_rejected"
+                ),
+            },
+        )
+        self.assertEqual(
+            requirements["diagnostic_candidate_guardrails"],
+            [
+                {
+                    "code": "diagnostic_check_join_in_progress_non_evidence",
+                    "strict_shape": "ShooterGameMode.CheckJoinInProgress(1,0)",
+                    "can_satisfy_session_start_rejected_anchor": False,
+                    "required_runtime_observer_event": {
+                        "role": "session_start_rejected",
+                        "target": "ShooterGameMode.CheckJoinInProgress",
+                        "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                        "copied_bool_values": ["1", "0"],
+                    },
+                },
+                {
+                    "code": "diagnostic_rejected_drift_non_evidence",
+                    "can_satisfy_approved_runtime_evidence": False,
+                    "required_next_step": (
+                        "compare distinct sanitized lifecycle snapshot roots before another "
+                        "approved runtime-evidence attempt"
+                    ),
+                },
+            ],
+        )
+
     def accepted_inventory_payload(self) -> dict:
-        targets = [
-            "ShooterGameMode.PostLogin",
-            "ShooterGameMode.Logout",
-            "ShooterPlayerController.ServerSendChatMessage",
-            "ShooterPlayerController.ServerRequestTribeLog",
-            "ShooterPlayerController.AllowTribeGroupPermission",
-            "ShooterPlayerController.IsInTribe",
-            "ShooterPlayerController.ClientReceiveMyTribeOnlineList",
-            "ShooterPlayerController.ClientReceiveActiveMissionTags",
-            "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
-            "MissionType.AddPlayerToMission",
-            "ShooterPlayerController.ServerKickPlayer",
-            "ShooterPlayerController.ServerListPlayers",
-        ]
+        targets = schema_target_list(
+            checker.PLAYER_IDENTITY_TARGET_SET,
+            "obelisk.ufunction-chain.snapshot.v1",
+        )
         return {
             "ready": True,
             "accepted_pack": {
@@ -210,6 +303,25 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["counts_as_first_evidence"])
+        self.assertFalse(payload["counts_toward_p0_dependency_chain"])
+        self.assertFalse(payload["counts_toward_public_sdk"])
+        self.assertFalse(payload["counts_toward_runtime"])
+        self.assertFalse(payload["counts_toward_v1_completion"])
+        first_evidence_boundary = payload["first_evidence_boundary"]
+        self.assertFalse(first_evidence_boundary["counts_as_first_evidence"])
+        self.assertFalse(first_evidence_boundary["accepted_planning_authorizes_runtime"])
+        self.assertFalse(first_evidence_boundary["no_users_policy_counts_as_evidence"])
+        self.assertFalse(first_evidence_boundary["passive_snapshots_count_as_evidence"])
+        self.assertFalse(first_evidence_boundary["beta_notices_count_as_evidence"])
+        self.assertFalse(first_evidence_boundary["package_shape_counts_as_evidence"])
+        self.assertFalse(first_evidence_boundary["side_lanes_count_as_evidence"])
+        self.assertTrue(first_evidence_boundary["approved_runtime_evidence_missing"])
+        self.assertIn("post_runtime_fast_path_inputs", first_evidence_boundary)
+        self.assertNotIn(
+            "approved_runtime_evidence_ready",
+            first_evidence_boundary["post_runtime_fast_path_inputs"],
+        )
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
         self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
         progress_signal = payload["progress_signal"]
@@ -499,6 +611,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "privacy.identifier_redaction",
                 "planning.source_bound_committed_manifests",
                 "lifetime.generation_scope_invalidation.candidate_policy",
+                "abi.public_pod_contract.private_layout_candidate",
+                "abi.public_pod_contract.public_abi_preflight_candidate",
+                "lifecycle.owner_cleanup.owner_token_sdk_consumer_contract",
+                "separation.no_commands_permissions_persistence",
             ],
         )
         planning_source = public_contract_gap["source_bound_planning_manifest_verification"]
@@ -507,10 +623,55 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual([], planning_source["blockers"])
         self.assertTrue(public_contract_gap["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertTrue(public_contract_gap["principal_invalidation_policy"]["accepted_for_policy_review"])
+        decision_record = public_contract_gap["identity_public_contract_decision_record"]
+        self.assertTrue(decision_record["provided"])
+        self.assertTrue(decision_record["record_valid"])
+        self.assertFalse(decision_record["accepted_for_contract_review"])
+        self.assertEqual(
+            decision_record["review_inputs_non_counting_until"],
+            "runtime.lifecycle_evidence",
+        )
+        self.assertIn(
+            "reviewed-identity-public-contract-decision-record.json",
+            public_contract_gap["inputs"]["identity_public_contract_decision_record"],
+        )
         self.assertFalse(public_contract_gap["promotion_ready"])
         self.assertFalse(public_contract_gap["public_sdk_ready"])
         self.assertFalse(public_contract_gap["runtime_ready"])
         self.assertFalse(public_contract_gap["public_header_allowed"])
+
+    def test_checked_in_first_evidence_artifact_is_non_authorizing_planning_only(self) -> None:
+        artifact_path = (
+            REPO_ROOT
+            / "docs"
+            / "research"
+            / "player-identity-planning-sources"
+            / "players-identity-first-evidence.json"
+        )
+
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(artifact["schema"], checker.FIRST_EVIDENCE_SCHEMA)
+        self.assertEqual(artifact["readiness_classification"], "planning_only")
+        self.assertFalse(artifact["promotion_ready"])
+        self.assertFalse(artifact["public_sdk_ready"])
+        self.assertFalse(artifact["runtime_ready"])
+        self.assertFalse(artifact["counts_as_first_evidence"])
+        self.assertFalse(artifact["counts_toward_p0_dependency_chain"])
+        boundary = artifact["first_evidence_boundary"]
+        self.assertFalse(boundary["counts_as_first_evidence"])
+        self.assertFalse(boundary["accepted_planning_authorizes_runtime"])
+        self.assertFalse(boundary["no_users_policy_counts_as_evidence"])
+        self.assertFalse(boundary["passive_snapshots_count_as_evidence"])
+        self.assertFalse(boundary["beta_notices_count_as_evidence"])
+        self.assertFalse(boundary["package_shape_counts_as_evidence"])
+        self.assertFalse(boundary["side_lanes_count_as_evidence"])
+        self.assertTrue(boundary["approved_runtime_evidence_missing"])
+        self.assertEqual(
+            boundary["required_authorizing_input"],
+            "approved_runtime_principal_lifecycle_evidence",
+        )
+        self.assertIn("non-counting first-evidence inputs", " ".join(boundary["non_claims"]))
 
     def test_rejected_artifact_root_does_not_emit_copy_paste_protected_recipe_paths(self) -> None:
         result = self.run_checker(
@@ -532,6 +693,48 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertIn("<non-protected-artifact-root>", recipe_commands)
         self.assertNotIn("/servidor/ark/obelisk/player-identity-offline", recipe_commands)
+
+    def test_inaccessible_artifact_parent_is_unavailable_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            blocked_parent = Path(temporary) / "operator-only"
+            blocked_parent.mkdir()
+            root = blocked_parent / "artifacts"
+            original_lstat = Path.lstat
+
+            def inaccessible_lstat(path: Path, *args, **kwargs):
+                if path == blocked_parent:
+                    raise PermissionError("operator artifact parent is inaccessible")
+                return original_lstat(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "lstat", autospec=True, side_effect=inaccessible_lstat), \
+                    mock.patch.object(checker, "run_json_command") as child:
+                result, inventory, error = checker.scan_reflection_inventory_root(root)
+                offline = checker.bounded_artifact_file_scan(root)
+            child.assert_not_called()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("inaccessible", error)
+        self.assertFalse(inventory["ready"])
+        self.assertIsNone(inventory["accepted_pack"])
+        self.assertEqual(inventory["reasons"][0]["reason"], "artifact_root_unavailable")
+        self.assertEqual(checker.artifact_root_diagnosis(inventory)["status"], "artifact_root_unavailable")
+        self.assertEqual(offline["status"], "artifact_root_unavailable")
+        self.assertFalse(offline["ready_to_build_core_evidence_pack"])
+        self.assertEqual(offline["shooter_game_server_candidates"], [])
+        self.assertEqual(offline["core_like_candidates"], [])
+
+    def test_shared_inventory_reports_inaccessible_root_without_approval(self) -> None:
+        import check_reflection_inventory_pack_readiness as inventory_checker
+
+        with mock.patch.object(
+            inventory_checker, "candidate_manifest_paths", side_effect=PermissionError("artifact unavailable")
+        ):
+            report = inventory_checker.build_report(Path("/offline/operator/artifacts"), 6)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["reasons"][0]["reason"], "artifact_root_unavailable")
+        self.assertIsNone(report["accepted_pack"])
+        for field in ("ready", "accepted_for_candidate_planning", "promotion_ready", "public_sdk_ready", "runtime_ready"):
+            self.assertFalse(report[field], field)
 
     def test_workspace_offline_artifact_root_is_allowed_for_inventory_scan(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
@@ -793,6 +996,167 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(payload["blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
+        pre_runtime = payload["next_actionable_blocker"]["pre_runtime_offline_requirement"]
+        self.assertEqual(pre_runtime["code"], "distinct_lifecycle_snapshot_root_check_required")
+        self.assertEqual(pre_runtime["status"], "not_provided")
+        self.assertFalse(pre_runtime["satisfied"])
+        self.assertEqual(
+            pre_runtime["required_targets"],
+            ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+        )
+        self.assertIn("--lifecycle-snapshot-root-check", pre_runtime["required_command"])
+        self.assertIn("<distinct-sanitized-lifecycle-root>", pre_runtime["required_command"])
+        self.assertIn("planning-layout evidence only", " ".join(pre_runtime["non_claims"]))
+
+    def test_lifecycle_snapshot_candidate_root_satisfies_pre_runtime_requirement_only(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        lifecycle_checks: list[str] = []
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.lower_level_accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command and "--lifecycle-snapshot-root-check" in args:
+                lifecycle_checks.append(args[args.index("--candidate-root") + 1])
+                return ok, {
+                    "schema": "obelisk.lifecycle-ufunction-snapshot-root-requirement.v1",
+                    "offline_requirement": {
+                        "satisfied": True,
+                        "status": "accepted",
+                        "blocker_count": 0,
+                        "blocker_reason_counts": {},
+                        "blockers": [],
+                    },
+                    "comparison_counts": {"accepted": 2, "inconclusive": 0, "rejected": 0},
+                    "candidate_snapshot_scope": {
+                        "exact_required_targets": True,
+                        "extra_targets": [],
+                        "missing_targets": [],
+                    },
+                    "approved_runtime_evidence": False,
+                    "runtime_ready": False,
+                    "public_sdk_ready": False,
+                }
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lifecycle_root = root / "lifecycle-root"
+            lifecycle_root.mkdir()
+            lifecycle_manifest = root / "players-identity-lifecycle-anchor-candidates.json"
+            principal_manifest = root / "players-identity-principal-invalidation-policy.json"
+            lifecycle_payload = lifecycle_manifest_bound_to_first_evidence()
+            lifecycle_manifest.write_text(json.dumps(lifecycle_payload), encoding="utf-8")
+            principal_manifest.write_text(
+                json.dumps(principal_policy_bound_to_lifecycle(lifecycle_payload)),
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                artifact_root=root,
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=root / "candidate-root",
+                lifecycle_snapshot_candidate_root=lifecycle_root,
+                lifecycle_anchor_candidates_manifest=lifecycle_manifest,
+                principal_invalidation_policy_manifest=principal_manifest,
+                runtime_principal_lifecycle_evidence_manifest=None,
+                approved_runtime_principal_lifecycle_evidence_manifest=None,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False, "resolved_root": str(root)},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertEqual(lifecycle_checks, [str(lifecycle_root)])
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
+        lifecycle_check = payload["lifecycle_snapshot_root_check"]
+        self.assertTrue(lifecycle_check["provided"])
+        self.assertTrue(lifecycle_check["ready"])
+        self.assertEqual(lifecycle_check["status"], "satisfied_planning_only")
+        self.assertFalse(lifecycle_check["approved_runtime_evidence"])
+        self.assertFalse(lifecycle_check["runtime_ready"])
+        pre_runtime = payload["next_actionable_blocker"]["pre_runtime_offline_requirement"]
+        self.assertTrue(pre_runtime["satisfied"])
+        self.assertEqual(pre_runtime["status"], "satisfied_planning_only")
+        self.assertEqual(pre_runtime["provided_candidate_root"], str(lifecycle_root))
+        self.assertEqual(pre_runtime["comparison_counts"]["accepted"], 2)
+        self.assertEqual(pre_runtime["next_blocker_after_satisfied"], "approved_runtime_evidence_missing")
+
+    def test_lifecycle_snapshot_summary_rejects_overclaiming_comparator_output(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        summary = checker.lifecycle_snapshot_root_check_summary(
+            ok,
+            {
+                "schema": checker.LIFECYCLE_SNAPSHOT_ROOT_CHECK_SCHEMA,
+                "offline_requirement": {
+                    "satisfied": True,
+                    "status": "accepted",
+                    "blocker_count": 0,
+                    "blocker_reason_counts": {},
+                    "blockers": [],
+                },
+                "comparison_counts": {"accepted": 2, "inconclusive": 0, "rejected": 0},
+                "candidate_snapshot_scope": {
+                    "exact_required_targets": True,
+                    "extra_targets": [],
+                    "missing_targets": [],
+                },
+                "approved_runtime_evidence": True,
+                "approved_runtime_evidence_blocker": "identity_public_contract_gate_missing",
+                "readiness_effect": "runtime",
+                "runtime_ready": True,
+                "public_sdk_ready": False,
+            },
+            Path("/tmp/lifecycle-root"),
+        )
+
+        self.assertTrue(summary["provided"])
+        self.assertFalse(summary["ready"])
+        self.assertEqual(summary["status"], "blocked")
+        self.assertFalse(summary["approved_runtime_evidence"])
+        self.assertFalse(summary["runtime_ready"])
+        self.assertEqual(summary["next_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn(
+            "lifecycle_snapshot_root_check_approved_runtime_evidence_not_false",
+            summary["summary_blockers"],
+        )
+        self.assertIn(
+            "lifecycle_snapshot_root_check_runtime_blocker_mismatch",
+            summary["summary_blockers"],
+        )
+        self.assertIn(
+            "lifecycle_snapshot_root_check_readiness_effect_not_none",
+            summary["summary_blockers"],
+        )
 
     def test_explicit_artifact_root_does_not_use_workspace_fallback(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
@@ -1416,7 +1780,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             request_path = Path(tmp) / "window-request.json"
             env_path = Path(tmp) / "observer-window.env"
             start = datetime.now(timezone.utc) + timedelta(hours=1)
-            end = start + timedelta(minutes=10)
+            end = start + timedelta(minutes=15)
             run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
             request_args = SimpleNamespace(
                 instance="arkserver2",
@@ -1433,6 +1797,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 notice_path="not_applicable",
                 rollback_owner="operator",
                 output_dir=Path(tmp),
+                obelisk_build_artifact=None,
+                obelisk_build_artifact_sha256=None,
+                obelisk_build_artifact_label=None,
                 json=True,
             )
             request_payload = prepare_window_request.request_payload(request_args)
@@ -1454,6 +1821,15 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertTrue(diagnosis["operator_current_turn_runtime_window_approval_required"])
         self.assertFalse(diagnosis["approved_runtime_evidence_present"])
         self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertEqual(diagnosis["user_policy"], "no_regular_users")
+        self.assertTrue(diagnosis["no_users_policy_only"])
+        self.assertFalse(diagnosis["counts_as_first_evidence"])
+        self.assertFalse(diagnosis["no_users_policy_counts_as_evidence"])
+        self.assertFalse(diagnosis["passive_wait_counts_as_evidence"])
+        self.assertEqual(
+            diagnosis["first_evidence_boundary"]["side_lane_blocker"],
+            "window_request_not_first_evidence",
+        )
         self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(diagnosis["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         self.assertEqual(
@@ -1511,7 +1887,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 encoding="utf-8",
             )
             start = datetime.now(timezone.utc) + timedelta(hours=1)
-            end = start + timedelta(minutes=10)
+            end = start + timedelta(minutes=15)
             run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
             request_args = SimpleNamespace(
                 instance="arkserver2",
@@ -1528,10 +1904,14 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 notice_path="not_applicable",
                 rollback_owner="operator",
                 output_dir=root,
+                obelisk_build_artifact=None,
+                obelisk_build_artifact_sha256=None,
+                obelisk_build_artifact_label=None,
                 json=True,
             )
-            request_payload = prepare_window_request.request_payload(request_args)
-            env_lines = prepare_window_request.env_lines(request_args)
+            with mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
+                request_payload = prepare_window_request.request_payload(request_args)
+                env_lines = prepare_window_request.env_lines(request_args)
             request_path.write_text(json.dumps(request_payload), encoding="utf-8")
             env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
             (root / "operator-approval-request.md").write_text(
@@ -1566,11 +1946,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(payload["blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
+        self.assertEqual(
+            payload["next_actionable_blocker"]["pre_runtime_offline_requirement"]["code"],
+            "distinct_lifecycle_snapshot_root_check_required",
+        )
         self.assertTrue(window_request["request_pack_ready"])
         self.assertTrue(window_request["operator_request_verified"])
         self.assertFalse(window_request["bundle_inputs_ready"])
         self.assertFalse(window_request["request_pack_is_runtime_evidence"])
         self.assertTrue(window_request["operator_current_turn_runtime_window_approval_required"])
+        self.assertEqual(window_request["user_policy"], "no_regular_users")
+        self.assertTrue(window_request["no_users_policy_only"])
+        self.assertFalse(window_request["counts_as_first_evidence"])
+        self.assertFalse(window_request["no_users_policy_counts_as_evidence"])
+        self.assertFalse(window_request["passive_wait_counts_as_evidence"])
         self.assertFalse(window_request["approved_runtime_evidence_present"])
         self.assertFalse(window_request["runtime_evidence_ready"])
         self.assertFalse(window_request["promotion_ready"])
@@ -1578,6 +1967,15 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(window_request["runtime_ready"])
         self.assertEqual(window_request["remaining_blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(window_request["next_blocker"], "operator_current_turn_runtime_window_approval_required")
+        first_evidence_boundary = payload["first_evidence_boundary"]
+        self.assertFalse(first_evidence_boundary["no_users_policy_counts_as_evidence"])
+        self.assertEqual(
+            first_evidence_boundary["observed_non_counting_inputs"]["window_request_user_policy"],
+            "no_regular_users",
+        )
+        self.assertTrue(
+            first_evidence_boundary["observed_non_counting_inputs"]["window_request_no_users_policy_only"]
+        )
 
     def test_window_request_pack_diagnosis_preserves_env_parse_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1601,6 +1999,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 notice_path="not_applicable",
                 rollback_owner="operator",
                 output_dir=Path(tmp),
+                obelisk_build_artifact=None,
+                obelisk_build_artifact_sha256=None,
+                obelisk_build_artifact_label=None,
                 json=True,
             )
             request_path.write_text(
@@ -1645,6 +2046,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 notice_path="not_applicable",
                 rollback_owner="operator",
                 output_dir=request_dir,
+                obelisk_build_artifact=None,
+                obelisk_build_artifact_sha256=None,
+                obelisk_build_artifact_label=None,
                 json=True,
             )
             request_payload = prepare_window_request.request_payload(request_args)
@@ -1686,6 +2090,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 notice_path="not_applicable",
                 rollback_owner="operator",
                 output_dir=Path(tmp),
+                obelisk_build_artifact=None,
+                obelisk_build_artifact_sha256=None,
+                obelisk_build_artifact_label=None,
                 json=True,
             )
             request_path.write_text(
@@ -2297,6 +2704,58 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertTrue(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
+    def test_reflection_inventory_chain_requires_explicit_input_target_set(self) -> None:
+        payload = self.lower_level_accepted_inventory_payload()
+        del payload["accepted_pack"]["inputs"]["target_sets"]
+
+        diagnosis = checker.reflection_inventory_chain_diagnosis(payload)
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertIn(
+            "accepted_reflection_inventory_input_target_set_missing",
+            diagnosis["blockers"],
+        )
+
+    def test_reflection_inventory_chain_rejects_same_size_target_set_drift(self) -> None:
+        payload = self.lower_level_accepted_inventory_payload()
+        expected_targets = schema_target_list(
+            checker.PLAYER_IDENTITY_TARGET_SET,
+            "obelisk.ufunction-chain.snapshot.v1",
+        )
+        drifted_targets = list(expected_targets)
+        drifted_targets[-1] = "ShooterGameMode.PostLogin"
+        accepted_pack = payload["accepted_pack"]
+        accepted_pack["matched_targets"] = list(drifted_targets)
+        accepted_pack["target_set_coverage"]["requested_targets"] = list(drifted_targets)
+
+        diagnosis = checker.reflection_inventory_chain_diagnosis(payload)
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertIn(
+            "accepted_reflection_inventory_expected_targets_mismatch",
+            diagnosis["blockers"],
+        )
+        self.assertIn(
+            "accepted_reflection_inventory_covered_targets_mismatch",
+            diagnosis["blockers"],
+        )
+        self.assertNotIn(
+            "accepted_reflection_inventory_not_full_player_identity_target_set",
+            diagnosis["blockers"],
+        )
+        self.assertNotIn(
+            "accepted_reflection_inventory_covered_targets_incomplete",
+            diagnosis["blockers"],
+        )
+        self.assertNotIn(
+            "accepted_reflection_inventory_missing_required_target:ShooterPlayerController.ServerKickPlayer",
+            diagnosis["blockers"],
+        )
+        self.assertNotIn(
+            "accepted_reflection_inventory_missing_required_target:ShooterPlayerController.ServerListPlayers",
+            diagnosis["blockers"],
+        )
+
     def test_ready_inventory_payload_without_core_evidence_chain_still_blocks(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
 
@@ -2587,6 +3046,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(diagnosis["next_blocker"], "identity_public_contract_gate_missing")
         self.assertTrue(diagnosis["approved_runtime_evidence_present"])
         self.assertTrue(diagnosis["runtime_evidence_ready"])
+        self.assertTrue(diagnosis["source_checker_approved"])
+        self.assertTrue(diagnosis["complete_lifecycle_event_triplet_candidate_present"])
+        self.assertTrue(diagnosis["complete_lifecycle_event_triplet_observed_by_checker_report"])
+        self.assertEqual(
+            diagnosis["required_observed_runtime_cases"],
+            ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+        )
         self.assertFalse(diagnosis["promotion_ready"])
         self.assertFalse(diagnosis["public_sdk_ready"])
         self.assertFalse(diagnosis["runtime_ready"])
@@ -2609,6 +3075,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             report["public_sdk_ready"] = True
             report["public_abi_ready"] = True
             report["v1_completion_ready"] = True
+            report["stable_claim_allowed"] = True
+            report["complete_sdk_allowed"] = True
+            report["complete_sdk_ready"] = True
             report["public_capability_bits_now"] = ["OBELISK_PUBLIC_IDENTITY"]
             report["public_callback_abi_now"] = ["ObeliskRegisterPlayerIdentityCallback"]
             return report
@@ -2631,6 +3100,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(diagnosis["ready"])
         self.assertFalse(diagnosis["approved_runtime_evidence_present"])
         self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertFalse(diagnosis["source_checker_approved"])
         self.assertFalse(diagnosis["promotion_ready"])
         self.assertFalse(diagnosis["public_header_allowed"])
         self.assertFalse(diagnosis["public_sdk_ready"])
@@ -2644,6 +3114,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_report_public_sdk_ready_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_abi_ready_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_v1_completion_ready_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_stable_claim_allowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_complete_sdk_allowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_complete_sdk_ready_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_capability_bits_now_not_empty", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_callback_abi_now_not_empty", diagnosis["blockers"])
 
@@ -2683,6 +3156,76 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_report_counts_toward_complete_sdk_claim_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_or_runtime_accounting_allowed_not_false", diagnosis["blockers"])
 
+    def test_approved_runtime_manifest_diagnosis_rejects_camelcase_sdk_alias_overclaim(self) -> None:
+        original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
+
+        def alias_overclaim_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["observerEventTripletReady"] = True
+            report["runtimeEvidenceAcceptedAsPublicContract"] = True
+            report["approvedRuntimeEvidenceReadyForSdk"] = True
+            report["publicHeaderAllowed"] = True
+            report["publicAbiReady"] = True
+            report["publicSdkReady"] = True
+            report["runtimeReady"] = True
+            report["v1CompletionReady"] = True
+            report["stableReleaseContractClaimAllowed"] = True
+            report["stableV1SdkClaimAllowed"] = True
+            report["completeSdkReady"] = True
+            report["completeSdkClaimAllowed"] = True
+            report["completeSdkClaimReady"] = True
+            report["sdkCompletionReady"] = True
+            report["countsTowardCompleteSdk"] = True
+            report["countsTowardCompleteSdkClaim"] = True
+            report["completeSdkCredits"] = 1
+            report["sdkCredit"] = "1/12"
+            report["p0DependencyChainCredits"] = [0, 1]
+            report["v1CompletionCredit"] = "0/12"
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                checker.approved_runtime_principal_lifecycle_evidence,
+                "build_report",
+                side_effect=alias_overclaim_report,
+            ), mock.patch.dict(os.environ, approved_runtime_safe_test_env()):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["source_checker_approved"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertIn("approved_runtime_report_observerEventTripletReady_not_false", diagnosis["blockers"])
+        self.assertIn(
+            "approved_runtime_report_runtimeEvidenceAcceptedAsPublicContract_not_false",
+            diagnosis["blockers"],
+        )
+        self.assertIn("approved_runtime_report_approvedRuntimeEvidenceReadyForSdk_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_publicHeaderAllowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_publicAbiReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_publicSdkReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_runtimeReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_v1CompletionReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_stableReleaseContractClaimAllowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_stableV1SdkClaimAllowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_completeSdkReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_completeSdkClaimAllowed_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_completeSdkClaimReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_sdkCompletionReady_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_countsTowardCompleteSdk_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_countsTowardCompleteSdkClaim_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_completeSdkCredits_not_zero", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_sdkCredit_not_zero", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_p0DependencyChainCredits_not_zero", diagnosis["blockers"])
+        self.assertNotIn("approved_runtime_report_v1CompletionCredit_not_zero", diagnosis["blockers"])
+
     def test_approved_runtime_manifest_diagnosis_rejects_report_not_ready(self) -> None:
         original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
 
@@ -2711,6 +3254,66 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(diagnosis["runtime_evidence_ready"])
         self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
         self.assertIn("approved_runtime_report_ready_not_true", diagnosis["blockers"])
+
+    def test_approved_runtime_manifest_diagnosis_marks_non_first_evidence_side_lanes(self) -> None:
+        cases = (
+            (
+                "obelisk.player-principal-passive-snapshot.v1",
+                "passive_snapshot_not_first_evidence",
+            ),
+            (
+                "obelisk.player-principal-lifecycle-beta-notice-prep.v1",
+                "beta_notice_not_first_evidence",
+            ),
+            (
+                "obelisk.installed-sdk-package-shape.v1",
+                "package_shape_not_first_evidence",
+            ),
+            (
+                "obelisk.sdk-status-side-lane-summary.v1",
+                "sdk_status_side_lane_not_first_evidence",
+            ),
+            (
+                "obelisk.player-principal-lifecycle-no-users-passive-wait-recommendation.v1",
+                "no_users_passive_wait_not_first_evidence",
+            ),
+        )
+        for schema, blocker in cases:
+            with self.subTest(schema=schema), tempfile.TemporaryDirectory() as tmp:
+                manifest = Path(tmp) / "side-lane.json"
+                manifest.write_text(json.dumps({"schema": schema, "ready": True}), encoding="utf-8")
+
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    manifest
+                )
+
+                self.assertFalse(diagnosis["ready"])
+                self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+                self.assertFalse(diagnosis["runtime_evidence_ready"])
+                self.assertFalse(diagnosis["counts_as_first_evidence"])
+                self.assertIn(blocker, diagnosis["blockers"])
+                self.assertEqual(diagnosis["first_evidence_boundary"]["side_lane_blocker"], blocker)
+                self.assertFalse(diagnosis["first_evidence_boundary"]["counts_as_first_evidence"])
+
+    def test_runtime_shape_fixture_manifest_is_shape_only_not_first_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "runtime-principal-lifecycle-shape.json"
+            manifest.write_text(
+                json.dumps(runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.runtime_principal_lifecycle_evidence_manifest_diagnosis(manifest)
+
+        self.assertTrue(diagnosis["ready"])
+        self.assertTrue(diagnosis["shape_accepted_by_this_checker"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertFalse(diagnosis["counts_as_first_evidence"])
+        self.assertEqual(
+            diagnosis["first_evidence_boundary"]["side_lane_blocker"],
+            "runtime_shape_fixture_not_first_evidence",
+        )
 
     def test_approved_runtime_manifest_diagnosis_rejects_legacy_public_contract_gate_alias(self) -> None:
         original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report

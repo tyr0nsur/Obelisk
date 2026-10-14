@@ -3,6 +3,7 @@
 #endif
 
 #include "TimerManager.h"
+#include "GameplayCallbackScope.h"
 
 #include "runtime/Logger.h"
 
@@ -140,6 +141,8 @@ namespace Obelisk::Core
                 t_CurrentTimerOwner = owner;
                 try
                 {
+                    GameplayCallbackScope callbackScope(GameplayCallbackFamily::Timer,
+                                                         GameplayCallbackScope::TrackingMode::CurrentOnly);
                     callback(timerId, userData);
                 }
                 catch (const std::exception& e)

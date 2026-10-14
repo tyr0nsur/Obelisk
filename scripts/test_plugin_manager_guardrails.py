@@ -7,18 +7,59 @@ import re
 import unittest
 from pathlib import Path
 
+from native_prototype_guardrails import (
+    NATIVE_PROTOTYPE_API_FIELDS,
+    native_prototype_symbols_for_header,
+    without_native_prototype_symbols,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_MANAGER = REPO_ROOT / "core" / "PluginManager.cpp"
 PLUGIN_MANAGER_HEADER = REPO_ROOT / "core" / "PluginManager.h"
+PLUGIN_MANAGER_TESTS = REPO_ROOT / "tests" / "core" / "PluginManagerTests.cpp"
+CMAKE_LISTS = REPO_ROOT / "CMakeLists.txt"
+TIMER_MANAGER = REPO_ROOT / "core" / "TimerManager.cpp"
+LOGGER = REPO_ROOT / "runtime" / "Logger.cpp"
 OBELISK_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 CORE_DIR = REPO_ROOT / "core"
 
+INJECTED_OWNER_REGISTRIES = {
+    "m_ChatDispatcher": "ChatEventDispatcher",
+    "m_CommandDispatcher": "CommandDispatcher",
+    "m_PlayerLifecycleDispatcher": "PlayerLifecycleDispatcher",
+}
+
+NATIVE_OWNER_UNREGISTER_APIS = {
+    "PluginUnregisterCommandWithOwnerToken": "PluginOwnerCommandDispatcherLocked",
+    "PluginUnregisterPlayerLifecycleWithOwnerToken": "PluginOwnerPlayerLifecycleDispatcherLocked",
+}
+
 COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
     "MissionCopiedBoolEventDispatcher": (
-        "internal/test-only copied lifecycle dispatcher; not plugin-facing until a later "
-        "promotion wires a public ABI registration path and PluginManager owner cleanup"
+        "internal/test-only non-public copied lifecycle dispatcher; not plugin-facing until "
+        "a later promotion wires a public ABI registration path and PluginManager owner cleanup"
     ),
+}
+
+INTERNAL_TEST_ONLY_DISPATCHERS = {
+    "MissionCopiedBoolEventDispatcher": (
+        "internal/test-only non-public copied lifecycle dispatcher; not plugin-facing until "
+        "a later promotion wires a public ABI registration path and PluginManager owner cleanup"
+    ),
+    "PlayerPrincipalEventDispatcher": (
+        "internal/test-only non-public player-principal lifecycle dispatcher; not plugin-facing "
+        "until a later player identity promotion wires a public ABI registration path, "
+        "PluginManager owner cleanup, and SDK tests"
+    ),
+}
+
+DISPATCHER_PUBLIC_NAME_ALIASES = {
+    "ChatEventDispatcher": ("ChatMessage",),
+    "StructureEventDispatcher": ("GameplayPolicy",),
+    "InventoryPolicyEventDispatcher": ("GameplayPolicy",),
+    "ItemReturnEventDispatcher": ("GameplayPolicy",),
+    "PlayerPrincipalEventDispatcher": ("PlayerIdentity",),
 }
 
 COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
@@ -39,6 +80,18 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
     ),
 }
 
+COPIED_DISPATCHER_PLUGIN_MANAGER_CLEANUP_TOKENS = {
+    "ChatEventDispatcher": "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)",
+    "StructureEventDispatcher": "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+    "InventoryPolicyEventDispatcher": (
+        "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"
+    ),
+    "ItemReturnEventDispatcher": "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+    "PlayerPrincipalEventDispatcher": (
+        "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"
+    ),
+}
+
 OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
     "RegisterPreProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
     "RegisterPostProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
@@ -51,6 +104,8 @@ OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
     "RegisterGameplayPolicyEventWithOwnerTokenHandle": "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
     "RegisterChatMessageEventWithOwnerTokenHandle": "UnregisterChatMessageRegistrationsForOwner(owner)",
     "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
+    "RegisterCommandWithOwnerTokenHandle": "m_CommandDispatcher->UnregisterCallbacksForOwner(owner)",
+    "RegisterPlayerLifecycleWithOwnerTokenHandle": "m_PlayerLifecycleDispatcher->UnregisterCallbacksForOwner(owner)",
 }
 
 LEGACY_VOID_OWNER_TOKEN_REGISTRATION_WRAPPERS = {
@@ -78,9 +133,16 @@ BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS = {
         "ObeliskPlayerPrincipal",
         "ObeliskPrincipalId",
         "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
+        "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+        "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_EVENTS",
+        "PLAYER_PRINCIPAL_EVENTS",
         "RegisterPlayerPrincipal",
+        "RegisterPlayerIdentity",
+        "RegisterPlayerPrincipalEvent",
         "UnregisterPlayerPrincipal",
+        "UnregisterPlayerIdentity",
         "ResolvePlayerPrincipal",
+        "ResolvePlayerIdentity",
     ),
     "permissions/admin": (
         "ObeliskPermissionQuery",
@@ -107,6 +169,46 @@ BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS = {
         "MutateItem",
         "OverrideReturn",
         "ReturnOverride",
+    ),
+    "transfer/buff/dino side lanes": (
+        "TransferScriptStruct",
+        "TransferPayload",
+        "TransferBAccept",
+        "ObeliskTransfer",
+        "ObeliskTransferPayload",
+        "ObeliskTransferScriptStruct",
+        "ObeliskTransferBAccept",
+        "OBELISK_API_CAPABILITY_TRANSFER",
+        "OBELISK_API_CAPABILITY_TRANSFER_PAYLOAD",
+        "OBELISK_API_CAPABILITY_TRANSFER_SCRIPTSTRUCT",
+        "OBELISK_API_CAPABILITY_TRANSFER_BACCEPT",
+        "RegisterTransfer",
+        "RegisterTransferPayload",
+        "RegisterTransferScriptStruct",
+        "RegisterTransferBAccept",
+        "UnregisterTransfer",
+        "UnregisterTransferPayload",
+        "UnregisterTransferScriptStruct",
+        "UnregisterTransferBAccept",
+        "BuffStatus",
+        "ObeliskBuff",
+        "ObeliskBuffStatus",
+        "OBELISK_API_CAPABILITY_BUFF",
+        "OBELISK_API_CAPABILITY_BUFF_STATUS",
+        "RegisterBuff",
+        "RegisterBuffStatus",
+        "UnregisterBuff",
+        "UnregisterBuffStatus",
+        "DinoScalar",
+        "CopiedDinoScalar",
+        "ObeliskDino",
+        "ObeliskDinoScalar",
+        "OBELISK_API_CAPABILITY_DINO",
+        "OBELISK_API_CAPABILITY_DINO_SCALAR",
+        "RegisterDino",
+        "RegisterDinoScalar",
+        "UnregisterDino",
+        "UnregisterDinoScalar",
     ),
 }
 
@@ -224,6 +326,22 @@ def assert_tokens_present(test_case: unittest.TestCase, body: str, tokens: set[s
             test_case.assertIn(token, body)
 
 
+def assert_cleanup_token_uses_cleanup_family(
+    test_case: unittest.TestCase,
+    cleanup_body: str,
+    cleanup_token: str,
+) -> None:
+    test_case.assertIn(cleanup_token, cleanup_body)
+    cleanup_index = cleanup_body.index(cleanup_token)
+    cleanup_window = cleanup_body[max(0, cleanup_index - 360):cleanup_index]
+    test_case.assertIn(
+        "cleanupFamily(",
+        cleanup_window,
+        "Owner cleanup backstops must be invoked through the isolated PluginManager "
+        "cleanup family wrapper so exceptions block dlclose.",
+    )
+
+
 def owner_cleanup_registry_classes() -> set[str]:
     registry_classes: set[str] = set()
     for header in CORE_DIR.glob("*.h"):
@@ -244,9 +362,22 @@ def cleaned_owner_registry_classes(cleanup_body: str) -> set[str]:
             cleanup_body,
         )
     )
-    if "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)" in cleanup_body:
-        registries.add("ChatEventDispatcher")
+    for member, registry in INJECTED_OWNER_REGISTRIES.items():
+        if f"{member}->UnregisterCallbacksForOwner(owner)" in cleanup_body:
+            registries.add(registry)
     return registries
+
+
+def blocked_surface_scan_text(api_header: str, plugin_manager_text: str) -> tuple[str, str]:
+    # Only the complete, exactly named callback prototype is exempt. Prefix
+    # exemptions would also admit blocked command/identity authority APIs.
+    allowed = native_prototype_symbols_for_header(api_header)
+    api_header = without_native_prototype_symbols(api_header, header_only=True)
+    if allowed:
+        plugin_manager_text = without_native_prototype_symbols(plugin_manager_text)
+        wrappers = "|".join(re.escape(f"Plugin{field}") for field in NATIVE_PROTOTYPE_API_FIELDS)
+        plugin_manager_text = re.sub(rf"\b(?:{wrappers})\b", "NativePrototypeWrapper", plugin_manager_text)
+    return strip_c_comments(api_header), strip_c_comments(plugin_manager_text)
 
 
 def cleaned_dispatcher_classes(cleanup_body: str) -> set[str]:
@@ -262,6 +393,46 @@ def event_dispatcher_class_names() -> set[str]:
             raise AssertionError(f"{header} has no event dispatcher class declaration")
         dispatchers.add(match.group(1))
     return dispatchers
+
+
+def dispatcher_public_name_stems(dispatcher: str) -> set[str]:
+    if not dispatcher.endswith("EventDispatcher"):
+        raise AssertionError(f"not an event dispatcher class name: {dispatcher}")
+
+    base_name = dispatcher.removesuffix("EventDispatcher")
+    stems = {base_name}
+    if base_name.endswith("Event"):
+        stems.add(base_name.removesuffix("Event"))
+    stems.update(DISPATCHER_PUBLIC_NAME_ALIASES.get(dispatcher, ()))
+    return stems
+
+
+def public_plugin_surface_tokens(api_header: str, plugin_manager_text: str) -> set[str]:
+    tokens = {
+        field
+        for field in obelisk_api_function_field_names(api_header)
+        if field.startswith(("Register", "Unregister"))
+    }
+    tokens.update(
+        re.findall(
+            r"\b(?:uint64_t|void|bool)\s+(Plugin(?:Register|Unregister)[A-Za-z0-9_]*)\s*\(",
+            plugin_manager_text,
+        )
+    )
+    tokens.update(re.findall(r"\bOBELISK_API_CAPABILITY_[A-Z0-9_]+", api_header))
+    return tokens
+
+
+def public_plugin_surface_tokens_for_dispatcher(
+    dispatcher: str,
+    public_tokens: set[str],
+) -> set[str]:
+    stems = {stem.replace("_", "").lower() for stem in dispatcher_public_name_stems(dispatcher)}
+    return {
+        token
+        for token in public_tokens
+        if any(stem in token.replace("_", "").lower() for stem in stems)
+    }
 
 
 class PluginManagerGuardrailTests(unittest.TestCase):
@@ -376,8 +547,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
         constructor_body = extract_function_body(
             plugin_manager_text,
-            r"PluginManager::PluginManager\(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher\)"
-            r"\s*:\s*m_Loader\(&loader\)\s*,\s*m_ChatDispatcher\(&chatDispatcher\)",
+            r"PluginManager::PluginManager\(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher,\s*"
+            r"CommandDispatcher& commandDispatcher, PlayerLifecycleDispatcher& playerLifecycleDispatcher\)"
+            r"\s*:\s*m_Loader\(&loader\)\s*,\s*m_ChatDispatcher\(&chatDispatcher\)"
+            r"\s*,\s*m_CommandDispatcher\(&commandDispatcher\)"
+            r"\s*,\s*m_PlayerLifecycleDispatcher\(&playerLifecycleDispatcher\)",
         )
         assigned_fields = set(re.findall(r"\bm_Api\.([A-Za-z_][A-Za-z0-9_]*)\s*=", constructor_body))
         declared_fields = set(obelisk_api_field_names(api_header))
@@ -446,14 +620,107 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "pluginDirectoryError)"
         )
         self.assertIn(validation_token, load_body)
+        plugin_directory_status_token = (
+            "fs::symlink_status(pluginDirectory, pluginDirectoryStatusError)"
+        )
         self.assertLess(
             load_body.index(validation_token),
-            load_body.index("fs::symlink_status(pluginDirectory)"),
+            load_body.index(plugin_directory_status_token),
         )
         self.assertLess(
-            load_body.index("fs::symlink_status(pluginDirectory)"),
-            load_body.index("fs::directory_iterator(pluginDirectory)"),
+            load_body.index(plugin_directory_status_token),
+            load_body.index(
+                "fs::directory_iterator iterator(pluginDirectory, "
+                "fs::directory_options::none, directoryIteratorError)"
+            ),
         )
+        self.assertIn("entry.symlink_status(entryStatusError)", load_body)
+        self.assertIn("fs::is_symlink(entryStatus)", load_body)
+        candidate_component_validation = re.search(
+            r"ValidateExistingPathComponentsNoSymlinks\(\s*path,\s*\"Plugin candidate\",\s*"
+            r"candidatePathError\s*\)",
+            load_body,
+        )
+        self.assertIsNotNone(
+            candidate_component_validation,
+            "Plugin candidates must revalidate the full path before open so a replaced "
+            "plugin directory symlink is rejected.",
+        )
+        self.assertLess(
+            load_body.index("fs::symlink_status(path, candidateStatusError)"),
+            load_body.index("m_Loader->Open(path, loaderError)"),
+        )
+        self.assertLess(
+            candidate_component_validation.start(),
+            load_body.index("m_Loader->Open(path, loaderError)"),
+        )
+
+        per_plugin_config_revalidation = re.search(
+            r"ValidateExistingPathComponentsNoSymlinks\(\s*configRoot,\s*\"OBELISK_CONFIG_DIR\",\s*"
+            r"pluginConfigRootComponentError\s*\)",
+            load_body,
+        )
+        self.assertIsNotNone(
+            per_plugin_config_revalidation,
+            "OBELISK_CONFIG_DIR must be revalidated per plugin before default config creation.",
+        )
+        self.assertLess(
+            per_plugin_config_revalidation.start(),
+            load_body.index("PreparePluginConfig(metadata"),
+        )
+
+    def test_plugin_loading_requires_safe_instance_id_before_config_or_discovery(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
+
+        instance_env_token = 'std::getenv("OBELISK_INSTANCE_ID")'
+        safe_instance_token = "IsSafeInstanceId(instanceId)"
+        config_env_token = 'std::getenv("OBELISK_CONFIG_DIR")'
+        iterator_token = (
+            "fs::directory_iterator iterator(pluginDirectory, "
+            "fs::directory_options::none, directoryIteratorError)"
+        )
+        open_token = "m_Loader->Open(path, loaderError)"
+
+        for token in (instance_env_token, safe_instance_token, config_env_token, iterator_token, open_token):
+            with self.subTest(token=token):
+                self.assertIn(token, load_body)
+
+        self.assertLess(load_body.index(instance_env_token), load_body.index(config_env_token))
+        self.assertLess(load_body.index(safe_instance_token), load_body.index(config_env_token))
+        self.assertLess(load_body.index(safe_instance_token), load_body.index(iterator_token))
+        self.assertLess(load_body.index(safe_instance_token), load_body.index(open_token))
+
+    def test_logger_rejects_unsafe_instance_id_instead_of_sanitizing_path(self) -> None:
+        text = LOGGER.read_text(encoding="utf-8")
+        self.assertNotIn("SanitizeIdentifier", text)
+
+        safe_identifier_body = extract_function_body(
+            text,
+            r"std::string GetSafeInstanceIdentifier\(.*?\)",
+        )
+        self.assertIn("std::isalnum(ch) || ch == '_' || ch == '-'", safe_identifier_body)
+        self.assertIn("throw std::runtime_error", safe_identifier_body)
+        self.assertIn("OBELISK_INSTANCE_ID", safe_identifier_body)
+
+        init_body = extract_function_body(text, r"void Logger::Init\(\)")
+        self.assertIn(
+            'GetSafeInstanceIdentifier(std::getenv("OBELISK_INSTANCE_ID"))',
+            init_body,
+        )
+        self.assertLess(
+            init_body.index("GetSafeInstanceIdentifier"),
+            init_body.index("GetLogDir()"),
+            "Logger must reject unsafe instance ids before creating log roots.",
+        )
+        self.assertIn("GetInstanceLogDir(logDir, instanceId)", init_body)
+
+        instance_log_dir_body = extract_function_body(
+            text,
+            r"std::filesystem::path GetInstanceLogDir\(.*?\)",
+        )
+        self.assertIn("const std::string& instanceId", text)
+        self.assertNotIn("std::getenv", instance_log_dir_body)
 
     def test_no_throw_logging_helper_never_uses_logging_macros(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -640,12 +907,37 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "Cleanup retry visibility must be logged before retaining the mapped plugin.",
         )
         for forbidden in (
+            "RemoveLoadedPluginOwner(plugin.owner)",
             "RemovePluginOwnerToken(plugin.ownerToken)",
             "ClearPluginOwnerUnloading(plugin.owner)",
             "SafeCloseLibrary",
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, failure_body)
+
+    def test_partial_unload_progress_publication_does_not_allocate_retry_vector(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        body = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
+        match = re.search(
+            r"const auto publishPartialUnloadStateAndAbort = \[\&\]\(\) noexcept",
+            body,
+        )
+        self.assertIsNotNone(match)
+        publish_body = extract_braced_body(body, match)
+
+        self.assertIn("std::is_nothrow_move_constructible_v<PluginInfo>", publish_body)
+        self.assertIn("m_LoadedPlugins.erase(it.base(), m_LoadedPlugins.end())", publish_body)
+        self.assertIn("m_LoadedPlugins.insert(", publish_body)
+        self.assertIn("std::make_move_iterator(retainedPlugins.rbegin())", publish_body)
+        self.assertIn("std::make_move_iterator(retainedPlugins.rend())", publish_body)
+        for forbidden in (
+            "std::vector<PluginInfo> retryPlugins",
+            "retryPlugins.reserve",
+            "retryPlugins.insert",
+            "m_LoadedPlugins = std::move(retryPlugins)",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, publish_body)
 
     def test_unloading_owner_rejects_new_registrations_but_allows_unregister(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -671,6 +963,32 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             unregister_body.index("return owner"),
         )
 
+    def test_unloading_owner_state_uses_retained_owner_api_state(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        self.assertIn("bool Unloading = false", text)
+        self.assertIn(".Unloading = false", extract_function_body(text, r"uint64_t AddPluginOwnerToken\(.*?\)"))
+        self.assertNotIn(
+            "UnloadingPluginOwners",
+            text,
+            "Unloading state must live in retained owner API state so shutdown marking "
+            "does not allocate or lose retry state before callback cleanup.",
+        )
+
+        mark_body = extract_function_body(text, r"void MarkPluginOwnerUnloading\(.*?\)")
+        self.assertIn("PluginOwnerApiStates().find(owner)", mark_body)
+        self.assertIn("it->second.Unloading = true", mark_body)
+        self.assertNotIn(".insert", mark_body)
+
+        clear_body = extract_function_body(text, r"void ClearPluginOwnerUnloading\(.*?\)")
+        self.assertIn("PluginOwnerApiStates().find(owner)", clear_body)
+        self.assertIn("it->second.Unloading = false", clear_body)
+        self.assertNotIn(".erase", clear_body)
+
+        is_unloading_body = extract_function_body(text, r"bool IsUnloadingPluginOwnerLocked\(.*?\)")
+        self.assertIn("PluginOwnerApiStates().find(owner)", is_unloading_body)
+        self.assertIn("it->second.Unloading", is_unloading_body)
+
     def test_plugin_owner_tokens_are_non_zero_and_snapshot_capabilities(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         body = extract_function_body(text, r"uint64_t AddPluginOwnerToken\(.*?\)")
@@ -687,7 +1005,37 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn(".Capabilities = capabilities", body)
 
         load_body = extract_function_body(text, r"void PluginManager::LoadPlugins\(.*?\)")
-        self.assertIn("AddPluginOwnerToken(pluginOwner, m_Api.capabilities, m_ChatDispatcher)", load_body)
+        self.assertRegex(
+            load_body,
+            r"AddPluginOwnerToken\(pluginOwner, m_Api\.capabilities, m_ChatDispatcher,\s*"
+            r"m_CommandDispatcher, m_PlayerLifecycleDispatcher\)",
+        )
+        for token in (".Commands = commands", ".PlayerLifecycle = playerLifecycle"):
+            self.assertIn(token, body)
+
+    def test_plugin_owner_token_removal_preserves_state_until_last_owner_token(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        helper_body = extract_function_body(
+            text,
+            r"bool HasPluginOwnerTokenForOwnerLocked\(.*?\)",
+        )
+        self.assertIn("PluginOwnerTokens().begin()", helper_body)
+        self.assertIn("PluginOwnerTokens().end()", helper_body)
+        self.assertIn("return item.second == owner", helper_body)
+
+        remove_body = extract_function_body(text, r"void RemovePluginOwnerToken\(.*?\)")
+        self.assertIn("void* owner = it->second", remove_body)
+        self.assertIn("PluginOwnerTokens().erase(it)", remove_body)
+        self.assertIn("if (!HasPluginOwnerTokenForOwnerLocked(owner))", remove_body)
+        self.assertIn("PluginOwnerApiStates().erase(owner)", remove_body)
+        self.assertNotIn("PluginOwnerApiStates().erase(it->second)", remove_body)
+        self.assertLess(
+            remove_body.index("PluginOwnerTokens().erase(it)"),
+            remove_body.index("if (!HasPluginOwnerTokenForOwnerLocked(owner))"),
+            "Owner API state must only be considered stale after the removed token is "
+            "gone from PluginOwnerTokens.",
+        )
 
     def test_public_plugin_manager_registration_handles_are_non_zero_and_not_live_reused(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -743,6 +1091,88 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("PluginOwnerHasCapabilityLocked(owner, OBELISK_API_CAPABILITY_TIMERS)", timer_body)
         self.assertNotIn("BuildApiCapabilities()", timer_body)
         self.assertNotIn("m_Api.capabilities", timer_body)
+
+    def test_public_timer_api_validates_duration_inputs_before_registration(self) -> None:
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        timer_body = extract_function_body(
+            plugin_manager_text,
+            r"uint64_t PluginRegisterTimerWithOwnerTokenHandle\(",
+        )
+        register_index = timer_body.index("RegisterProcessEventCallbackForOwnerToken(")
+
+        validation_tokens = (
+            "if ((flags & ~OBELISK_TIMER_FLAG_REPEATING) != 0)",
+            "if (delayMs == 0)",
+            "TimerManager::IsSupportedDuration(delayMs)",
+            "const bool repeating = (flags & OBELISK_TIMER_FLAG_REPEATING) != 0",
+            "if (repeating && intervalMs == 0)",
+            "TimerManager::IsSupportedDuration(intervalMs)",
+            "if (!repeating && intervalMs != 0)",
+        )
+        for token in validation_tokens:
+            with self.subTest(token=token):
+                self.assertIn(token, timer_body)
+                self.assertLess(
+                    timer_body.index(token),
+                    register_index,
+                    "Public timer ABI wrapper must reject invalid durations before owner "
+                    "resolution or TimerManager registration.",
+                )
+
+        timer_manager_text = TIMER_MANAGER.read_text(encoding="utf-8")
+        register_body = extract_function_body(
+            timer_manager_text,
+            r"uint64_t TimerManager::Register\(.*?\)",
+        )
+        self.assertLess(
+            register_body.index("IsSupportedDuration(delayMs)"),
+            register_body.index("Clock::now() + std::chrono::milliseconds(delayMs)"),
+            "TimerManager must validate delay range before converting or adding it to now().",
+        )
+        self.assertLess(
+            register_body.index("IsSupportedDuration(intervalMs)"),
+            register_body.index("TimerEntry{"),
+            "TimerManager must validate repeating interval range before storing it.",
+        )
+
+    def test_timer_owner_cleanup_waits_for_in_flight_callbacks_before_dlclose(self) -> None:
+        timer_manager_text = TIMER_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            timer_manager_text,
+            r"size_t TimerManager::UnregisterCallbacksForOwner\(.*?\)",
+        )
+
+        for token in (
+            "timer->Cancelled = true",
+            "timer->InFlight == 0",
+            "t_CurrentTimerOwner == owner",
+            "state.Cv.wait(lock",
+            "item.second->Owner == owner && item.second->InFlight != 0",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, cleanup_body)
+
+        self.assertLess(
+            cleanup_body.index("timer->Cancelled = true"),
+            cleanup_body.index("state.Cv.wait(lock"),
+            "Owner cleanup must cancel plugin timers before waiting for in-flight callbacks.",
+        )
+        self.assertLess(
+            cleanup_body.index("t_CurrentTimerOwner == owner"),
+            cleanup_body.index("state.Cv.wait(lock"),
+            "Timer self-cleanup must bypass the cross-thread wait to avoid deadlock.",
+        )
+
+        self_cleanup_match = re.search(
+            r"if \(t_CurrentTimerOwner == owner\)\s*\{(?P<body>.*?)\n\s*\}",
+            cleanup_body,
+            re.S,
+        )
+        self.assertIsNotNone(self_cleanup_match)
+        self_cleanup_body = self_cleanup_match.group("body")
+        self.assertIn("state.Cv.notify_all()", self_cleanup_body)
+        self.assertIn("return removed", self_cleanup_body)
+        self.assertNotIn("state.Cv.wait", self_cleanup_body)
 
     def test_unregister_plugin_callbacks_is_per_family_and_cleans_timers(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -825,11 +1255,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                     gameplay_unregister_body,
                     "Gameplay policy cleanup fallback must not ignore a zero removed count.",
                 )
-                fallback_call = (
-                    f"const size_t fallbackRemoved =\n"
-                    f"                            {dispatcher}::Get().UnregisterCallbacksForOwner(owner)"
+                self.assertRegex(
+                    gameplay_unregister_body,
+                    rf"const\s+size_t\s+fallbackRemoved\s*=\s*"
+                    rf"{dispatcher}::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
                 )
-                self.assertIn(fallback_call, gameplay_unregister_body)
                 self.assertIn(f"{removed_flag} = fallbackRemoved != 0;", gameplay_unregister_body)
 
     def test_public_registration_tracking_is_reconciled_after_direct_dispatcher_cleanup(self) -> None:
@@ -890,6 +1320,38 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, gameplay_reconcile_body)
 
+        gameplay_unregister_body = extract_function_body(
+            text,
+            r"bool UnregisterGameplayPolicyRegistrationForOwner\(.*?\)",
+        )
+        self.assertRegex(
+            gameplay_unregister_body,
+            r"catch\s*\(\.\.\.\)\s*\{\s*"
+            r"if\s*\(structureRemoved\s*\|\|\s*inventoryRemoved\s*\|\|\s*itemReturnRemoved\)\s*"
+            r"\(void\)syncRemovedDispatcherTracking\(\);\s*"
+            r"throw;\s*\}",
+        )
+
+    def test_gameplay_policy_partial_failure_retry_keeps_later_family_failure_enabled(self) -> None:
+        tests_text = PLUGIN_MANAGER_TESTS.read_text(encoding="utf-8")
+        body = extract_function_body(
+            tests_text,
+            r"void TestUnloadAllRetriesGameplayPolicyCleanupAfterPartialPublicBackingFailure\(.*?\)",
+        )
+        first_unload = body.index("manager.UnloadAll();")
+        second_unload = body.index("manager.UnloadAll();", first_unload + len("manager.UnloadAll();"))
+        clear_failure = body.index("SetPublicGameplayPolicyInventoryUnregisterFailureForTesting(false)")
+        self.assertLess(
+            second_unload,
+            clear_failure,
+            "The partial gameplay cleanup retry must prove stale public tracking is gone "
+            "before clearing the injected later-family failure.",
+        )
+        self.assertIn(
+            "gameplay-policy partial retry accepted a new owner-token callback while unloading",
+            body,
+        )
+
     def test_public_owner_token_handle_apis_have_owner_cleanup_backstops(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
@@ -914,7 +1376,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
 
         for api_field, cleanup_token in OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS.items():
             with self.subTest(api_field=api_field):
-                self.assertIn(cleanup_token, cleanup_body)
+                assert_cleanup_token_uses_cleanup_family(self, cleanup_body, cleanup_token)
 
     def test_public_owner_token_registration_apis_are_handle_based_or_legacy_wrappers(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
@@ -948,6 +1410,24 @@ class PluginManagerGuardrailTests(unittest.TestCase):
     def test_plugin_manager_uses_owner_scoped_unregister_for_event_dispatchers(self) -> None:
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         dispatcher_classes = event_dispatcher_class_names()
+
+        # The native dispatchers intentionally name their owner-scoped method
+        # Unregister(owner,id). Exempt only these two validated wrapper bodies,
+        # preserving the blanket denial of bare unregister through other aliases.
+        for wrapper, owner_registry in NATIVE_OWNER_UNREGISTER_APIS.items():
+            body = extract_function_body(plugin_manager_text, rf"bool {wrapper}\(.*?\)")
+            with self.subTest(wrapper=wrapper):
+                self.assertIn("ResolveOwnerTokenForUnregister", body)
+                self.assertIn("if (!owner)", body)
+                self.assertIn(f"{owner_registry}(owner)", body)
+                self.assertEqual(
+                    re.findall(r"->\s*Unregister\s*\(([^)]*)\)", body),
+                    ["owner, registrationId"],
+                    "Native command/lifecycle unregister must include the resolved owner and handle.",
+                )
+                self.assertIn("SafeLogErrorNoThrow", body)
+                self.assertIn("catch (...)", body)
+            plugin_manager_text = plugin_manager_text.replace(body, "", 1)
 
         self.assertNotRegex(
             plugin_manager_text,
@@ -1156,9 +1636,153 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             with self.subTest(dispatcher=dispatcher):
                 self.assertIn(dispatcher, registry_classes)
                 self.assertIn("internal/test-only", reason)
+                self.assertIn("non-public", reason)
                 self.assertIn("not plugin-facing", reason)
                 self.assertIn("PluginManager owner cleanup", reason)
                 self.assertNotIn(dispatcher, cleaned_registries)
+
+    def test_new_event_dispatcher_families_require_owner_cleanup_decision(self) -> None:
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        dispatcher_classes = event_dispatcher_class_names()
+        registry_classes = owner_cleanup_registry_classes()
+        missing_owner_cleanup = sorted(dispatcher_classes - registry_classes)
+        self.assertEqual(
+            missing_owner_cleanup,
+            [],
+            "New EventDispatcher families need an owner-scoped cleanup contract before "
+            "they can be treated as safe around plugin unload.",
+        )
+
+        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
+        undecided_dispatchers = sorted(
+            dispatcher_classes - cleaned_dispatchers - set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS)
+        )
+        self.assertEqual(
+            undecided_dispatchers,
+            [],
+            "New EventDispatcher families must either be wired into "
+            "PluginManager::UnregisterPluginCallbacks or listed as an explicit "
+            "internal/test-only exception with blocked public ABI tokens.",
+        )
+
+    def test_current_copied_dispatcher_owner_cleanup_parity_is_explicit(self) -> None:
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+        dispatcher_classes = event_dispatcher_class_names()
+        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
+
+        implicit_cleanup_dispatchers = sorted(
+            cleaned_dispatchers
+            - set(COPIED_DISPATCHER_PLUGIN_MANAGER_CLEANUP_TOKENS)
+            - set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS)
+        )
+        self.assertEqual(
+            implicit_cleanup_dispatchers,
+            [],
+            "Every copied dispatcher cleaned by PluginManager must be listed in "
+            "COPIED_DISPATCHER_PLUGIN_MANAGER_CLEANUP_TOKENS so cleanup-family "
+            "exception handling stays guarded.",
+        )
+
+        for dispatcher, cleanup_token in COPIED_DISPATCHER_PLUGIN_MANAGER_CLEANUP_TOKENS.items():
+            with self.subTest(dispatcher=dispatcher, decision="PluginManager cleanup"):
+                self.assertIn(dispatcher, dispatcher_classes)
+                self.assertNotIn(dispatcher, COPIED_DISPATCHER_CLEANUP_EXCEPTIONS)
+                assert_cleanup_token_uses_cleanup_family(self, cleanup_body, cleanup_token)
+
+        for dispatcher in sorted(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS):
+            cleanup_token = f"{dispatcher}::Get().UnregisterCallbacksForOwner(owner)"
+            with self.subTest(dispatcher=dispatcher, decision="internal/test-only exception"):
+                self.assertIn(dispatcher, dispatcher_classes)
+                self.assertNotIn(cleanup_token, cleanup_body)
+
+    def test_plugin_facing_event_dispatchers_require_plugin_manager_cleanup(self) -> None:
+        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
+        plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        public_tokens = public_plugin_surface_tokens(api_header, plugin_manager_text)
+        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
+        cleanup_omissions: list[str] = []
+        stale_exclusions: list[str] = []
+
+        for dispatcher in sorted(event_dispatcher_class_names()):
+            matched_tokens = sorted(public_plugin_surface_tokens_for_dispatcher(dispatcher, public_tokens))
+            if not matched_tokens:
+                continue
+
+            with self.subTest(dispatcher=dispatcher):
+                if dispatcher not in cleaned_dispatchers:
+                    cleanup_omissions.append(
+                        f"{dispatcher}: public surface tokens {', '.join(matched_tokens)}"
+                    )
+                if dispatcher in COPIED_DISPATCHER_CLEANUP_EXCEPTIONS:
+                    stale_exclusions.append(
+                        f"{dispatcher}: public surface tokens {', '.join(matched_tokens)}"
+                    )
+
+        self.assertEqual(
+            cleanup_omissions,
+            [],
+            "Any dispatcher with a public registration/capability surface must be wired "
+            "through PluginManager::UnregisterPluginCallbacks.",
+        )
+        self.assertEqual(
+            stale_exclusions,
+            [],
+            "A dispatcher cannot remain an internal/test-only cleanup exclusion after "
+            "public registration or capability tokens appear.",
+        )
+
+    def test_internal_test_only_dispatchers_are_explicitly_non_plugin_facing(self) -> None:
+        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
+        plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
+        public_tokens = public_plugin_surface_tokens(api_header, plugin_manager_text)
+
+        production_files = [
+            *sorted((REPO_ROOT / "core").glob("*.cpp")),
+            *sorted((REPO_ROOT / "hooks").glob("*.cpp")),
+            *sorted((REPO_ROOT / "ue").glob("*.cpp")),
+        ]
+
+        stale_internal_markers = sorted(set(INTERNAL_TEST_ONLY_DISPATCHERS) - event_dispatcher_class_names())
+        self.assertEqual(stale_internal_markers, [])
+
+        for dispatcher, reason in INTERNAL_TEST_ONLY_DISPATCHERS.items():
+            with self.subTest(dispatcher=dispatcher):
+                self.assertIn("internal/test-only", reason)
+                self.assertIn("non-public", reason)
+                self.assertIn("not plugin-facing", reason)
+                self.assertEqual(
+                    sorted(public_plugin_surface_tokens_for_dispatcher(dispatcher, public_tokens)),
+                    [],
+                    "Internal/test-only dispatchers must not gain public ABI fields, "
+                    "PluginManager C wrappers, or capability bits.",
+                )
+
+                register_call = f"{dispatcher}::Get().Register("
+                production_registrations = [
+                    str(path.relative_to(REPO_ROOT))
+                    for path in production_files
+                    if register_call in strip_c_comments(path.read_text(encoding="utf-8"))
+                ]
+                self.assertEqual(
+                    production_registrations,
+                    [],
+                    "Internal/test-only dispatchers must not gain production registration "
+                    "calls until promotion adds public ABI, owner cleanup, and SDK tests.",
+                )
 
     def test_internal_test_only_dispatcher_exceptions_are_not_public_abi_or_plugin_manager_wired(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
@@ -1243,8 +1867,10 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                         )
 
     def test_plugin_manager_does_not_wire_blocked_public_sdk_surfaces(self) -> None:
-        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
-        plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
+        api_header, plugin_manager_text = blocked_surface_scan_text(
+            OBELISK_API_HEADER.read_text(encoding="utf-8"),
+            PLUGIN_MANAGER.read_text(encoding="utf-8"),
+        )
 
         offenders: list[str] = []
         for family, tokens in BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS.items():
@@ -1263,6 +1889,134 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "cleanup, and SDK consumer tests.",
         )
 
+    def test_native_prototype_exemptions_require_the_complete_exact_table(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        manager = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        self.assertTrue(native_prototype_symbols_for_header(api_header))
+        for field in NATIVE_PROTOTYPE_API_FIELDS:
+            with self.subTest(missing_exact_field=field):
+                incomplete = api_header.replace(field, field + "AuthorityAlias", 1)
+                self.assertFalse(native_prototype_symbols_for_header(incomplete))
+                scanned_header, scanned_manager = blocked_surface_scan_text(incomplete, manager)
+                self.assertIn("OBELISK_API_CAPABILITY_COMMAND_REPLIES", scanned_header)
+                self.assertIn("PluginRegisterCommandWithOwnerTokenHandle", scanned_manager)
+
+    def test_native_prototype_exemptions_preserve_blocked_authority_names(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        manager = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        blocked = ("RegisterCommandAuthority", "RegisterAdminCommand", "ResolvePlayerPrincipal")
+        extra = "\n".join(f"void {name}();" for name in blocked)
+        scanned_header, scanned_manager = blocked_surface_scan_text(api_header + extra, manager + extra)
+        for token in blocked:
+            with self.subTest(blocked_token=token):
+                self.assertIn(token, scanned_header)
+                self.assertIn(token, scanned_manager)
+
+    def test_runtime_callback_scopes_precede_plugin_entry_and_restore_outer_scope(self) -> None:
+        scope_header = (CORE_DIR / "GameplayCallbackScope.h").read_text(encoding="utf-8")
+        self.assertIn("m_CountsDepth(mode == TrackingMode::Gameplay)", scope_header)
+        self.assertRegex(scope_header, r"if \(m_CountsDepth\)\s*\+\+Depth\(m_Family\)")
+        self.assertIn("CurrentStorage() = this", scope_header)
+        self.assertIn("CurrentStorage() = m_Previous", scope_header)
+        self.assertRegex(scope_header, r"if \(m_CountsDepth\)\s*--Depth\(m_Family\)")
+
+        for dispatcher, family in (("CommandDispatcher", "Command"),
+                                   ("PlayerLifecycleDispatcher", "PlayerLifecycle")):
+            body = extract_function_body(
+                (CORE_DIR / f"{dispatcher}.cpp").read_text(encoding="utf-8"),
+                rf"size_t {dispatcher}::Dispatch\(.*?\)",
+            )
+            token = f"GameplayCallbackScope callbackScope(GameplayCallbackFamily::{family})"
+            with self.subTest(dispatcher=dispatcher):
+                self.assertIn(token, body)
+                self.assertLess(body.index(token), body.index("registration->Callback(&event"))
+        command_text = (CORE_DIR / "CommandDispatcher.cpp").read_text(encoding="utf-8")
+        dispatch = extract_function_body(command_text, r"size_t CommandDispatcher::Dispatch\(.*?\)")
+        self.assertLess(dispatch.index("invocation.CallbackScope = &callbackScope"),
+                        dispatch.index("registration->Callback(&event"))
+        for operation, use in (("Reply", "invocation->Backend("),
+                               ("GetPlayer", "*out = *invocation->Player")):
+            body = extract_function_body(command_text, rf"bool CommandDispatcher::{operation}\(.*?\)")
+            check = "GameplayCallbackScope::Current() != invocation->CallbackScope"
+            self.assertIn(check, body)
+            self.assertLess(body.index(check), body.index(use))
+
+        event_text = (CORE_DIR / "EventManager.cpp").read_text(encoding="utf-8")
+        callback_bodies = [
+            extract_braced_body(event_text, match)
+            for match in re.finditer(r"(?:bool|void) EventManager::Trigger(?:Pre|Post)ProcessEvent\([^)]*\)", event_text)
+        ]
+        callback_bodies = [body for body in callback_bodies if "snapshot.callback(" in body]
+        self.assertEqual(len(callback_bodies), 4)
+        for body in callback_bodies:
+            self.assertRegex(body, r"GameplayCallbackScope callbackScope\(GameplayCallbackFamily::ProcessEvent,\s*"
+                                  r"GameplayCallbackScope::TrackingMode::CurrentOnly\)")
+            self.assertLess(body.index("GameplayCallbackScope callbackScope"), body.index("snapshot.callback("))
+        timer = extract_function_body(TIMER_MANAGER.read_text(encoding="utf-8"), r"void WorkerLoop\(\)")
+        self.assertRegex(timer, r"GameplayCallbackScope callbackScope\(GameplayCallbackFamily::Timer,\s*"
+                               r"GameplayCallbackScope::TrackingMode::CurrentOnly\)")
+        self.assertLess(timer.index("GameplayCallbackScope callbackScope"), timer.index("callback(timerId, userData)"))
+
+    def test_side_lane_names_have_no_plugin_facing_callback_fields(self) -> None:
+        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
+        plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
+        side_lane_name_re = re.compile(
+            r"(?:Transfer|ScriptStruct|Payload|BAccept|Buff|BuffStatus|Dino|DinoScalar)"
+        )
+
+        public_callback_fields = [
+            field
+            for field in obelisk_api_function_field_names(api_header)
+            if field.startswith(("Register", "Unregister"))
+        ]
+        plugin_boundary_wrappers = re.findall(
+            r"\b(?:uint64_t|void|bool)\s+(Plugin(?:Register|Unregister)[A-Za-z0-9_]*)\s*\(",
+            plugin_manager_text,
+        )
+        capability_tokens = sorted(set(re.findall(r"\bOBELISK_API_CAPABILITY_[A-Z0-9_]+", api_header)))
+
+        offenders = [
+            f"ObeliskApi field: {field}"
+            for field in public_callback_fields
+            if side_lane_name_re.search(field)
+        ]
+        offenders.extend(
+            f"PluginManager wrapper: {function_name}"
+            for function_name in plugin_boundary_wrappers
+            if side_lane_name_re.search(function_name)
+        )
+        offenders.extend(
+            f"ObeliskApi capability: {capability}"
+            for capability in capability_tokens
+            if side_lane_name_re.search(capability)
+        )
+
+        self.assertEqual(
+            offenders,
+            [],
+            "Transfer ScriptStruct/payload, Buff status, and Dino scalar side-lane names "
+            "must not gain public callback fields, C wrappers, or capability bits.",
+        )
+
+    def test_player_principal_dispatcher_registration_stays_test_only_until_promotion(self) -> None:
+        production_files = [
+            *sorted((REPO_ROOT / "core").glob("*.cpp")),
+            *sorted((REPO_ROOT / "hooks").glob("*.cpp")),
+            *sorted((REPO_ROOT / "ue").glob("*.cpp")),
+        ]
+        offenders: list[str] = []
+        for path in production_files:
+            text = strip_c_comments(path.read_text(encoding="utf-8"))
+            if "PlayerPrincipalEventDispatcher::Get().Register(" in text:
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(
+            offenders,
+            [],
+            "PlayerPrincipalEventDispatcher registration is internal/test-only until "
+            "player identity promotion adds public ABI, owner cleanup, and SDK tests.",
+        )
+
     def test_event_dispatcher_owner_cleanup_failures_propagate_to_plugin_manager(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):
             text = source.read_text(encoding="utf-8")
@@ -1276,6 +2030,130 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 with self.subTest(source=source.name, catch_body=catch_body.strip()[:80]):
                     self.assertIn("throw", catch_body)
                     self.assertNotRegex(catch_body, r"\breturn\s+0\s*;")
+
+    def test_player_principal_owner_cleanup_setup_failures_keep_retry_state(self) -> None:
+        text = (CORE_DIR / "PlayerPrincipalEventDispatcher.cpp").read_text(encoding="utf-8")
+        body = extract_function_body(
+            text,
+            r"size_t PlayerPrincipalEventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+        )
+
+        self.assertIn(
+            "const auto retainPendingOwnerCleanupFailures",
+            body,
+            "PlayerPrincipalEventDispatcher owner cleanup must keep a no-loss path for "
+            "pending DestroyUserData retry records if setup fails after taking them.",
+        )
+        retain_tokens = {
+            "RetainFailedOwnerDestroySubscriptions(owner, removed, retainedFailure)": (
+                "pending retry records must retain their stored failure so the next "
+                "PluginManager cleanup attempt still fails visibly"
+            ),
+            "RetainFailedOwnerDestroySubscriptions(owner, currentRemoved)": (
+                "newly removed callbacks must be retained when setup fails before "
+                "DestroyUserData can run"
+            ),
+        }
+        for token, message in retain_tokens.items():
+            with self.subTest(token=token):
+                self.assertIn(token, body, message)
+        catch_bodies = re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", body, re.S)
+        self.assertTrue(catch_bodies, "owner cleanup must keep visible catch blocks.")
+        for catch_body in catch_bodies:
+            with self.subTest(catch_body=catch_body.strip()[:80]):
+                self.assertIn("retainPendingOwnerCleanupFailures();", catch_body)
+                self.assertIn("throw", catch_body)
+
+    def test_plugin_manager_player_principal_retry_setup_failure_test_has_test_hooks(self) -> None:
+        tests_text = PLUGIN_MANAGER_TESTS.read_text(encoding="utf-8")
+        test_body = extract_function_body(
+            tests_text,
+            r"void TestUnloadAllRetainsPlayerPrincipalDestroyRetryAfterOwnerCleanupSetupFailure\(\)",
+        )
+
+        for token in (
+            ".registerPlayerPrincipalCallback = true",
+            ".failDestroyUserDataOnce = true",
+            "PlayerPrincipalEventDispatcher::Get().FailNextFailedOwnerDestroyRetrySetupForTesting()",
+            "playerPrincipalSubscriptionsAtClose == 0",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, test_body)
+
+        self.assertIn(
+            "TestUnloadAllRetainsPlayerPrincipalDestroyRetryAfterOwnerCleanupSetupFailure();",
+            tests_text,
+        )
+
+        cmake_text = CMAKE_LISTS.read_text(encoding="utf-8")
+        compile_definitions = re.search(
+            r"target_compile_definitions\(\s*plugin_manager_tests\b(?P<body>.*?)\)",
+            cmake_text,
+            re.S,
+        )
+        self.assertIsNotNone(compile_definitions)
+        self.assertIn(
+            "OBELISK_PLAYER_PRINCIPAL_EVENT_DISPATCHER_ENABLE_TEST_HOOKS=1",
+            compile_definitions.group("body"),
+            "plugin_manager_tests must compile the player-principal dispatcher test hook "
+            "used by the owner-cleanup setup-failure parity test.",
+        )
+
+    def test_copied_dispatcher_owner_cleanup_setup_failures_keep_retry_state(self) -> None:
+        for dispatcher in (
+            "ChatEventDispatcher",
+            "StructureEventDispatcher",
+            "MissionCopiedBoolEventDispatcher",
+            "InventoryPolicyEventDispatcher",
+            "ItemReturnEventDispatcher",
+            "PlayerPrincipalEventDispatcher",
+        ):
+            with self.subTest(dispatcher=dispatcher):
+                text = (CORE_DIR / f"{dispatcher}.cpp").read_text(encoding="utf-8")
+                header = (CORE_DIR / f"{dispatcher}.h").read_text(encoding="utf-8")
+                body = extract_function_body(
+                    text,
+                    rf"size_t {dispatcher}::UnregisterCallbacksForOwner\(void\* owner\)",
+                )
+
+                self.assertIn("FailNextFailedOwnerDestroyRetrySetupForTesting", header)
+                self.assertIn("m_FailNextFailedOwnerDestroyRetrySetupForTesting", body)
+                self.assertIn("const auto retainPendingOwnerCleanupFailures", body)
+                self.assertRegex(
+                    body,
+                    r"RetainFailedOwnerDestroySubscriptions\(owner, removed(?:, \w+)?\)",
+                )
+                self.assertIn("RetainFailedOwnerDestroySubscriptions(owner, currentRemoved)", body)
+                catch_bodies = re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", body, re.S)
+                self.assertTrue(catch_bodies, "owner cleanup must keep visible catch blocks.")
+                for catch_body in catch_bodies:
+                    self.assertIn("retainPendingOwnerCleanupFailures();", catch_body)
+                    self.assertIn("throw", catch_body)
+
+    def test_deferred_event_dispatchers_use_fallback_failure_recording(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "TakeDeferredDestroyFailures" not in text:
+                continue
+
+            dispatcher = source.stem
+            header = (CORE_DIR / f"{dispatcher}.h").read_text(encoding="utf-8")
+            finish_body = extract_function_body(
+                text,
+                rf"void {dispatcher}::FinishDispatch\(\)",
+            )
+
+            with self.subTest(dispatcher=dispatcher):
+                self.assertIn("m_HasFallbackDeferredDestroyFailure", header)
+                self.assertIn("m_FallbackDeferredDestroyFailure", header)
+                self.assertIn("ReserveDeferredDestroyFailureSlots", text)
+                self.assertIn("RecordDeferredDestroyFailure", text)
+                self.assertIn("RecordDeferredDestroyFailure(", finish_body)
+                self.assertNotIn(
+                    "std::vector<DeferredDestroyFailure> failures",
+                    finish_body,
+                    "deferred cleanup failures must be recorded through the fallback-aware helper",
+                )
 
     def test_deferred_event_dispatcher_owner_cleanup_uses_batch_id(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):
@@ -1292,7 +2170,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("cleanupBatchId = m_NextCleanupBatchId++", body)
                 self.assertRegex(
                     body,
-                    r"QueueOrDestroyRemovedSubscriptions\((?:removed|currentRemoved), lock, cleanupBatchId\)",
+                    r"QueueOrDestroyRemovedSubscriptions\((?:\w+, )?(?:removed|currentRemoved), lock, cleanupBatchId(?:, \w+)?\)",
                 )
                 self.assertTrue(
                     "deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)" in body or
@@ -1322,7 +2200,10 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 with self.subTest(source=source.name, signature=signature):
                     self.assertIn("std::exception_ptr deferredFailure", body)
                     self.assertIn("uint64_t cleanupBatchId = 0", body)
-                    self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
+                    self.assertRegex(
+                        body,
+                        r"QueueOrDestroyRemovedSubscriptions\((?:\w+, )?removed, lock, cleanupBatchId(?:, \w+)?\)",
+                    )
                     self.assertTrue(
                         "deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)" in body or
                         "TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure)" in body,
@@ -1356,12 +2237,34 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 continue
             body = extract_function_body(text, r"void \w+EventDispatcher::FinishDispatch\(\)")
             with self.subTest(source=source.name):
-                self.assertTrue(
+                captures_with_bulk_vector = (
                     "failures.push_back({item.CleanupBatchId, std::current_exception()})" in body or
-                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})" in body,
+                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})" in body
+                )
+                captures_with_record_helper = (
+                    "RecordDeferredDestroyFailure(\n"
+                    "                    item.CleanupBatchId,\n"
+                    "                    item.Subscription,\n"
+                    "                    std::current_exception())" in body
+                )
+                self.assertTrue(
+                    captures_with_bulk_vector or captures_with_record_helper,
                     "deferred cleanup failures must be captured before notify",
                 )
-                self.assertIn("try\n            {\n                m_DeferredDestroyFailures.insert", body)
+                if captures_with_bulk_vector:
+                    self.assertIn("try\n            {\n                m_DeferredDestroyFailures.insert", body)
+                else:
+                    record_body = extract_function_body(
+                        text,
+                        r"void \w+EventDispatcher::RecordDeferredDestroyFailure\(.*?\)",
+                    )
+                    self.assertIn(
+                        "m_DeferredDestroyFailures.push_back({cleanupBatchId, subscription, failure})",
+                        record_body,
+                    )
+                    self.assertIn("m_FallbackDeferredDestroyFailure", record_body)
+                    self.assertLess(body.index("RecordDeferredDestroyFailure("),
+                                    body.index("m_DispatchCv.notify_all()"))
                 self.assertLess(body.index("m_PendingDestroyInProgress -= pending.size()"),
                                 body.index("m_DispatchCv.notify_all()"))
 
@@ -1378,10 +2281,56 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                     "Deferred cleanup must retain every failed subscription in a cleanup "
                     "batch so PluginManager retry can quiesce all plugin-owned user data.",
                 )
-                self.assertIn(
-                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})",
-                    body,
+                self.assertTrue(
+                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})" in body or
+                    (
+                        "RecordDeferredDestroyFailure(\n"
+                        "                    item.CleanupBatchId,\n"
+                        "                    item.Subscription,\n"
+                        "                    std::current_exception())" in body
+                    ),
+                    "Deferred cleanup must retain the failed subscription, not only the exception.",
                 )
+
+    def test_deferred_event_dispatcher_take_helpers_reserve_before_queue_mutation(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+
+            failed_owner_body = extract_function_body(
+                text,
+                r"std::vector<[^>]+> \w+EventDispatcher::TakeFailedOwnerDestroySubscriptions\(.*?\)",
+            )
+            with self.subTest(source=source.name, helper="TakeFailedOwnerDestroySubscriptions"):
+                self.assertIn("subscriptions.reserve(", failed_owner_body)
+                self.assertLess(
+                    failed_owner_body.index("subscriptions.reserve("),
+                    failed_owner_body.index("std::remove_if"),
+                    "retained owner cleanup failures must reserve before mutating the retry queue.",
+                )
+                if "m_HasFallbackFailedOwnerDestroy = false" in failed_owner_body:
+                    self.assertLess(
+                        failed_owner_body.index("subscriptions.reserve("),
+                        failed_owner_body.index("m_HasFallbackFailedOwnerDestroy = false"),
+                        "fallback retained owner cleanup failure must stay queued if output allocation fails.",
+                    )
+
+            deferred_body = extract_function_body(
+                text,
+                r"std::vector<[^>]+> \w+EventDispatcher::TakeDeferredDestroyFailures\(.*?\)",
+            )
+            with self.subTest(source=source.name, helper="TakeDeferredDestroyFailures"):
+                self.assertIn("failedSubscriptions.reserve(", deferred_body)
+                self.assertLess(
+                    deferred_body.index("failedSubscriptions.reserve("),
+                    deferred_body.index("std::remove_if"),
+                    "deferred cleanup failures must reserve before mutating the retry queue.",
+                )
+                if "m_HasFallbackDeferredDestroyFailure = false" in deferred_body:
+                    self.assertLess(
+                        deferred_body.index("failedSubscriptions.reserve("),
+                        deferred_body.index("m_HasFallbackDeferredDestroyFailure = false"),
+                        "fallback deferred cleanup failure must stay queued if output allocation fails.",
+                    )
 
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")

@@ -321,6 +321,70 @@ namespace
                 "self-unregister destroy chat callback remained registered");
     }
 
+    struct SelfUnregisterFailingDestroyCapture
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t registrationId = 0;
+        int calls = 0;
+        int destroyCalls = 0;
+        bool failNextDestroy = true;
+    };
+
+    void SelfUnregisterWithFailingDestroyCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterFailingDestroyCapture*>(userData);
+        ++capture->calls;
+        Require(capture->dispatcher != nullptr, "self-unregister failing destroy callback had no dispatcher");
+        Require(capture->dispatcher->Unregister(capture->registrationId),
+                "self-unregister failing destroy callback could not unregister itself");
+    }
+
+    void FailsOnceSelfUnregisterDestroy(void* userData)
+    {
+        auto* capture = static_cast<SelfUnregisterFailingDestroyCapture*>(userData);
+        ++capture->destroyCalls;
+        if (capture->failNextDestroy)
+        {
+            capture->failNextDestroy = false;
+            throw std::runtime_error("expected deferred self-unregister destroy failure");
+        }
+    }
+
+    void TestSelfUnregisterDeferredDestroyFailurePropagatesToOwnerCleanup()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        SelfUnregisterFailingDestroyCapture capture{&dispatcher, 0, 0, 0, true};
+
+        capture.registrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterWithFailingDestroyCallback, &capture, FailsOnceSelfUnregisterDestroy});
+        Require(capture.registrationId != 0,
+                "self-unregister failing destroy registration id was not assigned");
+
+        Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                "self-unregister failing destroy chat callback did not run");
+        Require(capture.calls == 1, "self-unregister failing destroy callback ran wrong number of times");
+        Require(capture.destroyCalls == 1, "deferred DestroyUserData did not run during dispatch finish");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "self-unregister failing destroy callback remained dispatchable");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid deferred self-unregister DestroyUserData failure");
+        Require(capture.destroyCalls == 2, "owner cleanup did not retry deferred failed DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "resolved deferred self-unregister cleanup kept retry state");
+    }
+
     struct UnregisterOtherCapture
     {
         Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
@@ -665,6 +729,236 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "deferred destroy callback survived cleanup");
     }
 
+    struct WaitingDeferredDestroyFailureState
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        uint64_t registrationId = 0;
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool callbackEntered = false;
+        bool callbackUnregistered = false;
+        bool releaseCallback = false;
+        bool destroyEntered = false;
+        bool releaseDestroy = false;
+        bool failNextDestroy = true;
+        int destroyCalls = 0;
+    };
+
+    void SelfUnregisterAndBlockCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<WaitingDeferredDestroyFailureState*>(userData);
+        Require(state->dispatcher != nullptr, "waiting deferred destroy callback had no dispatcher");
+        Require(state->dispatcher->Unregister(state->registrationId),
+                "waiting deferred destroy callback could not unregister itself");
+        {
+            std::unique_lock<std::mutex> lock(state->mutex);
+            state->callbackEntered = true;
+            state->callbackUnregistered = true;
+            state->cv.notify_all();
+            state->cv.wait(lock, [&state]() { return state->releaseCallback; });
+        }
+    }
+
+    void BlockingFailsOnceDeferredDestroy(void* userData)
+    {
+        auto* state = static_cast<WaitingDeferredDestroyFailureState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        ++state->destroyCalls;
+        if (state->destroyCalls == 1)
+        {
+            state->destroyEntered = true;
+            state->cv.notify_all();
+            state->cv.wait(lock, [&state]() { return state->releaseDestroy; });
+        }
+        if (state->failNextDestroy)
+        {
+            state->failNextDestroy = false;
+            throw std::runtime_error("expected waiting deferred destroy failure");
+        }
+    }
+
+    void TestNoOpOwnerCleanupReportsDeferredDestroyFailureAfterWait()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        WaitingDeferredDestroyFailureState state;
+        state.dispatcher = &dispatcher;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> cleanupThrew{false};
+
+        state.registrationId = dispatcher.Register(
+            &owner,
+            {SelfUnregisterAndBlockCallback, &state, BlockingFailsOnceDeferredDestroy});
+        Require(state.registrationId != 0, "waiting deferred destroy registration failed");
+
+        std::thread dispatchThread([&dispatcher]() {
+            Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                    "waiting deferred destroy callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.callbackEntered && state.callbackUnregistered;
+                    }),
+                    "waiting deferred destroy callback did not unregister itself");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup returned before deferred destroy completed");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseCallback = true;
+        }
+        state.cv.notify_all();
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.destroyEntered;
+                    }),
+                    "waiting deferred DestroyUserData did not start");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup returned while deferred DestroyUserData was running");
+
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseDestroy = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup did not return after deferred destroy failure");
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "no-op owner cleanup returned zero after deferred DestroyUserData failure");
+        Require(state.destroyCalls == 2,
+                "no-op owner cleanup did not retry failed deferred DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "resolved waiting deferred destroy cleanup kept retry state");
+    }
+
+    struct FallbackDeferredDestroyRecordState
+    {
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool callbackEntered = false;
+        bool releaseCallback = false;
+        bool failNextDestroy = true;
+        int destroyCalls = 0;
+    };
+
+    void BlockingFallbackDeferredDestroyCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<FallbackDeferredDestroyRecordState*>(userData);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->callbackEntered = true;
+        state->cv.notify_all();
+        state->cv.wait(lock, [&state]() { return state->releaseCallback; });
+    }
+
+    void FailsOnceFallbackDeferredDestroy(void* userData)
+    {
+        auto* state = static_cast<FallbackDeferredDestroyRecordState*>(userData);
+        ++state->destroyCalls;
+        if (state->failNextDestroy)
+        {
+            state->failNextDestroy = false;
+            throw std::runtime_error("expected fallback deferred destroy failure");
+        }
+    }
+
+    void TestOwnerCleanupUsesFallbackWhenDeferredFailureRecordFails()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        FallbackDeferredDestroyRecordState state;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> cleanupThrew{false};
+
+        const uint64_t id = dispatcher.Register(
+            &owner,
+            {BlockingFallbackDeferredDestroyCallback, &state, FailsOnceFallbackDeferredDestroy});
+        Require(id != 0, "fallback deferred destroy registration failed");
+
+        std::thread dispatchThread([&dispatcher]() {
+            Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                    "fallback deferred destroy callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.mutex);
+            Require(state.cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.callbackEntered;
+                    }),
+                    "fallback deferred destroy callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            try
+            {
+                (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+            }
+            catch (const std::runtime_error&)
+            {
+                cleanupThrew.store(true, std::memory_order_release);
+            }
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "fallback deferred owner cleanup did not remove callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "fallback deferred owner cleanup completed before dispatch was released");
+
+        dispatcher.FailNextDeferredDestroyFailureRecordForTesting();
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.releaseCallback = true;
+        }
+        state.cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire),
+                "fallback deferred owner cleanup did not finish");
+        Require(cleanupThrew.load(std::memory_order_acquire),
+                "fallback deferred owner cleanup hid deferred DestroyUserData failure");
+        Require(state.destroyCalls == 1,
+                "fallback deferred owner cleanup retried DestroyUserData before returning failure");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "fallback deferred owner cleanup retry did not report retained DestroyUserData");
+        Require(state.destroyCalls == 2,
+                "fallback deferred owner cleanup retry did not rerun retained DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "fallback deferred owner cleanup retry was not idempotent");
+    }
+
     void TestOwnerCleanup()
     {
         Obelisk::Core::ChatEventDispatcher dispatcher;
@@ -764,6 +1058,59 @@ namespace
         Require(state.CountingCalls == 1, "retry cleanup repeated successful chat DestroyUserData");
         Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0, "completed chat cleanup was not idempotent");
         Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left chat callbacks dispatchable");
+    }
+
+    void TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "retry setup failure chat registration failed");
+
+        bool firstCleanupThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            firstCleanupThrew = true;
+        }
+
+        Require(firstCleanupThrew,
+                "retry setup failure fixture did not create a retained chat DestroyUserData failure");
+        Require(state.FailingCalls == 1,
+                "retry setup failure fixture did not attempt first chat DestroyUserData cleanup");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "retry setup failure fixture left chat callback dispatchable after first cleanup");
+
+        dispatcher.FailNextFailedOwnerDestroyRetrySetupForTesting();
+        bool setupFailureThrew = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::bad_alloc&)
+        {
+            setupFailureThrew = true;
+        }
+
+        Require(setupFailureThrew,
+                "chat owner cleanup retry setup failure did not propagate to PluginManager");
+        Require(state.FailingCalls == 1,
+                "chat owner cleanup retry setup failure reran DestroyUserData before setup completed");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1,
+                "chat owner cleanup retry setup failure did not retain pending DestroyUserData for retry");
+        Require(state.FailingCalls == 2,
+                "chat owner cleanup retry setup failure did not retry retained DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "chat owner cleanup retry setup failure retry was not idempotent after success");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "chat owner cleanup retry setup failure left callback dispatchable");
     }
 
     struct DestroyUnregisterOtherState
@@ -995,14 +1342,18 @@ int main()
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();
     TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
+    TestSelfUnregisterDeferredDestroyFailurePropagatesToOwnerCleanup();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
     TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
+    TestNoOpOwnerCleanupReportsDeferredDestroyFailureAfterWait();
+    TestOwnerCleanupUsesFallbackWhenDeferredFailureRecordFails();
     TestOwnerCleanup();
     TestOwnerCleanupPropagatesDestroyUserDataFailure();
     TestOwnerCleanupRetriesFailedDestroyUserData();
+    TestOwnerCleanupRetrySetupFailureRetainsFailedDestroyUserData();
     TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestDeferredDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestDestroyUserDataRunsInsideGameplayCallbackScope();

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from artifact_identity import ARTIFACT_IDENTITY_KEYS, complete_artifact_identity, is_sha256
+from reflection_target_sets import side_lane_fail_closed_source_artifact_issues
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -220,8 +221,11 @@ EXPECTED_SNAPSHOT_GENERATOR = "scripts/inspect_core_ufunctions.py --snapshot-jso
 SNAPSHOT_BASE_DIR = "base"
 SNAPSHOT_CANDIDATE_DIR = "candidate"
 FORBIDDEN_TRUE_READY_KEYS = {
+    "approved_runtime_samples_ready",
     "build_policy_ready",
     "build_policy_sdk_ready",
+    "complete_sdk_ready",
+    "complete_sdk_readiness",
     "counts_toward_complete_sdk",
     "enforcement_ready",
     "identity_ready",
@@ -229,8 +233,14 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "mutation_ready",
     "promotion_ready",
     "public_sdk_ready",
+    "public_lookup_ready",
     "return_override_ready",
+    "route_acceptance_ready",
+    "route_accepted",
     "runtime_ready",
+    "runtime_samples_approved",
+    "sdk_progress",
+    "sdk_progress_ready",
     "stable",
     "release_supported",
     "structure_events_ready",
@@ -264,6 +274,7 @@ FORBIDDEN_READY_DOMAINS = {
     "lookup",
     "mutation",
     "observer",
+    "progress",
     "promotion",
     "promote",
     "promoted",
@@ -273,7 +284,11 @@ FORBIDDEN_READY_DOMAINS = {
     "placement",
     "release",
     "return",
+    "route",
+    "routes",
     "runtime",
+    "sample",
+    "samples",
     "sdk",
     "stable",
     "structure",
@@ -283,10 +298,12 @@ FORBIDDEN_READY_DOMAINS = {
 }
 READY_TERMS = {
     "accepted",
+    "approved",
     "complete",
     "completion",
     "counts",
     "done",
+    "progress",
     "promoted",
     "promotion",
     "readiness",
@@ -306,9 +323,11 @@ FORBIDDEN_STRING_DOMAINS = {
     "structureevents sdk": "public_structure_events_sdk",
     "public abi": "public_abi",
     "promotion gate": "promotion_gate",
+    "approved runtime samples": "runtime_samples",
     "build placement": "build_placement_policy",
     "build policy": "build_policy",
     "collision policy": "no_collision_policy",
+    "complete sdk readiness": "v1_completion",
     "counts toward complete sdk": "v1_completion",
     "enforcement allowed": "enforcement",
     "enforcement ready": "enforcement",
@@ -316,13 +335,20 @@ FORBIDDEN_STRING_DOMAINS = {
     "no-collision": "no_collision_policy",
     "owner lookup": "structure_ownership",
     "ownership lookup": "structure_ownership",
+    "mutation readiness": "mutation",
+    "public lookup": "public_lookup",
     "pin code outcome": "pin_code_policy",
     "pin outcome": "pin_code_policy",
     "pincode outcome": "pin_code_policy",
     "placement policy": "build_placement_policy",
     "release supported": "release_support",
     "release-supported": "release_support",
+    "route accepted": "route_acceptance",
+    "route acceptance": "route_acceptance",
     "runtime support": "runtime_support",
+    "runtime sample": "runtime_samples",
+    "runtime samples": "runtime_samples",
+    "sdk progress": "sdk_progress",
     "stable sdk": "structure_sdk",
     "support tier": "support_tier",
     "umbrella leaf promoted": "umbrella_leaf_promotion",
@@ -332,10 +358,10 @@ FORBIDDEN_STRING_DOMAINS = {
     "v1 support": "v1_completion",
 }
 POSITIVE_STRING_CLAIM_RE = re.compile(
-    r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"(?:\baccepted\b|\bapproved\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
     r"\bactive\b|\bavailable\b|\benabled\b|\bsupported\b|"
     r"\brelease[-_\s]+supported\b|\bstable\b|\bcounts[-_\s]+toward[-_\s]+complete[-_\s]+sdk\b|"
-    r"\bpublic[-_\s]+ready\b|\bready\b)",
+    r"\bpublic[-_\s]+ready\b|\bprogress\b|\bready\b)",
     re.IGNORECASE,
 )
 NEGATED_TRUE_KEY_PREFIXES = (
@@ -1258,6 +1284,29 @@ def scan_for_forbidden_runtime_inputs(payload: Any, blockers: list[dict[str, Any
             scan_for_forbidden_runtime_inputs(value, blockers, f"{path}[{index}]")
 
 
+def add_side_lane_source_artifact_guardrails(payload: Any, blockers: list[dict[str, Any]], path: str) -> None:
+    for issue in side_lane_fail_closed_source_artifact_issues(
+        payload,
+        expected_target_sets=(TARGET_SET,),
+        path=path,
+    ):
+        # Structure build-policy reports intentionally contain layout-only readiness
+        # fields such as planning_layout_gate.ready=true and second_source.accepted
+        # counts. Keep generic status alias scanning in the structure-specific checks.
+        if issue.get("reason") == "positive_status_alias_source_not_allowed":
+            continue
+        blockers.append(issue)
+
+
+def surface_source_artifact_guardrail_payload(surface: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(surface)
+    # This checker owns only the build-policy intake lane. The legacy aggregate/census
+    # checker candidate can coexist on the same surface with its own target set without
+    # becoming a stale alias for build-policy evidence.
+    payload.pop("readiness_checker_candidate", None)
+    return payload
+
+
 def build_report(
     blockers: list[dict[str, Any]],
     *,
@@ -1296,6 +1345,10 @@ def build_report(
             "mutation": "not_claimed",
             "return_override": "not_claimed",
             "runtime_hooks": "not_claimed",
+            "route_acceptance": "not_claimed",
+            "approved_runtime_samples": "not_claimed",
+            "public_lookup": "not_claimed",
+            "sdk_progress": "not_claimed",
             "v1_completion": "not_claimed",
         },
         "field_shape_contract": {
@@ -1357,12 +1410,18 @@ def main() -> int:
     if readiness is not None:
         validate_readiness(readiness, blockers)
         validate_readiness_snapshot_shapes(readiness, readiness_path, blockers)
+        add_side_lane_source_artifact_guardrails(readiness, blockers, "$.readiness")
         scan_for_forbidden_runtime_inputs(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
         scan_for_forbidden_string_claims(readiness, blockers, "$.readiness")
     if surface is not None:
         surface_path = "$.manifest.surfaces[obelisk.structure_census.v1]"
+        add_side_lane_source_artifact_guardrails(
+            surface_source_artifact_guardrail_payload(surface),
+            blockers,
+            surface_path,
+        )
         scan_for_forbidden_runtime_inputs(surface, blockers, surface_path)
         scan_for_forbidden_true_ready(surface, blockers, surface_path)
         scan_for_forbidden_true_claims(surface, blockers, surface_path)

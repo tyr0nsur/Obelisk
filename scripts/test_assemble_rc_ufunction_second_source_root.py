@@ -85,7 +85,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
-            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             output = temp / "rc-root"
 
@@ -94,8 +93,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
-                "--item-return-root",
-                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -106,19 +103,18 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             output_snapshot_count = len(list(output.rglob("*.snapshot.json")))
 
-            self.assertEqual(summary["target_count"], 12)
-            self.assertEqual(manifest["target_count"], 12)
+            self.assertEqual(summary["target_count"], 9)
+            self.assertEqual(manifest["target_count"], 9)
             self.assertIs(manifest["path_redacted"], True)
             self.assertEqual(
                 manifest["target_sets"],
                 [
                     "minimal-second-source-intake",
                     "structure-observer-intake",
-                    "item-return-only-policy-slice",
                     "chat-message-intake",
                 ],
             )
-            self.assertEqual(output_snapshot_count, 12)
+            self.assertEqual(output_snapshot_count, 9)
             manifest_text = json.dumps(manifest, sort_keys=True)
             self.assertNotIn(str(temp), manifest_text)
             self.assertNotIn("/servidor/ark", manifest_text)
@@ -151,12 +147,34 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             self.assertEqual(chat_snapshot["evidence"]["artifact_sha256"], "1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e")
             self.assertNotIn("generated_by", chat_snapshot["evidence"])
 
+    def test_rejects_stale_item_return_root_argument(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            minimal = self.copy_root(temp, "minimal")
+            structure = self.copy_root(temp, "structure")
+            chat = self.copy_root(temp, "chat")
+            result = self.run_builder(
+                "--minimal-root",
+                str(minimal),
+                "--structure-root",
+                str(structure),
+                "--item-return-root",
+                "/servidor/ark/workspace-offline/item-return-only-policy-slice/ufunction-snapshots",
+                "--chat-root",
+                str(chat),
+                "--output-root",
+                str(temp / "rc-root"),
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unrecognized arguments: --item-return-root", result.stderr)
+
     def test_manifest_uses_redacted_evidence_identity_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
-            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             chat_snapshot = chat / SHA_PREFIX / "sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json"
             payload = json.loads(chat_snapshot.read_text(encoding="utf-8"))
@@ -170,8 +188,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
-                "--item-return-root",
-                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -191,7 +207,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
-            item_return = self.copy_root(temp, "item_return")
             chat = temp / "chat-empty"
             chat.mkdir()
             result = self.run_builder(
@@ -199,8 +214,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
-                "--item-return-root",
-                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -216,7 +229,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
             temp = Path(temp_dir)
             minimal = self.copy_root(temp, "minimal")
             structure = self.copy_root(temp, "structure")
-            item_return = self.copy_root(temp, "item_return")
             chat = self.copy_root(temp, "chat")
             duplicate = structure / SHA_PREFIX / "sdk_structures/PrimalStructure.AllowStructureAccess.snapshot.json"
             payload = json.loads(duplicate.read_text(encoding="utf-8"))
@@ -228,8 +240,6 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
                 str(minimal),
                 "--structure-root",
                 str(structure),
-                "--item-return-root",
-                str(item_return),
                 "--chat-root",
                 str(chat),
                 "--output-root",
@@ -239,6 +249,59 @@ class AssembleRcUFunctionSecondSourceRootTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("divergent duplicate snapshot", result.stderr)
+
+    def test_rejects_orphan_snapshot_in_target_set_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            minimal = self.copy_root(temp, "minimal")
+            structure = self.copy_root(temp, "structure")
+            chat = self.copy_root(temp, "chat")
+            orphan_relative = TARGET_PATHS["item_return"][0]
+            orphan_destination = minimal / SHA_PREFIX / orphan_relative
+            orphan_destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(FIXTURE_ROOT / SHA_PREFIX / orphan_relative, orphan_destination)
+
+            result = self.run_builder(
+                "--minimal-root",
+                str(minimal),
+                "--structure-root",
+                str(structure),
+                "--chat-root",
+                str(chat),
+                "--output-root",
+                str(temp / "rc-root"),
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unexpected snapshot target for minimal-second-source-intake", result.stderr)
+        self.assertIn("PrimalItem.AllowEquipItem", result.stderr)
+
+    def test_rejects_symlinked_source_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            minimal = self.copy_root(temp, "minimal")
+            structure = self.copy_root(temp, "structure")
+            chat = self.copy_root(temp, "chat")
+            snapshot = chat / SHA_PREFIX / "sdk_chat/ShooterPlayerController.ServerSendChatMessage.snapshot.json"
+            real_snapshot = temp / "real-chat.snapshot.json"
+            shutil.move(snapshot, real_snapshot)
+            snapshot.symlink_to(real_snapshot)
+
+            result = self.run_builder(
+                "--minimal-root",
+                str(minimal),
+                "--structure-root",
+                str(structure),
+                "--chat-root",
+                str(chat),
+                "--output-root",
+                str(temp / "rc-root"),
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot must not be a symlink", result.stderr)
 
 
 if __name__ == "__main__":

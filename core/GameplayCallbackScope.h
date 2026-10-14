@@ -11,15 +11,27 @@ namespace Obelisk::Core
         Inventory,
         Mission,
         PlayerPrincipal,
+        Command,
+        PlayerLifecycle,
+        ProcessEvent,
+        Timer,
     };
 
     class GameplayCallbackScope
     {
     public:
-        explicit GameplayCallbackScope(GameplayCallbackFamily family)
+        enum class TrackingMode { Gameplay, CurrentOnly };
+
+        // CurrentOnly marks a runtime callback without changing the gameplay
+        // depths used by existing cross-family cleanup/unload policies.
+        explicit GameplayCallbackScope(GameplayCallbackFamily family, TrackingMode mode = TrackingMode::Gameplay)
             : m_Family(family)
+            , m_CountsDepth(mode == TrackingMode::Gameplay)
+            , m_Previous(CurrentStorage())
         {
-            ++Depth(m_Family);
+            if (m_CountsDepth)
+                ++Depth(m_Family);
+            CurrentStorage() = this;
         }
 
         GameplayCallbackScope(const GameplayCallbackScope&) = delete;
@@ -27,7 +39,14 @@ namespace Obelisk::Core
 
         ~GameplayCallbackScope()
         {
-            --Depth(m_Family);
+            CurrentStorage() = m_Previous;
+            if (m_CountsDepth)
+                --Depth(m_Family);
+        }
+
+        static const GameplayCallbackScope* Current()
+        {
+            return CurrentStorage();
         }
 
         static bool IsInsideCallback(GameplayCallbackFamily family)
@@ -41,10 +60,20 @@ namespace Obelisk::Core
                 Depth(GameplayCallbackFamily::Structure) != 0 ||
                 Depth(GameplayCallbackFamily::Inventory) != 0 ||
                 Depth(GameplayCallbackFamily::Mission) != 0 ||
-                Depth(GameplayCallbackFamily::PlayerPrincipal) != 0;
+                Depth(GameplayCallbackFamily::PlayerPrincipal) != 0 ||
+                Depth(GameplayCallbackFamily::Command) != 0 ||
+                Depth(GameplayCallbackFamily::PlayerLifecycle) != 0 ||
+                Depth(GameplayCallbackFamily::ProcessEvent) != 0 ||
+                Depth(GameplayCallbackFamily::Timer) != 0;
         }
 
     private:
+        static const GameplayCallbackScope*& CurrentStorage()
+        {
+            static thread_local const GameplayCallbackScope* current = nullptr;
+            return current;
+        }
+
         static size_t& Depth(GameplayCallbackFamily family)
         {
             static thread_local size_t chatDepth = 0;
@@ -52,6 +81,10 @@ namespace Obelisk::Core
             static thread_local size_t inventoryDepth = 0;
             static thread_local size_t missionDepth = 0;
             static thread_local size_t playerPrincipalDepth = 0;
+            static thread_local size_t commandDepth = 0;
+            static thread_local size_t playerLifecycleDepth = 0;
+            static thread_local size_t processEventDepth = 0;
+            static thread_local size_t timerDepth = 0;
             switch (family)
             {
             case GameplayCallbackFamily::Chat:
@@ -64,10 +97,20 @@ namespace Obelisk::Core
                 return missionDepth;
             case GameplayCallbackFamily::PlayerPrincipal:
                 return playerPrincipalDepth;
+            case GameplayCallbackFamily::Command:
+                return commandDepth;
+            case GameplayCallbackFamily::PlayerLifecycle:
+                return playerLifecycleDepth;
+            case GameplayCallbackFamily::ProcessEvent:
+                return processEventDepth;
+            case GameplayCallbackFamily::Timer:
+                return timerDepth;
             }
             return chatDepth;
         }
 
         GameplayCallbackFamily m_Family;
+        bool m_CountsDepth;
+        const GameplayCallbackScope* m_Previous;
     };
 }

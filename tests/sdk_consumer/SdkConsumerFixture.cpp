@@ -1,7 +1,11 @@
 #include <obelisk/ObeliskApi.h>
 
+#include "extern/nlohmann/json.hpp"
+
 #include <dlfcn.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdlib>
 #include <cstdint>
@@ -18,6 +22,7 @@
 
 namespace
 {
+    using json = nlohmann::json;
     using GetInfoFn = bool (*)(ObeliskPluginMetadata*);
     using InitFn = bool (*)(ObeliskApi*, const ObeliskPluginInitContext*);
     using ShutdownFn = void (*)();
@@ -34,7 +39,13 @@ namespace
     int g_ChatMessageUnregisterCount = 0;
     int g_TimerRegisterCount = 0;
     int g_TimerUnregisterCount = 0;
+    int g_ProcessEventRegisterAttemptCount = 0;
+    int g_GameplayPolicyRegisterAttemptCount = 0;
+    int g_ChatMessageRegisterAttemptCount = 0;
+    int g_TimerRegisterAttemptCount = 0;
+    int g_CallProcessEventCount = 0;
     bool g_ThrowLog = false;
+    bool g_FailProcessEventRegistration = false;
     bool g_FailGameplayPolicyRegistration = false;
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
@@ -45,6 +56,8 @@ namespace
     bool g_BadDescriptorCatalogMetadata = false;
     bool g_BadDescriptorCatalogName = false;
     bool g_BadDescriptorCatalogFlags = false;
+    bool g_MissingResourceDescriptorNoIdentityFlag = false;
+    bool g_MissingResourceDescriptorNoLookupFlag = false;
     std::string g_ExpectedPluginId;
     std::vector<std::string> g_InfoLogs;
     std::vector<std::string> g_ErrorLogs;
@@ -93,6 +106,127 @@ namespace
         return false;
     }
 
+    bool ModeBeforeProcessEventHandleApi(const std::string& mode)
+    {
+        return mode == "short-api-before-process-event-handles" ||
+            mode == "short-api-before-process-event-unregister";
+    }
+
+    bool ModeBeforeGameplayPolicyApi(const std::string& mode)
+    {
+        return mode == "short-api-before-gameplay-policy" ||
+            ModeBeforeProcessEventHandleApi(mode);
+    }
+
+    bool ModeUnavailableProcessEventHandleApi(const std::string& mode)
+    {
+        return ModeBeforeProcessEventHandleApi(mode) ||
+            mode == "no-process-event-owner-token-capability" ||
+            mode == "null-process-event-handle-slot" ||
+            mode == "null-process-event-unregister-slot";
+    }
+
+    bool ModeUnavailableGameplayPolicyApi(const std::string& mode)
+    {
+        return ModeBeforeGameplayPolicyApi(mode) ||
+            mode == "short-api-between-gameplay-policy-register-unregister" ||
+            mode == "null-gameplay-policy-register-slot" ||
+            mode == "null-gameplay-policy-unregister-slot";
+    }
+
+    bool ModeBeforeDescriptorApi(const std::string& mode)
+    {
+        return mode == "short-api-before-descriptors" ||
+            mode == "short-api-between-gameplay-policy-register-unregister";
+    }
+
+    bool ModeBeforeGameplayPolicyEventDescriptorApi(const std::string& mode)
+    {
+        return ModeBeforeDescriptorApi(mode) ||
+            mode == "short-api-between-descriptor-functions";
+    }
+
+    bool ModeBeforeChatMessageApi(const std::string& mode)
+    {
+        return ModeBeforeGameplayPolicyApi(mode) ||
+            ModeBeforeGameplayPolicyEventDescriptorApi(mode) ||
+            mode == "short-api-before-chat-slots";
+    }
+
+    bool ModeUnavailableChatMessageApi(const std::string& mode)
+    {
+        return ModeBeforeChatMessageApi(mode) ||
+            mode == "short-api-between-chat-message-register-unregister" ||
+            mode == "null-chat-message-register-slot" ||
+            mode == "null-chat-message-unregister-slot";
+    }
+
+    bool ModeBeforeTimerApi(const std::string& mode)
+    {
+        return ModeBeforeChatMessageApi(mode) ||
+            mode == "short-api-between-chat-message-register-unregister" ||
+            mode == "short-api-before-timer-slots" ||
+            mode == "short-api-between-timer-register-unregister";
+    }
+
+    bool ModeUnavailableTimerApi(const std::string& mode)
+    {
+        return ModeBeforeTimerApi(mode) ||
+            mode == "null-timer-register-slot" ||
+            mode == "null-timer-unregister-slot";
+    }
+
+    bool IsSafeInstanceToken(const std::string& token)
+    {
+        if (token.empty())
+            return false;
+
+        for (const unsigned char ch : token)
+        {
+            if (std::isalnum(ch) || ch == '_' || ch == '-')
+                continue;
+            return false;
+        }
+        return true;
+    }
+
+    void RequireSafeDisabledDefaultConfig(const char* defaultConfigJson)
+    {
+        Require(defaultConfigJson != nullptr && defaultConfigJson[0] != '\0', "missing default config");
+
+        json config;
+        try
+        {
+            config = json::parse(defaultConfigJson);
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::string("default_config_json parse failed: ") + e.what());
+        }
+
+        Require(config.is_object(), "default_config_json must be a JSON object");
+        const auto enabled = config.find("enabled");
+        Require(enabled != config.end() && enabled->is_boolean(),
+            "default_config_json must include boolean enabled");
+        Require(!enabled->get<bool>(), "default_config_json must be safe-disabled with enabled=false");
+
+        const auto allowAllInstances = config.find("allow_all_instances");
+        Require(allowAllInstances != config.end() && allowAllInstances->is_boolean(),
+            "default_config_json must include boolean allow_all_instances");
+        Require(!allowAllInstances->get<bool>(),
+            "default_config_json must set allow_all_instances=false");
+
+        const auto allowlist = config.find("instance_allowlist");
+        Require(allowlist != config.end() && allowlist->is_array(),
+            "default_config_json must include array instance_allowlist");
+        for (const auto& entry : *allowlist)
+        {
+            Require(entry.is_string(), "default_config_json instance_allowlist entries must be strings");
+            Require(IsSafeInstanceToken(entry.get<std::string>()),
+                "default_config_json instance_allowlist entries must be safe instance ids");
+        }
+    }
+
     void RegisterProcessEvent(OnProcessEventCallback)
     {
     }
@@ -103,6 +237,7 @@ namespace
 
     void CallProcessEvent(void*, void*, void*)
     {
+        ++g_CallProcessEventCount;
     }
 
     uint64_t RegisterNamedProcessEventWithOwnerTokenHandle(uint64_t ownerToken,
@@ -112,6 +247,9 @@ namespace
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in callback registration");
         Require(nameIndex == 42, "unexpected callback FName index");
         Require(callback != nullptr, "callback registration received null callback");
+        ++g_ProcessEventRegisterAttemptCount;
+        if (g_FailProcessEventRegistration)
+            return 0;
         g_RegisteredCallback = callback;
         ++g_RegisterCount;
         return 1001;
@@ -136,6 +274,7 @@ namespace
             "unexpected gameplay policy event mask");
         Require(callback != nullptr, "gameplay policy registration received null callback");
         Require(userData != nullptr, "gameplay policy registration received null user data");
+        ++g_GameplayPolicyRegisterAttemptCount;
         if (g_FailGameplayPolicyRegistration)
             return 0;
         g_RegisteredGameplayPolicyCallback = callback;
@@ -163,6 +302,7 @@ namespace
         Require(ownerToken == 0xC0FFEE, "unexpected owner token in chat message registration");
         Require(callback != nullptr, "chat message registration received null callback");
         Require(userData != nullptr, "chat message registration received null user data");
+        ++g_ChatMessageRegisterAttemptCount;
         if (g_FailChatMessageRegistration)
             return 0;
         g_RegisteredChatMessageCallback = callback;
@@ -205,6 +345,7 @@ namespace
         }
         Require(callback != nullptr, "timer registration received null callback");
         Require(userData != nullptr, "timer registration received null user data");
+        ++g_TimerRegisterAttemptCount;
         if (g_FailTimerRegistration)
             return 0;
         g_RegisteredTimerCallback = callback;
@@ -374,6 +515,10 @@ namespace
         out->flags = OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY |
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY |
             OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
+        if (g_MissingResourceDescriptorNoIdentityFlag)
+            out->flags &= ~OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY;
+        if (g_MissingResourceDescriptorNoLookupFlag)
+            out->flags &= ~OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP;
         if (resourceKind == OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE)
         {
             out->supported_gameplay_policy_event_mask = OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES;
@@ -759,13 +904,22 @@ int main(int argc, char** argv)
             timerSeen = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerSeen");
         if (!timerAccepted)
             timerAccepted = ResolveOptional<BoolProbeFn>(handle, "OProcessTimer_TimerAccepted");
+        BoolProbeFn copiedInitPointersIntact =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_CopiedInitPointersIntact");
+        if (!copiedInitPointersIntact)
+            copiedInitPointersIntact = ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_CopiedInitPointersIntact");
+        BoolProbeFn postInitCallProcessEventSkipped =
+            ResolveOptional<BoolProbeFn>(handle, "SdkConsumerMinimal_PostInitCallProcessEventSkipped");
+        if (!postInitCallProcessEventSkipped)
+            postInitCallProcessEventSkipped =
+                ResolveOptional<BoolProbeFn>(handle, "CAbiMinimal_PostInitCallProcessEventSkipped");
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
         Require(metadata.abi_version == OBELISK_PLUGIN_METADATA_ABI_VERSION, "metadata ABI mismatch");
         Require(metadata.struct_size >= sizeof(ObeliskPluginMetadata), "metadata size mismatch");
         Require(std::strcmp(metadata.plugin_id, expectedPluginId) == 0, "plugin_id mismatch");
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
-        Require(metadata.default_config_json != nullptr, "missing default config");
+        RequireSafeDisabledDefaultConfig(metadata.default_config_json);
         const char* configJson = metadata.default_config_json;
         if (mode == "active-process-event" ||
             mode == "active-process-event-no-filtered-capability" ||
@@ -846,15 +1000,23 @@ int main(int argc, char** argv)
         api.CallProcessEvent = CallProcessEvent;
         api.abi_version = OBELISK_API_ABI_VERSION;
         api.struct_size = sizeof(ObeliskApi);
-        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
-            OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
-        if (mode != "active-process-event-no-filtered-capability")
+        const bool exposesRawProcessEventDebugApi = std::strcmp(expectedPluginId, "oBaseEvents") == 0;
+        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS;
+        if (exposesRawProcessEventDebugApi)
+            api.capabilities |= OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+        if (mode == "post-init-call-process-event-skipped")
+            api.capabilities |= OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT;
+        if (mode != "no-process-event-owner-token-capability")
+            api.capabilities |= OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS;
+        if (exposesRawProcessEventDebugApi && mode != "active-process-event-no-filtered-capability")
             api.capabilities |= OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS;
-        api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
-            RegisterNamedProcessEventWithOwnerTokenHandle;
-        api.UnregisterProcessEventCallbackWithOwnerToken =
-            UnregisterProcessEventCallbackWithOwnerToken;
+        if (exposesRawProcessEventDebugApi)
+        {
+            api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
+                RegisterNamedProcessEventWithOwnerTokenHandle;
+            api.UnregisterProcessEventCallbackWithOwnerToken =
+                UnregisterProcessEventCallbackWithOwnerToken;
+        }
         if (mode != "no-gameplay-policy-capability" &&
             mode != "active-policy-audit-no-gameplay-policy-capability" &&
             mode != "no-descriptor-capability" &&
@@ -889,11 +1051,56 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = RegisterTimerWithOwnerTokenHandle;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = RemoveScheduledWithOwnerToken;
         }
+        if (mode == "short-api-before-capabilities")
+        {
+            api.struct_size = offsetof(ObeliskApi, capabilities);
+            api.capabilities = 0;
+            api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+            api.UnregisterProcessEventCallbackWithOwnerToken = nullptr;
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
         if (mode == "short-api-before-gameplay-policy")
         {
             api.struct_size = offsetof(ObeliskApi, RegisterGameplayPolicyEventWithOwnerTokenHandle);
             api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
             api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-before-process-event-handles")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterPreProcessEventWithOwnerTokenHandle);
+            api.RegisterPreProcessEventWithOwnerTokenHandle = nullptr;
+            api.RegisterPostProcessEventWithOwnerTokenHandle = nullptr;
+            api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+            api.RegisterPostProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+            api.UnregisterProcessEventCallbackWithOwnerToken = nullptr;
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-before-process-event-unregister")
+        {
+            api.struct_size = offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken);
+            api.UnregisterProcessEventCallbackWithOwnerToken = nullptr;
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
             api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
             api.UnregisterChatMessageEventWithOwnerToken = nullptr;
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
@@ -915,6 +1122,47 @@ int main(int argc, char** argv)
             api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
             api.DescribeResourceKind = nullptr;
             api.DescribeGameplayPolicyEventKind = nullptr;
+        }
+        if (mode == "short-api-between-gameplay-policy-register-unregister")
+        {
+            api.struct_size = offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken);
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+            api.DescribeResourceKind = nullptr;
+            api.DescribeGameplayPolicyEventKind = nullptr;
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-between-descriptor-functions")
+        {
+            api.struct_size = offsetof(ObeliskApi, DescribeGameplayPolicyEventKind);
+            api.DescribeGameplayPolicyEventKind = nullptr;
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-before-chat-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle);
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-between-chat-message-register-unregister")
+        {
+            api.struct_size = offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken);
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "short-api-before-timer-slots")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle);
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
         if (mode == "short-api-before-descriptors")
         {
@@ -961,6 +1209,28 @@ int main(int argc, char** argv)
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
         }
+        if (mode == "null-process-event-handle-slot")
+            api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+        if (mode == "null-process-event-unregister-slot")
+            api.UnregisterProcessEventCallbackWithOwnerToken = nullptr;
+        if (mode == "null-gameplay-policy-register-slot")
+            api.RegisterGameplayPolicyEventWithOwnerTokenHandle = nullptr;
+        if (mode == "null-gameplay-policy-unregister-slot")
+            api.UnregisterGameplayPolicyEventWithOwnerToken = nullptr;
+        if (mode == "null-resource-descriptor-slot")
+            api.DescribeResourceKind = nullptr;
+        if (mode == "null-gameplay-policy-descriptor-slot")
+            api.DescribeGameplayPolicyEventKind = nullptr;
+        if (mode == "null-chat-message-register-slot")
+            api.RegisterChatMessageEventWithOwnerTokenHandle = nullptr;
+        if (mode == "null-chat-message-unregister-slot")
+            api.UnregisterChatMessageEventWithOwnerToken = nullptr;
+        if (mode == "null-timer-register-slot")
+            api.RegisterTimerWithOwnerTokenHandle = nullptr;
+        if (mode == "null-timer-unregister-slot")
+            api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        if (mode == "fail-process-event-registration")
+            g_FailProcessEventRegistration = true;
         if (mode == "fail-gameplay-policy-registration")
             g_FailGameplayPolicyRegistration = true;
         if (mode == "fail-chat-message-registration")
@@ -981,15 +1251,20 @@ int main(int argc, char** argv)
             g_BadDescriptorCatalogName = true;
         if (mode == "bad-descriptor-catalog-flags")
             g_BadDescriptorCatalogFlags = true;
+        if (mode == "missing-resource-descriptor-no-identity-flag")
+            g_MissingResourceDescriptorNoIdentityFlag = true;
+        if (mode == "missing-resource-descriptor-no-lookup-flag")
+            g_MissingResourceDescriptorNoLookupFlag = true;
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
         context.struct_size = sizeof(ObeliskPluginInitContext);
-        const std::string configDirString = configDir.string();
-        const std::string configPathString = (configDir / "config.json").string();
+        std::string configDirString = configDir.string();
+        std::string configPathString = (configDir / "config.json").string();
+        std::string instanceIdString = "sdk-consumer-test";
         context.config_dir = configDirString.c_str();
         context.config_path = configPathString.c_str();
-        context.instance_id = "sdk-consumer-test";
+        context.instance_id = instanceIdString.c_str();
         context.plugin_owner_token = 0xC0FFEE;
         if (mode == "zero-owner-token")
             context.plugin_owner_token = 0;
@@ -1023,19 +1298,54 @@ int main(int argc, char** argv)
         }
 
         const bool initSucceeded = init(&api, &context);
+        if (mode == "post-init-call-process-event-skipped")
+        {
+            Require(g_CallProcessEventCount == 0,
+                "plugin invoked CallProcessEvent during init");
+        }
+        if (mode == "short-api-before-capabilities")
+        {
+            Require(!initSucceeded, "plugin accepted API table that does not advertise capabilities");
+            Require(g_ProcessEventRegisterAttemptCount == 0,
+                "short API before capabilities attempted ProcessEvent registration");
+            Require(g_RegisterCount == 0,
+                "short API before capabilities unexpectedly registered ProcessEvent");
+            Require(g_GameplayPolicyRegisterAttemptCount == 0,
+                "short API before capabilities attempted gameplay policy registration");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "short API before capabilities unexpectedly registered gameplay policy");
+            Require(g_ChatMessageRegisterAttemptCount == 0,
+                "short API before capabilities attempted chat message registration");
+            Require(g_ChatMessageRegisterCount == 0,
+                "short API before capabilities unexpectedly registered chat message");
+            Require(g_TimerRegisterAttemptCount == 0,
+                "short API before capabilities attempted timer registration");
+            Require(g_TimerRegisterCount == 0,
+                "short API before capabilities unexpectedly registered timer");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
         if (mode == "zero-owner-token")
         {
             Require(!initSucceeded, "plugin accepted zero owner token");
+            Require(g_ProcessEventRegisterAttemptCount == 0,
+                "zero owner token attempted ProcessEvent registration");
             Require(g_RegisterCount == 0, "zero owner token unexpectedly registered a callback");
             Require(g_UnregisterCount == 0, "zero owner token unexpectedly unregistered a callback");
+            Require(g_GameplayPolicyRegisterAttemptCount == 0,
+                "zero owner token attempted gameplay policy registration");
             Require(g_GameplayPolicyRegisterCount == 0,
                 "zero owner token unexpectedly registered a gameplay policy callback");
             Require(g_GameplayPolicyUnregisterCount == 0,
                 "zero owner token unexpectedly unregistered a gameplay policy callback");
+            Require(g_ChatMessageRegisterAttemptCount == 0,
+                "zero owner token attempted chat message registration");
             Require(g_ChatMessageRegisterCount == 0,
                 "zero owner token unexpectedly registered a chat message callback");
             Require(g_ChatMessageUnregisterCount == 0,
                 "zero owner token unexpectedly unregistered a chat message callback");
+            Require(g_TimerRegisterAttemptCount == 0, "zero owner token attempted timer registration");
             Require(g_TimerRegisterCount == 0, "zero owner token unexpectedly registered a timer callback");
             Require(g_TimerUnregisterCount == 0, "zero owner token unexpectedly unregistered a timer callback");
             cleanupConfigDir();
@@ -1057,6 +1367,28 @@ int main(int argc, char** argv)
                 "failed init unexpectedly unregistered a chat message callback");
             Require(g_TimerRegisterCount == 0, "failed init unexpectedly registered a timer callback");
             Require(g_TimerUnregisterCount == 0, "failed init unexpectedly unregistered a timer callback");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "fail-process-event-registration")
+        {
+            Require(!initSucceeded, "plugin accepted failed ProcessEvent handle registration");
+            Require(g_ProcessEventRegisterAttemptCount == 1,
+                "plugin did not attempt ProcessEvent handle registration");
+            Require(g_RegisterCount == 0,
+                "zero ProcessEvent handle should not be counted as accepted");
+            Require(g_UnregisterCount == 0,
+                "zero ProcessEvent handle unexpectedly unregistered a callback");
+            Require(g_RegisteredCallback == nullptr,
+                "ProcessEvent callback survived zero ProcessEvent handle");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "plugin registered gameplay policy after zero ProcessEvent handle");
+            Require(g_ChatMessageRegisterCount == 0,
+                "plugin registered chat after zero ProcessEvent handle");
+            Require(g_TimerRegisterCount == 0,
+                "plugin registered timer after zero ProcessEvent handle");
+            g_FailProcessEventRegistration = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1228,15 +1560,44 @@ int main(int argc, char** argv)
         if (mode == "fail-gameplay-policy-registration")
         {
             Require(!initSucceeded, "plugin accepted failed gameplay policy registration");
+            if (std::strcmp(expectedPluginId, "sdk_consumer_minimal") == 0)
+            {
+                Require(g_RegisterCount == 0,
+                    "minimal SDK consumer registered raw ProcessEvent before gameplay policy failure");
+                Require(g_UnregisterCount == 0,
+                    "minimal SDK consumer unregistered raw ProcessEvent after gameplay policy failure");
+                Require(g_RegisteredCallback == nullptr,
+                    "ProcessEvent callback survived failed gameplay policy registration cleanup");
+            }
+            Require(g_GameplayPolicyRegisterAttemptCount == 1,
+                "plugin did not attempt gameplay policy registration");
             Require(g_GameplayPolicyRegisterCount == 0,
-                "failed gameplay policy registration should not be counted as accepted");
+                "zero gameplay policy handle should not be counted as accepted");
             Require(g_GameplayPolicyUnregisterCount == 0,
-                "failed gameplay policy registration unexpectedly unregistered a callback");
+                "zero gameplay policy handle unexpectedly unregistered a callback");
             Require(g_ChatMessageRegisterCount == 0,
-                "plugin registered chat after gameplay policy registration failed");
+                "plugin registered chat after zero gameplay policy handle");
             Require(g_TimerRegisterCount == 0,
-                "plugin registered timer after gameplay policy registration failed");
+                "plugin registered timer after zero gameplay policy handle");
             g_FailGameplayPolicyRegistration = false;
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "missing-resource-descriptor-no-identity-flag" ||
+            mode == "missing-resource-descriptor-no-lookup-flag")
+        {
+            Require(!initSucceeded, "plugin accepted resource descriptor without no-identity/no-lookup flags");
+            Require(g_RegisterCount == 0,
+                "bad resource descriptor unexpectedly registered a ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "bad resource descriptor unexpectedly registered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "bad resource descriptor unexpectedly registered a chat message callback");
+            Require(g_TimerRegisterCount == 0,
+                "bad resource descriptor unexpectedly registered a timer callback");
+            g_MissingResourceDescriptorNoIdentityFlag = false;
+            g_MissingResourceDescriptorNoLookupFlag = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1260,6 +1621,15 @@ int main(int argc, char** argv)
         if (mode == "fail-chat-message-registration")
         {
             Require(!initSucceeded, "plugin accepted failed chat message registration");
+            if (std::strcmp(expectedPluginId, "sdk_consumer_minimal") == 0)
+            {
+                Require(g_RegisterCount == 0,
+                    "minimal SDK consumer registered raw ProcessEvent before chat failure");
+                Require(g_UnregisterCount == 0,
+                    "minimal SDK consumer unregistered raw ProcessEvent after chat failure");
+                Require(g_RegisteredCallback == nullptr,
+                    "ProcessEvent callback survived failed chat registration cleanup");
+            }
             if (std::strcmp(expectedPluginId, "oChatAudit") == 0)
             {
                 Require(g_GameplayPolicyRegisterCount == 0,
@@ -1278,12 +1648,14 @@ int main(int argc, char** argv)
                 Require(g_RegisteredGameplayPolicyUserData == nullptr,
                     "gameplay policy user data survived failed chat registration cleanup");
             }
+            Require(g_ChatMessageRegisterAttemptCount == 1,
+                "plugin did not attempt chat message registration");
             Require(g_ChatMessageRegisterCount == 0,
-                "failed chat message registration should not be counted as accepted");
+                "zero chat message handle should not be counted as accepted");
             Require(g_ChatMessageUnregisterCount == 0,
-                "failed chat message registration unexpectedly unregistered a callback");
+                "zero chat message handle unexpectedly unregistered a callback");
             Require(g_TimerRegisterCount == 0,
-                "plugin registered timer after chat message registration failed");
+                "plugin registered timer after zero chat message handle");
             g_FailChatMessageRegistration = false;
             cleanupConfigDir();
             closeHandle();
@@ -1292,6 +1664,15 @@ int main(int argc, char** argv)
         if (mode == "fail-timer-registration")
         {
             Require(!initSucceeded, "plugin accepted failed timer registration");
+            if (std::strcmp(expectedPluginId, "sdk_consumer_minimal") == 0)
+            {
+                Require(g_RegisterCount == 0,
+                    "minimal SDK consumer registered raw ProcessEvent before timer failure");
+                Require(g_UnregisterCount == 0,
+                    "minimal SDK consumer unregistered raw ProcessEvent after timer failure");
+                Require(g_RegisteredCallback == nullptr,
+                    "ProcessEvent callback survived failed timer registration cleanup");
+            }
             if (std::strcmp(expectedPluginId, "oProcessTimer") == 0)
             {
                 Require(g_GameplayPolicyRegisterCount == 0,
@@ -1331,10 +1712,12 @@ int main(int argc, char** argv)
                 "chat message callback survived failed timer registration cleanup");
             Require(g_RegisteredChatMessageUserData == nullptr,
                 "chat message user data survived failed timer registration cleanup");
+            Require(g_TimerRegisterAttemptCount == 1,
+                "plugin did not attempt timer registration");
             Require(g_TimerRegisterCount == 0,
-                "failed timer registration should not be counted as accepted");
+                "zero timer handle should not be counted as accepted");
             Require(g_TimerUnregisterCount == 0,
-                "failed timer registration unexpectedly unregistered a callback");
+                "zero timer handle unexpectedly unregistered a callback");
             g_FailTimerRegistration = false;
             cleanupConfigDir();
             closeHandle();
@@ -1396,21 +1779,47 @@ int main(int argc, char** argv)
         }
 
         Require(initSucceeded, "ObeliskPlugin_Init failed");
+        if (mode == "borrowed-init-pointers")
+        {
+            Require(copiedInitPointersIntact != nullptr, "plugin did not expose copied init pointer probe");
+            std::fill(configDirString.begin(), configDirString.end(), 'x');
+            std::fill(configPathString.begin(), configPathString.end(), 'y');
+            std::fill(instanceIdString.begin(), instanceIdString.end(), 'z');
+            Require(copiedInitPointersIntact(), "plugin retained borrowed init context strings");
+        }
+        if (mode == "borrowed-api-table")
+        {
+            api = {};
+        }
+        if (mode == "post-init-call-process-event-skipped")
+        {
+            Require(postInitCallProcessEventSkipped != nullptr,
+                "plugin did not expose post-init CallProcessEvent probe");
+            Require(postInitCallProcessEventSkipped(),
+                "plugin did not recognize post-init CallProcessEvent as a skipped debug-only path");
+            Require(g_CallProcessEventCount == 0,
+                "plugin invoked post-init CallProcessEvent through a captured API table");
+        }
         const bool hasGameplayPolicyProbe = gameplayPolicyEventSeen && gameplayPolicyEventAccepted;
         const bool hasChatMessageProbe = chatMessageEventSeen && chatMessageEventAccepted;
         const bool hasTimerProbe = timerSeen && timerAccepted;
-        if (hasGameplayPolicyProbe && mode == "short-api-before-gameplay-policy")
+        if (ModeUnavailableProcessEventHandleApi(mode))
+        {
+            Require(g_RegisterCount == 0,
+                "plugin registered ProcessEvent callback with unavailable API slot");
+            Require(g_UnregisterCount == 0,
+                "plugin unregistered ProcessEvent callback with unavailable API slot");
+            Require(g_RegisteredCallback == nullptr,
+                "ProcessEvent callback survived unavailable API slot");
+        }
+        if (hasGameplayPolicyProbe && ModeUnavailableGameplayPolicyApi(mode))
         {
             Require(g_GameplayPolicyRegisterCount == 0,
-                "plugin registered gameplay policy callback with short API table");
+                "plugin registered gameplay policy callback with unavailable API slot");
             Require(g_GameplayPolicyUnregisterCount == 0,
-                "plugin unregistered gameplay policy callback with short API table");
-            Require(g_ChatMessageRegisterCount == 0,
-                "plugin registered chat callback with short API table");
-            Require(g_ChatMessageUnregisterCount == 0,
-                "plugin unregistered chat callback with short API table");
-            Require(!gameplayPolicyEventSeen(), "plugin reported gameplay policy event with short API table");
-            Require(!gameplayPolicyEventAccepted(), "plugin accepted gameplay policy event with short API table");
+                "plugin unregistered gameplay policy callback with unavailable API slot");
+            Require(!gameplayPolicyEventSeen(), "plugin reported gameplay policy event with unavailable API slot");
+            Require(!gameplayPolicyEventAccepted(), "plugin accepted gameplay policy event with unavailable API slot");
         }
         else if (hasGameplayPolicyProbe && mode == "no-gameplay-policy-capability")
         {
@@ -1437,14 +1846,14 @@ int main(int argc, char** argv)
             Require(gameplayPolicyEventAccepted(),
                 "plugin did not validate copied ignore-cooldown inventory policy event");
         }
-        if (hasChatMessageProbe && mode == "short-api-before-gameplay-policy")
+        if (hasChatMessageProbe && ModeUnavailableChatMessageApi(mode))
         {
             Require(g_ChatMessageRegisterCount == 0,
-                "plugin registered chat message callback with short API table");
+                "plugin registered chat message callback with unavailable API slot");
             Require(g_ChatMessageUnregisterCount == 0,
-                "plugin unregistered chat message callback with short API table");
-            Require(!chatMessageEventSeen(), "plugin reported chat message event with short API table");
-            Require(!chatMessageEventAccepted(), "plugin accepted chat message event with short API table");
+                "plugin unregistered chat message callback with unavailable API slot");
+            Require(!chatMessageEventSeen(), "plugin reported chat message event with unavailable API slot");
+            Require(!chatMessageEventAccepted(), "plugin accepted chat message event with unavailable API slot");
         }
         else if (hasChatMessageProbe && mode == "no-chat-message-capability")
         {
@@ -1465,14 +1874,14 @@ int main(int argc, char** argv)
             Require(chatMessageEventSeen(), "plugin did not observe chat message event");
             Require(chatMessageEventAccepted(), "plugin did not validate copied chat message event");
         }
-        if (hasTimerProbe && mode == "short-api-before-gameplay-policy")
+        if (hasTimerProbe && ModeUnavailableTimerApi(mode))
         {
             Require(g_TimerRegisterCount == 0,
-                "plugin registered timer callback with short API table");
+                "plugin registered timer callback with unavailable API slot");
             Require(g_TimerUnregisterCount == 0,
-                "plugin unregistered timer callback with short API table");
-            Require(!timerSeen(), "plugin reported timer event with short API table");
-            Require(!timerAccepted(), "plugin accepted timer event with short API table");
+                "plugin unregistered timer callback with unavailable API slot");
+            Require(!timerSeen(), "plugin reported timer event with unavailable API slot");
+            Require(!timerAccepted(), "plugin accepted timer event with unavailable API slot");
         }
         else if (hasTimerProbe && mode == "no-timer-capability")
         {
@@ -1482,15 +1891,6 @@ int main(int argc, char** argv)
                 "plugin unregistered timer callback without capability");
             Require(!timerSeen(), "plugin reported timer event without registration");
             Require(!timerAccepted(), "plugin accepted timer event without registration");
-        }
-        else if (hasTimerProbe && mode == "short-api-between-timer-register-unregister")
-        {
-            Require(g_TimerRegisterCount == 0,
-                "plugin registered timer callback without an advertised unregister slot");
-            Require(g_TimerUnregisterCount == 0,
-                "plugin unregistered timer callback without an advertised unregister slot");
-            Require(!timerSeen(), "plugin reported timer event without an advertised unregister slot");
-            Require(!timerAccepted(), "plugin accepted timer event without an advertised unregister slot");
         }
         else if (hasTimerProbe && (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||
@@ -1709,12 +2109,19 @@ int main(int argc, char** argv)
             Require(g_RegisteredChatMessageUserData == nullptr,
                 "chat command helper user data survived shutdown unregister");
         }
-        if (hasGameplayPolicyProbe && mode == "short-api-before-gameplay-policy")
+        if (ModeUnavailableProcessEventHandleApi(mode))
+        {
+            Require(g_RegisterCount == 0,
+                "plugin registered ProcessEvent callback with unavailable API slot");
+            Require(g_UnregisterCount == 0,
+                "plugin unregistered ProcessEvent callback with unavailable API slot");
+        }
+        if (hasGameplayPolicyProbe && ModeUnavailableGameplayPolicyApi(mode))
         {
             Require(g_GameplayPolicyRegisterCount == 0,
-                "plugin registered gameplay policy callback with short API table");
+                "plugin registered gameplay policy callback with unavailable API slot");
             Require(g_GameplayPolicyUnregisterCount == 0,
-                "plugin unregistered gameplay policy callback with short API table");
+                "plugin unregistered gameplay policy callback with unavailable API slot");
         }
         else if (hasGameplayPolicyProbe && mode == "no-gameplay-policy-capability")
         {
@@ -1734,12 +2141,12 @@ int main(int argc, char** argv)
             Require(g_RegisteredGameplayPolicyUserData == nullptr,
                 "gameplay policy user data survived shutdown unregister");
         }
-        if (hasChatMessageProbe && mode == "short-api-before-gameplay-policy")
+        if (hasChatMessageProbe && ModeUnavailableChatMessageApi(mode))
         {
             Require(g_ChatMessageRegisterCount == 0,
-                "plugin registered chat message callback with short API table");
+                "plugin registered chat message callback with unavailable API slot");
             Require(g_ChatMessageUnregisterCount == 0,
-                "plugin unregistered chat message callback with short API table");
+                "plugin unregistered chat message callback with unavailable API slot");
         }
         else if (hasChatMessageProbe && mode == "no-chat-message-capability")
         {
@@ -1759,12 +2166,12 @@ int main(int argc, char** argv)
             Require(g_RegisteredChatMessageUserData == nullptr,
                 "chat message user data survived shutdown unregister");
         }
-        if (hasTimerProbe && mode == "short-api-before-gameplay-policy")
+        if (hasTimerProbe && ModeUnavailableTimerApi(mode))
         {
             Require(g_TimerRegisterCount == 0,
-                "plugin registered timer callback with short API table");
+                "plugin registered timer callback with unavailable API slot");
             Require(g_TimerUnregisterCount == 0,
-                "plugin unregistered timer callback with short API table");
+                "plugin unregistered timer callback with unavailable API slot");
         }
         else if (hasTimerProbe && mode == "no-timer-capability")
         {
@@ -1772,13 +2179,6 @@ int main(int argc, char** argv)
                 "plugin registered timer callback without capability");
             Require(g_TimerUnregisterCount == 0,
                 "plugin unregistered timer callback without capability");
-        }
-        else if (hasTimerProbe && mode == "short-api-between-timer-register-unregister")
-        {
-            Require(g_TimerRegisterCount == 0,
-                "plugin registered timer callback without an advertised unregister slot");
-            Require(g_TimerUnregisterCount == 0,
-                "plugin unregistered timer callback without an advertised unregister slot");
         }
         else if (hasTimerProbe && (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||

@@ -9,8 +9,11 @@ parameter ownership details.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
+import os
+import stat
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -632,11 +635,68 @@ def reject_protected_input_path(label: str, path: Path) -> None:
     )
 
 
+class SymlinkInputPathError(OSError):
+    def __init__(self, component: Path) -> None:
+        super().__init__(errno.ELOOP, f"path must not be a symlink: {component}")
+        self.component = component
+
+
+def open_regular_file_no_symlink(path: Path):
+    symlink_component = protected_paths.first_symlink_component(path)
+    if symlink_component is not None:
+        raise SymlinkInputPathError(symlink_component)
+
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    if not candidate.name:
+        raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+
+    common_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = common_flags | getattr(os, "O_DIRECTORY", 0)
+    file_flags = common_flags
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+        file_flags |= os.O_NOFOLLOW
+
+    parent_fd: int | None = None
+    try:
+        parent_fd = os.open(candidate.anchor, directory_flags)
+        for part in candidate.parts[1:-1]:
+            next_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            os.close(parent_fd)
+            parent_fd = next_fd
+        fd = os.open(candidate.name, file_flags, dir_fd=parent_fd)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise SymlinkInputPathError(candidate) from exc
+        raise
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+    try:
+        status = os.fstat(fd)
+        if not stat.S_ISREG(status.st_mode):
+            raise OSError(errno.EINVAL, f"path must be a regular file: {candidate}")
+        return os.fdopen(fd, "rb")
+    except Exception:
+        os.close(fd)
+        raise
+
+
 def load_json_file(label: str, path: Path) -> dict[str, Any]:
     reject_protected_input_path(label, path)
-    if not path.is_file():
-        raise SystemExit(f"missing {label}: {path}")
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        with open_regular_file_no_symlink(path) as handle:
+            payload = json.loads(handle.read().decode("utf-8"))
+    except SymlinkInputPathError as exc:
+        raise SystemExit(f"{label} must not be a symlink: {exc.component}") from exc
+    except FileNotFoundError as exc:
+        raise SystemExit(f"missing {label}: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path}: invalid JSON: {exc}") from exc
+    except OSError as exc:
+        raise SystemExit(f"{path}: unreadable {label}: {exc}") from exc
     if not isinstance(payload, dict):
         raise SystemExit(f"{label} must contain a JSON object: {path}")
     return payload
@@ -644,12 +704,17 @@ def load_json_file(label: str, path: Path) -> dict[str, Any]:
 
 def file_sha256(path: Path) -> str:
     reject_protected_input_path("hash input", path)
-    if not path.is_file():
-        raise SystemExit(f"missing hash input: {path}")
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with open_regular_file_no_symlink(path) as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except SymlinkInputPathError as exc:
+        raise SystemExit(f"hash input must not be a symlink: {exc.component}") from exc
+    except FileNotFoundError as exc:
+        raise SystemExit(f"missing hash input: {path}") from exc
+    except OSError as exc:
+        raise SystemExit(f"{path}: unreadable hash input: {exc}") from exc
     return digest.hexdigest()
 
 
@@ -688,12 +753,31 @@ def manifest_index(manifest: dict[str, Any], snapshot_root: Path) -> dict[str, P
 
 
 def expand_ufunction_target_sets(target_sets: list[str]) -> dict[str, list[str]]:
-    from reflection_target_sets import TARGET_SETS
+    from reflection_target_sets import (
+        TARGET_SETS,
+        target_set_catalog_hygiene_issues,
+        target_set_name_promotion_aliases,
+    )
+
+    catalog_issues = target_set_catalog_hygiene_issues()
+    if catalog_issues:
+        reasons = sorted({str(issue.get("reason", "unknown")) for issue in catalog_issues})
+        raise SystemExit(
+            "target-set catalog hygiene failed: "
+            + ", ".join(reasons)
+            + "; fix scripts/reflection_target_sets.py before building redacted signatures or claiming target-set coverage"
+        )
 
     expanded: dict[str, list[str]] = {}
     for target_set in target_sets:
         if target_set in expanded:
             raise SystemExit(f"duplicate target set: {target_set}")
+        aliases = target_set_name_promotion_aliases(target_set)
+        if aliases:
+            raise SystemExit(
+                "target set name contains promotion/readiness alias: "
+                + f"{target_set} ({', '.join(aliases)})"
+            )
         entries = TARGET_SETS.get(target_set)
         if entries is None:
             raise SystemExit(f"unknown target set: {target_set}")
@@ -1128,6 +1212,18 @@ def safety_summary(signatures: list[dict[str, Any]], *, snapshot_count: int, tar
     return {
         "artifact_status": "candidate_only",
         "promotion_ready": False,
+        "public_sdk_ready": False,
+        "p0_dependency_chain_ready": False,
+        "complete_sdk_ready": False,
+        "stable_sdk_ready": False,
+        "v1_completion_ready": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_p0_dependency_chain_claim": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_v1_completion": False,
+        "complete_sdk_claim_progress_contribution": 0,
+        "p0_dependency_chain_claim_progress_contribution": 0,
+        "v1_completion_progress_contribution": 0,
         "intended_use": "offline_review_only",
         "evidence_scope": "redacted_ufunction_signature_metadata",
         "signature_count": len(signatures),
@@ -1151,12 +1247,21 @@ def safety_summary(signatures: list[dict[str, Any]], *, snapshot_count: int, tar
         "redaction_policy": "object_class_identity_sensitive_scalars_and_container_payloads_redacted",
         "not_promoted_surfaces": [
             "public_sdk",
+            "target_set_lists",
+            "redacted_signatures",
+            "public_reachability",
+            "source_markers",
             "object_identity",
             "class_identity",
             "lookup",
             "mutation",
             "return_override",
             "resource_handle",
+            "runtime_hooks",
+            "p0_dependency_chain",
+            "complete_sdk",
+            "stable_sdk",
+            "v1_completion",
             "cross_binary_portability",
         ],
     }
@@ -1188,12 +1293,30 @@ def unique_ordered(values: list[str]) -> list[str]:
     return ordered
 
 
+def duplicate_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
+
+
 def target_set_coverage(
     *,
     manifest_target_sets: list[str],
     source_target_sets: list[str],
     emitted_targets: list[str],
 ) -> dict[str, Any]:
+    from reflection_target_sets import (
+        TARGET_SET_REVISION_SCHEMA,
+        TARGET_SET_REVISION_SOURCE,
+        target_set_module_lane,
+        target_set_readiness_classification,
+        target_set_revision_source_sha256,
+    )
+
     if set(manifest_target_sets).intersection(source_target_sets):
         overlap = sorted(set(manifest_target_sets).intersection(source_target_sets))
         raise SystemExit(f"target set declared for both manifest and direct snapshots: {', '.join(overlap)}")
@@ -1224,12 +1347,16 @@ def target_set_coverage(
             {
                 "name": target_set,
                 "source": source,
+                "module_lane": target_set_module_lane(target_set),
+                "readiness_classification": target_set_readiness_classification(target_set),
                 "expected_targets": targets,
                 "covered_targets": covered,
                 "missing_targets": missing,
                 "complete": not missing,
             }
         )
+
+    exact_coverage = bool(declared) and not missing_targets and not unexpected_targets
 
     if declared and (missing_targets or unexpected_targets):
         detail = []
@@ -1242,12 +1369,91 @@ def target_set_coverage(
     return {
         "schema": TARGET_SET_COVERAGE_SCHEMA,
         "status": "complete" if declared else "not_declared",
-        "complete": not missing_targets and not unexpected_targets,
+        "complete": exact_coverage,
+        "exact_coverage": exact_coverage,
+        "coverage_scope": "declared_named_target_sets" if declared else "unscoped_direct_snapshots",
+        "blockers": [] if declared else ["source_target_set_required_for_exact_coverage"],
+        "target_set_revision_schema": TARGET_SET_REVISION_SCHEMA if declared else None,
+        "target_set_revision_source": TARGET_SET_REVISION_SOURCE if declared else None,
+        "target_set_revision_source_sha256": (
+            target_set_revision_source_sha256(
+                [target_set for target_set, _ in declared],
+                schema_filter=SUPPORTED_SNAPSHOT_SCHEMA,
+            )
+            if declared
+            else None
+        ),
         "declared_target_sets": entries,
         "expected_targets": expected_targets,
         "emitted_targets": emitted_targets,
         "missing_targets": missing_targets,
         "unexpected_targets": unexpected_targets,
+        "target_families": [
+            {
+                "name": target_set,
+                "source": source,
+                "module_lane": target_set_module_lane(target_set),
+                "readiness_classification": target_set_readiness_classification(target_set),
+            }
+            for target_set, source in declared
+        ],
+    }
+
+
+def redacted_signature_artifact_identity(
+    *,
+    manifest: dict[str, Any] | None,
+    snapshot_payloads: list[dict[str, Any]],
+    target_sets: list[str],
+) -> dict[str, Any] | None:
+    from reflection_target_sets import (
+        TARGET_SET_REVISION_SCHEMA,
+        target_set_revision_source_sha256,
+    )
+
+    if not target_sets:
+        return None
+
+    ark_hashes: list[str] = []
+    source_artifact_ids: list[str] = []
+    if isinstance(manifest, dict):
+        manifest_ark_hash = manifest.get("ark_binary_sha256")
+        if isinstance(manifest_ark_hash, str) and manifest_ark_hash:
+            ark_hashes.append(manifest_ark_hash)
+
+    for payload in snapshot_payloads:
+        evidence = payload.get("evidence")
+        if not isinstance(evidence, dict):
+            return None
+        ark_hash = evidence.get("ark_binary_sha256")
+        artifact_sha = evidence.get("artifact_sha256")
+        capture_id = evidence.get("capture_id")
+        evidence_pack_id = evidence.get("evidence_pack_id")
+        if not all(isinstance(value, str) and value for value in (ark_hash, artifact_sha, capture_id, evidence_pack_id)):
+            return None
+        ark_hashes.append(ark_hash)
+        source_artifact_ids.extend(
+            [
+                f"artifact_sha256:{artifact_sha}",
+                f"capture_id:{capture_id}",
+                f"evidence_pack_id:{evidence_pack_id}",
+            ]
+        )
+
+    ark_hash_values = unique_ordered(ark_hashes)
+    if len(ark_hash_values) != 1:
+        return None
+
+    return {
+        "ark_binary_sha256": ark_hash_values[0],
+        "target_set_revision": "reflection_target_sets.py:" + "+".join(target_sets),
+        "target_set_revision_schema": TARGET_SET_REVISION_SCHEMA,
+        "target_set_revision_source_sha256": target_set_revision_source_sha256(
+            target_sets,
+            schema_filter=SUPPORTED_SNAPSHOT_SCHEMA,
+        ),
+        "source_artifact_ids": unique_ordered(source_artifact_ids),
+        "path_redacted": True,
     }
 
 
@@ -1261,8 +1467,22 @@ def build_report(
     target_sets = target_sets or []
     source_target_sets = source_target_sets or []
     snapshots = snapshots or []
+    duplicate_target_sets = duplicate_strings(target_sets)
+    if duplicate_target_sets:
+        raise SystemExit("duplicate --target-set value(s): " + ", ".join(duplicate_target_sets))
+    duplicate_source_target_sets = duplicate_strings(source_target_sets)
+    if duplicate_source_target_sets:
+        raise SystemExit(
+            "duplicate --source-target-set value(s): " + ", ".join(duplicate_source_target_sets)
+        )
     if source_target_sets and not snapshots:
         raise SystemExit("--source-target-set requires at least one --snapshot")
+    overlapping_target_sets = sorted(set(target_sets).intersection(source_target_sets))
+    if overlapping_target_sets:
+        raise SystemExit(
+            "target set declared for both manifest and direct snapshots: "
+            + ", ".join(overlapping_target_sets)
+        )
     manifest_paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, target_sets)
     if missing_targets:
         raise SystemExit("target-set manifest missing targets: " + ",".join(missing_targets))
@@ -1270,19 +1490,28 @@ def build_report(
     if not all_paths:
         raise SystemExit("provide at least one --target-set or --snapshot")
 
-    signatures: list[dict[str, Any]] = []
-    seen_targets: set[str] = set()
     input_snapshots = [
         {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
         for index, path in enumerate(all_paths, start=1)
     ]
+    signatures: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+    snapshot_payloads: list[dict[str, Any]] = []
     for path, source_snapshot in zip(all_paths, input_snapshots, strict=True):
-        for signature in build_from_snapshot(path, source_snapshot):
+        payload = load_json_file("snapshot", path)
+        snapshot_payloads.append(payload)
+        snapshot_targets: list[str] = []
+        for target_payload in require_snapshot_payload(payload, path):
+            signature = build_target_signature(target_payload, path, source_snapshot)
             target = signature["target"]
             if target in seen_targets:
                 raise SystemExit(f"duplicate target in signature inputs: {target}")
             signatures.append(signature)
             seen_targets.add(target)
+            snapshot_targets.append(target)
+        source_snapshot["targets"] = snapshot_targets
+        if len(snapshot_targets) == 1:
+            source_snapshot["target"] = snapshot_targets[0]
     emitted_targets = [signature["target"] for signature in signatures]
     coverage = target_set_coverage(
         manifest_target_sets=target_sets,
@@ -1293,6 +1522,12 @@ def build_report(
     descriptor_preflight = None
     if DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET in all_target_sets:
         descriptor_preflight = build_dino_compact_descriptor_preflight_from_inputs(all_paths, input_snapshots)
+    manifest = load_manifest(snapshot_root) if target_sets else None
+    artifact_identity = redacted_signature_artifact_identity(
+        manifest=manifest,
+        snapshot_payloads=snapshot_payloads,
+        target_sets=all_target_sets,
+    )
 
     report = {
         "schema": OUTPUT_SCHEMA,
@@ -1322,6 +1557,8 @@ def build_report(
     }
     if descriptor_preflight is not None:
         report["descriptor_preflight"] = descriptor_preflight
+    if artifact_identity is not None:
+        report["artifact_identity"] = artifact_identity
     return report
 
 
@@ -3440,6 +3677,35 @@ def build_players_identity_first_evidence(*, snapshot_root: Path = DEFAULT_SNAPS
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "counts_as_first_evidence": False,
+        "counts_toward_p0_dependency_chain": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "first_evidence_boundary": {
+            "counts_as_first_evidence": False,
+            "accepted_planning_authorizes_runtime": False,
+            "no_users_policy_counts_as_evidence": False,
+            "passive_snapshots_count_as_evidence": False,
+            "beta_notices_count_as_evidence": False,
+            "package_shape_counts_as_evidence": False,
+            "side_lanes_count_as_evidence": False,
+            "approved_runtime_evidence_missing": True,
+            "required_authorizing_input": "approved_runtime_principal_lifecycle_evidence",
+            "non_claim": (
+                "planning-only player identity first-evidence artifacts do not count as "
+                "approved runtime evidence, runtime readiness, public SDK readiness, "
+                "P0 progress, or v1 completion"
+            ),
+            "non_claims": [
+                "non-counting first-evidence inputs remain planning-only",
+                (
+                    "planning-only player identity first-evidence artifacts do not count as "
+                    "approved runtime evidence, runtime readiness, public SDK readiness, "
+                    "P0 progress, or v1 completion"
+                ),
+            ],
+        },
         "snapshot_root": "redacted",
         "input_target_set": PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET,
         "generated_from": {

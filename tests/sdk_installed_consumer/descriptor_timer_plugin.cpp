@@ -32,12 +32,36 @@ namespace
         return path && stat(path, &st) == 0;
     }
 
+    bool HasApiMetadataPrefix(const ObeliskApi* api)
+    {
+        if (!api ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+        {
+            return false;
+        }
+
+        if (api->abi_version != OBELISK_API_ABI_VERSION)
+            return false;
+
+        return true;
+    }
+
+    bool HasDescriptorApi(const ObeliskApi* api)
+    {
+        return HasApiMetadataPrefix(api) &&
+            api->struct_size >= offsetof(ObeliskApi, DescribeResourceKind) +
+                sizeof(api->DescribeResourceKind) &&
+            api->struct_size >= offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
+                sizeof(api->DescribeGameplayPolicyEventKind) &&
+            (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) != 0 &&
+            (api->capabilities & OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS) != 0 &&
+            api->DescribeResourceKind &&
+            api->DescribeGameplayPolicyEventKind;
+    }
+
     bool HasSeedApi(const ObeliskApi* api, const ObeliskPluginInitContext* context)
     {
-        if (!api || !context ||
-            api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
-                    sizeof(api->UnregisterTimerWithOwnerToken) ||
+        if (!HasApiMetadataPrefix(api) || !context ||
             context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext) ||
             context->plugin_owner_token == 0)
@@ -45,9 +69,16 @@ namespace
             return false;
         }
 
+        if (!HasDescriptorApi(api) ||
+            api->struct_size < offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle) +
+                sizeof(api->RegisterTimerWithOwnerTokenHandle) ||
+            api->struct_size < offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
+                sizeof(api->UnregisterTimerWithOwnerToken))
+        {
+            return false;
+        }
+
         return (api->capabilities & kSeedCapabilityMask) == kSeedCapabilityMask &&
-            api->DescribeResourceKind &&
-            api->DescribeGameplayPolicyEventKind &&
             api->RegisterTimerWithOwnerTokenHandle &&
             api->UnregisterTimerWithOwnerToken;
     }
@@ -68,6 +99,9 @@ namespace
                                         const char* stableName,
                                         const char* displayName)
     {
+        if (!HasDescriptorApi(api))
+            return false;
+
         ObeliskResourceKindDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
         if (!api->DescribeResourceKind(resourceKind, &descriptor))
@@ -96,6 +130,9 @@ namespace
                                                const char* stableName,
                                                const char* displayName)
     {
+        if (!HasDescriptorApi(api))
+            return false;
+
         ObeliskGameplayPolicyEventDescriptor descriptor{};
         descriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
         if (!api->DescribeGameplayPolicyEventKind(eventKind, &descriptor))

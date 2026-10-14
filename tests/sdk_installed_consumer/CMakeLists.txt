@@ -39,7 +39,50 @@ if(NOT Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS STREQUAL "package-shape-eviden
         "Unexpected Obelisk installed SDK package-shape status: "
         "${Obelisk_INSTALLED_SDK_PACKAGE_SHAPE_STATUS}")
 endif()
-foreach(non_claim_var
+
+function(obelisk_require_package_marker variable expected_value)
+    if(NOT DEFINED ${variable})
+        message(FATAL_ERROR
+            "Installed Obelisk SDK package did not define required package-shape marker: "
+            "${variable}")
+    endif()
+    if(NOT "${${variable}}" STREQUAL "${expected_value}")
+        message(FATAL_ERROR
+            "Installed Obelisk SDK package marker ${variable} must be "
+            "${expected_value}, got ${${variable}}")
+    endif()
+endfunction()
+
+function(obelisk_reject_defined_positive_alias variable)
+    if(NOT DEFINED ${variable})
+        return()
+    endif()
+
+    string(TOUPPER "${${variable}}" alias_value)
+    if(alias_value STREQUAL "" OR
+       alias_value STREQUAL "0" OR
+       alias_value STREQUAL "FALSE" OR
+       alias_value STREQUAL "OFF" OR
+       alias_value STREQUAL "NO")
+        return()
+    endif()
+
+    message(FATAL_ERROR
+        "Installed Obelisk SDK package exposed forbidden positive readiness alias "
+        "${variable}=${${variable}}")
+endfunction()
+
+obelisk_require_package_marker(Obelisk_FIND_PACKAGE_SDK_PACKAGE_SHAPE_ONLY TRUE)
+obelisk_require_package_marker(Obelisk_SDK_BLOCKER_PROMOTION_COUNT 0)
+obelisk_require_package_marker(Obelisk_SDK_BLOCKER_PROMOTION_TOTAL 12)
+obelisk_require_package_marker(Obelisk_P0_DEPENDENCY_COUNT 0)
+obelisk_require_package_marker(Obelisk_P0_DEPENDENCY_TOTAL 4)
+obelisk_require_package_marker(
+    Obelisk_ACTIVE_COMPLETION_BLOCKER
+    approved_runtime_evidence_missing
+)
+
+foreach(required_false_non_claim_var IN ITEMS
     Obelisk_RUNTIME_READINESS_CLAIM_ALLOWED
     Obelisk_RUNTIME_LIVE_OP_APPROVAL_ALLOWED
     Obelisk_PLUGIN_HUB_PUBLICATION_ALLOWED
@@ -48,10 +91,80 @@ foreach(non_claim_var
     Obelisk_V1_COMPLETION_CLAIM_ALLOWED
     Obelisk_PUBLIC_MODULE_SDK_COVERAGE_CLAIM_ALLOWED
     Obelisk_PRODUCTION_STABLE_SDK_CLAIM_ALLOWED
+    Obelisk_EXACT_VERSION_REQUESTS_ALLOWED
+    Obelisk_FIND_PACKAGE_VERSION_IS_STABLE_SDK_CLAIM
+    Obelisk_FIND_PACKAGE_SDK_IS_PUBLIC_PACKAGE_READINESS
+    Obelisk_FIND_PACKAGE_SDK_IS_V1_COMPLETION_EVIDENCE
 )
-    if(${non_claim_var})
-        message(FATAL_ERROR "Installed Obelisk SDK package enabled forbidden non-claim marker: ${non_claim_var}")
-    endif()
+    obelisk_require_package_marker(${required_false_non_claim_var} FALSE)
+endforeach()
+
+foreach(forbidden_positive_alias IN ITEMS
+    Obelisk_ABI_LAYOUT_READY
+    Obelisk_ABI_LAYOUT_VALIDATED
+    Obelisk_ACCEPTED_FOR_CONTRACT_REVIEW
+    Obelisk_APPROVED_RUNTIME_BUNDLE_ACCEPTED
+    Obelisk_APPROVED_RUNTIME_EVIDENCE_ACCEPTED
+    Obelisk_C_ABI_READY
+    Obelisk_STRUCT_SIZE_READY
+    Obelisk_STRUCT_SIZE_VALIDATED
+    Obelisk_CMAKE_PACKAGE_READY
+    Obelisk_INSTALLED_HEADERS_READY
+    Obelisk_INSTALLED_SDK_CONSUMER_TESTS_READY
+    Obelisk_INSTALLED_SDK_PACKAGE_READY
+    Obelisk_PACKAGE_AVAILABLE
+    Obelisk_PACKAGE_PUBLICATION_ALLOWED
+    Obelisk_PACKAGE_SHAPE_COUNTS_TOWARD_COMPLETION
+    Obelisk_PACKAGE_SHAPE_COUNTS_TOWARD_PUBLIC_SDK
+    Obelisk_PACKAGE_SHAPE_COUNTS_TOWARD_V1_COMPLETION
+    Obelisk_PACKAGE_SHAPE_READY
+    Obelisk_PUBLIC_ABI_AVAILABLE
+    Obelisk_PUBLIC_CONTRACT_REVIEW_ACCEPTED
+    Obelisk_PUBLIC_HEADER_GATE_OPEN
+    Obelisk_PUBLIC_HEADER_GATE_PASSED
+    Obelisk_PUBLIC_HEADER_GATE_READY
+    Obelisk_HEADER_PROMOTION_GATE_OPEN
+    Obelisk_HEADER_PROMOTION_GATE_PASSED
+    Obelisk_HEADER_PROMOTION_GATE_READY
+    Obelisk_PUBLIC_HEADER_ALLOWED
+    Obelisk_PUBLIC_HEADER_PROMOTION_GATE_OPEN
+    Obelisk_PUBLIC_HEADER_PROMOTION_GATE_PASSED
+    Obelisk_PUBLIC_HEADER_PROMOTION_GATE_READY
+    Obelisk_PUBLIC_HEADER_READY
+    Obelisk_PUBLIC_HEADERS_READY
+    Obelisk_PUBLIC_PACKAGE_AVAILABLE
+    Obelisk_PUBLIC_PACKAGE_READY
+    Obelisk_PUBLIC_SDK_READY
+    Obelisk_COMPLETE_SDK_READY
+    Obelisk_COMPLETE_SDK_V1_READY
+    Obelisk_SDK_COMPLETE
+    Obelisk_SDK_V1_COMPLETE
+    Obelisk_V1_SDK_COMPLETE
+    Obelisk_SDK_CONSUMER_TESTS_READY
+    Obelisk_STABLE_SDK_READY
+    Obelisk_CALL_PROCESS_EVENT_ABI_VERSION
+    Obelisk_PUBLIC_CALL_PROCESS_EVENT_ABI_VERSION
+    Obelisk_STABLE_CALL_PROCESS_EVENT_ABI_VERSION
+    Obelisk_PROCESS_EVENT_PUBLIC_ABI_VERSION
+    Obelisk_PROCESS_EVENT_STABLE_ABI_VERSION
+    Obelisk_RAW_PROCESS_EVENT_ABI_VERSION
+    Obelisk_RAW_PROCESS_EVENT_PUBLIC_ABI_VERSION
+    Obelisk_PUBLIC_CALL_PROCESS_EVENT_READY
+    Obelisk_STABLE_CALL_PROCESS_EVENT_READY
+    Obelisk_CALL_PROCESS_EVENT_PUBLIC_READY
+    Obelisk_CALL_PROCESS_EVENT_STABLE_READY
+    Obelisk_RAW_PROCESS_EVENT_READY
+    Obelisk_RAW_PROCESS_EVENT_PUBLIC_READY
+    Obelisk_PUBLIC_PROCESS_EVENT_READY
+    Obelisk_PROCESS_EVENT_PUBLIC_READY
+    Obelisk_PROCESS_EVENT_PUBLIC_SDK_READY
+    Obelisk_PROCESS_EVENT_PUBLIC_CONTRACT_READY
+    Obelisk_RAW_PROCESS_EVENT_PUBLIC_CONTRACT_READY
+    Obelisk_PROCESS_EVENT_STABLE_SDK_READY
+    Obelisk_PROCESS_EVENT_CALLBACKS_PUBLIC_READY
+    Obelisk_RAW_PROCESS_EVENT_CALLBACKS_READY
+)
+    obelisk_reject_defined_positive_alias(${forbidden_positive_alias})
 endforeach()
 if(NOT Obelisk_API_ABI_VERSION EQUAL 1)
     message(FATAL_ERROR "Unexpected Obelisk API ABI version: ${Obelisk_API_ABI_VERSION}")

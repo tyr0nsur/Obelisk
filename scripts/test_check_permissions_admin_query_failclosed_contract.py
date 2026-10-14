@@ -59,6 +59,7 @@ def manifest() -> dict:
     fail_closed_names = [
         "stale_principal",
         "scope_mismatch",
+        "stale_principal_scope_flags",
         "process_mismatch",
         "missing_principal",
         "missing_runtime_principal_identity",
@@ -67,23 +68,28 @@ def manifest() -> dict:
         "operator_config_principal_claim",
         "operator_config_permission_claim",
         "operator_config_allow_capability_claim",
+        "plugin_supplied_authority_claim",
         "missing_action",
         "malformed_action_size",
         "action_size_exceeds_max",
         "malformed_resource_scope_size",
         "resource_scope_size_exceeds_max",
         "missing_principal_handle",
+        "principal_handle_only",
         "missing_principal_generation",
         "missing_principal_scope_flags",
+        "missing_server_process_epoch",
         "missing_principal_provenance",
         "principal_generation_mismatch",
         "plugin_supplied_principal_tuple",
+        "plugin_supplied_principal_provenance",
         "server_process_epoch_mismatch",
         "unsupported_principal_scope_flags",
         "missing_plugin_owner_token",
         "zero_plugin_owner_token",
         "unknown_plugin_owner_token",
         "unloading_plugin_owner_token",
+        "owner_token_identity_or_permission_claim",
         "missing_capability",
         "rate_limit_exceeded",
         "unknown_authority",
@@ -114,6 +120,7 @@ def manifest() -> dict:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "runtime_promotion_allowed": False,
+        "v1": False,
         "query_contract": {
             "kind": "query_only_fail_closed_permission_check",
             "mutation_allowed": False,
@@ -124,6 +131,7 @@ def manifest() -> dict:
                 query_field("principal_handle", "uint64_opaque"),
                 query_field("principal_generation", "uint64"),
                 query_field("principal_scope_flags", "uint64_flags"),
+                query_field("server_process_epoch", "uint64"),
                 query_field("action", "copied_bytes"),
                 query_field("action_size", "size_t"),
                 query_field("resource_scope", "copied_bytes"),
@@ -169,6 +177,10 @@ def manifest() -> dict:
             "allowed_authority_kinds": ["operator-config", "runtime-local"],
             "operator_config_allow_capable": False,
             "plugin_supplied_authority_allowed": False,
+            "plugin_supplied_authority_creates_identity_allowed": False,
+            "plugin_supplied_authority_creates_permission_allowed": False,
+            "command_text_authority_allowed": False,
+            "operator_config_authority_creates_permission_allowed": False,
             "remote_authority_allowed": False,
             "cross_process_authority_allowed": False,
             "unknown_authority_fails_closed": True,
@@ -177,6 +189,9 @@ def manifest() -> dict:
             "config_enables_surface_only": True,
             "runtime_observation_establishes_identity": True,
             "runtime_principal_required_for_permission_authority": True,
+            "principal_handle_alone_authorizes": False,
+            "principal_handle_only_creates_identity_allowed": False,
+            "principal_handle_only_creates_permission_allowed": False,
             "command_text_principal_claim_allowed": False,
             "operator_config_principal_claim_allowed": False,
             "command_text_permission_claim_allowed": False,
@@ -187,18 +202,25 @@ def manifest() -> dict:
             "plugin_supplied_principal_tuple_allowed": False,
             "command_supplied_principal_tuple_allowed": False,
             "operator_config_supplied_principal_tuple_allowed": False,
+            "plugin_supplied_principal_provenance_allowed": False,
+            "runtime_owned_principal_provenance_required_before_allow": True,
             "principal_tuple_provenance_required_before_allow": True,
             "principal_generation_provenance_required_before_allow": True,
             "principal_scope_provenance_required_before_allow": True,
             "server_process_epoch_required_before_allow": True,
+            "principal_handle_generation_scope_epoch_required_before_allow": True,
             "missing_principal_provenance_result": "deny",
+            "missing_server_process_epoch_result": "deny",
+            "principal_handle_only_result": "deny",
             "stale_principal_result": "deny",
+            "stale_principal_scope_flags_result": "deny",
             "principal_generation_mismatch_result": "deny",
             "scope_mismatch_result": "deny",
             "process_mismatch_result": "deny",
             "server_process_epoch_mismatch_result": "deny",
             "unsupported_principal_scope_flags_result": "deny",
             "plugin_supplied_principal_tuple_result": "deny",
+            "plugin_supplied_principal_provenance_result": "deny",
             "public_abi_field_allowed": False,
             "runtime_ready": False,
         },
@@ -213,6 +235,9 @@ def manifest() -> dict:
             "unloading_owner_token_result": "deny",
             "zero_owner_token_result": "deny",
             "missing_owner_token_result": "deny",
+            "invalid_owner_token_cannot_create_identity_or_permission": True,
+            "owner_token_does_not_establish_principal_identity": True,
+            "owner_token_does_not_grant_permission": True,
             "owner_cleanup_invalidates_query_budget": True,
             "owner_cleanup_invalidates_candidate_cache": True,
             "plugin_supplied_owner_identity_allowed": False,
@@ -226,7 +251,10 @@ def manifest() -> dict:
             "authority_kind_required_before_allow": True,
             "authority_generation_required_before_allow": True,
             "policy_epoch_required_before_allow": True,
+            "complete_policy_provenance_required_before_allow": True,
+            "policy_source_id_generation_authority_kind_generation_epoch_required_before_allow": True,
             "plugin_supplied_policy_provenance_allowed": False,
+            "plugin_supplied_policy_provenance_creates_authority_allowed": False,
             "command_text_policy_provenance_claim_allowed": False,
             "operator_config_policy_provenance_claim_allowed": False,
             "operator_config_allow_provenance_allowed": False,
@@ -248,6 +276,20 @@ def manifest() -> dict:
             "required_lifecycle_anchor_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
             "required_principal_invalidation_schema": "obelisk.players-identity-principal-invalidation-policy.v1",
             "required_runtime_evidence_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+            "required_identity_public_contract_decision_record_schema": "obelisk.player-identity-public-contract-decision-record.v1",
+            "required_identity_public_contract_decision_record_id": "reviewed_identity_public_contract_decision_record",
+            "required_identity_public_contract_review_status": "reviewed",
+            "required_identity_promotion_certificate_schema": "obelisk.player-identity-promotion-certificate.v1",
+            "required_identity_promotion_certificate_surface": "obelisk.player_identity.v1",
+            "required_identity_promotion_certificate_required_by_surface": "obelisk.permissions_admin.v1",
+            "required_identity_promotion_certificate_chain_position": 1,
+            "required_identity_promotion_certificate_required_by_chain_position": 2,
+            "required_identity_promotion_certificate_reviewed_artifact_hash": "evidence.reviewed_surface_record_sha256",
+            "required_identity_promotion_certificate_hash_policy": "evidence.reviewed_artifact_hash must equal evidence.reviewed_surface_record_sha256",
+            "missing_mismatched_or_stale_identity_certificate_counts": False,
+            "identity_alias_or_stale_source_unlock_allowed": False,
+            "identity_decision_record_alone_unlock_allowed": False,
+            "runtime_evidence_alone_unlock_allowed": False,
             "public_identity_required_before_promotion": True,
             "public_identity_promoted": False,
             "permissions_admin_public_abi_promoted": False,
@@ -311,8 +353,16 @@ def manifest() -> dict:
             "candidate-only pre-ABI permissions/admin query contract",
             "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
             "allow decisions require policy provenance and fail closed on missing or unknown authority",
+            "principal_handle alone never authorizes; generation, scope flags, server process epoch, and runtime-owned provenance are required before allow",
             "command text and operator config cannot establish principal identity or permission claims before runtime principal observation",
+            "plugin-supplied provenance, plugin-supplied authority, and invalid owner tokens cannot establish identity or permission authority",
+            "only a reviewed, hash-bound, current player-identity promotion certificate can satisfy the upstream identity dependency; identity aliases, stale decision records, route reports, and runtime evidence substitutes remain non-counting",
+            "generated, scaffold, placeholder, template, stale, or hash-unbound upstream certificates cannot satisfy the upstream identity dependency",
+            "nested readiness, progress, unlock, route, public, runtime, stable, Plugin Hub, publication, or SDK/P0 accounting aliases remain non-counting until the full hash-bound dependency chain is accepted",
             "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate",
+            "runtime-window artifacts, beta/Discord notices, no-users status, package installs, side-lanes, passive evidence, unblocked/allowed aliases, and generic identity-present aliases cannot unlock readiness",
+            "RCON, ListPlayers, Kick, ServerListPlayers, ServerKickPlayer, admin snapshots, static thunk, route candidate, source-ready, status, and command aliases are admin orientation or operational metadata only and cannot unlock readiness or progress",
+            "v1 remains false for this candidate-only pre-ABI planning artifact",
         ],
     }
 
@@ -347,6 +397,11 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1"])
+        for key in CHECKER.NO_CREDIT_FALSE_KEYS:
+            self.assertFalse(report[key], key)
+        for key in CHECKER.NO_CREDIT_ZERO_KEYS:
+            self.assertEqual(report[key], 0, key)
         self.assertEqual(
             report["query_fields"],
             [
@@ -354,6 +409,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "principal_handle",
                 "principal_generation",
                 "principal_scope_flags",
+                "server_process_epoch",
                 "action",
                 "action_size",
                 "resource_scope",
@@ -402,7 +458,28 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1"])
         self.assertEqual(report["mode"], "consume")
+
+    def test_wrong_schema_reports_fail_closed_json(self) -> None:
+        payload = manifest()
+        payload["schema"] = "obelisk.permissions-admin-query-failclosed-contract-check.v1"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["valid"])
+        self.assertIn("schema_mismatch", report["blockers"])
+        self.assertEqual(report["input_schema"], payload["schema"])
+        self.assertEqual(report["query_fields"], [])
+        self.assertEqual(report["decisions"], [])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["sdk_progress"], 0)
+        self.assertEqual(report["p0_progress"], 0)
 
     def test_promote_public_and_runtime_modes_fail_closed(self) -> None:
         for flag, expected in (
@@ -432,6 +509,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload["public_sdk_ready"] = True
         payload["runtime_ready"] = True
         payload["runtime_promotion_allowed"] = True
+        payload["v1"] = True
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
@@ -443,6 +521,25 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("public_sdk_ready_not_false", report["blockers"])
         self.assertIn("runtime_ready_not_false", report["blockers"])
         self.assertIn("runtime_promotion_allowed_not_false", report["blockers"])
+        self.assertIn("v1_not_false", report["blockers"])
+
+    def test_rejects_no_credit_flag_overclaims(self) -> None:
+        payload = manifest()
+        for key in CHECKER.NO_CREDIT_FALSE_KEYS:
+            payload[key] = True
+        for key in CHECKER.NO_CREDIT_ZERO_KEYS:
+            payload[key] = 1
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in CHECKER.NO_CREDIT_FALSE_KEYS:
+            self.assertIn(f"{key}_not_false", report["blockers"])
+            self.assertFalse(report[key], key)
+        for key in CHECKER.NO_CREDIT_ZERO_KEYS:
+            self.assertIn(f"{key}_not_zero", report["blockers"])
+            self.assertEqual(report[key], 0, key)
 
     def test_rejects_missing_or_weakened_artifact_identity_dependency_context(self) -> None:
         payload = manifest()
@@ -451,6 +548,11 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload["dependency_context"]["required_runtime_evidence_schema"] = (
             "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
         )
+        payload["dependency_context"]["required_identity_promotion_certificate_hash_policy"] = (
+            "any identity-looking certificate is accepted"
+        )
+        payload["dependency_context"]["missing_mismatched_or_stale_identity_certificate_counts"] = True
+        payload["dependency_context"]["identity_alias_or_stale_source_unlock_allowed"] = True
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
@@ -459,9 +561,30 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("artifact_identity_missing", report["blockers"])
         self.assertIn("dependency_context_public_identity_promoted_invalid", report["blockers"])
         self.assertIn("dependency_context_required_runtime_evidence_schema_invalid", report["blockers"])
+        self.assertIn(
+            "dependency_context_required_identity_promotion_certificate_hash_policy_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "dependency_context_missing_mismatched_or_stale_identity_certificate_counts_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "dependency_context_identity_alias_or_stale_source_unlock_allowed_invalid",
+            report["blockers"],
+        )
 
     def test_rejects_missing_required_query_fields(self) -> None:
-        for field_name in ("plugin_owner_token", "principal_generation", "action", "action_size", "request_flags"):
+        for field_name in (
+            "plugin_owner_token",
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "server_process_epoch",
+            "action",
+            "action_size",
+            "request_flags",
+        ):
             with self.subTest(field_name=field_name):
                 payload = manifest()
                 payload["query_contract"]["fields"] = [
@@ -633,6 +756,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
     def test_rejects_missing_fail_closed_blocker_cases(self) -> None:
         for case_name in (
             "scope_mismatch",
+            "stale_principal_scope_flags",
             "process_mismatch",
             "missing_principal",
             "missing_runtime_principal_identity",
@@ -641,20 +765,25 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "operator_config_principal_claim",
             "operator_config_permission_claim",
             "operator_config_allow_capability_claim",
+            "plugin_supplied_authority_claim",
             "missing_action",
             "malformed_action_size",
             "action_size_exceeds_max",
             "malformed_resource_scope_size",
             "resource_scope_size_exceeds_max",
             "missing_principal_handle",
+            "principal_handle_only",
             "missing_principal_scope_flags",
+            "missing_server_process_epoch",
             "missing_principal_provenance",
             "unsupported_principal_scope_flags",
             "plugin_supplied_principal_tuple",
+            "plugin_supplied_principal_provenance",
             "server_process_epoch_mismatch",
             "zero_plugin_owner_token",
             "unknown_plugin_owner_token",
             "unloading_plugin_owner_token",
+            "owner_token_identity_or_permission_claim",
             "missing_policy_source",
             "missing_policy_source_generation",
             "policy_source_generation_mismatch",
@@ -712,6 +841,10 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload = manifest()
         payload["authority_policy"]["unknown_authority_fails_closed"] = False
         payload["authority_policy"]["plugin_supplied_authority_allowed"] = True
+        payload["authority_policy"]["plugin_supplied_authority_creates_identity_allowed"] = True
+        payload["authority_policy"]["plugin_supplied_authority_creates_permission_allowed"] = True
+        payload["authority_policy"]["command_text_authority_allowed"] = True
+        payload["authority_policy"]["operator_config_authority_creates_permission_allowed"] = True
         payload["authority_policy"]["remote_authority_allowed"] = True
         payload["authority_policy"]["cross_process_authority_allowed"] = True
         payload["authority_policy"]["operator_config_allow_capable"] = True
@@ -722,9 +855,31 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("unknown_authority_not_fail_closed", report["blockers"])
         self.assertIn("authority_plugin_supplied_authority_allowed_not_false", report["blockers"])
+        self.assertIn("authority_plugin_supplied_authority_creates_identity_allowed_not_false", report["blockers"])
+        self.assertIn("authority_plugin_supplied_authority_creates_permission_allowed_not_false", report["blockers"])
+        self.assertIn("authority_command_text_authority_allowed_not_false", report["blockers"])
+        self.assertIn("authority_operator_config_authority_creates_permission_allowed_not_false", report["blockers"])
         self.assertIn("authority_remote_authority_allowed_not_false", report["blockers"])
         self.assertIn("authority_cross_process_authority_allowed_not_false", report["blockers"])
         self.assertIn("operator_config_allow_capable_not_false", report["blockers"])
+
+    def test_rejects_nested_generic_readiness_and_progress_aliases(self) -> None:
+        payload = manifest()
+        payload["planning_artifacts"] = {
+            "nested": {
+                "adminPromotionReady": True,
+                "sdkProgressContribution": 1,
+            }
+        }
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("generic_readiness_or_progress_alias_overclaim", report["blockers"])
+        labels = {detail["label"] for detail in report["blocker_details"]}
+        self.assertIn("$.planning_artifacts.nested.adminPromotionReady", labels)
+        self.assertIn("$.planning_artifacts.nested.sdkProgressContribution", labels)
 
     def test_operator_config_can_be_recognized_but_not_allow_capable(self) -> None:
         payload = manifest()
@@ -773,6 +928,9 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         payload = manifest()
         payload["principal_runtime_identity_policy"]["runtime_observation_establishes_identity"] = False
+        payload["principal_runtime_identity_policy"]["principal_handle_alone_authorizes"] = True
+        payload["principal_runtime_identity_policy"]["principal_handle_only_creates_identity_allowed"] = True
+        payload["principal_runtime_identity_policy"]["principal_handle_only_creates_permission_allowed"] = True
         payload["principal_runtime_identity_policy"]["command_text_principal_claim_allowed"] = True
         payload["principal_runtime_identity_policy"]["operator_config_permission_claim_allowed"] = True
 
@@ -782,6 +940,18 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(
             "principal_runtime_identity_policy_runtime_observation_establishes_identity_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_runtime_identity_policy_principal_handle_alone_authorizes_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_runtime_identity_policy_principal_handle_only_creates_identity_allowed_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_runtime_identity_policy_principal_handle_only_creates_permission_allowed_invalid",
             report["blockers"],
         )
         self.assertIn(
@@ -805,7 +975,14 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         payload = manifest()
         payload["principal_provenance_policy"]["plugin_supplied_principal_tuple_allowed"] = True
+        payload["principal_provenance_policy"]["plugin_supplied_principal_provenance_allowed"] = True
+        payload["principal_provenance_policy"]["runtime_owned_principal_provenance_required_before_allow"] = False
+        payload["principal_provenance_policy"]["principal_handle_generation_scope_epoch_required_before_allow"] = False
         payload["principal_provenance_policy"]["principal_generation_provenance_required_before_allow"] = False
+        payload["principal_provenance_policy"]["missing_server_process_epoch_result"] = "allow"
+        payload["principal_provenance_policy"]["principal_handle_only_result"] = "allow"
+        payload["principal_provenance_policy"]["stale_principal_scope_flags_result"] = "allow"
+        payload["principal_provenance_policy"]["plugin_supplied_principal_provenance_result"] = "allow"
         payload["principal_provenance_policy"]["server_process_epoch_mismatch_result"] = "allow"
         payload["principal_provenance_policy"]["public_abi_field_allowed"] = True
 
@@ -818,7 +995,26 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             report["blockers"],
         )
         self.assertIn(
+            "principal_provenance_policy_plugin_supplied_principal_provenance_allowed_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_provenance_policy_runtime_owned_principal_provenance_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_provenance_policy_principal_handle_generation_scope_epoch_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
             "principal_provenance_policy_principal_generation_provenance_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn("principal_provenance_policy_missing_server_process_epoch_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_principal_handle_only_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_stale_principal_scope_flags_result_invalid", report["blockers"])
+        self.assertIn(
+            "principal_provenance_policy_plugin_supplied_principal_provenance_result_invalid",
             report["blockers"],
         )
         self.assertIn("principal_provenance_policy_server_process_epoch_mismatch_result_invalid", report["blockers"])
@@ -829,9 +1025,11 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload["principal_provenance_policy"].pop("missing_principal_provenance_result")
         payload["principal_provenance_policy"]["principal_tuple_provenance_required_before_allow"] = False
         payload["principal_provenance_policy"]["stale_principal_result"] = "allow"
+        payload["principal_provenance_policy"]["stale_principal_scope_flags_result"] = "allow"
         payload["principal_provenance_policy"]["scope_mismatch_result"] = "unknown"
         payload["principal_provenance_policy"]["process_mismatch_result"] = "allow"
         payload["principal_provenance_policy"]["plugin_supplied_principal_tuple_result"] = "allow"
+        payload["principal_provenance_policy"]["plugin_supplied_principal_provenance_result"] = "allow"
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
@@ -844,9 +1042,14 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         )
         self.assertIn("principal_provenance_policy_missing_principal_provenance_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_stale_principal_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_stale_principal_scope_flags_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_scope_mismatch_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_process_mismatch_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_plugin_supplied_principal_tuple_result_invalid", report["blockers"])
+        self.assertIn(
+            "principal_provenance_policy_plugin_supplied_principal_provenance_result_invalid",
+            report["blockers"],
+        )
 
     def test_rejects_missing_or_weakened_owner_token_policy(self) -> None:
         payload = manifest()
@@ -862,6 +1065,9 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload["owner_token_policy"]["owner_token_validation_precedes_policy_evaluation"] = False
         payload["owner_token_policy"]["owner_token_validation_before_rate_budget"] = False
         payload["owner_token_policy"]["unknown_owner_token_result"] = "allow"
+        payload["owner_token_policy"]["invalid_owner_token_cannot_create_identity_or_permission"] = False
+        payload["owner_token_policy"]["owner_token_does_not_establish_principal_identity"] = False
+        payload["owner_token_policy"]["owner_token_does_not_grant_permission"] = False
         payload["owner_token_policy"]["plugin_supplied_owner_identity_allowed"] = True
         payload["owner_token_policy"]["public_abi_field_allowed"] = True
 
@@ -872,6 +1078,15 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("owner_token_policy_owner_token_validation_precedes_policy_evaluation_invalid", report["blockers"])
         self.assertIn("owner_token_policy_owner_token_validation_before_rate_budget_invalid", report["blockers"])
         self.assertIn("owner_token_policy_unknown_owner_token_result_invalid", report["blockers"])
+        self.assertIn(
+            "owner_token_policy_invalid_owner_token_cannot_create_identity_or_permission_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "owner_token_policy_owner_token_does_not_establish_principal_identity_invalid",
+            report["blockers"],
+        )
+        self.assertIn("owner_token_policy_owner_token_does_not_grant_permission_invalid", report["blockers"])
         self.assertIn("owner_token_policy_plugin_supplied_owner_identity_allowed_invalid", report["blockers"])
         self.assertIn("owner_token_policy_public_abi_field_allowed_invalid", report["blockers"])
 
@@ -887,7 +1102,12 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         payload = manifest()
         payload["policy_provenance_policy"]["policy_epoch_required_before_allow"] = False
+        payload["policy_provenance_policy"]["complete_policy_provenance_required_before_allow"] = False
+        payload["policy_provenance_policy"][
+            "policy_source_id_generation_authority_kind_generation_epoch_required_before_allow"
+        ] = False
         payload["policy_provenance_policy"]["plugin_supplied_policy_provenance_allowed"] = True
+        payload["policy_provenance_policy"]["plugin_supplied_policy_provenance_creates_authority_allowed"] = True
         payload["policy_provenance_policy"]["command_text_policy_provenance_claim_allowed"] = True
         payload["policy_provenance_policy"]["operator_config_allow_provenance_allowed"] = True
         payload["policy_provenance_policy"]["missing_policy_epoch_result"] = "allow"
@@ -898,7 +1118,19 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("policy_provenance_policy_policy_epoch_required_before_allow_invalid", report["blockers"])
+        self.assertIn(
+            "policy_provenance_policy_complete_policy_provenance_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "policy_provenance_policy_policy_source_id_generation_authority_kind_generation_epoch_required_before_allow_invalid",
+            report["blockers"],
+        )
         self.assertIn("policy_provenance_policy_plugin_supplied_policy_provenance_allowed_invalid", report["blockers"])
+        self.assertIn(
+            "policy_provenance_policy_plugin_supplied_policy_provenance_creates_authority_allowed_invalid",
+            report["blockers"],
+        )
         self.assertIn(
             "policy_provenance_policy_command_text_policy_provenance_claim_allowed_invalid",
             report["blockers"],
@@ -1074,18 +1306,29 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
     def test_rejects_nested_stable_and_v1_completion_overclaims(self) -> None:
         payload = manifest()
         payload["nested_claim"] = {
+            "v1": True,
+            "v1Ready": True,
+            "v1-enabled": True,
+            "v1_promoted": True,
             "stable_claim_allowed": True,
             "v1_completion_ready": True,
         }
-        payload["claim_text"] = "stable claim allowed; v1 completion ready"
+        payload["claim_text"] = "stable claim allowed; v1 ready; v1 enabled; v1 promoted; v1 completion ready"
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("stable_claim_allowed_overclaim", report["blockers"])
+        self.assertIn("v1_overclaim", report["blockers"])
+        self.assertIn("v1_ready_overclaim", report["blockers"])
+        self.assertIn("v1_enabled_overclaim", report["blockers"])
+        self.assertIn("v1_promoted_overclaim", report["blockers"])
         self.assertIn("v1_completion_ready_overclaim", report["blockers"])
         self.assertIn("stable_claim_allowed_string_overclaim", report["blockers"])
+        self.assertIn("v1_ready_string_overclaim", report["blockers"])
+        self.assertIn("v1_enabled_string_overclaim", report["blockers"])
+        self.assertIn("v1_promoted_string_overclaim", report["blockers"])
         self.assertIn("v1_completion_ready_string_overclaim", report["blockers"])
 
     def test_rejects_nested_route_accounting_and_authorization_overclaims(self) -> None:
@@ -1116,6 +1359,36 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "runtime_work_authorized_overclaim",
             "server_operations_authorized_overclaim",
             "runtime_approval_granted_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_recursive_progress_and_public_alias_overclaims(self) -> None:
+        payload = manifest()
+        payload["post_identity_alias_report"] = {
+            "progress": "1/4",
+            "claim-progress-contribution": "25%",
+            "p0Progress": 1,
+            "sdkProgressContribution": "1",
+            "publicReady": {"status": "ready"},
+            "public": "ready",
+            "zero_progress_aliases_remain_non_counting": {
+                "progress": 0,
+                "sdkProgressContribution": "0/4",
+                "publicReady": False,
+            },
+        }
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "progress_overclaim",
+            "claim_progress_contribution_overclaim",
+            "p0_progress_overclaim",
+            "sdk_progress_contribution_overclaim",
+            "public_ready_overclaim",
+            "public_overclaim",
         ):
             self.assertIn(blocker, report["blockers"])
 
@@ -1203,6 +1476,271 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         ):
             self.assertIn(blocker, report["blockers"])
 
+    def test_rejects_non_authorizing_shortcut_artifact_overclaims(self) -> None:
+        payload = manifest()
+        payload["shortcut_aliases"] = {
+            "packageInstallReady": True,
+            "packageShapeAccepted": True,
+            "packageShapeInstallReady": True,
+            "packageShapeSupportReady": True,
+            "pluginHubReady": True,
+            "pluginHubPlanningSupported": True,
+            "pluginHubSupportTierReady": True,
+            "sideLaneReady": True,
+            "sideLaneArtifactReady": True,
+        }
+        payload["nested_shortcut_aliases"] = {
+            "plugin_hub_planning": {"status": "supported"},
+            "side_lane_artifact": {"state": "ready"},
+            "package_shape_install": {"result": "accepted"},
+            "package_shape_support": {"outcome": "supported"},
+        }
+        payload["shortcut_source_provenance"] = [
+            {"source_provenance": "plugin_hub_planning", "status": "supported"},
+            {"source_marker": "side_lane_artifact", "state": "ready"},
+            {"source_provenance": "package_shape_install", "result": "accepted"},
+        ]
+        payload["shortcut_claim_texts"] = [
+            "package install is accepted",
+            "package shape is accepted",
+            "Plugin Hub planning is supported",
+            "side-lane artifact is ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "package_install_ready_overclaim",
+            "package_shape_accepted_overclaim",
+            "package_shape_install_ready_overclaim",
+            "package_shape_support_ready_overclaim",
+            "plugin_hub_ready_overclaim",
+            "plugin_hub_planning_supported_overclaim",
+            "plugin_hub_support_tier_ready_overclaim",
+            "side_lane_ready_overclaim",
+            "side_lane_artifact_ready_overclaim",
+            "plugin_hub_planning_overclaim",
+            "side_lane_artifact_overclaim",
+            "package_shape_install_overclaim",
+            "package_shape_support_overclaim",
+            "shortcut_artifact_source_overclaim",
+            "package_install_accepted_string_overclaim",
+            "package_shape_accepted_string_overclaim",
+            "plugin_hub_planning_supported_string_overclaim",
+            "side_lane_artifact_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_inline_beta_package_and_runtime_status_shortcuts(self) -> None:
+        payload = manifest()
+        payload["shortcut_aliases"] = {
+            "inlinePlayerIdentityPromotionCertificate": {"status": "promoted"},
+            "permissionsAdminPromotionCertificateInline": {"status": "ready"},
+            "multiSurfaceBetaCapturePack": {"status": "ready"},
+            "runtimeStatusReport": {"status": "ready"},
+            "copiedRuntimeStatusReport": {"status": "ready"},
+            "statusArtifact": {"status": "ready"},
+            "copyArtifact": {"status": "accepted"},
+        }
+        payload["shortcut_source_provenance"] = [
+            {"source_provenance": "runtime_status_report", "status": "ready"},
+            {"source_marker": "multi_surface_beta_capture_pack", "state": "ready"},
+        ]
+        payload["shortcut_claim_texts"] = [
+            "inline promotion certificate is promoted",
+            "runtime status report is ready",
+            "copied runtime status report is ready",
+            "multi-surface beta capture pack is ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "inline_player_identity_promotion_certificate_overclaim",
+            "permissions_admin_promotion_certificate_inline_overclaim",
+            "multi_surface_beta_capture_pack_overclaim",
+            "runtime_status_report_overclaim",
+            "copied_runtime_status_report_overclaim",
+            "status_artifact_overclaim",
+            "copy_artifact_overclaim",
+            "shortcut_artifact_source_overclaim",
+            "inline_promotion_certificate_string_overclaim",
+            "runtime_status_report_ready_string_overclaim",
+            "copied_runtime_status_report_ready_string_overclaim",
+            "multi_surface_beta_capture_pack_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_identity_gate_terminal_support_scoped_and_beta_runtime_progress_aliases(self) -> None:
+        payload = manifest()
+        payload["gate_aliases"] = {
+            "identityPublicContractGateMissingResolved": True,
+            "identityPublicContractGateResolved": True,
+        }
+        payload["shortcut_aliases"] = {
+            "supportTier": {"status": "supported"},
+            "supportTierMetadata": {"status": "ready"},
+            "terminalCertificate": {"status": "ready"},
+            "terminalStatusCertificate": {"status": "ready"},
+            "runtimeEvidenceStatusReport": {"status": "ready"},
+            "betaRuntimeStatus": {"status": "ready", "p0Progress": 1},
+            "scopedReleaseStatement": {"status": "ready", "sdkProgress": 1},
+        }
+        payload["shortcut_claim_texts"] = [
+            "terminal certificate is ready",
+            "support tier is supported",
+            "scoped release statement is ready",
+            "runtime evidence status report is ready",
+            "beta runtime status is ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "identity_public_contract_gate_missing_resolved_overclaim",
+            "identity_public_contract_gate_resolved_overclaim",
+            "support_tier_overclaim",
+            "support_tier_metadata_overclaim",
+            "terminal_certificate_overclaim",
+            "terminal_status_certificate_overclaim",
+            "runtime_evidence_status_report_overclaim",
+            "beta_runtime_status_overclaim",
+            "scoped_release_statement_overclaim",
+            "p0_progress_overclaim",
+            "sdk_progress_overclaim",
+            "terminal_certificate_ready_string_overclaim",
+            "support_tier_supported_string_overclaim",
+            "scoped_release_statement_ready_string_overclaim",
+            "runtime_evidence_status_report_ready_string_overclaim",
+            "beta_runtime_status_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["sdk_progress"], 0)
+        self.assertEqual(report["p0_progress"], 0)
+
+    def test_rejects_scope_b_bare_aliases_as_permissions_admin_promotion_credit(self) -> None:
+        payload = manifest()
+        payload["scope_b_aliases"] = {
+            "ready": True,
+            "runtimeReady": True,
+            "approvedRuntimeEvidence": True,
+            "publicSdk": True,
+            "stableSdk": True,
+            "completeSdk": True,
+            "P0": True,
+            "supportTier": {"status": "supported"},
+            "PluginHub": {"status": "ready"},
+            "packageShape": {"status": "ready"},
+            "beta": {"status": "ready"},
+            "Discord": {"status": "sent"},
+            "passiveSnapshot": {"status": "ready"},
+            "scopedReleaseStatement": True,
+        }
+        payload["claim_texts"] = [
+            "P0 is ready",
+            "beta is ready",
+            "Discord is sent",
+            "approved runtime evidence ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        labels = {detail["label"] for detail in report["blocker_details"]}
+        for label in (
+            "$.scope_b_aliases.ready",
+            "$.scope_b_aliases.runtimeReady",
+            "$.scope_b_aliases.approvedRuntimeEvidence",
+            "$.scope_b_aliases.publicSdk",
+            "$.scope_b_aliases.stableSdk",
+            "$.scope_b_aliases.completeSdk",
+            "$.scope_b_aliases.P0",
+            "$.scope_b_aliases.supportTier",
+            "$.scope_b_aliases.PluginHub",
+            "$.scope_b_aliases.packageShape",
+            "$.scope_b_aliases.beta",
+            "$.scope_b_aliases.Discord",
+            "$.scope_b_aliases.passiveSnapshot",
+            "$.scope_b_aliases.scopedReleaseStatement",
+        ):
+            with self.subTest(label=label):
+                self.assertIn(label, labels)
+        for blocker in (
+            "p0_overclaim",
+            "beta_overclaim",
+            "discord_overclaim",
+            "scoped_release_statement_overclaim",
+            "p0_ready_string_overclaim",
+            "beta_ready_string_overclaim",
+            "discord_sent_string_overclaim",
+            "approved_runtime_evidence_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["sdk_progress"], 0)
+        self.assertEqual(report["p0_progress"], 0)
+
+    def test_rejects_runtime_window_notice_no_users_and_identity_present_shortcuts(self) -> None:
+        payload = manifest()
+        payload["shortcut_aliases"] = {
+            "runtimeWindowPlanReady": True,
+            "runtime_window_artifact": {"status": "unblocked"},
+            "betaNoticeSent": True,
+            "discord_notice": {"status": "sent"},
+            "noUsersStatusReady": True,
+            "passiveEvidence": {"status": "allowed"},
+            "packageInstallUnblocked": True,
+            "sideLaneArtifactReady": True,
+            "identityPresent": True,
+            "principalObserved": True,
+            "permissionsAdminUnblocked": True,
+        }
+        payload["shortcut_claim_texts"] = [
+            "runtime window unblocked",
+            "beta notice sent",
+            "discord notice sent",
+            "no users status ready",
+            "identity present",
+            "principal observed",
+            "permissions unblocked",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "runtime_window_plan_ready_overclaim",
+            "runtime_window_artifact_overclaim",
+            "beta_notice_sent_overclaim",
+            "discord_notice_overclaim",
+            "no_users_status_ready_overclaim",
+            "passive_evidence_overclaim",
+            "package_install_unblocked_overclaim",
+            "side_lane_artifact_ready_overclaim",
+            "identity_present_overclaim",
+            "principal_observed_overclaim",
+            "permissions_admin_unblocked_overclaim",
+            "runtime_window_ready_string_overclaim",
+            "beta_notice_sent_string_overclaim",
+            "discord_sent_string_overclaim",
+            "no_users_status_ready_string_overclaim",
+            "identity_present_string_overclaim",
+            "principal_observed_string_overclaim",
+            "permissions_unblocked_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
     def test_rejects_broad_public_runtime_or_sdk_completion_claims(self) -> None:
         payload = manifest()
         payload["nested_claim"] = {
@@ -1248,6 +1786,72 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("negative_surface_exclusions_missing_required", report["blockers"])
+
+    def test_rejects_source_zero_start_end_transfer_and_rcon_shortcut_aliases(self) -> None:
+        payload = manifest()
+        payload["source_overclaim_total_flag_count"] = 0
+        payload["status"] = "ready"
+        payload["source_ready"] = True
+        payload["start_end_only_evidence"] = {"status": "ready"}
+        payload["transfer_baccept_candidate"] = {"status": "ready"}
+        payload["admin_snapshot"] = {"status": "ready"}
+        payload["adminStatusSnapshotReady"] = True
+        payload["rcon_command_candidate"] = {"status": "ready"}
+        payload["rcon_status"] = {"source_ready": True, "status": "ready"}
+        payload["server_list_players"] = {"source_ready": True, "status": "ready"}
+        payload["server_kick_player"] = {"source_ready": True, "status": "ready"}
+        payload["static_admin_thunk"] = {"source_ready": True, "status": "ready"}
+        payload["listPlayersReady"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "source_overclaim_zero_status_alias_overclaim",
+            "source_ready_overclaim",
+            "start_end_only_evidence_overclaim",
+            "transfer_baccept_candidate_overclaim",
+            "admin_snapshot_overclaim",
+            "public_or_runtime_readiness_overclaim",
+            "rcon_command_candidate_overclaim",
+            "rcon_status_overclaim",
+            "server_list_players_overclaim",
+            "server_kick_player_overclaim",
+            "static_admin_thunk_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_generic_admin_source_status_route_and_command_aliases(self) -> None:
+        payload = manifest()
+        payload["admin_source_status_aliases"] = [
+            {"source": "RCON", "status": "ready"},
+            {"source_marker": "RCON", "status": "accepted"},
+            {"source": "Kick", "status": "ready"},
+            {"source_marker": "Kick", "status": "accepted"},
+            {"source_alias": "admin_snapshot", "status": "ready"},
+            {"route_candidate": {"source": "RCON", "status": "ready"}},
+            {"command": "ShooterPlayerController.ServerListPlayers", "status": "ready"},
+            {"command_candidate": {"target": "ShooterPlayerController.ServerKickPlayer", "state": "supported"}},
+        ]
+        payload["kick"] = {"status": "ready"}
+        payload["kickReady"] = True
+        payload["principal_source"] = "Kick"
+        payload["claim_text"] = "route candidate ready, command candidate ready, and Kick ready"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("shortcut_artifact_source_overclaim", report["blockers"])
+        self.assertIn("route_candidate_overclaim", report["blockers"])
+        self.assertIn("command_candidate_overclaim", report["blockers"])
+        self.assertIn("kick_overclaim", report["blockers"])
+        self.assertIn("public_or_runtime_readiness_overclaim", report["blockers"])
+        self.assertIn("pre_runtime_principal_or_permission_claim_source", report["blockers"])
+        self.assertIn("route_candidate_ready_string_overclaim", report["blockers"])
+        self.assertIn("command_candidate_ready_string_overclaim", report["blockers"])
+        self.assertIn("positive_public_or_runtime_claim", report["blockers"])
 
     def test_rejects_manifest_under_protected_server_root_before_reading(self) -> None:
         result = subprocess.run(

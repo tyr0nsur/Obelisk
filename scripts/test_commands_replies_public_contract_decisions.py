@@ -74,8 +74,47 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(gate["runtime_delivery_allowed"])
         self.assertIn("permission_decision", gate["required_runtime_owned_inputs"])
         self.assertIn("router metadata", gate["forbidden_authority_sources"])
+        self.assertIn("post-runtime planning metadata", gate["forbidden_authority_sources"])
+        self.assertIn("chat/RCON/broadcast/send source alias", gate["forbidden_authority_sources"])
+        self.assertIn("status metadata", gate["forbidden_authority_sources"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
+
+        guardrail = payload["post_response_abi_evidence_guardrail"]
+        self.assertEqual(
+            guardrail["schema"],
+            "obelisk.commands-replies-post-response-abi-evidence-guardrail.v1",
+        )
+        self.assertEqual(
+            guardrail["requires_valid_upstream_promotion_certificates"],
+            [
+                "obelisk.player-identity-promotion-certificate.v1",
+                "obelisk.permissions-admin-promotion-certificate.v1",
+                "obelisk.command-chat-response-path-promotion-certificate.v1",
+            ],
+        )
+        self.assertIn(
+            "response/send/broadcast readiness aliases cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "post-runtime planning metadata and chat/RCON/broadcast/send-source aliases cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "source-kind/status metadata aliases for chat, RCON, broadcast, send-chat, replies, or response bridge cannot count without valid upstream promotion certificates",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "current command_chat_response_path promotion certificate must be path-and-sha-bound to the current upstream surface record; stale/current surface-record mismatches fail closed",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertIn(
+            "final/terminal, authz-ready, response-path-complete, reply-ready, public/stable SDK, P0 progress, beta/Discord ack, scoped release statement, and package-shape aliases cannot count without exact ordered predecessor certificates and current source hashes",
+            guardrail["required_fail_closed_guardrails"],
+        )
+        self.assertFalse(guardrail["certificate_metadata_counts_as_promotion"])
+        self.assertFalse(guardrail["response_send_broadcast_aliases_count_as_promotion"])
 
     def test_dependency_chain_blocks_commands_replies_until_response_path_is_promoted(self) -> None:
         payload = self.load_decisions()
@@ -88,6 +127,8 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(response_path["required_dependency"], "obelisk.command_chat_response_path.v1")
         for behavior in (
             "commands/replies remains blocked while command_chat_response_path is unpromoted or unresolved",
+            "commands/replies final P0 gate requires the current hash-bound command_chat_response_path promotion certificate",
+            "stale/current command_chat_response_path certificate mismatches and route-ready aliases keep commands/replies non-counting",
             "passive ChatMessageEvent parsing does not authorize replies",
             "legacy CallProcessEvent debug access does not authorize responses",
             "no response path is public through commands/replies until the response path is separately promoted",
@@ -242,6 +283,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             "raw ProcessEvent callbacks",
             "ArkApi or AseApi compatibility names",
             "command_chat_response_path planning status",
+            "route-ready aliases are not sufficient",
         ):
             self.assertIn(insufficient, evidence["not_sufficient"])
 
