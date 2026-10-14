@@ -296,3 +296,31 @@ current build passes 156 CTests. Four new modules passed 32 live lifecycle
 requests without changing the restarted server PID; their gameplay acceptance
 is separate and pending. See [SUITE_STATUS.md](SUITE_STATUS.md) and
 [the native binding audit](research/NATIVE_SUITE_BINDINGS.md).
+
+## Beta preparation — 14 October 2026
+
+A host reboot ended the preceding transient laboratory. After preserving its
+log, current saves and launcher, the same native installation started again at
+16:38:20 UTC with all six modules. A2S confirms TheIsland, 70 slots and protected
+access. The session is bounded to 24 hours. This recovery does not resolve the
+previous SIGABRT during whole-server shutdown.
+
+The live Essentials help text now lists all 20 suite verbs. Its reload and the
+updated Homes reload succeeded without changing the new game process. Homes
+reclaims disconnected histories under capacity pressure only after a complete,
+validated current-session list; incomplete lists preserve saved points and
+cooldowns. Real-library regressions exercise both cleanup and refusal cases.
+The updated build passes 156/156 CTests and 214/214 public SDK guardrails.
+
+[The beta guide](BETA_TESTER_GUIDE.md) documents every current command and 88
+pending acceptance cases. Steam, two-player isolation, new typed relogin,
+chat presentation, native queries and session-home movement still require real
+clients. The operator selected the new Discord announcements channel for the
+summary and complete guide. Publishing documentation does not accept any case.
+
+The announcement was posted and independently read back at 16:47 UTC. Its
+summary matches the reviewed content, the single Markdown attachment is 24,660
+bytes, and no mentions were sent. The REST publisher passes 23 mocked transport
+and input tests; its receipt binds guide bytes, filename, summary, destination
+and create/update operation. Its private message state supports future edits
+instead of repeatedly creating notices. The legacy beta bridge is unchanged.

@@ -80,6 +80,12 @@ verified separately. See [suite status](docs/SUITE_STATUS.md),
 [migration inspection](docs/ARKAPI_MIGRATION.md). Gameplay mutations require their
 own native proof and client acceptance; complete parity has not been established.
 
+The [beta tester guide](docs/BETA_TESTER_GUIDE.md) lists all 20 current chat
+commands and 88 acceptance cases with expected results and a report template.
+Cases remain pending until actual client observations are recorded. The
+announcement publisher attaches the reviewed guide to the operator-selected
+Discord channel; communication itself does not mark a gameplay case accepted.
+
 ## Build and test
 
 Requirements:

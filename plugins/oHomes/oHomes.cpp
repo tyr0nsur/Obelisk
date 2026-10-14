@@ -20,6 +20,22 @@ constexpr const char* defaults=R"({"enabled":false,"allow_all_instances":false,"
 void Reply(const ObeliskCommandInvocation& e,std::string_view text){api.ReplyToCommandWithOwnerToken(owner,e.invocation_token,{text.data(),text.size()});}
 std::string Fold(std::string_view v){std::string s(v);for(char& c:s)if(c>='A'&&c<='Z')c+=32;return s;}
 bool Name(std::string_view s){if(s.empty()||s.size()>32)return false;for(char c:s)if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-'))return false;return true;}
+void ReclaimDisconnectedHomes(const ObeliskCommandInvocation& invocation,const ObeliskChatSession& current){
+ // Absence is meaningful only in a complete snapshot taken in this command's
+ // gameplay scope. A truncated/failed list must never discard a live point.
+ if(!api.ListChatSessionsWithOwnerToken||!current.process_epoch)return;
+ std::array<ObeliskChatSession,OBELISK_CHAT_SESSION_LIST_MAX> records{};
+ for(auto& record:records){record.abi_version=OBELISK_CHAT_SESSION_ABI_VERSION;record.struct_size=sizeof(record);}
+ size_t written=0,total=0;
+ if(!api.ListChatSessionsWithOwnerToken(owner,invocation.invocation_token,records.data(),records.size(),&written,&total)||written>records.size()||written!=total)return;
+ std::set<uint64_t> active;
+ for(size_t i=0;i<written;++i){
+   const auto& record=records[i];
+   if(record.abi_version!=OBELISK_CHAT_SESSION_ABI_VERSION||record.struct_size<sizeof(record)||!record.session_token||record.process_epoch!=current.process_epoch||!active.insert(record.session_token).second)return;
+ }
+ if(!active.count(current.session_token))return;
+ std::erase_if(homes,[&](const auto& entry){return entry.second.Epoch!=current.process_epoch||!active.count(entry.first);});
+}
 void Handle(const ObeliskCommandInvocation* e,void*)noexcept{
 try{
  if(!e||e->abi_version!=1||e->struct_size<sizeof(*e)||!e->command_text.data||!e->command_text.size)return;
@@ -42,6 +58,7 @@ try{
  if(command=="/sethome"){
    ObeliskCommandWorldInfo pose{};pose.struct_size=sizeof(pose);
    if(!api.GetCommandWorldInfoWithOwnerToken(owner,e->invocation_token,&pose)||!(pose.flags&OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE)||pose.session_token!=session.session_token||pose.process_epoch!=session.process_epoch||pose.abi_version!=1||!std::isfinite(pose.x)||!std::isfinite(pose.y)||!std::isfinite(pose.z)){Reply(*e,"Tu posición no está disponible ahora.");return;}
+   if(homes.size()>=1024&&!homes.count(session.session_token))ReclaimDisconnectedHomes(*e,session);
    if(homes.size()>=1024&&!homes.count(session.session_token)){Reply(*e,"No se pueden guardar más puntos ahora.");return;}
    auto& entry=homes[session.session_token];if(entry.Epoch!=session.process_epoch){entry={};entry.Epoch=session.process_epoch;}
    if(entry.Points.size()>=quota&&!entry.Points.count(std::string(arg))){Reply(*e,"Has alcanzado el límite de puntos de esta sesión.");return;}

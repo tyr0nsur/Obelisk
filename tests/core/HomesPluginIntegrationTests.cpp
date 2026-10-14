@@ -3,6 +3,7 @@
 
 #include <dlfcn.h>
 #include <link.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -125,6 +126,144 @@ namespace
         const nlohmann::json value{{"enabled", true}, {"allow_all_instances", false},
             {"instance_allowlist", {instance}}, {"max_homes", quota}, {"cooldown_seconds", cooldown}};
         std::ofstream(root / "config/oHomes/config.json") << value.dump();
+    }
+
+    namespace CapacityFixture
+    {
+        struct Registration { uint64_t Handle; std::string Name; ObeliskCommandCallback Callback; void* Data; };
+        struct Harness
+        {
+            std::vector<Registration> Registrations;
+            std::vector<ObeliskChatSession> Roster;
+            std::vector<std::string> Replies;
+            uint64_t Current = 1, Owner = 7331, Invocation = 0, NextHandle = 0;
+            size_t TravelCalls = 0, ListCalls = 0, TotalOverride = 0, WrittenOverride = 0;
+            bool ListAvailable = true;
+        };
+        Harness* currentHarness = nullptr;
+        ObeliskChatSession Session(uint64_t token)
+        { return {OBELISK_CHAT_SESSION_ABI_VERSION, sizeof(ObeliskChatSession), token, 991}; }
+        bool Scope(uint64_t owner, uint64_t invocation)
+        { return currentHarness && owner == currentHarness->Owner && invocation && invocation == currentHarness->Invocation; }
+        uint64_t Register(uint64_t owner, const char* name, uint64_t flags, ObeliskCommandCallback callback, void* data)
+        {
+            if (!currentHarness || owner != currentHarness->Owner || !name || !callback || flags !=
+                (OBELISK_COMMAND_MATCH_FLAG_VERB | OBELISK_COMMAND_MATCH_FLAG_ASCII_CASE_INSENSITIVE)) return 0;
+            const auto handle = ++currentHarness->NextHandle;
+            currentHarness->Registrations.push_back({handle, name, callback, data}); return handle;
+        }
+        bool Unregister(uint64_t owner, uint64_t handle)
+        {
+            if (!currentHarness || owner != currentHarness->Owner) return false;
+            const auto before = currentHarness->Registrations.size();
+            std::erase_if(currentHarness->Registrations, [&](const auto& item) { return item.Handle == handle; });
+            return before != currentHarness->Registrations.size();
+        }
+        bool Reply(uint64_t owner, uint64_t invocation, ObeliskCommandStringView value)
+        {
+            if (!Scope(owner, invocation) || !value.data) return false;
+            currentHarness->Replies.emplace_back(value.data, value.size); return true;
+        }
+        bool Current(uint64_t owner, uint64_t invocation, ObeliskChatSession* out)
+        { if (!Scope(owner, invocation) || !out) return false; *out = Session(currentHarness->Current); return true; }
+        bool List(uint64_t owner, uint64_t invocation, ObeliskChatSession* out, size_t capacity, size_t* written, size_t* total)
+        {
+            if (!Scope(owner, invocation) || !out || !written || !total) return false;
+            ++currentHarness->ListCalls;
+            const auto copied = std::min(capacity, currentHarness->Roster.size());
+            std::copy_n(currentHarness->Roster.begin(), copied, out);
+            *written = currentHarness->WrittenOverride ? currentHarness->WrittenOverride : copied;
+            *total = currentHarness->TotalOverride ? currentHarness->TotalOverride : currentHarness->Roster.size();
+            return currentHarness->ListAvailable;
+        }
+        bool World(uint64_t owner, uint64_t invocation, ObeliskCommandWorldInfo* out)
+        {
+            if (!Scope(owner, invocation) || !out) return false;
+            *out = {OBELISK_COMMAND_WORLD_INFO_ABI_VERSION, sizeof(*out), OBELISK_COMMAND_WORLD_FLAG_POSITION_AVAILABLE,
+                100, 200, 300, 0, 0, 0, 0, 0, 991, currentHarness->Current}; return true;
+        }
+        bool Travel(uint64_t owner, uint64_t invocation, const ObeliskCommandWorldInfo* pose)
+        {
+            if (!Scope(owner, invocation) || !pose || pose->session_token != currentHarness->Current || pose->process_epoch != 991) return false;
+            ++currentHarness->TravelCalls; return true;
+        }
+        void Invoke(const char* verb, std::string message)
+        {
+            const auto found = std::find_if(currentHarness->Registrations.begin(), currentHarness->Registrations.end(),
+                [&](const auto& registration) { return registration.Name == verb; });
+            Require(found != currentHarness->Registrations.end(), "Capacity fixture command missing");
+            ObeliskCommandInvocation invocation{OBELISK_COMMAND_INVOCATION_ABI_VERSION, sizeof(invocation), 0, 0, 41,
+                {message.data(), message.size()}};
+            currentHarness->Invocation = invocation.invocation_token; found->Callback(&invocation, found->Data); currentHarness->Invocation = 0;
+        }
+        void Run(const fs::path& root)
+        {
+            Harness harness; currentHarness = &harness;
+            void* library = dlopen(OBELISK_HOMES_PLUGIN_PATH, RTLD_NOW | RTLD_LOCAL);
+            Require(library, "Homes capacity regression real DSO load failed");
+            const auto init = reinterpret_cast<bool(*)(ObeliskApi*, const ObeliskPluginInitContext*)>(dlsym(library, "ObeliskPlugin_Init"));
+            const auto shutdown = reinterpret_cast<void(*)()>(dlsym(library, "ObeliskPlugin_Shutdown"));
+            Require(init && shutdown, "Homes capacity regression lifecycle exports missing");
+            ObeliskApi api{}; api.abi_version = OBELISK_API_ABI_VERSION; api.struct_size = sizeof(api);
+            api.capabilities = OBELISK_API_CAPABILITY_CHAT_SESSIONS | OBELISK_API_CAPABILITY_COMMAND_WORLD_INFO_NATIVE |
+                OBELISK_API_CAPABILITY_COMMAND_MATCH_OPTIONS | OBELISK_API_CAPABILITY_COMMAND_REPLIES | OBELISK_API_CAPABILITY_COMMAND_SELF_TELEPORT;
+            api.RegisterCommandWithOptionsWithOwnerTokenHandle = Register; api.UnregisterCommandWithOwnerToken = Unregister;
+            api.ReplyToCommandWithOwnerToken = Reply; api.GetCommandChatSessionWithOwnerToken = Current;
+            api.ListChatSessionsWithOwnerToken = List; api.GetCommandWorldInfoWithOwnerToken = World; api.TeleportCommandOriginWithOwnerToken = Travel;
+            Config(root, "homes-test", 3, 3600);
+            const auto directory = (root / "config/oHomes").string(), path = (root / "config/oHomes/config.json").string();
+            const ObeliskPluginInitContext context{OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION, sizeof(context), directory.c_str(),
+                path.c_str(), "homes-test", harness.Owner};
+            Require(init(&api, &context), "Homes capacity regression plugin init failed");
+            Invoke("/sethome", "/sethome keeper"); Invoke("/home", "/home keeper");
+            Require(harness.TravelCalls == 1, "Homes capacity fixture could not establish a live cooldown");
+            for (uint64_t token = 2; token <= 1024; ++token)
+            {
+                harness.Current = token; Invoke("/sethome", "/sethome retired");
+                Require(harness.Replies.back().find("guardado") != std::string::npos, "Homes capacity fixture failed to fill historical sessions");
+            }
+            Require(harness.ListCalls == 0, "Homes needlessly scanned peers before capacity pressure");
+            harness.Current = 1025;
+            const std::vector<ObeliskChatSession> valid{Session(1), Session(1025)};
+            harness.Roster = valid;
+            auto rejected = [&] {
+                harness.Current = 1025; Invoke("/sethome", "/sethome fresh");
+                Require(harness.Replies.back().find("No se pueden guardar") != std::string::npos,
+                    "Homes reclaimed history using an incomplete or invalid roster");
+                harness.Current = 1; Invoke("/homes", "/homes");
+                Require(harness.Replies.back().find("keeper") != std::string::npos,
+                    "Homes discarded a live saved point after invalid roster output");
+                Invoke("/home", "/home keeper");
+                Require(harness.TravelCalls == 1 && harness.Replies.back().find("Espera") != std::string::npos,
+                    "Homes reset a live cooldown while reclaiming disconnected sessions");
+            };
+            harness.ListAvailable = false; rejected(); harness.ListAvailable = true;
+            harness.TotalOverride = 65; rejected(); harness.TotalOverride = 0;
+            harness.WrittenOverride = OBELISK_CHAT_SESSION_LIST_MAX + 1; rejected(); harness.WrittenOverride = 0;
+            harness.Roster.push_back(Session(1025)); rejected(); harness.Roster = valid;
+            harness.Roster[0].process_epoch = 992; rejected(); harness.Roster = valid;
+            harness.Roster[0].abi_version = 99; rejected(); harness.Roster = valid;
+            harness.Roster[0].struct_size = sizeof(ObeliskChatSession) - 1; rejected(); harness.Roster = valid;
+            harness.Roster[0].session_token = 0; rejected(); harness.Roster = {Session(1)};
+            rejected(); harness.Roster = valid;
+            harness.Current = 1025; Invoke("/sethome", "/sethome fresh");
+            Require(harness.Replies.back().find("guardado") != std::string::npos,
+                "Homes remained permanently full after the complete roster proved old sessions disconnected");
+            Invoke("/home", "/home fresh");
+            Require(harness.TravelCalls == 2 && harness.Replies.back().find("confirmada") != std::string::npos,
+                "Homes reclaimed capacity but failed to keep the new session's point");
+            harness.Current = 1; Invoke("/homes", "/homes");
+            Require(harness.Replies.back().find("keeper") != std::string::npos, "Homes complete cleanup discarded another live session's point");
+            Invoke("/home", "/home keeper");
+            Require(harness.TravelCalls == 2 && harness.Replies.back().find("Espera") != std::string::npos,
+                "Homes complete cleanup reset another live session's cooldown");
+            harness.Current = 2; Invoke("/homes", "/homes");
+            Require(harness.Replies.back().find("Sin puntos") != std::string::npos,
+                "Homes complete cleanup retained the disconnected session history");
+            shutdown();
+            Require(harness.Registrations.empty() && dlclose(library) == 0, "Homes capacity fixture leaked callbacks or DSO mapping");
+            currentHarness = nullptr;
+        }
     }
 }
 
@@ -264,5 +403,6 @@ void TestNativeHomesPluginIntegration()
         Require(commands.SubscriptionCount() == 0 && loader.CleanBeforeClose && loader.Closed > 1,
             "Homes callback cleanup did not precede real library closure");
     }
+    CapacityFixture::Run(root);
     fs::remove_all(root);
 }

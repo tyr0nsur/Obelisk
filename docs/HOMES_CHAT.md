@@ -131,6 +131,14 @@ The separate SDK-only oHomes package now exposes /sethome name, /home name,
 runtime-generated session token/epoch, not an opaque platform ID. They are
 process-local, limited to 3 points by default, and clear on reconnect or reload;
 pause/resume preserves them. A maximum of 1024 session histories bounds memory.
+When a new session reaches that limit, the plugin tries to reclaim disconnected
+histories using a complete SDK roster of at most 64 observed active sessions,
+within the same command callback. It validates the ABI, record sizes, process
+epoch, unique nonzero tokens and presence of the current origin before deleting
+histories absent from that roster. Failed, truncated or invalid snapshots leave
+every history unchanged and may keep the new save blocked. Points and cooldowns
+for sessions still present are preserved. This cleanup neither authenticates an
+account nor promotes the observed roster to a census of all online players.
 This prototype supports the fixed TheIsland laboratory, not cross-map homes.
 
 An explicitly enabled current-origin teleport checks scope/session/epoch,

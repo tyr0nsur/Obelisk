@@ -23,6 +23,7 @@ jobs:
           python3 -m unittest discover -s scripts -p test_obelisk_migrate.py
           python3 -m unittest discover -s scripts -p test_plugin_manager_guardrails.py
           python3 -m unittest discover -s scripts -p test_public_sdk_guardrails.py
+          python3 -m unittest discover -s scripts -p test_publish_discord_beta_guide.py
           bash -n scripts/install_obelisk.sh scripts/install_obelisk_plugin.sh
 
   build:
