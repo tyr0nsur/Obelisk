@@ -24,7 +24,7 @@ account. Store tests never establish live game effects.
 
 ## Verification
 
-The current full build passes 156/156 CTest cases, including real dlopen/dlclose
+The current full build passes 158/158 CTest cases, including real dlopen/dlclose
 integration of oEssentials. Those fixtures exercise hot discovery after startup,
 case/argument routing, separate mock origins, config reload, pause/resume,
 stop/start, invalid config rollback, symlink/path traversal and selected metadata
@@ -88,3 +88,25 @@ The shop delivery boolean can mean partial delivery. It cannot establish the
 purchased quantity; no purchase or kit fulfillment is enabled by this milestone.
 Attempting/uncertain receipts block duplicate delivery and automatic refund;
 only verified no-delivery can refund the private transaction.
+
+## Original gameplay parity increment
+
+The [parity contract](GAMEPLAY_PARITY_CONTRACT.md) and dated ASE ecosystem
+inventory fix the comparison by product, version, configuration and scenario.
+Each public catalog entry has pending behavior dimensions; listing it does not
+establish equivalence. No upstream plugin/framework source is incorporated.
+
+The private command-permission service requires an explicit trusted authority,
+exact scope, fresh ACL decisions, principal revisions and expiry checks after a
+slow resolver. The item-delivery verifier compares exact variant quantities and
+stack increments under complete, exclusively attributable snapshots. Partial
+or unknown delivery remains blocked without automatic refund/retry. Real SQLite
+and failure fixtures pass; neither service is linked to the live SDK/runtime.
+
+Exact-build identity research verifies provider/auth callback candidates and
+demonstrates that numeric transport IDs and provider masks are not sufficient
+authentication. Inventory research checks quantity metadata and the stacking
+path, without executing grants. The API remains 312 bytes, six live modules and
+20 chat verbs. Current checks: 158 CTests and 214 public SDK guardrails. Live
+authority, purchases and kit fulfillment remain disabled pending native evidence
+and client acceptance; these are foundations, not whole-product parity.

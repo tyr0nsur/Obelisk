@@ -23,6 +23,13 @@ ArkApi functionality and fast migration. Build original native implementations,
 compare observable contracts using primary references and preserve license
 notices for any reused component. Windows DLL ABI compatibility is not implied.
 The source stays private; the public repository contains presentation and metrics.
+The operator explicitly requests gameplay parity across the ASE ArkApi ecosystem
+with original ObeliskNative implementations and no copied upstream plugin or
+framework source. Use published documentation and observable behavior to specify
+contracts; do not incorporate upstream implementation code. Freeze the researched
+catalog by date/resource ID, track missing documentation separately, and measure
+commands, permissions, limits, persistence and failure behavior per feature.
+Implemented foundations and static native proofs do not establish full parity.
 Historical restrictions on new seed plugins or using ArkApi as a compatibility
 target are superseded by this explicit scope. Preserve exact-command legacy
 behavior; argument matching must be opt-in. Permission/economy storage can be

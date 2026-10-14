@@ -199,3 +199,18 @@ identidad y mundo duraderos. oWorldTools consulta posición, ID nativo de tribu,
 IDs de montura y estructura apuntada. Ninguna consulta demuestra políticas o
 mutaciones de dinos/estructuras/tribus. Pasan 156 CTests y 32 controles de ciclo
 real de los cuatro plugins nuevos; los efectos requieren aceptación cliente.
+
+## Alcance solicitado y comparación actual
+
+El operador exige implementación propia sin incorporar código fuente de los
+plugins/framework de referencia. Los permisos de licencias descritos arriba
+son contexto histórico, no una decisión de reutilizar esas implementaciones.
+El [contrato de gameplay](../GAMEPLAY_PARITY_CONTRACT.md) define equivalencia por
+escenarios, y el [inventario fechado](ASE_ECOSYSTEM_INVENTORY_2026-10-14.md) cubre
+157 fichas públicas paginadas, separando framework, duplicados y referencias
+externas. Ninguna ficha queda aceptada por su presencia en el inventario.
+
+El build actual pasa 158 CTests. Los nuevos servicios privados de permisos por
+comando y verificación de cantidades son offline; no activan autoridad, compras
+o kits. La correlación de auth Steam/EOS con la sesión y la evidencia completa
+de inventario siguen siendo requisitos del adaptador nativo.

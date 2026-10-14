@@ -35,6 +35,14 @@ Roles usan tokens ASCII de 1..64 bytes. Acciones/patrones tienen un máximo de 1
 
 Una membresía con `expires <= now` no está activa. Cualquier deny coincidente de un rol activo prevalece sobre todos los allows, incluso un deny amplio frente a un allow exacto. Ausencia de regla devuelve `Status::Ok` con `Allowed=false`; `ExplicitDeny` distingue denegación expresa de falta de allow. Error de input/almacenamiento nunca produce allow. No hay herencia de roles, nombres obtenidos de UE ni source de autoridad implícito.
 
+`SuitePermissionResult::NextMembershipExpiryUtcSeconds` devuelve la primera
+caducidad entre las membresías activas cuyas reglas coinciden con la acción, o
+sin valor cuando ninguna tiene caducidad. Un consumidor que termine después de
+ese límite debe reconsultar o denegar; no puede convertir el resultado anterior
+en un grant duradero. El servicio privado por comando descrito en
+[SUITE_COMMAND_PERMISSIONS.md](SUITE_COMMAND_PERMISSIONS.md) aplica este límite,
+sin añadir schema ni API pública ni autoridad a los IDs observados.
+
 ## Wallets enteros e idempotencia
 
 Los saldos y amounts son `int64_t` en unidades enteras; no se utilizan floats ni conversiones de moneda. Saldo mínimo cero. Amount debe ser positivo. `Balance` devuelve cero/`Exists=false` para un wallet aún inexistente. Crédito crea su wallet; una operación fallida no crea wallets parciales. Débito/transfer sin fondos devuelve `InsufficientFunds`; incremento fuera de INT64_MAX devuelve `Overflow`.

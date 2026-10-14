@@ -13,7 +13,7 @@ Tenemos seis módulos y 20 comandos de chat para probar en TheIsland: utilidades
 
 **Cómo probar:** entra al servidor y escribe los comandos en el **chat del juego**, una vez cargado tu personaje. No se escriben en el menú principal ni requieren la consola administrativa. Las credenciales de acceso se facilitan por el canal privado que indique la administración.
 
-**Qué está comprobado:** un cliente real Epic 361.8 recibió `pong`, confirmó nombre/ID nativo y chat ordinario en las versiones anteriores. Se registraron observaciones de login y logout. El nuevo conjunto pasó 156 pruebas CTest y 32 operaciones de módulos en el servidor sin cambiar el proceso durante esas operaciones.
+**Qué está comprobado:** un cliente real Epic 361.8 recibió `pong`, confirmó nombre/ID nativo y chat ordinario en las versiones anteriores. Se registraron observaciones de login y logout. La última compilación pasó 158 pruebas CTest y 32 operaciones de módulos en el servidor sin cambiar el proceso durante esas operaciones.
 
 **Qué sigue pendiente:** aceptación con clientes reales de los comandos nuevos, presentación en la caja de chat, Steam, privacidad entre jugadores, nuevo relogin y desplazamiento de homes. Los tests automáticos y los módulos cargados no confirman esos resultados.
 

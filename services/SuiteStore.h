@@ -42,6 +42,9 @@ namespace Obelisk::Services
         SuiteStoreStatus Status = SuiteStoreStatus::StorageError;
         bool Allowed = false;
         bool ExplicitDeny = false;
+        // Earliest expiry among currently matching ACL memberships. A caller
+        // finishing later must re-evaluate or fail closed at this boundary.
+        std::optional<int64_t> NextMembershipExpiryUtcSeconds = std::nullopt;
     };
 
     struct SuiteBalanceResult

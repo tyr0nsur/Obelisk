@@ -587,14 +587,15 @@ PRAGMA user_version=2;
         try
         {
             std::lock_guard lock(m_Impl->Mutex);
-            Statement query(m_Impl->Db, "SELECT p.pattern,p.effect FROM memberships m JOIN role_permissions p ON p.role=m.role "
+            Statement query(m_Impl->Db, "SELECT p.pattern,p.effect,m.expires_utc FROM memberships m JOIN role_permissions p ON p.role=m.role "
                 "WHERE m.subject_namespace=?1 AND m.opaque_id=?2 AND (m.expires_utc IS NULL OR m.expires_utc>?3)");
             query.Text(1, subject.Namespace); query.Text(2, subject.OpaqueId); query.Integer(3, now);
             bool allowed = false, denied = false;
+            std::optional<int64_t> expiry;
             for (;;)
             {
                 const int result = query.Step();
-                if (result == SQLITE_DONE) return {Status::Ok, allowed && !denied, denied};
+                if (result == SQLITE_DONE) return {Status::Ok, allowed && !denied, denied, expiry};
                 if (result != SQLITE_ROW) return {SqlStatus(result)};
                 const auto pattern = query.ColumnText(0);
                 const int effect = sqlite3_column_int(query.Value, 1);
@@ -602,6 +603,14 @@ PRAGMA user_version=2;
                     return {Status::StorageError};
                 if (PatternMatches(pattern, action))
                 {
+                    if (sqlite3_column_type(query.Value, 2) != SQLITE_NULL)
+                    {
+                        if (sqlite3_column_type(query.Value, 2) != SQLITE_INTEGER)
+                            return {Status::StorageError};
+                        const int64_t membershipExpiry = sqlite3_column_int64(query.Value, 2);
+                        if (membershipExpiry <= now) return {Status::StorageError};
+                        if (!expiry || membershipExpiry < *expiry) expiry = membershipExpiry;
+                    }
                     if (effect == 1) denied = true;
                     else allowed = true;
                 }

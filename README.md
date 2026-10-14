@@ -14,8 +14,8 @@ observations were consistent across that relogin; this does not establish
 storefront provenance, authentication or a durable player/session contract.
 
 The prototype baseline passed **147 CTest checks** before the latest identity
-and lifecycle extension. The current build now passes **156/156 CTest checks**,
-including the new identity and lifecycle fixtures. Those automated checks
+and lifecycle extension. The current build now passes **158/158 CTest checks**,
+including identity/lifecycle, command-permission and delivery-receipt fixtures. Those automated checks
 cover runtime and plugin behavior; the real-client observation establishes
 the in-game command/reply path. Steam acceptance, reply separation between two
 real players and the remaining session cases are still pending.
@@ -85,6 +85,14 @@ commands and 88 acceptance cases with expected results and a report template.
 Cases remain pending until actual client observations are recorded. The
 announcement publisher attaches the reviewed guide to the operator-selected
 Discord channel; communication itself does not mark a gameplay case accepted.
+
+The [gameplay parity contract](docs/GAMEPLAY_PARITY_CONTRACT.md) requires original
+native implementations with matching observable behaviors. The dated ASE
+inventory contains 157 catalog entries, including the framework and possible
+duplicate products; it does not assert coverage of all existing plugins.
+Permission decisions and exact inventory-delta verification now have private
+tested services. Verified account/session correlation and authoritative native
+inventory evidence are still required before live authorization or fulfillment.
 
 ## Build and test
 
