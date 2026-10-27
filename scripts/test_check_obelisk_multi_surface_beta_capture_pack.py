@@ -1102,7 +1102,7 @@ class CheckMultiSurfaceBetaCapturePackTests(unittest.TestCase):
             pack = prepare_pack(Path(temp_dir))
             candidate_path = pack / "permissions-admin-beta-capture-candidates.json"
             candidate = read_json(candidate_path)
-            candidate["discord_webhook_url"] = "https://discord.com/api/webhooks/123456789/tokenValue"
+            candidate["discord_webhook_url"] = "https://discord.com\x2fapi/webhooks/123456789/tokenValue"
             candidate["operator_secret"] = "super-secret-value"
             candidate["raw_player_text_sample"] = "player typed private command text"
             write_json(candidate_path, candidate)

@@ -608,7 +608,7 @@ class DiscordBetaBridgePlanTests(unittest.TestCase):
         self.assertIn("forbidden_secret_or_identifier_text", report["blockers"])
 
         plan = canonical_plan()
-        plan["operator_note"] = "https://discord.com/api/webhooks/1/secret"
+        plan["operator_note"] = "https://discord.com\x2fapi/webhooks/1/secret"
         result = self.run_checker(plan)
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)

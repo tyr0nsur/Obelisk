@@ -1,0 +1,446 @@
+{
+  "archive": "flowark-panel-and-ark-cluster-configs.zip",
+  "archive_sha256": "09d6cf020a57bed3369c89a4f9c7ef93b35c15bd93b745833f40be1394a4a21f",
+  "archive_prefix": "flowark-panel/dashboard/",
+  "source_origin": "User-provided FlowArk dashboard archive; historical git remote tyr0nsur/arkmanager",
+  "recovered_date": "2026-10-27",
+  "license_notice": "No project LICENSE or NOTICE was present in the selected archive. Retain dependency license notices when packaging. Recovered source remains private.",
+  "excluded": [
+    ".git",
+    "credentials",
+    ".env and deploy/env",
+    "runtime data",
+    "admin and player records",
+    "databases",
+    "logs",
+    "backups",
+    "build/dist",
+    "node_modules",
+    "Next.js marketing site",
+    "Discord bot",
+    "ArkApi source/plugin archive"
+  ],
+  "redactions": [],
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "97135b24e156a095e7829fb2268e93fc3f260d1a89a0482e877871ba297a264e",
+      "bytes": 207
+    },
+    {
+      "path": "DEPLOYMENT.md",
+      "sha256": "d87e71fb276673d7af886ba978a45ed02aae197aeb2df50a291e043b1a537a37",
+      "bytes": 14128
+    },
+    {
+      "path": "PRODUCTION_READINESS.md",
+      "sha256": "09002d552ec96f506994404c3aa5bd3eef632438a33d35a201a24427b08379f5",
+      "bytes": 68839
+    },
+    {
+      "path": "README.md",
+      "sha256": "bc03362a79b5d77ed6cde7fab04f4e086236ddfd143611b2d24083d3c71b9f37",
+      "bytes": 2901
+    },
+    {
+      "path": "client/.gitignore",
+      "sha256": "fe718e7babb14f3cbad2d97f08889b9ce5215ed3fe0e43b2b8cfbfb3b9b844e8",
+      "bytes": 253
+    },
+    {
+      "path": "client/README.md",
+      "sha256": "a460b4dc7e6392e76aa54d844c9261b8db0adb7f967ba8300526456f1dcf5fb4",
+      "bytes": 1027
+    },
+    {
+      "path": "client/apply_soft_theme.cjs",
+      "sha256": "b789a3544f0fdc5887631d974adcbc143d0522c87d650ceedd46359ae6acea77",
+      "bytes": 3070
+    },
+    {
+      "path": "client/eslint.config.js",
+      "sha256": "283399cc843a014c62819f0bc373f7aabcd7bd91db563277987e4d3dc6d03592",
+      "bytes": 855
+    },
+    {
+      "path": "client/index.html",
+      "sha256": "f41bbb9e0d8042dafb941017dc3c9e31737b2338771d58e686734f42e7f6ac27",
+      "bytes": 588
+    },
+    {
+      "path": "client/package-lock.json",
+      "sha256": "70d9dea630aa1d7651dd0cb3692241a8f5c375accfe0961a93c2b25c385f80a2",
+      "bytes": 129729
+    },
+    {
+      "path": "client/package.json",
+      "sha256": "50554347435db205a6005529fbdf601a0c6f0b13ee27de1cd2422de39e08a59a",
+      "bytes": 1094
+    },
+    {
+      "path": "client/public/favicon.svg",
+      "sha256": "b7c8005cfa1106b89725dfa3b9ff5b4a37fd02fa531b353704aaf47310995fad",
+      "bytes": 665
+    },
+    {
+      "path": "client/public/icons.svg",
+      "sha256": "b45fa506195cfcdef406ba9f0c77b36ddc1a7c224040926ec70abc2fdea7b93a",
+      "bytes": 5031
+    },
+    {
+      "path": "client/src/App.css",
+      "sha256": "6e25a776d3e8102da5bacb3cb99f4a5fc662a2e01e6143140671a556d28c3d5c",
+      "bytes": 2891
+    },
+    {
+      "path": "client/src/App.jsx",
+      "sha256": "45081abfc8d3fd4fbb56334bf8cf7c8cd45b94430ce446ef6882298006af9de8",
+      "bytes": 9422
+    },
+    {
+      "path": "client/src/assets/hero.png",
+      "sha256": "881ffbcaafc212e49addad08846a5b82761355fa20624253af3477ba33262c5c",
+      "bytes": 13057
+    },
+    {
+      "path": "client/src/components/Login.jsx",
+      "sha256": "b0246bd9ee383b59bab4c1d87451a65fd6d7b95b3273383f3e160cf49c571228",
+      "bytes": 10133
+    },
+    {
+      "path": "client/src/components/charts/ResourceGauge.jsx",
+      "sha256": "d638e22ca7b23ef8ef9c8035a4e192f95b00e4ac5afde62d4ffe842c53f680f7",
+      "bytes": 2316
+    },
+    {
+      "path": "client/src/components/charts/ResourceTrendChart.jsx",
+      "sha256": "45c948cd26b5a46df74b555a5d0dac14355d11e477805b419ed122d9b4ab6bb9",
+      "bytes": 4040
+    },
+    {
+      "path": "client/src/components/deployer/MaintenanceTools.jsx",
+      "sha256": "26acab09bbe1b252db6bbec37abe857f5a95098d942457cd947e61afc9da4d7f",
+      "bytes": 7844
+    },
+    {
+      "path": "client/src/components/deployer/NativeOrchestratorPanel.jsx",
+      "sha256": "dd5e6d271d579012a368cb5f9fd618c5f5b01fa2f4cdb00f3591a3dc7ebd88ea",
+      "bytes": 21509
+    },
+    {
+      "path": "client/src/components/deployer/NewServerForm.jsx",
+      "sha256": "58f586418346ed3018bc5206c47f0483a8dab7a726a2397e50de918c53087e92",
+      "bytes": 4625
+    },
+    {
+      "path": "client/src/components/deployer/NodesList.jsx",
+      "sha256": "7446f9e5a7dc545b09c09f6484fe05293ac89d3328e3a840fa157c367c824ea3",
+      "bytes": 7664
+    },
+    {
+      "path": "client/src/components/deployer/WipeTools.jsx",
+      "sha256": "6e452e9d74165d66854a280f9c150feef02cf1c6b85882622072fecc721e21c7",
+      "bytes": 2646
+    },
+    {
+      "path": "client/src/components/files/VisualConfigEditor.jsx",
+      "sha256": "98507bcc1c1fff0e18cce9754747231e57e88d8f29611e4be1ca292d87dffd68",
+      "bytes": 3878
+    },
+    {
+      "path": "client/src/components/layout/GlobalPlayersSidebar.jsx",
+      "sha256": "0a13766f05b8ed752f7b019f58d83cc1e93d1672450f9aeca8baf1b980dbca72",
+      "bytes": 14156
+    },
+    {
+      "path": "client/src/components/layout/OperationalContextBar.jsx",
+      "sha256": "6f9dc80d03bc6fd90da6eb9abeddafa90fe6570bf57f18ce4fed96073aab3bbc",
+      "bytes": 4783
+    },
+    {
+      "path": "client/src/components/layout/Sidebar.jsx",
+      "sha256": "9ee2903d5975ea34f48170c5a97c691befd00ec731977dfc32422fa3083036fe",
+      "bytes": 19283
+    },
+    {
+      "path": "client/src/components/layout/TopNavbar.jsx",
+      "sha256": "05c4c7f1ee3bed0a2b562a5a3b182413768a66dfb5921cc9fb379e9ba077c1f0",
+      "bytes": 21382
+    },
+    {
+      "path": "client/src/components/ui/ActionBtn.jsx",
+      "sha256": "9d686573edaa749ebf11fac1013973fd07f405d92ceb9fef79e6024900ba01d8",
+      "bytes": 968
+    },
+    {
+      "path": "client/src/components/ui/ConfirmModal.jsx",
+      "sha256": "bee3155d0a30e125bab507dc6c32608770c9f16e34a3709b25e065c98e0ca556",
+      "bytes": 9876
+    },
+    {
+      "path": "client/src/components/ui/DashboardToaster.jsx",
+      "sha256": "b40c8733385a20ec15ebf63b4f444a53f4bf99f7cbd4ec27c0ae7abe0f9a1772",
+      "bytes": 293
+    },
+    {
+      "path": "client/src/components/ui/MiniStat.jsx",
+      "sha256": "9f0f0e2eadb31e2337b406991748a3cd09e3dd1d45a363e39d7c2149932536fa",
+      "bytes": 842
+    },
+    {
+      "path": "client/src/components/ui/SidebarSection.jsx",
+      "sha256": "437c88b6fdbd04d5585503cecc0ac9e40be74fd9faf9b9dc7c73c68d104e7384",
+      "bytes": 330
+    },
+    {
+      "path": "client/src/components/ui/StatCard.jsx",
+      "sha256": "866822834611e3f44a135e9971da65f30daf2019872648c9ad5f57da97d97f5c",
+      "bytes": 1283
+    },
+    {
+      "path": "client/src/components/ui/TabButton.jsx",
+      "sha256": "de818e398d479fa2759192c754c76182f1dc61535aa9296baeb6732c9479cf1e",
+      "bytes": 1463
+    },
+    {
+      "path": "client/src/constants/adminValidation.js",
+      "sha256": "9586dd7f254c7b4107a8daa33fb4afb630649b04c167d59b4dee94b4f69beef8",
+      "bytes": 1166
+    },
+    {
+      "path": "client/src/constants/dashboard.js",
+      "sha256": "56543c01d3f38f2b6f78898bda50fe56b45634d98074f06b7929986ae19ffb89",
+      "bytes": 21060
+    },
+    {
+      "path": "client/src/constants/permissions.js",
+      "sha256": "7550676926573c40ec7e9f2ccdbfc951e4ec96ee1ad6bed9dd81468d672da62c",
+      "bytes": 1261
+    },
+    {
+      "path": "client/src/constants/roles.js",
+      "sha256": "b9267e588a562001be5e08b86d4391369cbf970409f104e438ca980bd5bdc556",
+      "bytes": 589
+    },
+    {
+      "path": "client/src/context/DashboardContext.jsx",
+      "sha256": "a4e4c8c9d6782d5aef76aab4e6a3db5e275447ee0eac000b560603341c100ad2",
+      "bytes": 720
+    },
+    {
+      "path": "client/src/hooks/useDashboardState.jsx",
+      "sha256": "3bb14ebc29e768591406fd7e8dfb63ec8bf542a69e1bf6bc7cfcbc5c3d895f20",
+      "bytes": 66253
+    },
+    {
+      "path": "client/src/index.css",
+      "sha256": "a91a6eb80c4ad36efd545fffeeaee5f1f9fc66ed1690b63c90ab1be2dd14267f",
+      "bytes": 7841
+    },
+    {
+      "path": "client/src/main.jsx",
+      "sha256": "8944ada01c6883d9b98430df9f8c8d6c3bfe0a3d920b244919a1ac400bb3143e",
+      "bytes": 347
+    },
+    {
+      "path": "client/src/pages/AdminsView.jsx",
+      "sha256": "f116fcda6f68820784c53bfca2918b34624c4ec1a9f8897e9c3c453940cf98ac",
+      "bytes": 27192
+    },
+    {
+      "path": "client/src/pages/AuditLogView.jsx",
+      "sha256": "0c8649ab793de8571315de4eff2eba1f55e73ee80746ec789c7c3efeb9f94415",
+      "bytes": 9013
+    },
+    {
+      "path": "client/src/pages/BansView.jsx",
+      "sha256": "dabbeab97b5025a6350ed8dc0ae6b8f92166fe7eb4dbd7b4a1d640d518bb13fa",
+      "bytes": 9561
+    },
+    {
+      "path": "client/src/pages/ClusterOverview.jsx",
+      "sha256": "56bba93be0bed6b57bec52861aa9861ec84203085d6c81dacd7d50b343fa7694",
+      "bytes": 15262
+    },
+    {
+      "path": "client/src/pages/DeployView.jsx",
+      "sha256": "75259942a94bb380b8444ca81c360f5a0fd1e1a8d22e6b53d24fbda9d2971d08",
+      "bytes": 9212
+    },
+    {
+      "path": "client/src/pages/FileManager.jsx",
+      "sha256": "52751ee0582c0c1c308049c4b6c8f8b118df2f405939d89238c31930c657eca5",
+      "bytes": 27233
+    },
+    {
+      "path": "client/src/pages/GlobalSettings.jsx",
+      "sha256": "1c662977da3911493ace130721da002fd02fa57808b58231475a60934dddefd1",
+      "bytes": 36196
+    },
+    {
+      "path": "client/src/pages/PlayersView.jsx",
+      "sha256": "b865a450f7295fa33f6c208c27deabdf6c372ba514a4f163017e8e4eaeea7bb6",
+      "bytes": 15736
+    },
+    {
+      "path": "client/src/pages/PluginsView.jsx",
+      "sha256": "388b22d59b98035a193898723cb137c804e5c2d9f962cd8f8ac5f0d92eda1754",
+      "bytes": 34830
+    },
+    {
+      "path": "client/src/pages/RconConsole.jsx",
+      "sha256": "c2c755bf30b9784e60e58bc50db01b47fe0f5afba65411f992fddede94c266cd",
+      "bytes": 21276
+    },
+    {
+      "path": "client/src/pages/ServerDashboard.jsx",
+      "sha256": "c0b59bebcb5f23c38a1a0fcdc119d78dc54ec047e3a30f136cea729e082f0f0c",
+      "bytes": 7988
+    },
+    {
+      "path": "client/src/pages/SettingsView.jsx",
+      "sha256": "fe56b6e75ff0aa88ba9a998700690a605cd346b16c79787782139103f5af40a0",
+      "bytes": 18389
+    },
+    {
+      "path": "client/src/pages/SystemHealth.jsx",
+      "sha256": "ae336be5ec8897ace6f4259894320a8952dde29498c1e93e752c87db4fb65956",
+      "bytes": 22804
+    },
+    {
+      "path": "client/src/pages/TasksManager.jsx",
+      "sha256": "ad592b7d2f590343b6b5eec37baf6375b5696eac8839188673d0503e25a25264",
+      "bytes": 57247
+    },
+    {
+      "path": "client/src/utils/cn.js",
+      "sha256": "eda3beb73fdfba01f4aacb1b6c1913b02238bc20254793bc9c6ef3c0dc5e72ea",
+      "bytes": 138
+    },
+    {
+      "path": "client/src/utils/configLine.js",
+      "sha256": "6423104b582755ae05e55e01495b3a234ef8961a8a84b528a1c38bbadca75a60",
+      "bytes": 2208
+    },
+    {
+      "path": "client/src/utils/cronPreview.js",
+      "sha256": "e260efb5889b20adf5e250a75cb5e7ccea0fd3cf54ee5392524aec3f591e25e5",
+      "bytes": 4426
+    },
+    {
+      "path": "client/src/utils/taskCron.js",
+      "sha256": "c7a1c7edc1fe8fdc166d288dc4dfbb69803a285269a40739e6038e3015bc03c2",
+      "bytes": 19525
+    },
+    {
+      "path": "client/test/dashboard-state.test.mjs",
+      "sha256": "8086581e75b0ab28ea3f316bfadc0115aa84a782264502da5c73b2c27d9c6e1a",
+      "bytes": 192730
+    },
+    {
+      "path": "client/update_health.cjs",
+      "sha256": "552f649f0c9613f8650833a51762909bcc4bb4139966687ab8f051d2c5124a47",
+      "bytes": 22102
+    },
+    {
+      "path": "client/vite.config.js",
+      "sha256": "960862ae37a95b33b602ac7d3d131e8652df0fbe108e022eb3410c14d90e25f9",
+      "bytes": 1343
+    },
+    {
+      "path": "deploy/check-dashboard-health.sh",
+      "sha256": "3be74fab5d93f729e5d72c808e12e548a521f05b69380305d82a48a386aef8b6",
+      "bytes": 8339
+    },
+    {
+      "path": "deploy/check-deploy-templates.sh",
+      "sha256": "7c3e420b530cb8ce9effda27937fa34111e8046b0b1aa5ec41ca6bc74106cf47",
+      "bytes": 19892
+    },
+    {
+      "path": "deploy/check-production-env.sh",
+      "sha256": "4e5dfafce63c2a55688ef761d5215e2997fedcbcfd6b4aca4feef6305099b5d8",
+      "bytes": 9991
+    },
+    {
+      "path": "deploy/check-production-ready.sh",
+      "sha256": "60a72685636d52d036fa5d9979479d1d99cdee181475cef63a9a882e01af7c89",
+      "bytes": 1066
+    },
+    {
+      "path": "deploy/logrotate/flowark-dashboard",
+      "sha256": "a8138230130bf45dc30524ec87a56309144947c8b4ece2ed3065d2ec66790784",
+      "bytes": 138
+    },
+    {
+      "path": "deploy/manage-dashboard-data.sh",
+      "sha256": "f707b1af94b14b44e01a14946f17b1b2cf6a0de58202e6fb37309dd530b9b254",
+      "bytes": 6012
+    },
+    {
+      "path": "deploy/nginx/flowark-dashboard-map.conf",
+      "sha256": "13693d2a3e54f06c5f80772850fa8920e9486638959b7eba9a6fe26fb2e44c94",
+      "bytes": 156
+    },
+    {
+      "path": "deploy/nginx/flowark-dashboard.conf",
+      "sha256": "d33bfc6798feda4fd48d1db35401a8de1de35e009c83fe5d9ee982ec95022c77",
+      "bytes": 1422
+    },
+    {
+      "path": "deploy/pm2/ecosystem.config.cjs",
+      "sha256": "15059446545d7b2a45556f217503a367859f1120efbc048862ab4258ea15e068",
+      "bytes": 430
+    },
+    {
+      "path": "deploy/start-pm2.sh",
+      "sha256": "53a3e3c1ce9ac954da17cf209cb4c1a189caee2aa9f234e1bfad7e1044f5026f",
+      "bytes": 3204
+    },
+    {
+      "path": "deploy/systemd/flowark-dashboard.service",
+      "sha256": "76e4002f818b8c834baee15c7596a49d69b0d59136051dd29ff1bbfd6639a30f",
+      "bytes": 1765
+    },
+    {
+      "path": "docs/orchestrator-install-branch.md",
+      "sha256": "ca2a4f5f72e8fe6c0ca55dc371dc2b42ccbc5bdee33f4da156a28229cdc3a5eb",
+      "bytes": 9985
+    },
+    {
+      "path": "server/package-lock.json",
+      "sha256": "ab1818900ed137bae4e63fe0d1fbece80abdb01ef09f7f7eff5c55742dca11ce",
+      "bytes": 76390
+    },
+    {
+      "path": "server/package.json",
+      "sha256": "5b2fbf0cec98ee8f00dae7ea8d567c27b8c798a708ca4bf89343aa66f5270f55",
+      "bytes": 731
+    },
+    {
+      "path": "server/server.js",
+      "sha256": "f29044ada222b3e139de5e0cbcff930bbf3f1dbbf13908ce76d2e51a7b10435f",
+      "bytes": 216958
+    },
+    {
+      "path": "server/test/bootstrap.test.js",
+      "sha256": "e94f491eeddf70fc8f6cd565e68110c979b9321105fd14e59eb9a5216dd61725",
+      "bytes": 27996
+    },
+    {
+      "path": "server/test/config-secrets.test.js",
+      "sha256": "80df8636be96c93dbd131c655c0604f83a79dc7889f558745894050d74b1bdb6",
+      "bytes": 141775
+    }
+  ],
+  "post_recovery_exclusions": [
+    {
+      "path": "client/apply_soft_theme.cjs",
+      "reason": "Historical one-off source rewrite script; obsolete after integrated ObeliskNative views. Original retained in the source ZIP."
+    },
+    {
+      "path": "client/update_health.cjs",
+      "reason": "Historical one-off source rewrite script; obsolete after integrated ObeliskNative views. Original retained in the source ZIP."
+    }
+  ]
+}

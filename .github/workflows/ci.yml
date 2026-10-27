@@ -1,4 +1,4 @@
-name: Native prototype CI
+name: ObeliskNative ecosystem CI
 
 on:
   pull_request:
@@ -10,6 +10,46 @@ permissions:
   contents: read
 
 jobs:
+  panel:
+    name: ObeliskNative Panel and Hub
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: |
+          npm --prefix apps/flowark/client ci --ignore-scripts
+          npm --prefix apps/flowark/server ci --ignore-scripts
+
+      - name: Validate and build frontend before backend asset checks
+        run: |
+          npm --prefix apps/flowark/client run lint
+          npm --prefix apps/flowark/client test
+          npm --prefix apps/flowark/client run build
+          npm --prefix apps/flowark/server test
+
+  artifacts:
+    name: Experimental artifact cryptography and packaging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify signed packaging and isolated staging
+        run: python3 scripts/test_obelisk_artifacts.py
+
+      - name: Reject committed secrets
+        run: python3 scripts/test_secret_guardrails.py
+
   scripts:
     name: Script tests
     runs-on: ubuntu-24.04

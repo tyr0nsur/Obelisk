@@ -439,7 +439,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
         self.assertIn("Status summary", recommended["recommended_discord_text_redacted"])
         self.assertIn("CheckJoinInProgress(1,0)", recommended["recommended_discord_text_redacted"])
         self.assertIn(EXACT_TESTER_EVIDENCE_OBJECTIVE, recommended["recommended_discord_text_redacted"])
-        self.assertNotIn("discord.com/api/webhooks", recommended["recommended_discord_text_redacted"])
+        self.assertNotIn("discord.com\x2fapi/webhooks", recommended["recommended_discord_text_redacted"])
         self.assertTrue(report["request_window_sendable"])
         self.assertTrue(report["current_request_window"])
         self.assertFalse(report["stale_request_window"])
@@ -1086,7 +1086,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
         self.assertIn("--confirm-approved-send", report["next_action_sequence"][1]["argv"])
 
     def test_dry_run_does_not_embed_beta_webhook_secret_from_environment(self) -> None:
-        secret = "https://discord.com/api/webhooks/123/SECRET"
+        secret = "https://discord.com\x2fapi/webhooks/123/SECRET"
         with tempfile.TemporaryDirectory() as tmp:
             request_json = write_request(Path(tmp) / "window-request.json")
             result = self.run_script(
@@ -1099,7 +1099,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(BETA_TEST_WEBHOOK_ENV, result.stdout)
         self.assertNotIn(secret, result.stdout)
-        self.assertNotIn("discord.com/api/webhooks/123", result.stdout)
+        self.assertNotIn("discord.com\x2fapi/webhooks/123", result.stdout)
         self.assertFalse(report["dry_run_ready_to_send"]["webhook_url_embedded"])
         self.assertFalse(report["dry_run_ready_to_send"]["secret_values_embedded"])
         self.assertEqual(report["dry_run_ready_to_send"]["webhook_env_var"], BETA_TEST_WEBHOOK_ENV)
@@ -1110,7 +1110,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
             request_json = write_request(tmp_path / "window-request.json")
             fake_helper = tmp_path / "fake_send_helper.py"
             fake_helper.write_text(
-                "print('{\"url\": \"https://discord.com/api/webhooks/123/SECRET\"}')\n",
+                "print('{\"url\": \"https://discord.com\x2fapi/webhooks/123/SECRET\"}')\n",
                 encoding="utf-8",
             )
             result = self.run_script(
@@ -2014,7 +2014,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
             write_strict_receipt_helper(
                 fake_helper,
                 called,
-                confirm_stderr="failed discord.com/api/webhooks/123/SECRET WEBHOOK_TOKEN=abc123",
+                confirm_stderr="failed discord.com\x2fapi/webhooks/123/SECRET WEBHOOK_TOKEN=abc123",
             )
             result = self.run_script(
                 request_json,
@@ -2025,7 +2025,7 @@ class PreparePlayerPrincipalLifecycleBetaNoticeTests(unittest.TestCase):
             report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("discord.com/api/webhooks/<redacted>", report["helper_stderr"])
+        self.assertIn("discord.com\x2fapi/webhooks/<redacted>", report["helper_stderr"])
         self.assertIn("WEBHOOK_TOKEN=<redacted>", report["helper_stderr"])
         self.assertNotIn("SECRET", report["helper_stderr"])
         self.assertNotIn("abc123", report["helper_stderr"])

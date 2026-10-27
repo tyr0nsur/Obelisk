@@ -1,8 +1,25 @@
-# Obelisk — native Linux ARK plugin prototype
+# ObeliskNative — native Linux ASE ecosystem
 
-This private repository contains the native Linux runtime and plugin API being
-developed for **ARK: Survival Evolved**. The public project name is
-**ObeliskNative**; Obelisk remains the internal source and ABI name.
+This private repository contains the **ObeliskNative** ecosystem for
+**ARK: Survival Evolved on Linux**: Runtime, Hub, Panel and versioned Artifacts.
+Obelisk remains the internal C ABI name. The panel was recovered from the
+operator's FlowArk project; its source path and legacy environment variables
+remain compatible.
+
+As of **27 October 2026**, the local experimental panel integrates six original
+native modules, instance-specific cooperative plugin control, signed artifact
+discovery, console and player capabilities, and reviewed PvE/PvP/Hardcore
+configuration changes. The 157 ASE catalog entries are migration references,
+not installable ObeliskNative plugins. Source remains private; the public
+repository contains presentation and progress only.
+
+Start with [ecosystem scope](docs/OBELISKNATIVE_ECOSYSTEM.md),
+[the panel](apps/flowark/README.md),
+[artifact distribution](docs/ARTIFACTS.md) and
+[current validation and local access](docs/ECOSYSTEM_VALIDATION_2026-10-27.md).
+The freemium offer is a proposal, not a live subscription. Gameplay acceptance,
+authenticated Steam/Epic identity, live inventory fulfillment and stable shutdown
+remain open. The game laboratory is currently stopped; the panel runs separately.
 
 ## Verified milestone
 
@@ -33,10 +50,10 @@ for the current target, evidence and remaining checks.
 
 ## Plugin lifecycle milestone
 
-The installed native runtime now controls the cooperative `oPing` plugin through
+On 14 October, the installed native runtime controlled the cooperative `oPing` plugin through
 an OS-local operator socket. Thirteen live requests covered status, pause,
 resume, two reloads, stop and start while the game server PID remained unchanged.
-Four plugin generations loaded; the final generation is running. Cleanup closes
+Four plugin generations loaded during that test. This is historical live evidence, not current uptime. Cleanup closes
 admission and drains callbacks, registrations and user-data destruction before
 Shutdown. Failed cleanup or lifecycle exceptions retain mapped code.
 
@@ -49,8 +66,8 @@ See [operator lifecycle](docs/PLUGIN_LIFECYCLE_OPERATIONS.md) and
 
 ## Current development
 
-The immediate work is a small, useful Linux plugin demonstrated with real
-clients. The operator-authorized scope is recorded in
+The current work integrates the native suite, Hub, panel and distribution while
+accepting each gameplay feature with real clients. The operator-authorized scope is recorded in
 [the October reboot review](docs/REBOOT_2026-10-13.md); its initial installation
 and smoke-test details are historical, while `OPING_PROTOTYPE.md` tracks the
 active public-branch target.
@@ -146,7 +163,8 @@ hooks/                ProcessEvent and private native chat/lifecycle adapters
 loader/               LD_PRELOAD bootstrap
 runtime/              Logging, binary identity and runtime services
 ue/                   Private UE memory, text and class validation helpers
-plugins/              Other retained reference and experimental plugins
+plugins/              First-party suite and retained experimental examples
+apps/flowark/         ObeliskNative panel and Hub (recovered FlowArk source)
 examples/             Installed SDK package examples
 tests/               Offline C++, plugin, ABI and SDK consumer checks
 docs/                Current prototype notes and historical research/planning
@@ -157,7 +175,7 @@ packaging/           Harness and LinuxGSM wrapper templates
 ## Runtime and plugin contract
 
 The isolated prototype uses `LD_PRELOAD`, a binary-verified private adapter and
-one plugin, `oPing.so`. The active runtime is described in
+six original utility modules. `oPing.so` is the minimal command example. The active runtime is described in
 [OPING_PROTOTYPE.md](docs/OPING_PROTOTYPE.md). Runtime libraries, plugin binaries,
 configuration and logs belong under an operator-chosen runtime root:
 

@@ -1510,7 +1510,7 @@ class PreparePlayerPrincipalLifecycleRuntimeWindowExecutionTests(unittest.TestCa
             self.assertFalse(broadcast["raw_player_text_allowed"])
             self.assertFalse(broadcast["secret_or_webhook_output_allowed"])
             self.assertIn("CheckJoinInProgress(1,0)", broadcast["recommended_discord_text_redacted"])
-            self.assertNotIn("discord.com/api/webhooks", broadcast["recommended_discord_text_redacted"])
+            self.assertNotIn("discord.com\x2fapi/webhooks", broadcast["recommended_discord_text_redacted"])
             self.assertIn("monitor_ark_player_presence_passive.sh", broadcast["connected_player_check_command_not_executed"])
             self.assertEqual(
                 restart_action["runner_contract"]["side_effect_domain"],

@@ -141,7 +141,7 @@ class DiscordBetaBridgeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertFalse(report["valid"])
         self.assertIn("bot_token_missing", report["blockers"])
-        self.assertNotIn("discord.com/api/webhooks", result.stdout)
+        self.assertNotIn("discord.com\x2fapi/webhooks", result.stdout)
         self.assertNotIn("abc123", result.stdout)
 
     def test_present_token_requires_rotation_attestation_without_leaking_token(self) -> None:

@@ -55,3 +55,16 @@ Use focused build/tests and recorded runtime evidence. The first required
 gameplay acceptance test needs a real client: command, targeted reply,
 two-player distinction, and disconnected-session rejection. Do not infer it
 from a timer, injection, static decompilation, or fixture success.
+
+# Current ecosystem integration (27 October 2026)
+
+The operator now requests the whole ecosystem under the ObeliskNative brand:
+Runtime, Hub, Panel and versioned Artifacts, with a proposed freemium offer.
+Reuse the recovered FlowArk source in apps/flowark; legacy paths/variables are
+compatibility details. Current scope and acceptance are in
+docs/OBELISKNATIVE_ECOSYSTEM.md and docs/ECOSYSTEM_VALIDATION_2026-10-27.md.
+Keep the 157 external references distinct from six implemented native modules.
+The local panel is separate from the stopped ARK lab; configured RCON is not
+verified connectivity. Never infer authenticated Steam/Epic identity from an
+observed native ID. Signed experimental artifacts do not establish gameplay
+acceptance and must not activate a running server automatically.

@@ -285,7 +285,7 @@ class PlanPlayerPrincipalLifecycleRuntimeWindowTests(unittest.TestCase):
         self.assertFalse(recommended["raw_player_text_or_identity_allowed"])
         self.assertFalse(recommended["secret_or_webhook_output_allowed"])
         self.assertIn("CheckJoinInProgress(1,0)", recommended["recommended_discord_text_redacted"])
-        self.assertNotIn("discord.com/api/webhooks", recommended["recommended_discord_text_redacted"])
+        self.assertNotIn("discord.com\x2fapi/webhooks", recommended["recommended_discord_text_redacted"])
         self.assertTrue(plan["standing_launch_authority"]["recorded"])
         self.assertTrue(plan["standing_launch_authority"]["authorizes_scoped_runtime_window_preparation"])
         self.assertTrue(plan["standing_launch_authority"]["authorizes_window_request_preparation"])

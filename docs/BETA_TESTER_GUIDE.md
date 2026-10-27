@@ -1,6 +1,6 @@
 # ObeliskNative — guía de comandos y aceptación beta
 
-Actualización: 14 de octubre de 2026. Inventario contrastado con los seis módulos
+Actualización: 27 de octubre de 2026. Inventario contrastado con los seis módulos
 y su configuración activa. Las secciones siguientes están pensadas para lectura
 en Discord. Adjunta este documento como guía completa junto al resumen de
 comandos; la numeración permite localizar cada etapa y reportar sus casos.
@@ -10,6 +10,8 @@ comandos; la numeración permite localizar cada etapa y reportar sus casos.
 **ObeliskNative · beta de ARK: Survival Evolved para Linux**
 
 Tenemos seis módulos y 20 comandos de chat para probar en TheIsland: utilidades, catálogo de tienda/kits, homes de sesión, chat avanzado y consultas de dinos, estructuras y tribus.
+
+**Estado del laboratorio (27 de octubre):** el proceso de ARK está detenido; coordina una ventana con administración antes de intentar conectar. El panel privado funciona por separado. Esta actualización no acepta casos nuevos de gameplay.
 
 **Cómo probar:** entra al servidor y escribe los comandos en el **chat del juego**, una vez cargado tu personaje. No se escriben en el menú principal ni requieren la consola administrativa. Las credenciales de acceso se facilitan por el canal privado que indique la administración.
 
@@ -293,3 +295,18 @@ Comparte la evidencia en el canal de beta indicado. Oculta IP, contraseñas, IDs
 Privacidad de respuestas/privados, rechazo de sesiones antiguas, movimiento controlado de homes y cierre íntegro del servidor requieren validación explícita antes de ampliar el piloto. Las entregas de tienda/kits siguen siendo otro hito desactivado.
 
 Avances públicos del proyecto: https://github.com/tyr0nsur/ObeliskNative
+
+## Ecosistema ObeliskNative — avance del 27 de octubre
+
+La marca reúne Runtime, Hub, Panel y Artifacts. El Hub distingue seis módulos
+nativos de 157 referencias ASE pendientes. El panel incorpora capacidades por
+instancia, consultas de jugadores incompletas explícitas, consola por mapa y
+revisión de configuración PvE/PvP/Hardcore antes de guardarla. Cambiar el modo
+requiere reiniciar el servidor; estas herramientas son para administración.
+
+Hay un artifact experimental firmado y verificado en distribución privada, sin
+activación automática. El acceso al panel se coordina por privado; no publiques
+credenciales, rutas de instalación, IDs o detalles de infraestructura. Las
+pruebas de interfaz y firma no confirman nuevas funciones dentro del juego.
+
+Presentación y capturas revisadas: https://github.com/tyr0nsur/ObeliskNative

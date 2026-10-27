@@ -1,3 +1,9 @@
+> Nota histórica, 27 de octubre de 2026: esta planificación precede la
+> integración de la suite y del panel. Consultar el
+> [estado actual del ecosistema](OBELISKNATIVE_ECOSYSTEM.md) para el ámbito
+> vigente. Los requisitos de evidencia se conservan; las restricciones de
+> planificación anteriores no sustituyen las instrucciones actuales del operador.
+
 # Plugin Hub Package Template
 
 Plugin Hub package work is post-SDK-complete. Use this template only when archived

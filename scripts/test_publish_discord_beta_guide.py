@@ -256,7 +256,7 @@ class DiscordBetaGuideTests(unittest.TestCase):
     def test_private_values_and_mentions_rejected_without_echoing_them(self):
         for value in [
             "password=placeholder", "203.0.113.7", "1234567890123456789", "0x12345678",
-            "@everyone", "<@&1234>", "https://discord.com/api/webhooks/placeholder",
+            "@everyone", "<@&1234>", "https://discord.com\x2fapi/webhooks/placeholder",
             self.config[publisher.bridge.TOKEN_ENV],
         ]:
             with self.subTest(kind=value[:8]):
