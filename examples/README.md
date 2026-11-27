@@ -7,6 +7,14 @@ in-tree reference plugins used by Obelisk's own build and tests.
 They are foundation/contributor package-shape samples for the current installed SDK package,
 not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is complete.
 
+The current native command extension also has `sdk_command_plugin/`: an experimental
+installed-SDK C11 consumer for exact commands, opt-in argument matching, scoped directed
+replies and cooperative lifecycle. Its executable fixture validates ABI checks, partial
+registration cleanup, UTF-8 replies to two mock origins and repeated shutdown/reinit.
+Real-client Steam/Epic acceptance is separate. The historical foundation-only limits
+below describe the earlier templates; the command starter follows the current native
+contracts documented in `docs/SDK_QUICKSTART.md` and `include/obelisk/ObeliskApi.h`.
+
 - `sdk_minimal_plugin/`: smallest external C plugin using `find_package(Obelisk 0.1.0
   CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk`.
 - `sdk_descriptor_catalog/`: external C plugin that reads metadata-only resource and
@@ -55,7 +63,7 @@ and false non-claim markers for exact-version stable-claim aliases, public packa
 and v1 completion evidence. Treat those variables as release-boundary markers only, not
 as runtime capabilities or support activation.
 
-Examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
+Foundation examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
 private headers, raw UE pointers, `ProcessEvent` internals, identity, lookup, mutation,
 return overrides, new gameplay APIs, chat replies/send-chat, or ArkApi implementation
 patterns in creator-facing examples.

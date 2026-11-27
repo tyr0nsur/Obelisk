@@ -32,8 +32,8 @@ como autoridad. La rotación necesita entregar la nueva confianza explícitament
 
 ```bash
 python3 scripts/obelisk_artifacts.py build \
-  --build-dir /servidor/obelisk/build \
-  --source-root /servidor/obelisk/Obelisk \
+  --build-dir build \
+  --source-root . \
   --version 0.1.0-beta.1 \
   --channel experimental \
   --output-dir /ruta/privada/artifacts \

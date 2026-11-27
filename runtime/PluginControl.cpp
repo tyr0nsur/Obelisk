@@ -108,8 +108,11 @@ namespace Obelisk::Runtime
                 error = "socket path must be absolute with a safe basename";
                 return -1;
             }
-            int fd = ::open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-            if (fd < 0) { error = "cannot open filesystem root"; return -1; }
+            // Directory descriptors are used for traversal and *at operations,
+            // never listing. O_PATH also works under search-only directory ACLs
+            // and user-namespace profiles that deny directory reads.
+            int fd = ::open("/", O_PATH | O_DIRECTORY | O_CLOEXEC);
+            if (fd < 0) { error = std::string("cannot open filesystem root: ") + std::strerror(errno); return -1; }
             for (const auto& component : path.parent_path().relative_path())
             {
                 const auto name = component.string();
@@ -117,7 +120,7 @@ namespace Obelisk::Runtime
                 {
                     ::close(fd); error = "unsafe directory component"; return -1;
                 }
-                const int next = ::openat(fd, name.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+                const int next = ::openat(fd, name.c_str(), O_PATH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
                 ::close(fd);
                 if (next < 0) { error = "socket parent inaccessible or contains a symlink"; return -1; }
                 fd = next;

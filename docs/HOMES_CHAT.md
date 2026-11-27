@@ -1,9 +1,6 @@
 # Homes storage and advanced chat
 
-These are original ObeliskNative modules. Source and native implementation
-details stay in this private repository. Compilation, fixture execution, live
-registration, native RPC dispatch, and actual client acceptance are separate
-evidence stages; none implies another automatically.
+These first-party modules provide session homes and chat commands. Fixture tests cover the runtime contracts. Validate in-game behavior with connected clients on a test server.
 
 ## Advanced chat plugin
 

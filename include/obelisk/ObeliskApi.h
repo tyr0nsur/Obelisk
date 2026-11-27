@@ -10,6 +10,10 @@
 #define OBELISK_API_ABI_VERSION 1u
 #define OBELISK_PLUGIN_METADATA_ABI_VERSION 1u
 #define OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION 1u
+// Cooperative lifecycle declaration, independent of the API capability bits.
+// The plugin owns only runtime-managed callbacks; no unmanaged threads, deferred
+// work or external execution may outlive them. See the optional exports below.
+#define OBELISK_PLUGIN_LIFECYCLE_MANAGED_CALLBACKS_ONLY 1u
 #define OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS (1ull << 0)
 #define OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS (1ull << 1)
 #define OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS (1ull << 2)
@@ -519,10 +523,21 @@ typedef struct ObeliskApi {
 // struct_size/capabilities/non-null function pointers before using each appended slot.
 // __attribute__((visibility("default"))) bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context);
 //
-// Plugins may also export this optional lifecycle hook. When present, the runtime
-// calls it before unregistering plugin-owned callbacks and before dlclose.
+// Plugins may also export this optional lifecycle hook for cleanup before dlclose.
+// Cooperative stop/reload retires and drains managed callbacks before this hook.
 // The hook must be idempotent and must not throw across the C ABI boundary.
 // __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown();
+//
+// Optional cooperative hot-control exports (both required for stop/reload):
+// uint32_t ObeliskPlugin_LifecycleCapabilities(void);
+// bool ObeliskPlugin_PrepareUnload(void);
+// Export them with C linkage and default visibility. LifecycleCapabilities returns
+// OBELISK_PLUGIN_LIFECYCLE_MANAGED_CALLBACKS_ONLY only if ALL execution is owned
+// by runtime-managed registrations. The runtime closes admission and drains those
+// callbacks before PrepareUnload, then calls idempotent Shutdown before dlclose.
+// PrepareUnload must return false if cleanup cannot safely proceed; the runtime
+// retains the mapping on failure. These declarations do not authorize hook removal
+// or make unmanaged workers safe. Do not request control from a plugin callback.
 
 #ifdef __cplusplus
 }

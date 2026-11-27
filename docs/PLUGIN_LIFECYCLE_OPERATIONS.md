@@ -80,12 +80,6 @@ Shutdown and Init and requires the plugin's own persistence for state migration.
 
 Owner-gate and socket transport fixtures pass. These establish generation
 isolation, thread routing, cancellation and admission behavior in tests.
-The full build passes 153 CTests. Thirteen actual server requests covered
-status, pause/resume, two reloads and stop/start of oPing without changing the
-server PID; the final plugin generation is running. The private deployment
-artifact records those results separately from fixture success.
-Steam, two-player response isolation and broader gameplay acceptance remain
-separate pending cases.
 
 Shutdown or PrepareUnload exceptions are terminal for that generation. Status
 reports retained code and the last failure; another request does not repeat a
@@ -101,10 +95,3 @@ a path. Selected metadata must match the ID before configuration is seeded, and
 config/instance gates and the managed-only cooperative contract still apply.
 Plugin symlinks and traversal are rejected. Requests for a known stopped ID keep
 the existing start behavior. There is no rescan of unrelated library constructors.
-
-On 14 October the actual server started with oPing only. Publishing oEssentials
-and starting its new ID succeeded without another server restart. Eleven requests
-then exercised status, pause/resume, reload and stop/start with the same game PID;
-both packages ended running. A real-library fixture covers new-ID discovery,
-metadata mismatch before config writes, invalid config rollback and callback
-cleanup before dlclose. Gameplay and client presentation remain separate checks.
