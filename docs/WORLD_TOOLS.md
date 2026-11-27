@@ -2,8 +2,7 @@
 
 `oWorldTools` provides four read-only commands using copied native observations
 for the player issuing the current command. Its default configuration is
-disabled with an empty instance allowlist. Source and native analysis stay in
-the private repository.
+disabled with an empty instance allowlist.
 
 | Command | Current scope |
 |---|---|
