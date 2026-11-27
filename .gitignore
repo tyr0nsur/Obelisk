@@ -20,3 +20,16 @@ core.*
 *.dmp
 dumps/
 chat_config.json
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite*
+*.db
+node_modules/
+AGENTS.md
+/agent-skills/

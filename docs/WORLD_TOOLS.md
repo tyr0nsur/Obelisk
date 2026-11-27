@@ -45,8 +45,6 @@ creates no worker threads and requests the managed callback-only unload contract
 Pause/resume/stop/reload use the runtime's existing owner generation gate and
 drained cleanup before library closure.
 
-The private [native binding audit](research/NATIVE_SUITE_BINDINGS.md) independently
-ties current Linux registrations to implementations and exact executable bytes.
 The real shared-library integration fixture exercises position/tribe/dino/
 structure formatting, two distinct mock origins, missing fields and runtime
 context, invalid ABI/nonfinite position, argument boundaries, instance scoping,

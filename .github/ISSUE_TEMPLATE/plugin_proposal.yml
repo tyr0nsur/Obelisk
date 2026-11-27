@@ -1,7 +1,7 @@
 name: Plugin proposal
 description: Propose a first-party or example plugin.
 title: "[Plugin]: "
-labels: ["plugin"]
+labels: ["enhancement"]
 body:
   - type: textarea
     id: goal

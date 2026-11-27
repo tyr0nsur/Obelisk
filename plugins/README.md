@@ -14,6 +14,7 @@ reference plugins and may use repository-local test/build wiring.
 ```text
 plugins/
   oPing/         Native command and copied-player observation milestone.
+  oMonitor/      Local process and observed session monitor.
   oEssentials/   Help, rules, MOTD and server info with opt-in argument routing.
   oBaseEvents/    Official example plugin for events, config, ABI checks, and shutdown.
   oProcessTimer/  Official core example plugin for process-local Obelisk timers.
@@ -43,13 +44,6 @@ HTTP endpoints, resource identities, lookups, mutations, return overrides, or ra
 `ProcessEvent` access.
 
 ## Adding Creator-Facing Examples
-
-The current product scope includes an original native Linux administrative suite
-and a functional migration path for ASE server operators. See the private
-[functional catalog](../docs/research/ARKAPI_PLUGIN_SUITE_PARITY.md) and
-[SDK parity audit](../docs/research/ARKAPI_API_PARITY.md). Each gameplay feature
-still requires its native evidence and acceptance checks; planned parity is not a
-claim of complete SDK support or Windows DLL binary compatibility.
 
 `oEssentials` is the first utility package: `/help`, `/help rules`, `/rules`,
 `/motd`, and `/serverinfo`. It uses the public copied command invocation and

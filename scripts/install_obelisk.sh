@@ -9,21 +9,15 @@ Installs built Obelisk runtime artifacts into a centralized server root.
 Runtime .so files are staged under temporary names in the destination directory and then
 published with atomic renames, so ARK restarts do not observe partial shared libraries.
 The install root must be supplied as a positional argument.
-Install output is package-shape evidence only; it is not runtime/live-ops approval,
-Plugin Hub readiness/publication, support-tier activation, a stable SDK claim, or v1 SDK
-completion.
-Current complete-SDK route remains blocked: SDK blocker promotion 0/12, P0 dependency
-chain 0/4, stable_claim_allowed=false, active blocker
-approved_runtime_evidence_missing. Summary: SDK 0/12, P0 0/4, stable=false.
-
 Options:
   --dry-run              Print actions without changing files.
   --backup-existing      Back up replaced runtime .so files with a timestamp suffix.
   --build-dir <dir>      Use a specific CMake build directory (default: build or OBELISK_BUILD_DIR).
   -h, --help             Show this help.
 
-Set OBELISK_ALLOW_SERVER_ROOT_WRITES=1 to install to the approved live central root
-/servidor/ark/obelisk. Other /servidor/ark paths remain rejected.
+Set OBELISK_PROTECTED_SERVER_ROOT to your game installation root to protect it
+from writes. To permit the exact obelisk subdirectory, also set
+OBELISK_ALLOW_SERVER_ROOT_WRITES=1.
 
 EOF
 }
@@ -33,7 +27,7 @@ DRY_RUN=0
 BACKUP_EXISTING=0
 BUILD_DIR_INPUT="${OBELISK_BUILD_DIR:-build}"
 ROOT_SET=0
-SERVER_ROOT="/servidor/ark"
+SERVER_ROOT="${OBELISK_PROTECTED_SERVER_ROOT:-}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -109,6 +103,7 @@ reject_protected_path() {
     local resolved_path
     local allowed_live_root
 
+    [[ -n "${SERVER_ROOT}" ]] || return 0
     absolute_path="$(realpath -s -m "${path}")"
     resolved_path="$(realpath -m "${path}")"
     allowed_live_root=0

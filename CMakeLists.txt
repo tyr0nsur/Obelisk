@@ -208,6 +208,7 @@ set_target_properties(obelisk PROPERTIES INSTALL_RPATH "\$ORIGIN")
 
 add_subdirectory(plugins/oBaseEvents)
 add_subdirectory(plugins/oPing)
+add_subdirectory(plugins/oMonitor)
 add_subdirectory(plugins/oEssentials)
 add_subdirectory(plugins/oShopKits)
 add_subdirectory(plugins/oAdvancedChat)
@@ -465,6 +466,21 @@ add_executable(command_dispatcher_tests
 target_include_directories(command_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(command_dispatcher_tests PRIVATE obelisk_sdk pthread)
 add_test(NAME CommandDispatcherTests COMMAND command_dispatcher_tests)
+
+add_executable(sdk_command_example_fixture
+    tests/sdk_consumer/CommandExampleFixture.cpp
+    core/CommandDispatcher.cpp
+)
+target_include_directories(sdk_command_example_fixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(sdk_command_example_fixture PRIVATE obelisk_sdk dl pthread)
+add_test(NAME SdkInstalledCommandExample
+    COMMAND ${CMAKE_COMMAND}
+        -DOBELISK_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DOBELISK_BUILD_DIR=${CMAKE_BINARY_DIR}
+        -DOBELISK_FIXTURE=$<TARGET_FILE:sdk_command_example_fixture>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/sdk_consumer/CommandExample.cmake
+)
+set_tests_properties(SdkInstalledCommandExample PROPERTIES TIMEOUT 60 LABELS "sdk_consumer;commands")
 
 add_executable(player_lifecycle_dispatcher_tests
     tests/core/PlayerLifecycleDispatcherTests.cpp
@@ -1006,3 +1022,11 @@ foreach(obelisk_private_target IN LISTS obelisk_private_targets)
         endif()
     endforeach()
 endforeach()
+
+# Actual external-resource boundary: load, emit bounded native snapshots, unload.
+add_executable(monitor_resource_tests tests/core/MonitorResourceTests.cpp core/PluginConfig.cpp)
+target_include_directories(monitor_resource_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/extern)
+target_link_libraries(monitor_resource_tests PRIVATE dl)
+add_dependencies(monitor_resource_tests oMonitor)
+add_test(NAME MonitorResourceTests COMMAND monitor_resource_tests $<TARGET_FILE:oMonitor>)
+set_tests_properties(MonitorResourceTests PROPERTIES TIMEOUT 30)

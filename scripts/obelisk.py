@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_ROOT = Path("/servidor/ark/obelisk")
 REQUIRED_DIRS = ("lib", "plugins", "config", "logs", "state/instances")
 STABLE_INSTANCE_MARKERS = frozenset(("enable-process-event-hook", "disable-plugins"))
 FORBIDDEN_STABLE_MARKERS = frozenset(
@@ -342,8 +341,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--root",
-        default=os.environ.get("OBELISK_ROOT", str(DEFAULT_ROOT)),
-        help="Obelisk install root. Defaults to OBELISK_ROOT or /servidor/ark/obelisk.",
+        default=os.environ.get("OBELISK_ROOT"),
+        help="Obelisk install root. Defaults to OBELISK_ROOT.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -365,6 +364,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not args.root:
+        parser.error("specify --root or set OBELISK_ROOT")
     root = Path(args.root)
 
     if args.command == "status":

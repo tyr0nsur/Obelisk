@@ -347,12 +347,7 @@ proves all of these items together:
 - release docs name every promoted target set and keep runtime-observer log summaries
   separate from second-source promotion evidence.
 
-The promoted v0.1 gameplay surface is `GameplayPolicyEvent`, an Obelisk-level copied POD
-policy signal. Its structure-backed promotion claim points to the fresh accepted
-[`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md)
-and remains paired with the accepted compact inventory/structure layouts from
-`minimal-second-source-intake` for the generic policy family. It is not a public
-`StructureEvents` wrapper, not a public Inventory SDK, and it does not expose UE4 objects.
+The v0.1 `GameplayPolicyEvent` surface provides copied POD policy signals.
 Plugins subscribe with `RegisterGameplayPolicyEventWithOwnerTokenHandle`, an event-kind
 mask, and a process-local owner-token handle; shutdown must call
 `UnregisterGameplayPolicyEventWithOwnerToken`.
@@ -437,11 +432,7 @@ plugin-facing delivery has accepted beta evidence for the known send modes;
 `enable-chat-reflection` is only the historical observer path and does not prove
 `ChatMessageEvent` delivery.
 
-A plugin may layer a private parser over the copied text for local command-like workflows,
-but that parser must keep `principal=unknown`, use only global plugin config for
-enable/disable decisions, and avoid chat responses or per-player permission claims. See
-[research/2026-05-30-chat-command-helper-roadmap.md](research/2026-05-30-chat-command-helper-roadmap.md)
-for the non-ABI helper roadmap.
+Use the [command starter](../examples/sdk_command_plugin/README.md) to register commands and send scoped replies.
 
 ## HTTP And Security
 

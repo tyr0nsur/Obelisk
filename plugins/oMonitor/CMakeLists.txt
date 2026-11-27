@@ -1,0 +1,7 @@
+add_library(oMonitor SHARED oMonitor.cpp)
+target_include_directories(oMonitor PRIVATE ${PROJECT_SOURCE_DIR}/extern)
+target_link_libraries(oMonitor PRIVATE obelisk_sdk)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(oMonitor PRIVATE -fno-gnu-unique)
+endif()
+set_target_properties(oMonitor PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN 1)

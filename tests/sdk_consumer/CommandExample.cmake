@@ -1,0 +1,22 @@
+set(work "${OBELISK_BUILD_DIR}/tests/sdk_command_example")
+file(REMOVE_RECURSE "${work}")
+
+function(run)
+    execute_process(COMMAND ${ARGV} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(NOT result EQUAL 0)
+        message(FATAL_ERROR "Command example validation failed: ${ARGV}\n${output}\n${error}")
+    endif()
+endfunction()
+
+run("${CMAKE_COMMAND}" --install "${OBELISK_BUILD_DIR}" --prefix "${work}/sdk" --component SDK)
+file(COPY "${OBELISK_SOURCE_DIR}/examples/sdk_command_plugin/" DESTINATION "${work}/source")
+run("${CMAKE_COMMAND}" -S "${work}/source" -B "${work}/build" "-DCMAKE_PREFIX_PATH=${work}/sdk"
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_FLAGS=-Wall\ -Wextra\ -Werror)
+run("${CMAKE_COMMAND}" --build "${work}/build")
+file(READ "${work}/build/compile_commands.json" commands)
+string(FIND "${commands}" "${work}/sdk/include" installed)
+string(FIND "${commands}" "${OBELISK_SOURCE_DIR}/include" private)
+if(installed EQUAL -1 OR NOT private EQUAL -1)
+    message(FATAL_ERROR "Command starter did not consume only the installed SDK")
+endif()
+run("${OBELISK_FIXTURE}" "${work}/build/obelisk_sdk_command_plugin.so")
